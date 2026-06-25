@@ -1,0 +1,5 @@
+# bidcon · Marketplace de Cotas Contempladas — Prospere Consórcios
+User-agent: *
+Allow: /
+
+Sitemap: https://www.bidcon.com.br/sitemap.xml
