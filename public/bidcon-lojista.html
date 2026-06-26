@@ -245,6 +245,29 @@
   .vrc .vrv.pos{color:var(--verde-l)}
   .vres-cartas{font-size:11px;color:var(--cinza);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .vres-cartas b{color:#eaf1ff;font-weight:700}
+  .cscore{display:inline-flex;align-items:center;gap:4px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:10px;font-weight:800;letter-spacing:.02em;color:#04210f;background:var(--verde-l);border-radius:6px;padding:2px 7px}
+  .cscore .ico{width:12px;height:12px}
+  .dscore{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-style:normal;font-size:9.5px;font-weight:800;color:var(--verde-l);background:rgba(58,209,126,.14);border:1px solid rgba(58,209,126,.34);border-radius:5px;padding:1px 5px;margin-left:5px}
+  .dscore.best{color:#04210f;background:var(--verde-l);border-color:var(--verde-l)}
+  .dscore.off{color:var(--cinza);background:transparent;border-color:var(--linha)}
+  /* CARRO NA TROCA — alternador de modos + painel-resumo */
+  .fmodo{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .fmb{flex:1;min-width:160px;background:var(--carvao2);border:1px solid var(--linha);color:var(--cinza);font-family:var(--f-display);font-weight:700;font-size:12.5px;padding:9px 13px;border-radius:9px;cursor:pointer;transition:.12s}
+  .fmb small{display:block;font-weight:500;font-size:10px;opacity:.8;margin-top:1px}
+  .fmb:hover{color:#fff;border-color:var(--linha2)}
+  .fmb.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  .ftroca{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px}
+  .ftroca:empty{display:none}
+  .trh{background:linear-gradient(135deg,rgba(46,123,240,.12),rgba(46,123,240,.02));border:1px solid rgba(143,183,255,.3);border-radius:12px;padding:15px 16px}
+  .trh-l{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--azul-l);font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:11px}
+  .trh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+  .trc{display:flex;flex-direction:column;gap:3px}
+  .trl{font-size:10.5px;color:var(--cinza)}
+  .trl small{opacity:.8}
+  .trv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:17px;color:#fff;display:flex;align-items:center}
+  .trv.pos{color:var(--verde-l)}
+  .trh-nota{margin-top:12px;font-size:12px;color:#cfcfd4;line-height:1.5}
+  @media(max-width:560px){.trh-grid{grid-template-columns:1fr 1fr}}
   .mhn{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:7px;background:var(--azul);color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:11px}
   /* ===== DETALHES (<details>) ===== */
   .vdet{border:1px solid var(--linha);border-radius:10px;background:rgba(255,255,255,.018);overflow:hidden}
@@ -265,6 +288,10 @@
   .vzap.alt{background:var(--azul);color:#fff;box-shadow:0 6px 18px -8px rgba(46,123,240,.6)}
   .vzap.alt:hover{background:var(--azul-l)}
   @media(max-width:360px){.vres-grid{grid-template-columns:1fr}}
+  /* reordenação: fade-up com stagger curto (premium, leve) */
+  @keyframes vcardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .vcard.fadein{animation:vcardIn .34s cubic-bezier(.4,0,.2,1) both;animation-delay:calc(var(--i,0)*25ms)}
+  @media(prefers-reduced-motion:reduce){.vcard.fadein{animation:none}}
 </style>
 </head>
 <body>
@@ -334,6 +361,16 @@
         <label>Buscar</label>
         <input id="fBusca" type="text" placeholder="marca ou modelo">
       </div>
+      <div class="cf-grp">
+        <label>Ordenar pela carta</label>
+        <select id="ordc">
+          <option value="-credito">Maior crédito</option>
+          <option value="credito">Menor crédito</option>
+          <option value="-entrada">Maior entrada</option>
+          <option value="entrada">Menor entrada</option>
+          <option value="score">Melhor score</option>
+        </select>
+      </div>
       <div class="cf-spacer"></div>
       <div class="ccount" id="vCount"></div>
     </div>
@@ -345,8 +382,8 @@
   <!-- ABA 2: CONSULTOR FIPE -->
   <section class="panel" id="panel-fipe">
     <div class="sec-head">
-      <h2>Consultor <b>FIPE</b></h2>
-      <p>Escolha o veículo, veja o valor de tabela FIPE e quais cartas contempladas cobrem esse crédito.</p>
+      <h2>Consultor <b>FIPE</b> · carro na troca</h2>
+      <p>Escolha o veículo do cliente, veja o valor de tabela FIPE e use-o como <b>entrada</b>: quanto de crédito isso libera, o custo efetivo e o score de cada carta.</p>
     </div>
     <div class="fipe">
       <div class="fipe-row">
@@ -358,6 +395,11 @@
         <div class="fl">Valor FIPE</div>
         <div class="fv" id="fpValor">—</div>
         <div class="fmeta" id="fpMeta"></div>
+        <div class="fmodo" id="fpModo" style="display:none">
+          <button class="fmb on" data-modo="troca">Carro na troca <small>(o carro é a entrada)</small></button>
+          <button class="fmb" data-modo="cobre">Carta que cobre o valor</button>
+        </div>
+        <div class="ftroca" id="fpTroca"></div>
         <div class="fcartas" id="fpCartas"></div>
       </div>
     </div>
@@ -432,11 +474,45 @@ function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co
 // financiamento — consórcio não tem juros (é taxa de adm. diluída).
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
 
-// cartas que cobrem um preço (credito >= preco), ranqueadas pela menor sobra e menor entrada
+// cartas que cobrem um preço (credito >= preco). Cada carta ganha um SCORE de 0 a 100:
+// quanto MENOR a entrada e MENOR o custo efetivo mensal, MAIOR o score. Entrada e custo
+// são normalizados (min-max) dentro do conjunto que cobre o bem e combinados com pesos.
+const SCORE_PESO_ENTRADA=0.55, SCORE_PESO_CUSTO=0.45;
+function pontuaCartas(lista){
+  if(!lista.length)return lista;
+  const ents=lista.map(c=>c.e), ams=lista.map(c=>amCota(c));
+  const eMin=Math.min(...ents), eMax=Math.max(...ents);
+  const aMin=Math.min(...ams), aMax=Math.max(...ams);
+  const norm=(v,mn,mx)=>mx>mn?(v-mn)/(mx-mn):0; // 0 = melhor (menor), 1 = pior (maior)
+  return lista.map(c=>{
+    const nE=norm(c.e,eMin,eMax), nA=norm(amCota(c),aMin,aMax);
+    const score=Math.round((1-(SCORE_PESO_ENTRADA*nE+SCORE_PESO_CUSTO*nA))*100);
+    return {...c,score};
+  });
+}
 function cartasPara(preco){
-  return CARTAS.filter(c=>c.c>=preco)
-    .map(c=>({...c,sobra:c.c-preco}))
-    .sort((a,b)=>a.sobra-b.sobra||a.e-b.e);
+  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,sobra:c.c-preco}));
+  return pontuaCartas(cobrem)
+    .sort((a,b)=>b.score-a.score||a.sobra-b.sobra||a.e-b.e);
+}
+
+// CARRO NA TROCA: o valor FIPE do carro do cliente entra como ENTRADA.
+// Buscamos as cartas cuja entrada é coberta pelo valor do carro (entrada <= valorCarro):
+// o carro "paga" a entrada e a carta libera o CRÉDITO. Cada carta recebe o mesmo SCORE
+// (menor entrada + menor custo efetivo = score maior). Nunca falamos "desconto".
+function cartasPorTroca(valorCarro){
+  if(!(valorCarro>0))return [];
+  const cobre=CARTAS.filter(c=>c.e<=valorCarro).map(c=>({
+    ...c,
+    troco:Math.max(0,valorCarro-c.e), // quanto do carro sobra depois de cobrir a entrada
+  }));
+  return pontuaCartas(cobre)
+    .sort((a,b)=>b.score-a.score||b.c-a.c||a.e-b.e);
+}
+function zapTroca(co,carro){
+  const txt=`Olá! Tenho um ${carro.nome} avaliado em ${BRL(carro.valor)} na tabela FIPE e quero usá-lo como entrada `+
+    `na carta contemplada nº ${co.n} (crédito ${BRL(co.c)}, entrada ${BRL(co.e)}). Como funciona a troca?`;
+  return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 
 function zapVeiculo(co,veic){
@@ -586,13 +662,37 @@ async function carregarEstoque(){
     setLojaStatus('',null);vLimite=18;carregarEstoque();
   });
 })();
+// ----- ordenação pela carta que cobre (crédito / entrada / score) -----
+function matchDe(v){
+  if(v.cartas&&v.cartas.length)return {credito:v.cartas[0].c,entrada:v.cartas[0].e,score:v.cartas[0].score};
+  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1};
+  return null;
+}
+const ORDC_KEY='bidcon_ordc';
+const ORDC_LABEL={'-credito':'maior crédito','credito':'menor crédito','-entrada':'maior entrada','entrada':'menor entrada','score':'melhor score'};
+function ordenaPorCarta(arr){
+  const ordc=$('ordc')?$('ordc').value:'-credito';
+  const wm=arr.map(item=>({item,m:matchDe(item)}));
+  wm.sort((a,b)=>{
+    const A=a.m, B=b.m;
+    if(!A&&!B)return a.item.preco-b.item.preco;
+    if(!A)return 1; if(!B)return -1;
+    if(ordc==='credito')return A.credito-B.credito;
+    if(ordc==='-credito')return B.credito-A.credito;
+    if(ordc==='entrada')return A.entrada-B.entrada;
+    if(ordc==='-entrada')return B.entrada-A.entrada;
+    if(ordc==='score')return B.score-A.score||A.entrada-B.entrada;
+    return B.credito-A.credito;
+  });
+  return wm.map(x=>x.item);
+}
 function estoqueFiltrado(){
   const match=$('fMatch').value, teto=Number($('fPreco').value)||0, q=($('fBusca').value||'').toLowerCase().trim();
   let arr=ESTOQUE.slice();
   if(match==='ok')arr=arr.filter(v=>v.cartas.length||v.combo);
   if(teto>0)arr=arr.filter(v=>v.preco<=teto);
   if(q)arr=arr.filter(v=>v.nome.toLowerCase().includes(q));
-  return arr.sort((a,b)=>a.preco-b.preco);
+  return ordenaPorCarta(arr);
 }
 // lista completa de cartas que cobrem (dentro do <details>)
 function cartasDetalhe(cartas){
@@ -600,17 +700,18 @@ function cartasDetalhe(cartas){
   const vis=cartas.slice(0,MOSTRA);
   const resto=cartas.length-vis.length;
   return `<div class="dcards">`+
-    vis.map(c=>`<div class="dcarta"><span class="dn">nº ${c.n}</span><span class="dd">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b></span></div>`).join('')+
+    vis.map(c=>`<div class="dcarta"><span class="dn">nº ${c.n}${c.score!=null?` <i class="dscore">score ${c.score}</i>`:''}</span><span class="dd">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b></span></div>`).join('')+
     (resto>0?`<div class="dmais">+${NUM(resto)} outra(s) carta(s) disponíveis no atendimento</div>`:'')+
   `</div>`;
 }
 function renderEstoque(){
   const arr=estoqueFiltrado();
-  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> veículo(s)`;
+  const ordc=$('ordc')?$('ordc').value:'-credito';
+  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> veículo(s) · ordenados por ${ORDC_LABEL[ordc]||'maior crédito'}`;
   const grid=$('vgrid');
-  if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum veículo com esse filtro. Ajuste o preço, a busca ou mostre todos.</div>';$('vMore').style.display='none';return;}
+  if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum resultado — ajuste os filtros.</div>';$('vMore').style.display='none';return;}
   const vis=arr.slice(0,vLimite);
-  grid.innerHTML=vis.map(v=>{
+  grid.innerHTML=vis.map((v,idx)=>{
     const best=v.cartas[0];
     // ----- monta RESUMO (frente) + DETALHES (<details>) conforme o caso -----
     let resumoHtml,detalheHtml='',ctaHtml;
@@ -622,7 +723,7 @@ function renderEstoque(){
           `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
           `<div class="vrc"><span class="vrl">Troco pra você</span><span class="vrv ${sobra>0?'pos':''}">${sobra>0?BRL(sobra):'—'}</span></div>`+
         `</div>`+
-        `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b></div>`+
+        `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b>${best.score!=null?` <span class="cscore" title="Menor entrada e menor custo = score maior">${ic('check')} score ${best.score}</span>`:''}</div>`+
       `</div>`;
       detalheHtml=`<details class="vdet"><summary>${ic('info')} Ver todas as cartas, custos e como pagar</summary><div class="vdet-in">`+
         `<div class="dlbl">Cartas que cobrem este veículo</div>`+
@@ -653,7 +754,7 @@ function renderEstoque(){
       ctaHtml=`<a class="vzap alt" href="${zapVeiculo({n:'—',c:v.preco,e:0},v)}" target="_blank" rel="noopener">${ic('martelo')} Quero uma carta pra este</a>`;
     }
     return `
-    <div class="vcard">
+    <div class="vcard fadein" style="--i:${Math.min(idx,16)}">
       <div class="vimg">
         ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>'+IMG_FALLBACK+'</div>'">`:`<div class="noimg">${ic('carro')}</div>`}
         <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?ic('check')+' dá pra fechar':(v.combo?ic('ia')+' dá com junção':'sem carta')}</span>
@@ -671,6 +772,7 @@ function renderEstoque(){
   $('vMore').style.display=arr.length>vLimite?'block':'none';
 }
 ['fMatch','fPreco','fBusca'].forEach(id=>$(id).addEventListener('input',()=>{vLimite=18;renderEstoque();}));
+(function(){const sel=$('ordc');if(!sel)return;const salvo=localStorage.getItem(ORDC_KEY);if(salvo&&ORDC_LABEL[salvo])sel.value=salvo;sel.addEventListener('change',()=>{localStorage.setItem(ORDC_KEY,sel.value);vLimite=18;renderEstoque();});})();
 $('vMore').addEventListener('click',()=>{vLimite+=18;renderEstoque();});
 
 // ===== ABA 2: CONSULTOR FIPE =====
@@ -700,31 +802,82 @@ $('fpModelo').addEventListener('change',e=>{
   if(!mo){$('fpAno').disabled=true;$('fpAno').innerHTML='<option value="">Escolha o modelo</option>';return;}
   fipeFill($('fpAno'),`${API360}/api/fipe?marca=${m}&modelo=${mo}`,'Selecione o ano…');
 });
+let FIPE_ATUAL=null; // guarda o último veículo consultado p/ alternar entre modos
 $('fpAno').addEventListener('change',async e=>{
   const m=$('fpMarca').value,mo=$('fpModelo').value,a=e.target.value;
-  if(!a){$('fpRes').classList.remove('on');return;}
-  $('fpValor').innerHTML='<span class="spin"></span>';$('fpRes').classList.add('on');$('fpMeta').textContent='';$('fpCartas').innerHTML='';
+  if(!a){$('fpRes').classList.remove('on');$('fpModo').style.display='none';FIPE_ATUAL=null;return;}
+  $('fpValor').innerHTML='<span class="spin"></span>';$('fpRes').classList.add('on');$('fpMeta').textContent='';$('fpCartas').innerHTML='';$('fpTroca').innerHTML='';$('fpModo').style.display='none';
   try{
     const r=await fetch(`${API360}/api/fipe?marca=${m}&modelo=${mo}&ano=${encodeURIComponent(a)}`);const j=await r.json();
-    if(!j.ok||!j.valor){$('fpValor').textContent='—';$('fpMeta').textContent='Não foi possível obter o valor.';return;}
+    if(!j.ok||!j.valor){$('fpValor').textContent='—';$('fpMeta').textContent='Não foi possível obter o valor.';FIPE_ATUAL=null;return;}
     $('fpValor').textContent=j.valorTexto||BRL(j.valor);
     $('fpMeta').textContent=`${j.marca} ${j.modelo} · ${j.anoModelo} · ${j.combustivel} · ref. ${j.referencia}`;
-    const cs=cartasPara(j.valor);
-    if(cs.length){
-      $('fpCartas').innerHTML=`<div class="vmatch has" style="grid-column:1/-1"><div class="mh">${ic('martelo')} ${cs.length} carta(s) cobrem ${j.valorTexto||BRL(j.valor)}</div></div>`+
-        cs.slice(0,6).map(renderCartaMini).join('');
-    }else{
-      const cb=comboPara(j.valor);
-      $('fpCartas').innerHTML=cb?
-        `<div class="vcombo" style="grid-column:1/-1"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${cb.combo.length} cartas juntas cobrem ${j.valorTexto||BRL(j.valor)}</div>`+
-          cb.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
-          `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada <b>${BRL(cb.ent)}</b> · sobra <b>${BRL(cb.sobra)}</b></span></div>`+
-          `<div class="ccusto">${custoLinhas(custosDe(cb.combo))}</div>`+
-          `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:j.modelo,preco:j.valor})}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${cb.combo.length} cartas</a></div>`:
-        `<div class="cempty" style="padding:24px">Nenhuma carta (nem junção) cobre esse valor hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
-    }
-  }catch(e){$('fpValor').textContent='—';$('fpMeta').textContent='Erro ao consultar a FIPE.';}
+    FIPE_ATUAL={valor:j.valor,valorTexto:j.valorTexto||BRL(j.valor),nome:`${j.marca} ${j.modelo} ${j.anoModelo}`,modelo:j.modelo};
+    $('fpModo').style.display='flex';
+    renderFipeModo();
+  }catch(e){$('fpValor').textContent='—';$('fpMeta').textContent='Erro ao consultar a FIPE.';FIPE_ATUAL=null;}
 });
+// alterna entre "carro na troca" (carro = entrada) e "carta que cobre o valor"
+function renderFipeModo(){
+  if(!FIPE_ATUAL)return;
+  const modo=(document.querySelector('.fmb.on')||{}).dataset?document.querySelector('.fmb.on').dataset.modo:'troca';
+  if(modo==='troca'){ $('fpCartas').innerHTML=''; renderTroca(FIPE_ATUAL); }
+  else { $('fpTroca').innerHTML=''; renderCobre(FIPE_ATUAL); }
+}
+// CARRO NA TROCA: o valor do carro é a ENTRADA; mostra crédito liberado, custo efetivo e score
+function renderTroca(car){
+  const cs=cartasPorTroca(car.valor);
+  if(!cs.length){
+    $('fpTroca').innerHTML=`<div class="cempty" style="padding:22px;grid-column:1/-1">Com ${car.valorTexto} de entrada não há carta disponível hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
+    return;
+  }
+  const best=cs[0];
+  const head=`<div class="trh" style="grid-column:1/-1">`+
+    `<div class="trh-l">${ic('carro')} Carro na troca como entrada</div>`+
+    `<div class="trh-grid">`+
+      `<div class="trc"><span class="trl">Vale de entrada <small>(FIPE)</small></span><span class="trv">${car.valorTexto}</span></div>`+
+      `<div class="trc"><span class="trl">Crédito que libera</span><span class="trv pos">${BRL(best.c)}</span></div>`+
+      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAm(best)}</span></div>`+
+      `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
+    `</div>`+
+    `<div class="trh-nota">A carta sugerida é a <b>nº ${best.n}</b>: o carro cobre a entrada de ${BRL(best.e)}${best.troco>0?` e ainda sobram ${BRL(best.troco)} pra você`:''}.</div>`+
+  `</div>`;
+  const lista=cs.slice(0,6).map(c=>renderTrocaMini(c,car)).join('');
+  $('fpTroca').innerHTML=head+lista;
+}
+function renderTrocaMini(co,car){
+  return `<div class="ccard">
+    <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum"><i class="dscore${co.score!=null?'':' off'}">score ${co.score!=null?co.score:'—'}</i></span></div>
+    <div class="ccredito"><div class="l">Crédito que libera</div><div class="v">${BRL(co.c)}</div></div>
+    <div class="crows"><div class="crow2"><div class="l">Entrada (o carro cobre)</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Sobra pra você</div><div class="v">${co.troco>0?BRL(co.troco):'—'}</div></div></div>
+    <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
+    <a class="czap" href="${zapTroca(co,car)}" target="_blank" rel="noopener">Usar meu carro nesta carta</a>
+  </div>`;
+}
+// modo clássico: cartas (ou junção) que COBREM o valor do carro
+function renderCobre(car){
+  const cs=cartasPara(car.valor);
+  if(cs.length){
+    $('fpCartas').innerHTML=`<div class="vmatch has" style="grid-column:1/-1"><div class="mh">${ic('martelo')} ${cs.length} carta(s) cobrem ${car.valorTexto}</div></div>`+
+      cs.slice(0,6).map(renderCartaMini).join('');
+  }else{
+    const cb=comboPara(car.valor);
+    $('fpCartas').innerHTML=cb?
+      `<div class="vcombo" style="grid-column:1/-1"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${cb.combo.length} cartas juntas cobrem ${car.valorTexto}</div>`+
+        cb.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
+        `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada <b>${BRL(cb.ent)}</b> · sobra <b>${BRL(cb.sobra)}</b></span></div>`+
+        `<div class="ccusto">${custoLinhas(custosDe(cb.combo))}</div>`+
+        `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:car.modelo,preco:car.valor})}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${cb.combo.length} cartas</a></div>`:
+      `<div class="cempty" style="padding:24px">Nenhuma carta (nem junção) cobre esse valor hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
+  }
+}
+// toggle dos modos
+document.querySelectorAll('.fmb').forEach(b=>b.addEventListener('click',()=>{
+  if(b.classList.contains('on'))return;
+  document.querySelectorAll('.fmb').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  renderFipeModo();
+}));
 function renderCartaMini(co){
   return `<div class="ccard">
     <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum">sobra ${BRL(co.sobra||0)}</span></div>

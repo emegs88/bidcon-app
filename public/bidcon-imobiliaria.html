@@ -128,6 +128,8 @@
   .mcarta .mn{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--azul-l);font-weight:700}
   .mcarta .md{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:#cfcfd4}
   .mcarta .md b{color:#fff}
+  .dscore{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-style:normal;font-size:9.5px;font-weight:800;color:var(--verde-l);background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.34);border-radius:5px;padding:1px 5px;margin-left:5px}
+  .dscore.best{color:#04210f;background:var(--verde-l);border-color:var(--verde-l)}
   .vlink{font-size:11px;color:var(--cinza);text-decoration:none;display:inline-flex;align-items:center;gap:5px}
   .vlink:hover{color:#fff}
   .vzap{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--azul);color:#fff;font-family:var(--f-body);font-weight:700;font-size:13.5px;text-decoration:none;border-radius:var(--pill);padding:13px;transition:.16s cubic-bezier(.4,0,.2,1);margin-top:auto;box-shadow:0 6px 18px -8px rgba(46,123,240,.6)}
@@ -200,6 +202,9 @@
   .fontebtn{background:var(--carvao2);border:1px solid var(--linha);color:var(--cinza);font-family:var(--f-display);font-weight:700;font-size:13px;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.12s}
   .fontebtn:hover{color:#fff;border-color:var(--linha2)}
   .fontebtn.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  .fontecad{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-family:var(--f-display);font-weight:700;font-size:12.5px;color:var(--azul-l);text-decoration:none;border:1px dashed rgba(143,183,255,.4);border-radius:9px;padding:7px 13px;transition:.12s}
+  .fontecad:hover{color:#fff;border-color:var(--azul);background:rgba(46,123,240,.12)}
+  @media(max-width:520px){.fontecad{margin-left:0;width:100%;justify-content:center}}
 
   .disc{background:var(--carvao);border:1px solid var(--linha);border-left:3px solid var(--azul);border-radius:16px;padding:18px 20px;margin-top:34px;font-size:12.5px;color:#cfcfd4;line-height:1.65;box-shadow:var(--sombra)}
   .disc b{color:var(--azul-l)}
@@ -211,6 +216,10 @@
   .sec-head h2{font-family:var(--f-display);font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:.02em}
   .sec-head h2 b{color:var(--azul-l)}
   .sec-head p{font-size:13px;color:var(--cinza);margin-top:3px}
+  /* reordenação: fade-up com stagger curto (premium, leve) */
+  @keyframes vcardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .vcard.fadein{animation:vcardIn .34s cubic-bezier(.4,0,.2,1) both;animation-delay:calc(var(--i,0)*25ms)}
+  @media(prefers-reduced-motion:reduce){.vcard.fadein{animation:none}}
 </style>
 </head>
 <body>
@@ -252,7 +261,7 @@
   <div class="fontebar">
     <span class="fontelbl">Imobiliária parceira:</span>
     <button class="fontebtn on" data-fonte="prospere">Prospere Hortolândia</button>
-    <button class="fontebtn" data-fonte="fmi">FMI Imobiliária</button>
+    <a class="fontecad" id="cadImob" href="#" target="_blank" rel="noopener">+ Cadastre o site da sua imobiliária</a>
   </div>
 
   <div class="tabs">
@@ -285,6 +294,16 @@
       <div class="cf-grp">
         <label>Buscar</label>
         <input id="fBusca" type="text" placeholder="bairro, cidade ou código">
+      </div>
+      <div class="cf-grp">
+        <label>Ordenar pela carta</label>
+        <select id="ordc">
+          <option value="-credito">Maior crédito</option>
+          <option value="credito">Menor crédito</option>
+          <option value="-entrada">Maior entrada</option>
+          <option value="entrada">Menor entrada</option>
+          <option value="score">Melhor score</option>
+        </select>
       </div>
       <div class="cf-spacer"></div>
       <div class="ccount" id="vCount"></div>
@@ -367,10 +386,26 @@ function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co
 // não tem juros). Rotulado como "custo mensal ~X%" pra não confundir com taxa mensal de financiamento.
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
 
+// SCORE de 0 a 100 por carta: quanto MENOR a entrada e MENOR o custo efetivo mensal,
+// MAIOR o score. Entrada e custo são normalizados (min-max) dentro das cartas que
+// cobrem o imóvel e combinados com pesos.
+const SCORE_PESO_ENTRADA=0.55, SCORE_PESO_CUSTO=0.45;
+function pontuaCartas(lista){
+  if(!lista.length)return lista;
+  const ents=lista.map(c=>c.e), ams=lista.map(c=>amCota(c));
+  const eMin=Math.min(...ents), eMax=Math.max(...ents);
+  const aMin=Math.min(...ams), aMax=Math.max(...ams);
+  const norm=(v,mn,mx)=>mx>mn?(v-mn)/(mx-mn):0; // 0 = melhor (menor), 1 = pior (maior)
+  return lista.map(c=>{
+    const nE=norm(c.e,eMin,eMax), nA=norm(amCota(c),aMin,aMax);
+    const score=Math.round((1-(SCORE_PESO_ENTRADA*nE+SCORE_PESO_CUSTO*nA))*100);
+    return {...c,score};
+  });
+}
 function cartasPara(preco){
-  return CARTAS.filter(c=>c.c>=preco)
-    .map(c=>({...c,sobra:c.c-preco}))
-    .sort((a,b)=>a.sobra-b.sobra||a.e-b.e);
+  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,sobra:c.c-preco}));
+  return pontuaCartas(cobrem)
+    .sort((a,b)=>b.score-a.score||a.sobra-b.sobra||a.e-b.e);
 }
 
 // junção de cartas: sem teto fixo de quantidade. Pode-se juntar quantas cartas
@@ -491,6 +526,31 @@ async function carregarImoveis(fonte){
     $('vCount').innerHTML='';$('vMore').style.display='none';
   }
 }
+// melhor carta de um item (carta única que cobre, senão o combo); null se nada cobre
+function matchDe(v){
+  if(v.cartas&&v.cartas.length)return {credito:v.cartas[0].c,entrada:v.cartas[0].e,score:v.cartas[0].score};
+  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1};
+  return null;
+}
+const ORDC_KEY='bidcon_ordc';
+const ORDC_LABEL={'-credito':'maior crédito','credito':'menor crédito','-entrada':'maior entrada','entrada':'menor entrada','score':'melhor score'};
+function ordenaPorCarta(arr){
+  const ordc=$('ordc')?$('ordc').value:'-credito';
+  // pré-calcula o match uma vez por item, sem recalcular no comparador
+  const wm=arr.map(item=>({item,m:matchDe(item)}));
+  wm.sort((a,b)=>{
+    const A=a.m, B=b.m;
+    if(!A&&!B)return a.item.preco-b.item.preco;
+    if(!A)return 1; if(!B)return -1; // itens sem carta vão para o fim
+    if(ordc==='credito')return A.credito-B.credito;
+    if(ordc==='-credito')return B.credito-A.credito;
+    if(ordc==='entrada')return A.entrada-B.entrada;
+    if(ordc==='-entrada')return B.entrada-A.entrada;
+    if(ordc==='score')return B.score-A.score||A.entrada-B.entrada;
+    return B.credito-A.credito;
+  });
+  return wm.map(x=>x.item);
+}
 function imoveisFiltrado(){
   const match=$('fMatch').value, tipo=$('fTipo').value, teto=Number($('fPreco').value)||0, q=($('fBusca').value||'').toLowerCase().trim();
   let arr=IMOVEIS.slice();
@@ -498,21 +558,22 @@ function imoveisFiltrado(){
   if(tipo)arr=arr.filter(v=>v.tipo===tipo);
   if(teto>0)arr=arr.filter(v=>v.preco<=teto);
   if(q)arr=arr.filter(v=>(v.nome+' '+v.bairro+' '+v.cidade+' '+v.codigo).toLowerCase().includes(q));
-  return arr.sort((a,b)=>a.preco-b.preco);
+  return ordenaPorCarta(arr);
 }
 function renderImoveis(){
   const arr=imoveisFiltrado();
-  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> imóvel(is)`;
+  const ordc=$('ordc')?$('ordc').value:'-credito';
+  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> imóvel(is) · ordenados por ${ORDC_LABEL[ordc]||'maior crédito'}`;
   const grid=$('vgrid');
-  if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum imóvel com esse filtro. Ajuste o preço, o tipo, a busca ou mostre todos.</div>';$('vMore').style.display='none';return;}
+  if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum resultado — ajuste os filtros.</div>';$('vMore').style.display='none';return;}
   const vis=arr.slice(0,vLimite);
-  grid.innerHTML=vis.map(v=>{
+  grid.innerHTML=vis.map((v,idx)=>{
     const top=v.cartas.slice(0,2);
     let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
     if(v.cartas.length){
       const cu=custosDe(best);
       matchHtml=`<div class="vmatch has"><div class="mh">${ic('banco')} <span class="mhn">${v.cartas.length}</span> carta(s) cobrem este imóvel</div>`+
-        top.map(c=>`<div class="mcarta"><span class="mn">nº ${c.n}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
+        top.map((c,i)=>`<div class="mcarta"><span class="mn">nº ${c.n}${c.score!=null?` <i class="dscore${i===0?' best':''}">score ${c.score}</i>`:''}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
       `</div>`;
       // como pagar usa a melhor carta (menor sobra/menor entrada)
@@ -531,7 +592,7 @@ function renderImoveis(){
     }
     const loc=[v.bairro,v.cidade].filter(Boolean).join(' · ');
     return `
-    <div class="vcard">
+    <div class="vcard fadein" style="--i:${Math.min(idx,16)}">
       <div class="vimg">
         ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>'+IMG_FALLBACK+'</div>'">`:`<div class="noimg">${ic('casa')}</div>`}
         <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?ic('check')+' dá pra fechar':(v.combo?ic('ia')+' dá com junção':'sem carta')}</span>
@@ -551,6 +612,8 @@ function renderImoveis(){
   $('vMore').style.display=arr.length>vLimite?'block':'none';
 }
 ['fMatch','fTipo','fPreco','fBusca'].forEach(id=>$(id).addEventListener('input',()=>{vLimite=18;renderImoveis();}));
+// ordenação pela carta — restaura escolha salva e persiste no localStorage
+(function(){const sel=$('ordc');if(!sel)return;const salvo=localStorage.getItem(ORDC_KEY);if(salvo&&ORDC_LABEL[salvo])sel.value=salvo;sel.addEventListener('change',()=>{localStorage.setItem(ORDC_KEY,sel.value);vLimite=18;renderImoveis();});})();
 $('vMore').addEventListener('click',()=>{vLimite+=18;renderImoveis();});
 
 // ===== ABA 2: CARTAS DE IMÓVEL =====
@@ -599,6 +662,8 @@ document.querySelectorAll('.fontebtn').forEach(b=>b.addEventListener('click',()=
   if(b.classList.contains('on'))return;
   carregarImoveis(b.dataset.fonte);
 }));
+// CTA: cadastrar o site da imobiliária (abre WhatsApp)
+(function(){const c=$('cadImob');if(c)c.href=`https://wa.me/${CWA}?text=${encodeURIComponent('Olá! Quero cadastrar o site da minha imobiliária no bidcon para cruzar meus imóveis com as cartas contempladas. Como funciona?')}`;})();
 
 carregarImoveis();
 renderCartas();
