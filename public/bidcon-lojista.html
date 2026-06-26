@@ -379,11 +379,12 @@
       <div class="cf-grp">
         <label>Ordenar pela carta</label>
         <select id="ordc">
-          <option value="-credito">Maior crédito</option>
-          <option value="credito">Menor crédito</option>
-          <option value="-entrada">Maior entrada</option>
+          <option value="oferta" selected>Melhor oferta</option>
+          <option value="custo">Menor custo efetivo</option>
           <option value="entrada">Menor entrada</option>
           <option value="score">Melhor score</option>
+          <option value="-credito">Maior crédito</option>
+          <option value="credito">Menor crédito</option>
         </select>
       </div>
       <div class="cf-spacer"></div>
@@ -497,6 +498,15 @@ const IMG_FALLBACK=ic('carro').replace(/"/g,'&quot;');
 // custo mensal aproximado sobre crédito - entrada (não é juros de financiamento)
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
+// custo efetivo de uma junção de cartas: PV = soma de (crédito−entrada),
+// parcela = soma das parcelas, prazo = maior nº de parcelas do conjunto.
+function amCombo(cartas){
+  const arr=Array.isArray(cartas)?cartas:[cartas];
+  const pv=arr.reduce((s,c)=>s+Math.max(0,(c.c||0)-(c.e||0)),0);
+  const pmt=arr.reduce((s,c)=>s+(c.p||0),0);
+  const n=arr.reduce((m,c)=>Math.max(m,c.x||0),0);
+  return n?taxaEfetiva(pv,pmt,n):0;
+}
 // Rotulado como "custo mensal ~X%" para NÃO confundir com taxa de juros de
 // financiamento — consórcio não tem juros (é taxa de adm. diluída).
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
@@ -517,24 +527,35 @@ function pontuaCartas(lista){
     return {...c,score};
   });
 }
+// MELHOR OFERTA: a carta ideal é a de MENOR CUSTO EFETIVO para o lojista — não
+// existe "troco" numa carta de consórcio (o crédito é vinculado ao bem). Por isso
+// a ordenação prioriza o maior SCORE (menor entrada + menor custo efetivo mensal)
+// e, em empate, a menor entrada. Para não puxar uma carta absurdamente maior que
+// o carro, descartamos as que passam muito do valor (ratio > teto) quando há
+// alternativa dentro do teto.
+const SOBRA_TETO=0.60; // até 60% acima do preço ainda é uma oferta sensata
 function cartasPara(preco){
-  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,sobra:c.c-preco}));
-  return pontuaCartas(cobrem)
-    .sort((a,b)=>b.score-a.score||a.sobra-b.sobra||a.e-b.e);
+  if(!(preco>0))return [];
+  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,ratio:c.c/preco}));
+  if(!cobrem.length)return [];
+  // preferimos as que encaixam bem (crédito <= preço × (1+teto)); senão, todas
+  const justas=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
+  const base=justas.length?justas:cobrem;
+  return pontuaCartas(base)
+    .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
 
-// CARRO NA TROCA: o valor FIPE do carro do cliente entra como ENTRADA.
+// CARRO NA TROCA: o valor pra troca do carro do cliente entra como ENTRADA.
 // Buscamos as cartas cuja entrada é coberta pelo valor do carro (entrada <= valorCarro):
-// o carro "paga" a entrada e a carta libera o CRÉDITO. Cada carta recebe o mesmo SCORE
-// (menor entrada + menor custo efetivo = score maior). Nunca falamos "desconto".
+// o carro "paga" a entrada e a carta libera o CRÉDITO. A melhor carta é a de
+// MAIOR SCORE (menor entrada + menor custo efetivo) — não a de maior crédito.
+// Não existe "troco/sobra": o crédito da carta é vinculado à compra do bem.
 function cartasPorTroca(valorCarro){
   if(!(valorCarro>0))return [];
-  const cobre=CARTAS.filter(c=>c.e<=valorCarro).map(c=>({
-    ...c,
-    troco:Math.max(0,valorCarro-c.e), // quanto do carro sobra depois de cobrir a entrada
-  }));
+  const cobre=CARTAS.filter(c=>c.e<=valorCarro).map(c=>({...c}));
+  if(!cobre.length)return [];
   return pontuaCartas(cobre)
-    .sort((a,b)=>b.score-a.score||b.c-a.c||a.e-b.e);
+    .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
 function zapTroca(co,carro){
   const txt=`Olá! Tenho um ${carro.nome} avaliado em ${BRL(carro.valor)} na tabela FIPE e quero usá-lo como entrada `+
@@ -543,10 +564,9 @@ function zapTroca(co,carro){
 }
 
 function zapVeiculo(co,veic){
-  const sobra=(veic&&veic.preco)?Math.max(0,co.c-veic.preco):0;
   const txt=`Olá! Sou lojista. Quero usar a carta contemplada nº ${co.n} (crédito ${BRL(co.c)}, entrada ${BRL(co.e)}) `+
     (veic?`pra fechar o ${veic.nome} (${BRL(veic.preco)}). `:`pra um veículo. `)+
-    `Entendi que a entrada de ${BRL(co.e)} é paga via PIX${sobra>0?` e a diferença de ${BRL(sobra)} é acertada em dinheiro com a loja`:''}. Como funciona?`;
+    `Entendi que a entrada de ${BRL(co.e)} é paga via PIX e o saldo segue nas parcelas. Como funciona?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 function zapCarta(co){
@@ -568,10 +588,15 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 // cartas (somando créditos) que cobre o preço — minimizando a sobra total e,
 // em empate, a entrada total. Heurística gulosa + busca local enxuta.
 const MAX_COMBO=3; // no máx 3 cartas por combo (transferência prática)
+// Monta a melhor junção de cartas que cobre o preço. Pode ser usada como
+// ALTERNATIVA a uma carta única quando a junção encaixa melhor (menos sobra),
+// evitando puxar uma carta gigante demais para um carro barato.
 function comboPara(preco){
   if(!CARTAS.length||preco<=0)return null;
-  if(CARTAS.some(c=>c.c>=preco))return null; // já existe carta única -> sem combo
-  const pool=CARTAS.slice().sort((a,b)=>b.c-a.c); // maiores créditos primeiro
+  // junção é feita com cartas que sozinhas NÃO cobrem o preço (c.c < preco):
+  // somar duas cartas pequenas encaixa melhor que puxar uma carta gigante.
+  const pool=CARTAS.filter(c=>c.c<preco).sort((a,b)=>b.c-a.c); // maiores créditos primeiro
+  if(pool.length<2)return null;
   let melhor=null;
   const avalia=(combo)=>{
     const cred=combo.reduce((s,c)=>s+c.c,0);
@@ -597,14 +622,22 @@ function comboPara(preco){
 //  crédito + R$ 85/carta; seguro de vida ≈ 0,0633% do crédito/mês.
 //  Valores de simulação, sujeitos à administradora.
 const TX_TRANSF=0.01, TX_TRANSF_CARTA=85, TX_SEGURO=0.000633;
-function custosDe(cartas){
+// Custos da operação. Quando informado o preço do bem (precoBem), os valores que
+// escalam com o crédito (saldo devedor, transferência, seguro) são proporcionais
+// à fração realmente usada para o veículo (precoBem/credito, no máx. 1) — assim
+// uma carta maior que o carro não infla o saldo devedor mostrado ao lojista.
+function custosDe(cartas,precoBem){
   const arr=Array.isArray(cartas)?cartas:[cartas];
   const credito=arr.reduce((s,c)=>s+(c.c||0),0);
   const entrada=arr.reduce((s,c)=>s+(c.e||0),0);
-  const saldo=arr.reduce((s,c)=>s+((c.p||0)*(c.x||0)),0);
-  const transf=Math.round(credito*TX_TRANSF + arr.length*TX_TRANSF_CARTA);
-  const seguro=credito*TX_SEGURO;
-  return {credito,entrada,saldo,transf,seguro,n:arr.length};
+  const saldoCheio=arr.reduce((s,c)=>s+((c.p||0)*(c.x||0)),0);
+  // fração do crédito de fato necessária para o bem (cap em 1)
+  const frac=(precoBem>0&&credito>0)?Math.min(1,precoBem/credito):1;
+  const saldo=Math.round(saldoCheio*frac);
+  const creditoUsado=Math.round(credito*frac);
+  const transf=Math.round(creditoUsado*TX_TRANSF + arr.length*TX_TRANSF_CARTA);
+  const seguro=creditoUsado*TX_SEGURO;
+  return {credito,entrada,saldo,transf,seguro,n:arr.length,frac};
 }
 function custoLinhas(cu){
   return `<div class="cline"><span>Saldo devedor</span><span>${BRL(cu.saldo)}</span></div>`+
@@ -615,11 +648,11 @@ function custoLinhas(cu){
 //  • a carta precisa ter crédito >= preço do veículo (garantido em cartasPara);
 //  • a diferença (sobra), quando o crédito passa do preço, é acertada em dinheiro
 //    com a loja;  • a entrada/sinal da carta é paga somente via PIX.
-function comoPagar(preco, sobra, entrada){
+function comoPagar(preco, entrada){
   const passos=[
     `<li><span class="ps">1</span><span>A carta cobre <b>todo o valor</b> do veículo (${BRL(preco)}) direto com a loja.</span></li>`,
-    `<li><span class="ps">2</span><span>Diferença de crédito ${sobra>0?`(<b>${BRL(sobra)}</b> de troco)`:''} ${sobra>0?'é':'quando houver, é'} acertada <b>em dinheiro</b> com a loja.</span></li>`,
-    `<li><span class="ps pix">3</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`
+    `<li><span class="ps pix">2</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`,
+    `<li><span class="ps">3</span><span>O saldo restante segue nas parcelas mensais do consórcio até a quitação.</span></li>`
   ].join('');
   return `<div class="comopagar"><div class="cph">${ic('cartao')} Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
 }
@@ -661,7 +694,17 @@ async function carregarEstoque(){
     // política de crédito: remove veículos acima de 8 anos de uso
     const permitidos=brutos.filter(dentroPolitica);
     const foraPolitica=brutos.length-permitidos.length;
-    ESTOQUE=permitidos.map(v=>({...v,cartas:cartasPara(v.preco),combo:comboPara(v.preco)}));
+    ESTOQUE=permitidos.map(v=>{
+      const cartas=cartasPara(v.preco), combo=comboPara(v.preco);
+      // decide a melhor forma de fechar: carta única vs junção, pelo MENOR custo
+      // efetivo (não há "troco" no consórcio). A junção só "vence" se o custo
+      // efetivo mensal somado for menor que o da melhor carta única.
+      let melhor='nenhuma';
+      if(cartas.length&&combo)melhor=(amCombo(combo.combo)<amCota(cartas[0]))?'combo':'carta';
+      else if(cartas.length)melhor='carta';
+      else if(combo)melhor='combo';
+      return {...v,cartas,combo,melhor};
+    });
     if(j.parceiro){$('estoqueSub').textContent=`Estoque de ${j.parceiro} cruzado com ${CARTAS.length} cartas de veículo · em tempo real`;$('discParceiro').textContent=j.parceiro;}
     if(foraPolitica>0&&$('politicaAviso')){$('politicaAviso').style.display='';$('politicaAviso').innerHTML=`${ic('info')} <b>${NUM(foraPolitica)}</b> veículo(s) acima de ${MAX_IDADE_VEIC} anos de uso não aparecem aqui — o consórcio de veículo aceita carros com até <b>${MAX_IDADE_VEIC} anos</b> (a partir de ${ANO_ATUAL-MAX_IDADE_VEIC}).`;}
     if(j.fonte){$('footFonte').href=j.fonte;$('footFonte').textContent=j.custom?j.parceiro:'parceiro';}
@@ -690,26 +733,31 @@ async function carregarEstoque(){
   });
 })();
 // ----- ordenação pela carta que cobre (crédito / entrada / score) -----
+// resumo da melhor forma de fechar (carta única OU junção) para ordenar o grid.
+// custo = custo efetivo mensal (menor é melhor); score = menor entrada+custo.
 function matchDe(v){
-  if(v.cartas&&v.cartas.length)return {credito:v.cartas[0].c,entrada:v.cartas[0].e,score:v.cartas[0].score};
-  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1};
+  if(v.melhor==='carta'&&v.cartas.length){const c=v.cartas[0];return {credito:c.c,entrada:c.e,score:c.score,custo:amCota(c)};}
+  if(v.melhor==='combo'&&v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1,custo:amCombo(v.combo.combo)};
+  if(v.cartas&&v.cartas.length){const c=v.cartas[0];return {credito:c.c,entrada:c.e,score:c.score,custo:amCota(c)};}
+  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1,custo:amCombo(v.combo.combo)};
   return null;
 }
 const ORDC_KEY='bidcon_ordc';
-const ORDC_LABEL={'-credito':'maior crédito','credito':'menor crédito','-entrada':'maior entrada','entrada':'menor entrada','score':'melhor score'};
+const ORDC_LABEL={'oferta':'melhor oferta','custo':'menor custo efetivo','entrada':'menor entrada','score':'melhor score','-credito':'maior crédito','credito':'menor crédito'};
 function ordenaPorCarta(arr){
-  const ordc=$('ordc')?$('ordc').value:'-credito';
+  const ordc=$('ordc')?$('ordc').value:'oferta';
   const wm=arr.map(item=>({item,m:matchDe(item)}));
   wm.sort((a,b)=>{
     const A=a.m, B=b.m;
     if(!A&&!B)return a.item.preco-b.item.preco;
     if(!A)return 1; if(!B)return -1;
+    if(ordc==='custo')return A.custo-B.custo||B.score-A.score;
+    if(ordc==='entrada')return A.entrada-B.entrada;
+    if(ordc==='score')return B.score-A.score||A.custo-B.custo;
     if(ordc==='credito')return A.credito-B.credito;
     if(ordc==='-credito')return B.credito-A.credito;
-    if(ordc==='entrada')return A.entrada-B.entrada;
-    if(ordc==='-entrada')return B.entrada-A.entrada;
-    if(ordc==='score')return B.score-A.score||A.entrada-B.entrada;
-    return B.credito-A.credito;
+    // 'oferta' (default): melhor score, depois menor custo efetivo e menor entrada
+    return B.score-A.score||A.custo-B.custo||A.entrada-B.entrada;
   });
   return wm.map(x=>x.item);
 }
@@ -733,8 +781,8 @@ function cartasDetalhe(cartas){
 }
 function renderEstoque(){
   const arr=estoqueFiltrado();
-  const ordc=$('ordc')?$('ordc').value:'-credito';
-  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> veículo(s) · ordenados por ${ORDC_LABEL[ordc]||'maior crédito'}`;
+  const ordc=$('ordc')?$('ordc').value:'oferta';
+  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> veículo(s) · ordenados por ${ORDC_LABEL[ordc]||'melhor oferta'}`;
   const grid=$('vgrid');
   if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum resultado — ajuste os filtros.</div>';$('vMore').style.display='none';return;}
   const vis=arr.slice(0,vLimite);
@@ -742,13 +790,13 @@ function renderEstoque(){
     const best=v.cartas[0];
     // ----- monta RESUMO (frente) + DETALHES (<details>) conforme o caso -----
     let resumoHtml,detalheHtml='',ctaHtml;
-    if(v.cartas.length){
-      const sobra=Math.max(0,best.c-v.preco), cu=custosDe(best);
+    if(v.melhor==='carta'){
+      const cu=custosDe(best,v.preco);
       resumoHtml=`<div class="vres ok">`+
         `<div class="vres-cobre">${ic('check')} A carta cobre <b>100%</b> do preço da loja</div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Troco pra você</span><span class="vrv ${sobra>0?'pos':''}">${sobra>0?BRL(sobra):'—'}</span></div>`+
+          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAm(best)}</span></div>`+
         `</div>`+
         `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b>${best.score!=null?` <span class="cscore" title="Menor entrada e menor custo = score maior">${ic('check')} score ${best.score}</span>`:''}</div>`+
       `</div>`;
@@ -756,16 +804,16 @@ function renderEstoque(){
         `<div class="dlbl">Cartas que cobrem este veículo</div>`+
         cartasDetalhe(v.cartas)+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
-        comoPagar(v.preco,best.sobra,best.e)+
+        comoPagar(v.preco,best.e)+
       `</div></details>`;
       ctaHtml=`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">${ic('martelo')} Fechar com a carta nº ${best.n}</a>`;
-    }else if(v.combo){
-      const cu=custosDe(v.combo.combo);
+    }else if(v.melhor==='combo'){
+      const cu=custosDe(v.combo.combo,v.preco);
       resumoHtml=`<div class="vres ok">`+
         `<div class="vres-cobre">${ic('ia')} <span class="iatag">junção IA</span> <b>${NUM(v.combo.combo.length)}</b> cartas juntas cobrem <b>100%</b></div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada somada <small>(via PIX)</small></span><span class="vrv">${BRL(v.combo.ent)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Troco pra você</span><span class="vrv ${v.combo.sobra>0?'pos':''}">${v.combo.sobra>0?BRL(v.combo.sobra):'—'}</span></div>`+
+          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">custo mensal ~${amCombo(v.combo.combo).toFixed(2).replace('.',',')}%</span></div>`+
         `</div>`+
         `<div class="vres-cartas">Crédito somado <b>${BRL(v.combo.cred)}</b></div>`+
       `</div>`;
@@ -773,7 +821,7 @@ function renderEstoque(){
         `<div class="dlbl">Cartas juntas para este veículo</div>`+
         `<div class="dcards">`+v.combo.combo.map(c=>`<div class="dcarta"><span class="dn">nº ${c.n}</span><span class="dd">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b></span></div>`).join('')+`</div>`+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
-        comoPagar(v.preco,v.combo.sobra,v.combo.ent)+
+        comoPagar(v.preco,v.combo.ent)+
       `</div></details>`;
       ctaHtml=`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${NUM(v.combo.combo.length)} cartas</a>`;
     }else{
@@ -892,7 +940,7 @@ function renderTroca(car,entrada){
       `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAm(best)}</span></div>`+
       `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
     `</div>`+
-    `<div class="trh-nota">A carta sugerida é a <b>nº ${best.n}</b>: o carro cobre a entrada de ${BRL(best.e)}${best.troco>0?` e ainda sobram ${BRL(best.troco)} pra você`:''}.</div>`+
+    `<div class="trh-nota">A carta sugerida é a <b>nº ${best.n}</b>: o carro cobre a entrada de ${BRL(best.e)} e a carta libera <b>${BRL(best.c)}</b> de crédito pra você comprar um bem maior.</div>`+
   `</div>`;
   const carRef={nome:car.nome,valor:val,modelo:car.modelo};
   const lista=cs.slice(0,6).map(c=>renderTrocaMini(c,carRef)).join('');
@@ -902,7 +950,7 @@ function renderTrocaMini(co,car){
   return `<div class="ccard">
     <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum"><i class="dscore${co.score!=null?'':' off'}">score ${co.score!=null?co.score:'—'}</i></span></div>
     <div class="ccredito"><div class="l">Crédito que libera</div><div class="v">${BRL(co.c)}</div></div>
-    <div class="crows"><div class="crow2"><div class="l">Entrada (o carro cobre)</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Sobra pra você</div><div class="v">${co.troco>0?BRL(co.troco):'—'}</div></div></div>
+    <div class="crows"><div class="crow2"><div class="l">Entrada (o carro cobre)</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela estimada</div><div class="v">${co.p?BRL(co.p):'—'}</div></div></div>
     <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
     <a class="czap" href="${zapTroca(co,car)}" target="_blank" rel="noopener">Usar meu carro nesta carta</a>
   </div>`;
@@ -918,8 +966,8 @@ function renderCobre(car){
     $('fpCartas').innerHTML=cb?
       `<div class="vcombo" style="grid-column:1/-1"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${cb.combo.length} cartas juntas cobrem ${car.valorTexto}</div>`+
         cb.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
-        `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada <b>${BRL(cb.ent)}</b> · sobra <b>${BRL(cb.sobra)}</b></span></div>`+
-        `<div class="ccusto">${custoLinhas(custosDe(cb.combo))}</div>`+
+        `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada <b>${BRL(cb.ent)}</b> · custo mensal ~<b>${amCombo(cb.combo).toFixed(2).replace('.',',')}%</b></span></div>`+
+        `<div class="ccusto">${custoLinhas(custosDe(cb.combo,car.valor))}</div>`+
         `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:car.modelo,preco:car.valor})}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${cb.combo.length} cartas</a></div>`:
       `<div class="cempty" style="padding:24px">Nenhuma carta (nem junção) cobre esse valor hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
   }
@@ -954,7 +1002,7 @@ document.querySelectorAll('.achip').forEach(ch=>ch.addEventListener('click',()=>
 })();
 function renderCartaMini(co){
   return `<div class="ccard">
-    <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum">sobra ${BRL(co.sobra||0)}</span></div>
+    <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum">${co.score!=null?`<i class="dscore">score ${co.score}</i>`:''}</span></div>
     <div class="ccredito"><div class="l">Crédito</div><div class="v">${BRL(co.c)}</div></div>
     <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
     <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>

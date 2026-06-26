@@ -298,11 +298,12 @@
       <div class="cf-grp">
         <label>Ordenar pela carta</label>
         <select id="ordc">
-          <option value="-credito">Maior crédito</option>
-          <option value="credito">Menor crédito</option>
-          <option value="-entrada">Maior entrada</option>
+          <option value="oferta" selected>Melhor oferta</option>
+          <option value="custo">Menor custo efetivo</option>
           <option value="entrada">Menor entrada</option>
           <option value="score">Melhor score</option>
+          <option value="-credito">Maior crédito</option>
+          <option value="credito">Menor crédito</option>
         </select>
       </div>
       <div class="cf-spacer"></div>
@@ -382,6 +383,15 @@ const IMG_FALLBACK=ic('casa').replace(/"/g,'&quot;');
 
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
+// custo efetivo de uma junção de cartas: PV = soma de (crédito−entrada),
+// parcela = soma das parcelas, prazo = maior nº de parcelas do conjunto.
+function amCombo(cartas){
+  const arr=Array.isArray(cartas)?cartas:[cartas];
+  const pv=arr.reduce((s,c)=>s+Math.max(0,(c.c||0)-(c.e||0)),0);
+  const pmt=arr.reduce((s,c)=>s+(c.p||0),0);
+  const n=arr.reduce((m,c)=>Math.max(m,c.x||0),0);
+  return n?taxaEfetiva(pv,pmt,n):0;
+}
 // Custo mensal estimado do plano (NÃO é taxa de juros de financiamento — consórcio
 // não tem juros). Rotulado como "custo mensal ~X%" pra não confundir com taxa mensal de financiamento.
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
@@ -402,10 +412,15 @@ function pontuaCartas(lista){
     return {...c,score};
   });
 }
+const SOBRA_TETO=0.60; // até 60% acima do valor do imóvel ainda é uma oferta sensata
 function cartasPara(preco){
-  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,sobra:c.c-preco}));
-  return pontuaCartas(cobrem)
-    .sort((a,b)=>b.score-a.score||a.sobra-b.sobra||a.e-b.e);
+  if(!(preco>0))return [];
+  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,ratio:c.c/preco}));
+  if(!cobrem.length)return [];
+  const justas=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
+  const base=justas.length?justas:cobrem;
+  return pontuaCartas(base)
+    .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
 
 // junção de cartas: sem teto fixo de quantidade. Pode-se juntar quantas cartas
@@ -440,14 +455,19 @@ function comboPara(preco){
 //  crédito + R$ 85/carta; seguro de vida ≈ 0,0633% do crédito/mês; fundo comum
 //  = saldo − juros estimados. Valores de simulação, sujeitos à administradora.
 const TX_TRANSF=0.01, TX_TRANSF_CARTA=85, TX_SEGURO=0.000633;
-function custosDe(cartas){
+function custosDe(cartas,precoBem){
   const arr=Array.isArray(cartas)?cartas:[cartas];
   const credito=arr.reduce((s,c)=>s+(c.c||0),0);
   const entrada=arr.reduce((s,c)=>s+(c.e||0),0);
-  const saldo=arr.reduce((s,c)=>s+((c.p||0)*(c.x||0)),0);
-  const transf=Math.round(credito*TX_TRANSF + arr.length*TX_TRANSF_CARTA);
-  const seguro=credito*TX_SEGURO;
-  return {credito,entrada,saldo,transf,seguro,n:arr.length};
+  const saldoCheio=arr.reduce((s,c)=>s+((c.p||0)*(c.x||0)),0);
+  // saldo devedor proporcional ao valor do imóvel — uma carta maior que o
+  // imóvel não infla o saldo: usa-se só a fração de crédito efetivamente usada.
+  const frac=(precoBem>0&&credito>0)?Math.min(1,precoBem/credito):1;
+  const saldo=Math.round(saldoCheio*frac);
+  const creditoUsado=Math.round(credito*frac);
+  const transf=Math.round(creditoUsado*TX_TRANSF + arr.length*TX_TRANSF_CARTA);
+  const seguro=creditoUsado*TX_SEGURO;
+  return {credito,entrada,saldo,transf,seguro,n:arr.length,frac};
 }
 // bloco financeiro em 3 células limpas (label em cima, valor mono embaixo) —
 // evita a quebra/desalinho do layout anterior em linha única.
@@ -459,32 +479,29 @@ function custoLinhas(cu){
   `</div>`;
 }
 // "Como pagar" — política de crédito de imóvel da Prospere:
-//  • a carta precisa ter crédito >= valor do imóvel (já garantido em cartasPara);
-//  • a diferença (sobra/troco), quando o crédito passa do valor, é acertada em
-//    dinheiro com o vendedor;  • a entrada/sinal da carta é paga somente via PIX.
-// preco = valor do imóvel; sobra = crédito − preço (o que sobra da carta);
-// entrada = entrada/sinal da carta.
-function comoPagar(preco, sobra, entrada){
+//  • a carta cobre o valor do imóvel direto com o vendedor;
+//  • a entrada/sinal da carta é paga somente via PIX;
+//  • o saldo segue nas parcelas mensais do consórcio até a quitação.
+// preco = valor do imóvel; entrada = entrada/sinal da carta.
+function comoPagar(preco, entrada){
   const passos=[
     `<li><span class="ps">1</span><span>A carta cobre <b>todo o valor</b> do imóvel (${BRL(preco)}) direto com o vendedor.</span></li>`,
-    `<li><span class="ps">2</span><span>Diferença de crédito ${sobra>0?`(<b>${BRL(sobra)}</b> de troco)`:''} ${sobra>0?'é':'quando houver, é'} acertada <b>em dinheiro</b> com o vendedor.</span></li>`,
-    `<li><span class="ps pix">3</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`
+    `<li><span class="ps pix">2</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`,
+    `<li><span class="ps">3</span><span>O saldo restante segue nas parcelas mensais do consórcio até a quitação.</span></li>`
   ].join('');
   return `<div class="comopagar"><div class="cph">${ic('cartao')} Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
 }
 function zapImovel(co,im){
-  const sobra=(im&&im.preco)?Math.max(0,co.c-im.preco):0;
   const txt=`Olá! Tenho interesse no imóvel ${im?im.nome+(im.codigo?` (cód. ${im.codigo})`:'')+(im.preco?` — ${BRL(im.preco)}`:'') : ''}. Quero usar a carta contemplada nº ${co.n} (crédito ${BRL(co.c)}, entrada ${BRL(co.e)}). `+
-    `Entendi que a entrada de ${BRL(co.e)} é paga via PIX${sobra>0?` e a diferença de ${BRL(sobra)} é acertada em dinheiro com o vendedor`:''}. Como funciona?`;
+    `Entendi que a entrada de ${BRL(co.e)} é paga via PIX e o saldo segue nas parcelas. Como funciona?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 function zapCombo(combo,im){
   const lst=combo.map(c=>`nº ${c.n} (crédito ${BRL(c.c)}, entrada ${BRL(c.e)})`).join(' + ');
   const cred=combo.reduce((s,c)=>s+c.c,0),ent=combo.reduce((s,c)=>s+c.e,0);
-  const sobra=(im&&im.preco)?Math.max(0,cred-im.preco):0;
   const txt=`Olá! Quero juntar as cartas contempladas ${lst} `+
     (im?`pra fechar o imóvel ${im.nome}${im.codigo?` (cód. ${im.codigo})`:''} (${BRL(im.preco)}). `:`. `)+
-    `Crédito somado ${BRL(cred)}, entrada somada ${BRL(ent)} (paga via PIX)${sobra>0?`, diferença de ${BRL(sobra)} em dinheiro com o vendedor`:''}. Como funciona a junção?`;
+    `Crédito somado ${BRL(cred)}, entrada somada ${BRL(ent)} (paga via PIX). Como funciona a junção?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 function zapCarta(co){
@@ -528,26 +545,26 @@ async function carregarImoveis(fonte){
 }
 // melhor carta de um item (carta única que cobre, senão o combo); null se nada cobre
 function matchDe(v){
-  if(v.cartas&&v.cartas.length)return {credito:v.cartas[0].c,entrada:v.cartas[0].e,score:v.cartas[0].score};
-  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1};
+  if(v.cartas&&v.cartas.length){const c=v.cartas[0];return {credito:c.c,entrada:c.e,score:c.score,custo:amCota(c)};}
+  if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1,custo:amCombo(v.combo.combo)};
   return null;
 }
 const ORDC_KEY='bidcon_ordc';
-const ORDC_LABEL={'-credito':'maior crédito','credito':'menor crédito','-entrada':'maior entrada','entrada':'menor entrada','score':'melhor score'};
+const ORDC_LABEL={'oferta':'melhor oferta','custo':'menor custo efetivo','entrada':'menor entrada','score':'melhor score','-credito':'maior crédito','credito':'menor crédito'};
 function ordenaPorCarta(arr){
-  const ordc=$('ordc')?$('ordc').value:'-credito';
+  const ordc=$('ordc')?$('ordc').value:'oferta';
   // pré-calcula o match uma vez por item, sem recalcular no comparador
   const wm=arr.map(item=>({item,m:matchDe(item)}));
   wm.sort((a,b)=>{
     const A=a.m, B=b.m;
     if(!A&&!B)return a.item.preco-b.item.preco;
     if(!A)return 1; if(!B)return -1; // itens sem carta vão para o fim
+    if(ordc==='custo')return A.custo-B.custo||B.score-A.score;
+    if(ordc==='entrada')return A.entrada-B.entrada;
+    if(ordc==='score')return B.score-A.score||A.custo-B.custo;
     if(ordc==='credito')return A.credito-B.credito;
     if(ordc==='-credito')return B.credito-A.credito;
-    if(ordc==='entrada')return A.entrada-B.entrada;
-    if(ordc==='-entrada')return B.entrada-A.entrada;
-    if(ordc==='score')return B.score-A.score||A.entrada-B.entrada;
-    return B.credito-A.credito;
+    return B.score-A.score||A.custo-B.custo||A.entrada-B.entrada;
   });
   return wm.map(x=>x.item);
 }
@@ -562,8 +579,8 @@ function imoveisFiltrado(){
 }
 function renderImoveis(){
   const arr=imoveisFiltrado();
-  const ordc=$('ordc')?$('ordc').value:'-credito';
-  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> imóvel(is) · ordenados por ${ORDC_LABEL[ordc]||'maior crédito'}`;
+  const ordc=$('ordc')?$('ordc').value:'oferta';
+  $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> imóvel(is) · ordenados por ${ORDC_LABEL[ordc]||'melhor oferta'}`;
   const grid=$('vgrid');
   if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum resultado — ajuste os filtros.</div>';$('vMore').style.display='none';return;}
   const vis=arr.slice(0,vLimite);
@@ -571,22 +588,22 @@ function renderImoveis(){
     const top=v.cartas.slice(0,2);
     let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
     if(v.cartas.length){
-      const cu=custosDe(best);
+      const cu=custosDe(best,v.preco);
       matchHtml=`<div class="vmatch has"><div class="mh">${ic('banco')} <span class="mhn">${v.cartas.length}</span> carta(s) cobrem este imóvel</div>`+
         top.map((c,i)=>`<div class="mcarta"><span class="mn">nº ${c.n}${c.score!=null?` <i class="dscore${i===0?' best':''}">score ${c.score}</i>`:''}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
       `</div>`;
-      // como pagar usa a melhor carta (menor sobra/menor entrada)
-      pagarHtml=comoPagar(v.preco,best.sobra,best.e);
+      // como pagar usa a melhor carta (maior score = menor entrada + menor custo)
+      pagarHtml=comoPagar(v.preco,best.e);
     }else if(v.combo){
       matchHtml='';
-      const cu=custosDe(v.combo.combo);
+      const cu=custosDe(v.combo.combo,v.preco);
       comboHtml=`<div class="vcombo"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> <span class="mhn">${v.combo.combo.length}</span> cartas juntas cobrem este imóvel</div>`+
         v.combo.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
-        `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · sobra <b>${BRL(v.combo.sobra)}</b></span></div>`+
+        `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · custo mensal ~${amCombo(v.combo.combo).toFixed(2).replace('.',',')}%</span></div>`+
         `<div class="vgar">${ic('banco')} Saldo devedor somado <b>${BRL(v.combo.saldo)}</b> cabe na garantia do imóvel (${BRL(v.combo.tetoGarantia)})</div>`+
         `<div class="ccusto">${custoLinhas(cu)}</div></div>`;
-      pagarHtml=comoPagar(v.preco,v.combo.sobra,v.combo.ent);
+      pagarHtml=comoPagar(v.preco,v.combo.ent);
     }else{
       matchHtml=`<div class="vmatch"><div class="mh none">Nenhuma carta cobre este valor hoje</div><div class="mcarta"><span class="md">Fale com a gente — buscamos uma carta sob medida.</span></div></div>`;
     }
