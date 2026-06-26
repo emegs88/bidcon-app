@@ -9,9 +9,10 @@
 <meta name="keywords" content="cotas contempladas, consórcio contemplado, carta de crédito, carta contemplada, marketplace de consórcio, comprar consórcio contemplado, crédito imobiliário, crédito de veículo, Prospere Consórcios, leilão de cotas">
 <meta name="author" content="Prospere Consórcios">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<meta name="theme-color" content="#0d0d0f">
+<meta name="theme-color" content="#080B14">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="512x512" href="/img/bidcon-icone-selo.png">
+<link rel="apple-touch-icon" href="/img/bidcon-app-icon.png">
 <link rel="canonical" href="https://www.bidcon.com.br/">
 <!-- Open Graph / WhatsApp / redes -->
 <meta property="og:type" content="website">
@@ -20,71 +21,79 @@
 <meta property="og:url" content="https://www.bidcon.com.br/">
 <meta property="og:title" content="bidcon · Marketplace de Cotas Contempladas | Prospere">
 <meta property="og:description" content="Compre cotas de consórcio já contempladas com segurança: crédito imobiliário e de veículo, transparência e custo na hora. Prospere Consórcios.">
-<meta property="og:image" content="https://www.bidcon.com.br/og.png">
+<meta property="og:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="bidcon · Crédito já contemplado, pronto pra usar — by Prospere Consórcios">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="bidcon · Marketplace de Cotas Contempladas | Prospere">
 <meta name="twitter:description" content="Compre cotas de consórcio já contempladas com segurança: crédito imobiliário e de veículo, transparência e custo na hora.">
-<meta name="twitter:image" content="https://www.bidcon.com.br/og.png">
+<meta name="twitter:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
 <!-- Dados estruturados (Google) -->
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.bidcon.com.br/#org","name":"Prospere Consórcios","alternateName":"bidcon","url":"https://www.bidcon.com.br/","description":"Marketplace de cotas de consórcio já contempladas (crédito imobiliário e de veículo).","areaServed":"BR","contactPoint":{"@type":"ContactPoint","contactType":"sales","telephone":"+55-19-99756-1909","email":"contato@prospere.com.br","availableLanguage":["pt-BR"]},"email":"contato@prospere.com.br","address":{"@type":"PostalAddress","streetAddress":"Av. da Emancipação, 3770 - Parque dos Pinheiros","addressLocality":"Hortolândia","addressRegion":"SP","postalCode":"13184-654","addressCountry":"BR"},"parentOrganization":{"@type":"Organization","name":"Prospere Consórcios","url":"https://www.prospere.com.br/"},"sameAs":["https://www.prospere.com.br/"]},{"@type":"WebSite","@id":"https://www.bidcon.com.br/#site","url":"https://www.bidcon.com.br/","name":"bidcon · Marketplace de Cotas Contempladas","inLanguage":"pt-BR","publisher":{"@id":"https://www.bidcon.com.br/#org"}},{"@type":"Service","name":"Compra e venda de cotas de consórcio contempladas","serviceType":"Cotas de consórcio contempladas","provider":{"@id":"https://www.bidcon.com.br/#org"},"areaServed":"BR","audience":{"@type":"Audience","audienceType":"Compradores de crédito imobiliário e de veículos"}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* paleta premium fintech — preto base, vermelho como único acento (~10% da tela) */
-    --preto:#0D0D0F;--carvao:#121217;--carvao2:#1A1A1E;--linha:rgba(255,255,255,.075);--linha2:rgba(255,255,255,.14);
-    --branco:#FFFFFF;--cinza:#9A9AA6;--cinza2:#6A6A75;
-    --vermelho:#D4111E;--vermelho-l:#ff3a48;--vermelho-d:#9c0c16;--vermelho-soft:rgba(212,17,30,.12);
-    --verde:#1faa59;--verde-l:#3ad17e;--ambar:#e3a008;--ambar-l:#f3c34a;
-    --azul:#2f6df0;--azul-l:#5b93ff;
+    /* paleta premium fintech — navy base, AZUL da marca como acento principal.
+       Os tokens --vermelho* foram remapeados para o azul bidcon (identidade própria
+       de plataforma, padrão fintech), mantendo todo o CSS existente sem reescrita. */
+    --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);--linha2:rgba(255,255,255,.15);
+    --branco:#FFFFFF;--cinza:#93A0B8;--cinza2:#5E6B85;
+    /* acento da marca = azul bidcon (#1E6FE6 base, #36C5F0 claro) */
+    --vermelho:#1E6FE6;--vermelho-l:#36C5F0;--vermelho-d:#1657c2;--vermelho-soft:rgba(46,123,240,.14);
+    --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
+    --azul:#2E7BF0;--azul-l:#5b93ff;
+    --b1:#8FB7FF;--b2:#36C5F0;--b3:#1E6FE6;--accent:#2E7BF0;
+    --grad-azul:linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6);
     --raio:22px;--raio-sm:14px;
-    --sombra:0 24px 60px -24px rgba(0,0,0,.7);
-    --sombra-vermelho:0 18px 48px -18px rgba(212,17,30,.42);
+    --sombra:0 24px 60px -24px rgba(0,0,0,.8);
+    --sombra-vermelho:0 18px 48px -18px rgba(46,123,240,.42);
     --pill:999px;
-    --f-display:'Sora',system-ui,sans-serif;
+    --f-display:'Poppins','Sora',system-ui,sans-serif;
     --f-body:'Inter',system-ui,sans-serif;
     --f-mono:'IBM Plex Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
   body{background:var(--preto);color:var(--branco);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;padding:0 0 80px;letter-spacing:-.005em;overflow-x:hidden;
-    background-image:radial-gradient(1100px 520px at 86% -14%,rgba(212,17,30,.10),transparent 60%),radial-gradient(900px 480px at 4% 2%,rgba(255,255,255,.028),transparent 55%);background-attachment:fixed;}
+    background-image:radial-gradient(1100px 520px at 86% -14%,rgba(46,123,240,.14),transparent 60%),radial-gradient(900px 480px at 4% 2%,rgba(54,197,240,.05),transparent 55%);background-attachment:fixed;}
   .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .wrap{max-width:1240px;margin:0 auto;padding:0 26px}
-  ::selection{background:var(--vermelho);color:#fff}
+  ::selection{background:var(--b2);color:#04121f}
   a{color:inherit}
-  :focus-visible{outline:2px solid var(--vermelho);outline-offset:3px;border-radius:6px}
+  :focus-visible{outline:2px solid var(--b2);outline-offset:3px;border-radius:6px}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto}}
 
   /* HEADER */
-  header{border-bottom:1px solid var(--linha);background:rgba(13,13,15,.72);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.2)}
+  header{border-bottom:1px solid var(--linha);background:rgba(8,11,20,.72);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.2)}
   .hbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:13px}
   .blogo{display:inline-flex;align-items:baseline;font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:-.03em;line-height:1;color:#fff}
-  .blogo b{color:var(--vermelho-l);font-weight:700}
+  .blogo b{font-weight:800;background:var(--grad-azul);-webkit-background-clip:text;background-clip:text;color:transparent}
   .blogo .seal{display:inline-flex;width:.86em;height:.86em;margin:0 -.02em;transform:translateY(.06em)}
   .blogo .seal svg{width:100%;height:100%;display:block}
   .bsel{font-size:10px;color:var(--cinza);letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--linha2);padding-left:13px}
   .bsel b{color:#cfcfd4;font-weight:600}
   .hcta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .hzap{display:inline-flex;align-items:center;gap:8px;background:var(--vermelho);color:#fff;font-family:var(--f-body);font-weight:600;font-size:13px;text-decoration:none;border-radius:var(--pill);padding:11px 19px;transition:.2s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 24px -8px rgba(212,17,30,.6)}
-  .hzap:hover{background:var(--vermelho-l);transform:translateY(-1px);box-shadow:0 12px 30px -8px rgba(212,17,30,.7)}
+  .hzap{display:inline-flex;align-items:center;gap:8px;background:var(--vermelho);color:#fff;font-family:var(--f-body);font-weight:600;font-size:13px;text-decoration:none;border-radius:var(--pill);padding:11px 19px;transition:.2s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 24px -8px rgba(46,123,240,.6)}
+  .hzap:hover{background:var(--vermelho-l);transform:translateY(-1px);box-shadow:0 12px 30px -8px rgba(46,123,240,.7)}
   .hloja{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.02);color:#d8d8de;font-family:var(--f-body);font-weight:600;font-size:13px;text-decoration:none;border:1px solid var(--linha2);border-radius:var(--pill);padding:10px 17px;transition:.2s cubic-bezier(.4,0,.2,1)}
   .hloja:hover{border-color:var(--branco);color:#fff;transform:translateY(-1px)}
   .himo:hover{border-color:var(--branco)}
 
   /* HERO */
   .hero{position:relative;margin:48px 0 14px;background:
-      radial-gradient(120% 90% at 88% 0%,rgba(212,17,30,.12),transparent 56%),
-      linear-gradient(160deg,#16161c,#0c0c10 72%);
+      radial-gradient(120% 90% at 88% 0%,rgba(46,123,240,.12),transparent 56%),
+      linear-gradient(160deg,#16213A,#0B1120 72%);
     border:1px solid var(--linha2);border-radius:28px;padding:54px 48px 48px;box-shadow:var(--sombra);overflow:hidden}
-  .hero::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(212,17,30,.5),transparent)}
+  .hero::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(46,123,240,.5),transparent)}
   .hero .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--cinza);font-weight:600;border:1px solid var(--linha2);padding:7px 14px;border-radius:var(--pill)}
-  .hero .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--vermelho);box-shadow:0 0 0 0 rgba(212,17,30,.6);animation:pulse 2.4s infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(212,17,30,.5)}70%{box-shadow:0 0 0 10px rgba(212,17,30,0)}100%{box-shadow:0 0 0 0 rgba(212,17,30,0)}}
+  .hero .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--vermelho);box-shadow:0 0 0 0 rgba(46,123,240,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,123,240,.5)}70%{box-shadow:0 0 0 10px rgba(46,123,240,0)}100%{box-shadow:0 0 0 0 rgba(46,123,240,0)}}
   .hero h1{font-family:var(--f-display);font-weight:800;font-size:clamp(2.4rem,4.6vw,3.6rem);line-height:1.04;letter-spacing:-.035em;margin:22px 0 16px;max-width:20ch}
-  .hero h1 b{color:var(--vermelho-l);font-weight:800}
+  .hero h1 b{font-weight:800;background:var(--grad-azul);-webkit-background-clip:text;background-clip:text;color:transparent}
   .hero p{color:var(--cinza);font-size:16px;max-width:60ch;line-height:1.62}
   .hero p b{color:#cfcfd4;font-weight:600}
   .hero .selos{display:flex;gap:14px 26px;flex-wrap:wrap;margin-top:26px}
@@ -120,7 +129,7 @@
 
   .cmodo{display:flex;gap:2px;background:var(--carvao2);border:1px solid var(--linha);border-radius:var(--pill);padding:4px}
   .cmodo button{background:none;border:0;color:var(--cinza);font-family:var(--f-body);font-size:12.5px;font-weight:600;padding:8px 17px;border-radius:var(--pill);cursor:pointer;transition:.18s;display:flex;align-items:center;gap:6px}
-  .cmodo button.on{background:var(--vermelho);color:#fff;box-shadow:0 6px 18px -8px rgba(212,17,30,.7)}
+  .cmodo button.on{background:var(--vermelho);color:#fff;box-shadow:0 6px 18px -8px rgba(46,123,240,.7)}
   .cmodo button.on[data-modo="leilao"]{background:var(--ambar);color:#1a1200;box-shadow:0 6px 18px -8px rgba(227,160,8,.7)}
 
   .leilao-aviso{display:flex;align-items:flex-start;gap:11px;background:rgba(227,160,8,.07);border:1px solid rgba(243,195,74,.35);border-radius:12px;padding:13px 16px;margin-bottom:16px;font-size:13px;color:#dcdce0;line-height:1.5}
@@ -130,11 +139,11 @@
   .cfilters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--carvao);border:1px solid var(--linha);border-radius:var(--raio);padding:15px 17px;margin-bottom:16px;box-shadow:var(--sombra)}
   .cseg{display:flex;gap:2px;background:var(--carvao2);border:1px solid var(--linha);border-radius:var(--pill);padding:3px}
   .cseg button{background:none;border:0;color:var(--cinza);font-family:var(--f-body);font-size:12px;font-weight:600;padding:8px 15px;border-radius:var(--pill);cursor:pointer;transition:.16s}
-  .cseg button.on{background:var(--vermelho);color:#fff;box-shadow:0 6px 16px -8px rgba(212,17,30,.7)}
+  .cseg button.on{background:var(--vermelho);color:#fff;box-shadow:0 6px 16px -8px rgba(46,123,240,.7)}
   .cf-grp{display:flex;flex-direction:column;gap:4px}
   .cf-grp label{font-size:9.5px;color:var(--cinza);letter-spacing:.12em;text-transform:uppercase}
   .cf-grp select,.cf-grp input{background:var(--carvao2);border:1px solid var(--linha);color:#fff;border-radius:12px;padding:10px 13px;font-family:var(--f-body);font-size:13px;outline:none;transition:.16s cubic-bezier(.4,0,.2,1)}
-  .cf-grp select:focus,.cf-grp input:focus{border-color:var(--vermelho);box-shadow:0 0 0 3px rgba(212,17,30,.18)}
+  .cf-grp select:focus,.cf-grp input:focus{border-color:var(--vermelho);box-shadow:0 0 0 3px rgba(46,123,240,.18)}
   .cf-grp input{min-width:150px}
   .cf-spacer{flex:1}
   .ccount{font-size:12px;color:var(--cinza);font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:.02em}
@@ -144,7 +153,7 @@
   .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .ccard{background:linear-gradient(165deg,var(--carvao2),var(--carvao));border:1px solid var(--linha);border-radius:var(--raio);padding:20px 21px;display:flex;flex-direction:column;gap:13px;transition:.22s cubic-bezier(.4,0,.2,1);position:relative;box-shadow:var(--sombra);overflow:hidden}
   .ccard::before{content:'';position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:0;transition:.22s}
-  .ccard:hover{border-color:rgba(255,70,81,.45);transform:translateY(-5px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 26px 52px -20px rgba(212,17,30,.42)}
+  .ccard:hover{border-color:rgba(54,197,240,.45);transform:translateY(-5px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 26px 52px -20px rgba(46,123,240,.42)}
   .ccard:hover::before{opacity:1}
   .ccard .ctop{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .ccat{display:flex;align-items:center;gap:7px;font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.02em;font-size:13.5px;color:#fff}
@@ -165,7 +174,7 @@
   .czap:hover{background:var(--verde-l);transform:translateY(-1px);box-shadow:0 12px 28px -10px rgba(31,170,89,.7)}
   .cempty{grid-column:1/-1;text-align:center;color:var(--cinza);padding:50px 10px;font-size:14px}
   .cmore{display:block;margin:20px auto 0;background:var(--carvao2);border:1px solid var(--linha2);color:#fff;font-family:var(--f-body);font-weight:600;font-size:13px;padding:13px 28px;border-radius:var(--pill);cursor:pointer;transition:.16s}
-  .cmore:hover{border-color:var(--vermelho);box-shadow:0 8px 22px -12px rgba(212,17,30,.5)}
+  .cmore:hover{border-color:var(--vermelho);box-shadow:0 8px 22px -12px rgba(46,123,240,.5)}
 
   /* CARDS LEILÃO */
   .lcard{background:linear-gradient(165deg,var(--carvao2),var(--carvao));border:1px solid var(--linha);border-radius:var(--raio);padding:20px 21px;display:flex;flex-direction:column;gap:13px;transition:.22s cubic-bezier(.4,0,.2,1);position:relative;box-shadow:var(--sombra);overflow:hidden}
@@ -201,7 +210,7 @@
   .steps{margin-top:26px;display:grid;gap:10px;position:relative}
   .step{display:grid;grid-template-columns:48px 1fr;gap:16px;align-items:start;background:var(--carvao);border:1px solid var(--linha);border-radius:var(--raio-sm);padding:17px 19px;transition:.18s cubic-bezier(.4,0,.2,1)}
   .step:hover{border-color:var(--linha2);transform:translateX(4px);box-shadow:var(--sombra)}
-  .step .sn{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:var(--pill);font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:16px;color:var(--vermelho-l);line-height:1;background:var(--vermelho-soft);border:1px solid rgba(212,17,30,.25)}
+  .step .sn{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:var(--pill);font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:16px;color:var(--vermelho-l);line-height:1;background:var(--vermelho-soft);border:1px solid rgba(46,123,240,.25)}
   .step .sh{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:-.01em}
   .step .sd{color:var(--cinza);font-size:13px;line-height:1.55;margin-top:5px}
   .step.imp{border-left:3px solid var(--ambar);background:rgba(227,160,8,.05)}
@@ -278,7 +287,7 @@
   .dcard .dh{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   .dcard .dt{font-family:var(--f-display);font-weight:600;font-size:15px;color:#fff;letter-spacing:-.01em}
   .dcard .dbadge{font-family:var(--f-display);font-weight:600;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:var(--pill)}
-  .dbadge.all{background:rgba(212,17,30,.12);color:var(--vermelho-l);border:1px solid rgba(212,17,30,.3)}
+  .dbadge.all{background:rgba(46,123,240,.12);color:var(--vermelho-l);border:1px solid rgba(46,123,240,.3)}
   .dbadge.one{background:rgba(58,209,126,.1);color:var(--verde-l);border:1px solid rgba(58,209,126,.28)}
   .dcard .dsub{font-size:11.5px;color:var(--cinza);margin-bottom:10px}
   .dcard ul{margin:0;padding-left:18px;color:#dcdce0;font-size:13px;line-height:1.65}
@@ -298,7 +307,7 @@
 <header>
   <div class="wrap hbar">
     <div class="brand">
-      <div class="blogo" aria-label="bidcon">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--vermelho-l)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="var(--vermelho-l)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b></div>
+      <div class="blogo" aria-label="bidcon">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><linearGradient id="bgrad" x1="0" y1=".15" x2="1" y2=".85"><stop offset="0" stop-color="#8FB7FF"/><stop offset=".45" stop-color="#36C5F0"/><stop offset="1" stop-color="#1E6FE6"/></linearGradient></defs><circle cx="50" cy="50" r="44" fill="none" stroke="url(#bgrad)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="url(#bgrad)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b></div>
       <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
     </div>
     <div class="hcta">
@@ -574,7 +583,7 @@
         </ul>
       </div>
 
-      <div class="dtips" style="margin:18px 0 0;background:rgba(212,17,30,.05);border-color:rgba(212,17,30,.2)">
+      <div class="dtips" style="margin:18px 0 0;background:rgba(46,123,240,.05);border-color:rgba(46,123,240,.2)">
         <div class="t" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg> Ano e aceitação do veículo</div>
         <ul>
           <li>O <b>ano-limite</b> aceito e o estado do veículo dependem da <b>administradora e da tabela vigente</b> — confirme sempre com o atendimento antes de fechar.</li>
@@ -601,7 +610,7 @@
       </div>
 
       <div class="dcat">Do imóvel — opcional</div>
-      <div class="dveic" style="background:rgba(212,17,30,.06);border-color:rgba(212,17,30,.22)">
+      <div class="dveic" style="background:rgba(46,123,240,.06);border-color:rgba(46,123,240,.22)">
         <div class="dh"><span class="dt" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Documentos do imóvel</span><span class="dbadge one">Opcional</span></div>
         <div class="dsub">Não obrigatório na pré-análise — envie se o imóvel já estiver definido.</div>
         <ul>
@@ -612,7 +621,7 @@
         </ul>
       </div>
 
-      <div class="dtips" style="margin:18px 0 0;background:rgba(212,17,30,.05);border-color:rgba(212,17,30,.2)">
+      <div class="dtips" style="margin:18px 0 0;background:rgba(46,123,240,.05);border-color:rgba(46,123,240,.2)">
         <div class="t" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Aceitação do imóvel</div>
         <ul>
           <li>A regularidade da matrícula e da situação cadastral do imóvel é <b>verificada na análise</b> — pendências (averbação, débitos, ônus) podem impedir a liberação.</li>
