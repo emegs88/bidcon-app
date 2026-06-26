@@ -425,7 +425,7 @@ const ICONS={
 function ic(n,cls){return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
 const IMG_FALLBACK=ic('carro').replace(/"/g,'&quot;');
 
-// custo efetivo (% a.m.) sobre crédito - entrada
+// custo mensal aproximado sobre crédito - entrada (não é juros de financiamento)
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
 // Rotulado como "custo mensal ~X%" para NÃO confundir com taxa de juros de
