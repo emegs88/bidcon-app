@@ -101,7 +101,9 @@
   .vcard:hover{border-color:rgba(91,147,255,.55);transform:translateY(-4px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 22px 44px -18px rgba(47,109,240,.5)}
   .vimg{position:relative;aspect-ratio:16/10;background:var(--carvao);overflow:hidden}
   .vimg img{width:100%;height:100%;object-fit:cover;display:block}
-  .vimg .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--cinza2);font-size:40px}
+  .vimg .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--cinza2)}
+  .vimg .noimg .ico{width:46px;height:46px;opacity:.5}
+  .ico{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
   .vbadge{position:absolute;top:10px;left:10px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:11px;padding:5px 9px;border-radius:8px;backdrop-filter:blur(6px)}
   .vbadge.ok{background:rgba(31,170,89,.92);color:#04210f}
   .vbadge.no{background:rgba(140,140,149,.85);color:#fff}
@@ -202,7 +204,7 @@
     </div>
     <div class="hcta">
       <a class="hnav" href="/bidcon.html">← Marketplace</a>
-      <a class="hnav veic" href="/bidcon-lojista.html">🚗 Lojista</a>
+      <a class="hnav veic" href="/bidcon-lojista.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Lojista</a>
       <a class="hzap" id="hzap" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
         Falar no WhatsApp
@@ -222,10 +224,10 @@
   <div class="stats" id="stats"></div>
 
   <div class="links">
-    <a class="lnk" id="lnkImoveis" href="https://www.prosperehortolandia.com.br/imoveis/a-venda" target="_blank" rel="noopener">🏠 Imóveis <b>da imobiliária</b> ↗</a>
-    <a class="lnk" id="lnkQuinto" href="https://www.quintoandar.com.br/comprar/imovel/hortolandia-sp-brasil" target="_blank" rel="noopener">🔑 Buscar no <b>QuintoAndar</b> ↗</a>
-    <a class="lnk" id="lnkZap" href="https://www.zapimoveis.com.br/venda/imoveis/sp+hortolandia/" target="_blank" rel="noopener">🟧 Buscar no <b>ZAP Imóveis</b> ↗</a>
-    <a class="lnk" href="/bidcon.html#docs" target="_blank" rel="noopener">📋 Check list de <b>documentos</b> ↗</a>
+    <a class="lnk" id="lnkImoveis" href="https://www.prosperehortolandia.com.br/imoveis/a-venda" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis <b>da imobiliária</b> ↗</a>
+    <a class="lnk" id="lnkQuinto" href="https://www.quintoandar.com.br/comprar/imovel/hortolandia-sp-brasil" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16 16l2-2M19 19l1.5-1.5"/></svg> Buscar no <b>QuintoAndar</b> ↗</a>
+    <a class="lnk" id="lnkZap" href="https://www.zapimoveis.com.br/venda/imoveis/sp+hortolandia/" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Buscar no <b>ZAP Imóveis</b> ↗</a>
+    <a class="lnk" href="/bidcon.html#docs" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg> Check list de <b>documentos</b> ↗</a>
   </div>
 
   <div class="fontebar">
@@ -235,8 +237,8 @@
   </div>
 
   <div class="tabs">
-    <button class="tab on" data-tab="imoveis">🏡 Imóveis × cartas</button>
-    <button class="tab" data-tab="cartas">🏦 Cartas de imóvel</button>
+    <button class="tab on" data-tab="imoveis"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis × cartas</button>
+    <button class="tab" data-tab="cartas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 9.5v9M19 9.5v9M9 9.5v9M15 9.5v9"/><path d="M3.5 18.5h17"/></svg> Cartas de imóvel</button>
   </div>
 
   <!-- ABA 1: IMÓVEIS -->
@@ -321,6 +323,24 @@ const CARTAS=(DADOS.cotas||[]).filter(c=>c.t==='imovel'&&c.c>0&&!c.r);
 const $=id=>document.getElementById(id);
 const BRL=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
 const NUM=v=>Number(v).toLocaleString('pt-BR');
+/* Sistema de ícones SVG modernos (line icons, font-independente — sem emoji) */
+const ICONS={
+  casa:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/>',
+  predio:'<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/>',
+  chave:'<circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16 16l2-2M19 19l1.5-1.5"/>',
+  banco:'<path d="M3 9.5 12 4l9 5.5"/><path d="M5 9.5v9M19 9.5v9M9 9.5v9M15 9.5v9"/><path d="M3.5 18.5h17"/>',
+  cartas:'<rect x="3" y="6" width="14" height="11" rx="1.5"/><path d="M7 3.5h14v11"/>',
+  ia:'<rect x="5" y="7" width="14" height="11" rx="2.5"/><path d="M12 4v3M8.5 11v2M15.5 11v2"/><path d="M2.5 12h2.5M19 12h2.5"/>',
+  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16 9"/>',
+  pin:'<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.4"/>',
+  alvo:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  cartao:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>',
+  martelo:'<path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/>',
+  carro:'<path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/>',
+  raio:'<path d="M13 2 5 13h5l-1 9 8-11h-5l1-9Z"/>'
+};
+function ic(n,cls){return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
+const IMG_FALLBACK=ic('casa').replace(/"/g,'&quot;');
 
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
@@ -388,7 +408,7 @@ function comoPagar(preco, sobra, entrada){
     `<li><span class="ps">2</span><span>Diferença de crédito ${sobra>0?`(<b>${BRL(sobra)}</b> de troco)`:''} ${sobra>0?'é':'quando houver, é'} acertada <b>em dinheiro</b> com o vendedor.</span></li>`,
     `<li><span class="ps pix">3</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`
   ].join('');
-  return `<div class="comopagar"><div class="cph">💳 Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
+  return `<div class="comopagar"><div class="cph">${ic('cartao')} Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
 }
 function zapImovel(co,im){
   const sobra=(im&&im.preco)?Math.max(0,co.c-im.preco):0;
@@ -464,7 +484,7 @@ function renderImoveis(){
     let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
     if(v.cartas.length){
       const cu=custosDe(best);
-      matchHtml=`<div class="vmatch has"><div class="mh">🏦 ${v.cartas.length} carta(s) cobrem este imóvel</div>`+
+      matchHtml=`<div class="vmatch has"><div class="mh">${ic('banco')} ${v.cartas.length} carta(s) cobrem este imóvel</div>`+
         top.map(c=>`<div class="mcarta"><span class="mn">nº ${c.n}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
       `</div>`;
@@ -473,7 +493,7 @@ function renderImoveis(){
     }else if(v.combo){
       matchHtml='';
       const cu=custosDe(v.combo.combo);
-      comboHtml=`<div class="vcombo"><div class="mh">🤖 <span class="iatag">junção IA</span> ${v.combo.combo.length} cartas juntas cobrem este imóvel</div>`+
+      comboHtml=`<div class="vcombo"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${v.combo.combo.length} cartas juntas cobrem este imóvel</div>`+
         v.combo.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
         `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · sobra <b>${BRL(v.combo.sobra)}</b></span></div>`+
         `<div class="ccusto">${custoLinhas(cu)}</div></div>`;
@@ -485,19 +505,19 @@ function renderImoveis(){
     return `
     <div class="vcard">
       <div class="vimg">
-        ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>🏡</div>'">`:'<div class="noimg">🏡</div>'}
-        <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?'✓ dá pra fechar':(v.combo?'🤖 dá com junção':'sem carta')}</span>
+        ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>'+IMG_FALLBACK+'</div>'">`:`<div class="noimg">${ic('casa')}</div>`}
+        <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?ic('check')+' dá pra fechar':(v.combo?ic('ia')+' dá com junção':'sem carta')}</span>
         ${v.tipo?`<span class="vtipo">${v.tipo}</span>`:''}
       </div>
       <div class="vbody">
         <div class="vnome">${v.nome}</div>
-        ${loc?`<div class="vloc">📍 ${loc}${v.area?` · ${v.area} m²`:''}${v.codigo?` · ${v.codigo}`:''}</div>`:''}
+        ${loc?`<div class="vloc">${ic('pin')} ${loc}${v.area?` · ${v.area} m²`:''}${v.codigo?` · ${v.codigo}`:''}</div>`:''}
         <div class="vpreco"><span class="l">Preço anunciado</span>${BRL(v.preco)}</div>
         ${matchHtml}
         ${comboHtml}
         ${pagarHtml}
         ${v.link?`<a class="vlink" href="${v.link}" target="_blank" rel="noopener">Ver anúncio na imobiliária ↗</a>`:''}
-        ${best?`<a class="vzap" href="${zapImovel(best,v)}" target="_blank" rel="noopener">🏦 Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">🤖 Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
+        ${best?`<a class="vzap" href="${zapImovel(best,v)}" target="_blank" rel="noopener">${ic('banco')} Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
       </div>
     </div>`;}).join('');
   $('vMore').style.display=arr.length>vLimite?'block':'none';
@@ -518,7 +538,7 @@ function renderCartas(){
   const vis=arr.slice(0,cLimite);
   grid.innerHTML=vis.map(co=>`
     <div class="ccard">
-      <div class="ctop"><span class="ccat">🏡 Imóvel</span><span class="cnum">nº ${co.n}</span></div>
+      <div class="ctop"><span class="ccat">${ic('casa')} Imóvel</span><span class="cnum">nº ${co.n}</span></div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
       <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
       <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
@@ -538,7 +558,7 @@ $('cMore').addEventListener('click',()=>{cLimite+=18;renderCartas();});
   const minEnt=CARTAS.length?CARTAS.reduce((m,c)=>Math.min(m,c.e),Infinity):0;
   const mi=v=>v>=1e6?(v/1e6).toFixed(1).replace('.',',')+' mi':BRL(v);
   $('stats').innerHTML=`
-    <div class="stat"><div class="sv">${NUM(totalCartas)}</div><div class="sl">Cartas de imóvel 🏡</div></div>
+    <div class="stat"><div class="sv">${NUM(totalCartas)}</div><div class="sl">Cartas de imóvel ${ic('casa')}</div></div>
     <div class="stat"><div class="sv">R$ ${mi(credito)}</div><div class="sl">Em crédito disponível</div></div>
     <div class="stat"><div class="sv">R$ ${mi(maxCred)}</div><div class="sl">Maior crédito</div></div>
     <div class="stat"><div class="sv">${BRL(minEnt)}</div><div class="sl">Menor entrada</div></div>`;

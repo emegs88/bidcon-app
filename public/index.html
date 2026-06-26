@@ -104,6 +104,7 @@
 
   /* STATS / prova social */
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 0 6px}
+  .ico{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
   .stat{background:var(--carvao);border:1px solid var(--linha);border-radius:16px;padding:18px 20px;box-shadow:var(--sombra);transition:.16s cubic-bezier(.4,0,.2,1)}
   .stat:hover{border-color:var(--linha2);transform:translateY(-2px)}
   .stat .sv{font-family:var(--f-mono);font-weight:600;font-size:24px;color:var(--branco);line-height:1}
@@ -301,8 +302,8 @@
       <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
     </div>
     <div class="hcta">
-      <a class="hloja himo" href="/bidcon-imobiliaria.html">🏡 Imóveis</a>
-      <a class="hloja" href="/bidcon-lojista.html">🚗 Sou lojista</a>
+      <a class="hloja himo" href="/bidcon-imobiliaria.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis</a>
+      <a class="hloja" href="/bidcon-lojista.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Sou lojista</a>
       <a class="hzap" id="hzap" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
         Falar no WhatsApp
@@ -328,19 +329,19 @@
   <section class="oque">
     <div class="oqc">
       <span class="n">1</span>
-      <div class="ic">🎯</div>
+      <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></div>
       <h3>O que é uma carta contemplada</h3>
       <p>É uma cota de consórcio que <b>já foi sorteada</b> — o crédito está liberado. Você assume o lugar do titular e usa o valor pra comprar o bem.</p>
     </div>
     <div class="oqc">
       <span class="n">2</span>
-      <div class="ic">💰</div>
+      <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></div>
       <h3>Você paga só a entrada</h3>
       <p>Para assumir a carta, paga a <b>entrada</b> (à vista ou dando um bem na troca) e segue com as parcelas. Nada de entrada de banco nem juros de financiamento.</p>
     </div>
     <div class="oqc">
       <span class="n">3</span>
-      <div class="ic">🔑</div>
+      <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16 16l2-2M19 19l1.5-1.5"/></svg></div>
       <h3>Crédito na mão, sem espera</h3>
       <p>Com a transferência aprovada pela administradora, o <b>crédito fica disponível</b> pra usar — sem depender de sorteio ou lance, com contrato e acompanhamento Prospere.</p>
     </div>
@@ -355,13 +356,13 @@
       <div class="csrc" id="srcLine">Carregando...</div>
     </div>
     <div class="cmodo" id="cotasModo">
-      <button data-modo="market" class="on">🛒 Marketplace</button>
-      <button data-modo="leilao">🔨 Leilão</button>
+      <button data-modo="market" class="on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M2.5 3.5h2l2.2 11.2a1.4 1.4 0 0 0 1.4 1.1h7.8a1.4 1.4 0 0 0 1.4-1.1L20.5 7H6"/></svg> Marketplace</button>
+      <button data-modo="leilao"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/></svg> Leilão</button>
     </div>
   </div>
 
   <div class="leilao-aviso" id="leilaoAviso" style="display:none">
-    <span class="ico">🔨</span>
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/></svg>
     <div>Modo leilão — uma seleção de cartas com <b>as melhores oportunidades</b>, ordenadas pela <b>menor entrada</b> pra assumir. A entrada é paga à vista; o restante vira parcela. <b>Vagas limitadas — confirme a disponibilidade no atendimento.</b></div>
   </div>
 
@@ -427,16 +428,16 @@
     <p class="csub">Tudo que a administradora pede para liberar a carta sem retrabalho. Escolha o bem e o seu tipo de renda — com a documentação completa, a pré-análise sai em <b>até 1 dia útil</b>.</p>
 
     <div class="dseg" id="bemSeg">
-      <button data-bem="veiculo" class="on">🚗 Veículo</button>
-      <button data-bem="imovel">🏡 Imóvel</button>
+      <button data-bem="veiculo" class="on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Veículo</button>
+      <button data-bem="imovel"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóvel</button>
     </div>
     <div class="dseg" id="docSeg" style="margin-top:0">
-      <button data-pf="pf" class="on">👤 Pessoa Física</button>
-      <button data-pf="pj">🏢 Pessoa Jurídica</button>
+      <button data-pf="pf" class="on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/></svg> Pessoa Física</button>
+      <button data-pf="pj"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/></svg> Pessoa Jurídica</button>
     </div>
 
     <div class="dtips">
-      <div class="t">⚡ Dicas para agilizar</div>
+      <div class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 5 13h5l-1 9 8-11h-5l1-9Z"/></svg> Dicas para agilizar</div>
       <ul>
         <li>Digitalize <b>em PDF legível</b>, cada documento em um arquivo separado (foto não é indicada).</li>
         <li>Documento com mais de uma página: digitalize todas no mesmo arquivo e na ordem certa.</li>
@@ -565,7 +566,7 @@
     <!-- BLOCO DO BEM: VEÍCULO -->
     <div id="bemVeiculo">
       <div class="dveic">
-        <div class="dh"><span class="dt">🚗 Do veículo (PF e PJ)</span><span class="dbadge all">Todos</span></div>
+        <div class="dh"><span class="dt"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Do veículo (PF e PJ)</span><span class="dbadge all">Todos</span></div>
         <div class="dsub">Documentos do bem — necessários quando o veículo já está definido.</div>
         <ul>
           <li>DUT ou CRLV<small>Foto, digitalizado em PDF ou via digital.</small></li>
@@ -574,7 +575,7 @@
       </div>
 
       <div class="dtips" style="margin:18px 0 0;background:rgba(212,17,30,.05);border-color:rgba(212,17,30,.2)">
-        <div class="t" style="color:var(--vermelho-l)">📅 Ano e aceitação do veículo</div>
+        <div class="t" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg> Ano e aceitação do veículo</div>
         <ul>
           <li>O <b>ano-limite</b> aceito e o estado do veículo dependem da <b>administradora e da tabela vigente</b> — confirme sempre com o atendimento antes de fechar.</li>
           <li>A liberação final está sujeita à <b>vistoria e aprovação</b> da administradora; documentos em dia e fotos nítidas evitam recusa.</li>
@@ -601,7 +602,7 @@
 
       <div class="dcat">Do imóvel — opcional</div>
       <div class="dveic" style="background:rgba(212,17,30,.06);border-color:rgba(212,17,30,.22)">
-        <div class="dh"><span class="dt" style="color:var(--vermelho-l)">🏡 Documentos do imóvel</span><span class="dbadge one">Opcional</span></div>
+        <div class="dh"><span class="dt" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Documentos do imóvel</span><span class="dbadge one">Opcional</span></div>
         <div class="dsub">Não obrigatório na pré-análise — envie se o imóvel já estiver definido.</div>
         <ul>
           <li><b>Imóvel urbano:</b> Matrícula ou Certidão de inteiro teor<small>Atualizada, emitida pelo Registro de Imóveis.</small></li>
@@ -612,7 +613,7 @@
       </div>
 
       <div class="dtips" style="margin:18px 0 0;background:rgba(212,17,30,.05);border-color:rgba(212,17,30,.2)">
-        <div class="t" style="color:var(--vermelho-l)">🏡 Aceitação do imóvel</div>
+        <div class="t" style="color:var(--vermelho-l)"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Aceitação do imóvel</div>
         <ul>
           <li>A regularidade da matrícula e da situação cadastral do imóvel é <b>verificada na análise</b> — pendências (averbação, débitos, ônus) podem impedir a liberação.</li>
           <li>A liberação final está sujeita à <b>análise e aprovação da administradora</b>; documentação atualizada evita retrabalho.</li>
@@ -622,9 +623,9 @@
   </section>
 
   <div class="footnav">
-    <a href="/bidcon-imobiliaria.html">🏡 <b style="color:var(--azul-l)">Imóveis × cartas</b> — ache o imóvel e a carta que cobre</a>
-    <a href="/bidcon-lojista.html">🚗 <b style="color:var(--ambar-l)">Sou lojista</b> — cruze seu estoque com as cartas</a>
-    <a href="#docs">📋 <b style="color:var(--vermelho-l)">Documentos</b> — check list da pré-análise</a>
+    <a href="/bidcon-imobiliaria.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> <b style="color:var(--azul-l)">Imóveis × cartas</b> — ache o imóvel e a carta que cobre</a>
+    <a href="/bidcon-lojista.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> <b style="color:var(--ambar-l)">Sou lojista</b> — cruze seu estoque com as cartas</a>
+    <a href="#docs"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5Z"/><path d="M14 2.5V7h4M9 12h6M9 16h6"/></svg> <b style="color:var(--vermelho-l)">Documentos</b> — check list da pré-análise</a>
   </div>
 
   <div class="disc">
@@ -657,6 +658,25 @@ const BRL=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
 const NUM=v=>Number(v).toLocaleString('pt-BR');
 const tipoLabel=t=>t==='imovel'?'Imóvel':'Veículo';
 const SELO='<svg viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 1.8 3 .1.9 2.9 2.4 1.8-.9 2.9.9 2.9-2.4 1.8-.9 2.9-3 .1L12 22l-2.4-1.8-3-.1-.9-2.9L3.3 15l.9-2.9-.9-2.9 2.4-1.8.9-2.9 3-.1L12 2z" fill="#3ad17e"/><path d="M8.5 12l2.2 2.2 4.5-4.5" stroke="#04210f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* Sistema de ícones SVG modernos (line icons, font-independente — sem emoji) */
+const ICONS={
+  casa:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/>',
+  carro:'<path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/>',
+  chave:'<circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16 16l2-2M19 19l1.5-1.5"/>',
+  alvo:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  raio:'<path d="M13 2 5 13h5l-1 9 8-11h-5l1-9Z"/>',
+  troca:'<path d="M4 9h13l-3-3M20 15H7l3 3"/>',
+  martelo:'<path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/>',
+  dinheiro:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/>',
+  carrinho:'<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M2.5 3.5h2l2.2 11.2a1.4 1.4 0 0 0 1.4 1.1h7.8a1.4 1.4 0 0 0 1.4-1.1L20.5 7H6"/>',
+  doc:'<path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5Z"/><path d="M14 2.5V7h4M9 12h6M9 16h6"/>',
+  pessoa:'<circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/>',
+  predio:'<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/>',
+  pix:'<path d="M12 3.5 5 10.5 12 17.5 19 10.5 12 3.5Z"/><path d="M12 17.5v3"/>',
+  calendario:'<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>'
+};
+function ic(n,cls){return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
 
 // custo efetivo (taxa mensal real, bisseção) — só pra exibir referência ao cliente
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
@@ -690,10 +710,10 @@ function abrirDetalhe(num){
   $('mbox').innerHTML=`
     <div class="mhead">
       <div>
-        <span class="mtag ${co.t}"><span>${veic?'🚗':'🏠'}</span>${veic?'Carta de Veículo':'Carta de Imóvel'}</span>
+        <span class="mtag ${co.t}"><span>${veic?ic('carro'):ic('casa')}</span>${veic?'Carta de Veículo':'Carta de Imóvel'}</span>
         <div class="mnum">Carta contemplada nº ${co.n} · verificada pela Prospere</div>
       </div>
-      <button class="mclose" onclick="fecharDetalhe()" aria-label="Fechar">✕</button>
+      <button class="mclose" onclick="fecharDetalhe()" aria-label="Fechar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="mbody">
       <div class="mcred"><div class="l">Crédito já contemplado</div><div class="v">${BRL(co.c)}</div></div>
@@ -713,11 +733,11 @@ function abrirDetalhe(num){
       </div>
 
       <div class="mpaga">
-        <div class="t">💰 A entrada pode ser paga de 2 formas</div>
+        <div class="t">${ic('dinheiro')} A entrada pode ser paga de 2 formas</div>
         <div class="d">Você assume a carta pagando a entrada de <b>${BRL(co.e)}</b> — e essa entrada pode ser:</div>
         <div class="opts">
-          <span class="mopt"><span class="e">💵</span> Em dinheiro / PIX</span>
-          <span class="mopt"><span class="e">${veic?'🚗':'🏡'}</span> Dando ${trocaTxt}</span>
+          <span class="mopt"><span class="e">${ic('pix')}</span> Em dinheiro / PIX</span>
+          <span class="mopt"><span class="e">${veic?ic('carro'):ic('casa')}</span> Dando ${trocaTxt}</span>
         </div>
       </div>
 
@@ -782,7 +802,7 @@ function renderMarket(){
     return `
     <div class="ccard ${co.t}">
       <div class="ctop">
-        <span class="ccat"><span class="emo">${co.t==='imovel'?'🏠':'🚗'}</span>${co.t==='imovel'?'Imóvel':'Automóvel'}</span>
+        <span class="ccat"><span class="emo">${co.t==='imovel'?ic('casa'):ic('carro')}</span>${co.t==='imovel'?'Imóvel':'Automóvel'}</span>
         <span class="cnum">nº ${co.n}</span>
       </div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
@@ -790,7 +810,7 @@ function renderMarket(){
         <div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div>
         <div class="crow2"><div class="l">Parcela${co.x?` <span style="font-size:9px;color:var(--cinza2)">(${co.x}×)</span>`:''}</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">/mês</span>`:''}</div></div>
       </div>
-      <div class="cpaga"><span class="ico">💰</span><span>Entrada em <b>dinheiro</b> ou <b>${co.t==='imovel'?'imóvel/veículo':'carro'} na troca</b></span></div>
+      <div class="cpaga">${ic('dinheiro')}<span>Entrada em <b>dinheiro</b> ou <b>${co.t==='imovel'?'imóvel/veículo':'carro'} na troca</b></span></div>
       ${co.x?`<div class="ccusto"><span class="l">Custo efetivo</span><span class="v">${amCota(co).toFixed(2).replace('.',',')}% a.m.</span></div>`:''}
       <div class="cbtns">
         <a class="czap" href="${zapMarket(co)}" target="_blank" rel="noopener">Tenho interesse</a>
@@ -810,23 +830,23 @@ function renderLeilao(){
   const vis=arr.slice(0,limite);
   grid.innerHTML=vis.map((co,i)=>{
     const pos=i+1;
-    const medalha=pos===1?'🔥':'⭐';
+    const medalha=pos===1?ic('raio'):ic('alvo');
     return `
     <div class="lcard ${co.t} ${pos===1?'top1':''}">
       <div class="ltop">
         <span class="lrank"><span class="pos">${medalha}</span>${pos===1?'Top oportunidade':'Oportunidade'}</span>
         <span class="num">Carta nº ${co.n}</span>
       </div>
-      <div class="lcat"><span>${co.t==='imovel'?'🏠':'🚗'}</span>${co.t==='imovel'?'Imóvel':'Automóvel'}</div>
+      <div class="lcat"><span>${co.t==='imovel'?ic('casa'):ic('carro')}</span>${co.t==='imovel'?'Imóvel':'Automóvel'}</div>
       <div class="lcredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
-      <div class="llance"><div class="l">🔨 Entrada pra assumir</div><div class="v">${BRL(co.e)}</div></div>
+      <div class="llance"><div class="l">${ic('martelo')} Entrada pra assumir</div><div class="v">${BRL(co.e)}</div></div>
       <div class="crows">
         <div class="crow2"><div class="l">Parcela${co.x?` <span style="font-size:9px;color:var(--cinza2)">(${co.x}×)</span>`:''}</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">/mês</span>`:''}</div></div>
         <div class="crow2"><div class="l">Tipo</div><div class="v">${tipoLabel(co.t)}</div></div>
       </div>
-      <div class="cpaga"><span class="ico">💰</span><span>Entrada em <b>dinheiro</b> ou <b>${co.t==='imovel'?'imóvel/veículo':'carro'} na troca</b></span></div>
+      <div class="cpaga">${ic('dinheiro')}<span>Entrada em <b>dinheiro</b> ou <b>${co.t==='imovel'?'imóvel/veículo':'carro'} na troca</b></span></div>
       <div class="cbtns">
-        <a class="lzap" href="${zapLeilao(co)}" target="_blank" rel="noopener">🔨 Quero esta carta</a>
+        <a class="lzap" href="${zapLeilao(co)}" target="_blank" rel="noopener">${ic('martelo')} Quero esta carta</a>
         <button class="cdet" onclick="abrirDetalhe(${co.n})">Detalhes</button>
       </div>
     </div>`;}).join('');
@@ -886,8 +906,8 @@ $('srcLine').textContent=`${COTAS.length} cartas disponíveis · atualizado ${DA
   $('stats').innerHTML=`
     <div class="stat"><div class="sv"><b>${NUM(total)}</b></div><div class="sl">Cartas contempladas</div></div>
     <div class="stat"><div class="sv">R$ ${milhoes}</div><div class="sl">Em crédito disponível</div></div>
-    <div class="stat"><div class="sv">${NUM(imov)}</div><div class="sl">Imóvel 🏠</div></div>
-    <div class="stat"><div class="sv">${NUM(veic)}</div><div class="sl">Veículo 🚗</div></div>`;
+    <div class="stat"><div class="sv">${NUM(imov)}</div><div class="sl">Imóvel ${ic('casa')}</div></div>
+    <div class="stat"><div class="sv">${NUM(veic)}</div><div class="sl">Veículo ${ic('carro')}</div></div>`;
 })();
 
 render();

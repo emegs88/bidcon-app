@@ -107,7 +107,9 @@
   .vcard:hover{border-color:rgba(243,195,74,.55);transform:translateY(-4px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 22px 44px -18px rgba(227,160,8,.45)}
   .vimg{position:relative;aspect-ratio:16/10;background:var(--carvao);overflow:hidden}
   .vimg img{width:100%;height:100%;object-fit:cover;display:block}
-  .vimg .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--cinza2);font-size:40px}
+  .vimg .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--cinza2)}
+  .vimg .noimg .ico{width:46px;height:46px;opacity:.5}
+  .ico{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
   .vbadge{position:absolute;top:10px;left:10px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:11px;padding:5px 9px;border-radius:8px;backdrop-filter:blur(6px)}
   .vbadge.ok{background:rgba(31,170,89,.92);color:#04210f}
   .vbadge.no{background:rgba(140,140,149,.85);color:#fff}
@@ -230,7 +232,7 @@
     </div>
     <div class="hcta">
       <a class="hnav" href="/bidcon.html">← Marketplace</a>
-      <a class="hnav imo" href="/bidcon-imobiliaria.html">🏡 Imóveis</a>
+      <a class="hnav imo" href="/bidcon-imobiliaria.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis</a>
       <a class="hzap" id="hzap" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
         Falar no WhatsApp
@@ -250,9 +252,9 @@
   <div class="stats" id="stats"></div>
 
   <div class="tabs">
-    <button class="tab on" data-tab="estoque">🚗 Estoque parceiro × cartas</button>
-    <button class="tab" data-tab="fipe">📊 Consultor FIPE</button>
-    <button class="tab" data-tab="cartas">🔨 Cartas de veículo</button>
+    <button class="tab on" data-tab="estoque"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Estoque parceiro × cartas</button>
+    <button class="tab" data-tab="fipe"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16"/><path d="M7.5 15l3-3 2.5 2.5L18 9"/></svg> Consultor FIPE</button>
+    <button class="tab" data-tab="cartas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/></svg> Cartas de veículo</button>
   </div>
 
   <!-- ABA 1: ESTOQUE PARCEIRO -->
@@ -262,7 +264,7 @@
       <p id="estoqueSub">Carregando estoque do parceiro…</p>
     </div>
     <div class="lojabar">
-      <div class="lh">🏪 É sua loja? Cole o link do seu estoque</div>
+      <div class="lh"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5 5 4h14l1 5.5M4 9.5h16M4 9.5v10.5h16V9.5M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M9.5 20v-5h5v5"/></svg> É sua loja? Cole o link do seu estoque</div>
       <div class="lrow">
         <input id="lojaUrl" type="url" placeholder="ex: https://sualoja.com.br" autocomplete="off" spellcheck="false">
         <button class="lojabtn" id="lojaGo">Cruzar meu estoque</button>
@@ -361,6 +363,22 @@ const CARTAS=(DADOS.cotas||[]).filter(c=>c.t==='veiculo'&&c.c>0&&!c.r);
 const $=id=>document.getElementById(id);
 const BRL=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
 const NUM=v=>Number(v).toLocaleString('pt-BR');
+/* Sistema de ícones SVG modernos (line icons, font-independente — sem emoji) */
+const ICONS={
+  casa:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/>',
+  banco:'<path d="M3 9.5 12 4l9 5.5"/><path d="M5 9.5v9M19 9.5v9M9 9.5v9M15 9.5v9"/><path d="M3.5 18.5h17"/>',
+  ia:'<rect x="5" y="7" width="14" height="11" rx="2.5"/><path d="M12 4v3M8.5 11v2M15.5 11v2"/><path d="M2.5 12h2.5M19 12h2.5"/>',
+  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16 9"/>',
+  cartao:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 15h4"/>',
+  martelo:'<path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/>',
+  carro:'<path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/>',
+  grafico:'<path d="M4 4v16h16"/><path d="M7.5 15l3-3 2.5 2.5L18 9"/>',
+  loja:'<path d="M4 9.5 5 4h14l1 5.5M4 9.5h16M4 9.5v10.5h16V9.5M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M9.5 20v-5h5v5"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>'
+};
+function ic(n,cls){return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;}
+const IMG_FALLBACK=ic('carro').replace(/"/g,'&quot;');
 
 // custo efetivo (% a.m.) sobre crédito - entrada
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
@@ -453,7 +471,7 @@ function comoPagar(preco, sobra, entrada){
     `<li><span class="ps">2</span><span>Diferença de crédito ${sobra>0?`(<b>${BRL(sobra)}</b> de troco)`:''} ${sobra>0?'é':'quando houver, é'} acertada <b>em dinheiro</b> com a loja.</span></li>`,
     `<li><span class="ps pix">3</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`
   ].join('');
-  return `<div class="comopagar"><div class="cph">💳 Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
+  return `<div class="comopagar"><div class="cph">${ic('cartao')} Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
 }
 function zapCombo(combo,veic){
   const lst=combo.map(c=>`nº ${c.n} (crédito ${BRL(c.c)}, entrada ${BRL(c.e)})`).join(' + ');
@@ -475,7 +493,7 @@ const MAX_IDADE_VEIC=8;
 const ANO_ATUAL=new Date().getFullYear();
 const idadeVeic=v=>(v.ano&&v.ano>0)?ANO_ATUAL-Number(v.ano):null;
 const dentroPolitica=v=>{const i=idadeVeic(v);return i===null||i<=MAX_IDADE_VEIC;};
-function setLojaStatus(msg,cls){const el=$('lojaStatus');el.textContent=msg||'';el.className='lstatus'+(cls?' '+cls:'');}
+function setLojaStatus(msg,cls,icone){const el=$('lojaStatus');el.className='lstatus'+(cls?' '+cls:'');if(icone&&ICONS[icone]){el.innerHTML=ic(icone)+' ';const sp=document.createElement('span');sp.textContent=msg||'';el.appendChild(sp);}else{el.textContent=msg||'';}}
 async function carregarEstoque(){
   const lojaUrl=(localStorage.getItem(LOJA_KEY)||'').trim();
   const api=lojaUrl?`${API360}/api/estoque?url=${encodeURIComponent(lojaUrl)}`:API360+'/api/estoque';
@@ -484,7 +502,7 @@ async function carregarEstoque(){
     const r=await fetch(api);
     const j=await r.json();
     if(!j.ok){
-      if(lojaUrl){setLojaStatus('✕ '+(j.error||'Não consegui ler essa loja.'),'err');}
+      if(lojaUrl){setLojaStatus((j.error||'Não consegui ler essa loja.'),'err','x');}
       $('vgrid').innerHTML=`<div class="cempty">${lojaUrl?(j.error||'Não consegui ler o estoque dessa loja.'):'Não consegui carregar o estoque agora. Recarregue em instantes.'}</div>`;
       $('estoqueSub').textContent='Estoque indisponível.';
       return;
@@ -495,12 +513,12 @@ async function carregarEstoque(){
     const foraPolitica=brutos.length-permitidos.length;
     ESTOQUE=permitidos.map(v=>({...v,cartas:cartasPara(v.preco),combo:comboPara(v.preco)}));
     if(j.parceiro){$('estoqueSub').textContent=`Estoque de ${j.parceiro} cruzado com ${CARTAS.length} cartas de veículo · em tempo real`;$('discParceiro').textContent=j.parceiro;}
-    if(foraPolitica>0&&$('politicaAviso')){$('politicaAviso').style.display='';$('politicaAviso').innerHTML=`🛈 <b>${NUM(foraPolitica)}</b> veículo(s) acima de ${MAX_IDADE_VEIC} anos de uso não aparecem aqui — o consórcio de veículo aceita carros com até <b>${MAX_IDADE_VEIC} anos</b> (a partir de ${ANO_ATUAL-MAX_IDADE_VEIC}).`;}
+    if(foraPolitica>0&&$('politicaAviso')){$('politicaAviso').style.display='';$('politicaAviso').innerHTML=`${ic('info')} <b>${NUM(foraPolitica)}</b> veículo(s) acima de ${MAX_IDADE_VEIC} anos de uso não aparecem aqui — o consórcio de veículo aceita carros com até <b>${MAX_IDADE_VEIC} anos</b> (a partir de ${ANO_ATUAL-MAX_IDADE_VEIC}).`;}
     if(j.fonte){$('footFonte').href=j.fonte;$('footFonte').textContent=j.custom?j.parceiro:'parceiro';}
-    if(lojaUrl)setLojaStatus(`✓ ${NUM(j.total)} veículo(s) da sua loja cruzados com ${CARTAS.length} cartas.`,'ok');
+    if(lojaUrl)setLojaStatus(`${NUM(j.total)} veículo(s) da sua loja cruzados com ${CARTAS.length} cartas.`,'ok','check');
     renderEstoque();
   }catch(e){
-    if(lojaUrl)setLojaStatus('✕ Erro ao consultar essa loja.','err');
+    if(lojaUrl)setLojaStatus('Erro ao consultar essa loja.','err','x');
     $('vgrid').innerHTML='<div class="cempty">Não consegui carregar o estoque agora. Tente recarregar a página em instantes.</div>';
     $('estoqueSub').textContent='Estoque temporariamente indisponível.';
   }
@@ -540,7 +558,7 @@ function renderEstoque(){
     let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
     if(v.cartas.length){
       const cu=custosDe(best);
-      matchHtml=`<div class="vmatch has"><div class="mh">🔨 ${v.cartas.length} carta(s) cobrem este veículo</div>`+
+      matchHtml=`<div class="vmatch has"><div class="mh">${ic('martelo')} ${v.cartas.length} carta(s) cobrem este veículo</div>`+
         top.map(c=>`<div class="mcarta"><span class="mn">nº ${c.n}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
       `</div>`;
@@ -548,7 +566,7 @@ function renderEstoque(){
     }else if(v.combo){
       matchHtml='';
       const cu=custosDe(v.combo.combo);
-      comboHtml=`<div class="vcombo"><div class="mh">🤖 <span class="iatag">junção IA</span> ${v.combo.combo.length} cartas juntas cobrem este veículo</div>`+
+      comboHtml=`<div class="vcombo"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${v.combo.combo.length} cartas juntas cobrem este veículo</div>`+
         v.combo.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
         `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · sobra <b>${BRL(v.combo.sobra)}</b></span></div>`+
         `<div class="ccusto">${custoLinhas(cu)}</div></div>`;
@@ -559,8 +577,8 @@ function renderEstoque(){
     return `
     <div class="vcard">
       <div class="vimg">
-        ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>🚗</div>'">`:'<div class="noimg">🚗</div>'}
-        <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?'✓ dá pra fechar':(v.combo?'🤖 dá com junção':'sem carta')}</span>
+        ${v.img?`<img src="${v.img}" alt="${v.nome}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=&quot;noimg&quot;>'+IMG_FALLBACK+'</div>'">`:`<div class="noimg">${ic('carro')}</div>`}
+        <span class="vbadge ${v.cartas.length?'ok':(v.combo?'ok':'no')}">${v.cartas.length?ic('check')+' dá pra fechar':(v.combo?ic('ia')+' dá com junção':'sem carta')}</span>
         ${v.ano?`<span class="vano">${v.ano}</span>`:''}
       </div>
       <div class="vbody">
@@ -570,7 +588,7 @@ function renderEstoque(){
         ${comboHtml}
         ${pagarHtml}
         ${v.link?`<a class="vlink" href="${v.link}" target="_blank" rel="noopener">Ver anúncio na loja ↗</a>`:''}
-        ${best?`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">🔨 Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">🤖 Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
+        ${best?`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">${ic('martelo')} Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
       </div>
     </div>`;}).join('');
   $('vMore').style.display=arr.length>vLimite?'block':'none';
@@ -616,23 +634,23 @@ $('fpAno').addEventListener('change',async e=>{
     $('fpMeta').textContent=`${j.marca} ${j.modelo} · ${j.anoModelo} · ${j.combustivel} · ref. ${j.referencia}`;
     const cs=cartasPara(j.valor);
     if(cs.length){
-      $('fpCartas').innerHTML=`<div class="vmatch has" style="grid-column:1/-1"><div class="mh">🔨 ${cs.length} carta(s) cobrem ${j.valorTexto||BRL(j.valor)}</div></div>`+
+      $('fpCartas').innerHTML=`<div class="vmatch has" style="grid-column:1/-1"><div class="mh">${ic('martelo')} ${cs.length} carta(s) cobrem ${j.valorTexto||BRL(j.valor)}</div></div>`+
         cs.slice(0,6).map(renderCartaMini).join('');
     }else{
       const cb=comboPara(j.valor);
       $('fpCartas').innerHTML=cb?
-        `<div class="vcombo" style="grid-column:1/-1"><div class="mh">🤖 <span class="iatag">junção IA</span> ${cb.combo.length} cartas juntas cobrem ${j.valorTexto||BRL(j.valor)}</div>`+
+        `<div class="vcombo" style="grid-column:1/-1"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${cb.combo.length} cartas juntas cobrem ${j.valorTexto||BRL(j.valor)}</div>`+
           cb.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
           `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada <b>${BRL(cb.ent)}</b> · sobra <b>${BRL(cb.sobra)}</b></span></div>`+
           `<div class="ccusto">${custoLinhas(custosDe(cb.combo))}</div>`+
-          `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:j.modelo,preco:j.valor})}" target="_blank" rel="noopener">🤖 Fechar juntando ${cb.combo.length} cartas</a></div>`:
+          `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:j.modelo,preco:j.valor})}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${cb.combo.length} cartas</a></div>`:
         `<div class="cempty" style="padding:24px">Nenhuma carta (nem junção) cobre esse valor hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
     }
   }catch(e){$('fpValor').textContent='—';$('fpMeta').textContent='Erro ao consultar a FIPE.';}
 });
 function renderCartaMini(co){
   return `<div class="ccard">
-    <div class="ctop"><span class="ccat">🚗 nº ${co.n}</span><span class="cnum">sobra ${BRL(co.sobra||0)}</span></div>
+    <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum">sobra ${BRL(co.sobra||0)}</span></div>
     <div class="ccredito"><div class="l">Crédito</div><div class="v">${BRL(co.c)}</div></div>
     <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
     <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
@@ -651,7 +669,7 @@ function renderCartas(){
   const vis=arr.slice(0,cLimite);
   grid.innerHTML=vis.map(co=>`
     <div class="ccard">
-      <div class="ctop"><span class="ccat">🚗 Veículo</span><span class="cnum">nº ${co.n}</span></div>
+      <div class="ctop"><span class="ccat">${ic('carro')} Veículo</span><span class="cnum">nº ${co.n}</span></div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
       <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
       <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
@@ -670,7 +688,7 @@ $('cMore').addEventListener('click',()=>{cLimite+=18;renderCartas();});
   const minEnt=CARTAS.length?CARTAS.reduce((m,c)=>Math.min(m,c.e),Infinity):0;
   const mi=v=>v>=1e6?(v/1e6).toFixed(1).replace('.',',')+' mi':BRL(v);
   $('stats').innerHTML=`
-    <div class="stat"><div class="sv">${NUM(totalCartas)}</div><div class="sl">Cartas de veículo 🚗</div></div>
+    <div class="stat"><div class="sv">${NUM(totalCartas)}</div><div class="sl">Cartas de veículo ${ic('carro')}</div></div>
     <div class="stat"><div class="sv">R$ ${mi(credito)}</div><div class="sl">Em crédito disponível</div></div>
     <div class="stat"><div class="sv">${BRL(maxCred)}</div><div class="sl">Maior crédito</div></div>
     <div class="stat"><div class="sv">${BRL(minEnt)}</div><div class="sl">Menor entrada</div></div>`;
