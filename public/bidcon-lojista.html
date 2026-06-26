@@ -200,6 +200,14 @@
   .vzap.combo{background:var(--verde);color:#04210f}
   .vzap.combo:hover{background:var(--verde-l)}
   .iatag{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono';font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(58,209,126,.16);color:var(--verde-l);border:1px solid rgba(58,209,126,.4);border-radius:6px;padding:2px 7px}
+  /* bloco "Como pagar" — regra de pagamento (carta cobre, diferença em dinheiro, entrada via PIX) */
+  .comopagar{background:linear-gradient(135deg,rgba(31,170,89,.10),rgba(31,170,89,.02));border:1px solid rgba(58,209,126,.32);border-radius:10px;padding:11px 12px}
+  .comopagar .cph{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--verde-l);font-weight:800;margin-bottom:8px}
+  .cpsteps{list-style:none;display:flex;flex-direction:column;gap:7px}
+  .cpsteps li{display:flex;align-items:flex-start;gap:9px;font-size:12px;color:#d2d2d8;line-height:1.4}
+  .cpsteps li b{color:#fff;font-weight:800}
+  .cpsteps .ps{flex:0 0 18px;width:18px;height:18px;border-radius:50%;background:var(--linha2);color:#fff;font-family:'JetBrains Mono';font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .cpsteps .ps.pix{background:var(--verde);color:#04210f}
 </style>
 </head>
 <body>
@@ -357,8 +365,10 @@ function cartasPara(preco){
 }
 
 function zapVeiculo(co,veic){
+  const sobra=(veic&&veic.preco)?Math.max(0,co.c-veic.preco):0;
   const txt=`Olá! Sou lojista. Quero usar a carta contemplada nº ${co.n} (crédito ${BRL(co.c)}, entrada ${BRL(co.e)}) `+
-    (veic?`pra fechar o ${veic.nome} (${BRL(veic.preco)}). `:`pra um veículo. `)+`Como funciona?`;
+    (veic?`pra fechar o ${veic.nome} (${BRL(veic.preco)}). `:`pra um veículo. `)+
+    `Entendi que a entrada de ${BRL(co.e)} é paga via PIX${sobra>0?` e a diferença de ${BRL(sobra)} é acertada em dinheiro com a loja`:''}. Como funciona?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 function zapCarta(co){
@@ -423,12 +433,25 @@ function custoLinhas(cu){
     `<div class="cline"><span>Taxa de transferência</span><span>${BRL(cu.transf)}</span></div>`+
     `<div class="cline"><span>Seguro de vida <i style="color:var(--cinza);font-style:normal">/mês</i></span><span>${BRL(cu.seguro)}</span></div>`;
 }
+// "Como pagar" — política de crédito de veículo da Prospere:
+//  • a carta precisa ter crédito >= preço do veículo (garantido em cartasPara);
+//  • a diferença (sobra), quando o crédito passa do preço, é acertada em dinheiro
+//    com a loja;  • a entrada/sinal da carta é paga somente via PIX.
+function comoPagar(preco, sobra, entrada){
+  const passos=[
+    `<li><span class="ps">1</span><span>A carta cobre <b>todo o valor</b> do veículo (${BRL(preco)}) direto com a loja.</span></li>`,
+    `<li><span class="ps">2</span><span>Diferença de crédito ${sobra>0?`(<b>${BRL(sobra)}</b> de troco)`:''} ${sobra>0?'é':'quando houver, é'} acertada <b>em dinheiro</b> com a loja.</span></li>`,
+    `<li><span class="ps pix">3</span><span>A entrada da carta (<b>${BRL(entrada)}</b>) é paga <b>somente via PIX</b>.</span></li>`
+  ].join('');
+  return `<div class="comopagar"><div class="cph">💳 Como pagar</div><ul class="cpsteps">${passos}</ul></div>`;
+}
 function zapCombo(combo,veic){
   const lst=combo.map(c=>`nº ${c.n} (crédito ${BRL(c.c)}, entrada ${BRL(c.e)})`).join(' + ');
   const cred=combo.reduce((s,c)=>s+c.c,0),ent=combo.reduce((s,c)=>s+c.e,0);
+  const sobra=(veic&&veic.preco)?Math.max(0,cred-veic.preco):0;
   const txt=`Olá! Sou lojista. Quero juntar as cartas contempladas ${lst} `+
     (veic?`pra fechar o ${veic.nome} (${BRL(veic.preco)}). `:`. `)+
-    `Crédito somado ${BRL(cred)}, entrada somada ${BRL(ent)}. Como funciona a junção?`;
+    `Crédito somado ${BRL(cred)}, entrada somada ${BRL(ent)} (paga via PIX)${sobra>0?`, diferença de ${BRL(sobra)} em dinheiro com a loja`:''}. Como funciona a junção?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(txt)}`;
 }
 
@@ -504,13 +527,14 @@ function renderEstoque(){
   const vis=arr.slice(0,vLimite);
   grid.innerHTML=vis.map(v=>{
     const top=v.cartas.slice(0,2);
-    let matchHtml,best=v.cartas[0],comboHtml='';
+    let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
     if(v.cartas.length){
       const cu=custosDe(best);
       matchHtml=`<div class="vmatch has"><div class="mh">🔨 ${v.cartas.length} carta(s) cobrem este veículo</div>`+
         top.map(c=>`<div class="mcarta"><span class="mn">nº ${c.n}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
         `<div class="ccusto">${custoLinhas(cu)}</div>`+
       `</div>`;
+      pagarHtml=comoPagar(v.preco,best.sobra,best.e);
     }else if(v.combo){
       matchHtml='';
       const cu=custosDe(v.combo.combo);
@@ -518,6 +542,7 @@ function renderEstoque(){
         v.combo.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
         `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · sobra <b>${BRL(v.combo.sobra)}</b></span></div>`+
         `<div class="ccusto">${custoLinhas(cu)}</div></div>`;
+      pagarHtml=comoPagar(v.preco,v.combo.sobra,v.combo.ent);
     }else{
       matchHtml=`<div class="vmatch"><div class="mh none">Nenhuma carta cobre este valor hoje</div><div class="mcarta"><span class="md">Fale com a gente — buscamos uma carta sob medida.</span></div></div>`;
     }
@@ -533,6 +558,7 @@ function renderEstoque(){
         <div class="vpreco"><span class="l">Preço na loja</span>${BRL(v.preco)}</div>
         ${matchHtml}
         ${comboHtml}
+        ${pagarHtml}
         ${v.link?`<a class="vlink" href="${v.link}" target="_blank" rel="noopener">Ver anúncio na loja ↗</a>`:''}
         ${best?`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">🔨 Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">🤖 Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
       </div>
