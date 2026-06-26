@@ -9,9 +9,10 @@
 <meta name="keywords" content="carta contemplada veículo, consórcio de carro contemplado, cartas para lojista, vender carro com consórcio, FIPE, estoque de veículos, crédito de veículo, Prospere Consórcios, bidcon lojista">
 <meta name="author" content="Prospere Consórcios">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<meta name="theme-color" content="#0d0d0f">
+<meta name="theme-color" content="#080B14">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="512x512" href="/img/bidcon-icone-selo.png">
+<link rel="apple-touch-icon" href="/img/bidcon-app-icon.png">
 <link rel="canonical" href="https://www.bidcon.com.br/bidcon-lojista">
 <!-- Open Graph / WhatsApp / redes -->
 <meta property="og:type" content="website">
@@ -20,33 +21,40 @@
 <meta property="og:url" content="https://www.bidcon.com.br/bidcon-lojista">
 <meta property="og:title" content="bidcon Lojista · Estoque parceiro × Cartas contempladas | Prospere Consórcios">
 <meta property="og:description" content="Cruze seu estoque de veículos com cartas de consórcio já contempladas e veja na hora quais carros dá pra fechar. Consultor FIPE integrado.">
-<meta property="og:image" content="https://www.bidcon.com.br/og.png">
+<meta property="og:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="bidcon Lojista · Estoque de veículos cruzado com cartas de consórcio contempladas">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="bidcon Lojista · Estoque × Cartas contempladas | Prospere">
 <meta name="twitter:description" content="Cruze seu estoque de veículos com cartas de consórcio já contempladas. Consultor FIPE integrado.">
-<meta name="twitter:image" content="https://www.bidcon.com.br/og.png">
+<meta name="twitter:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
 <!-- Dados estruturados (Google) -->
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.bidcon.com.br/#org","name":"Prospere Consórcios","alternateName":"bidcon","url":"https://www.bidcon.com.br/","areaServed":"BR","contactPoint":{"@type":"ContactPoint","contactType":"sales","telephone":"+55-19-99756-1909","email":"contato@prospere.com.br","availableLanguage":["pt-BR"]},"email":"contato@prospere.com.br","address":{"@type":"PostalAddress","streetAddress":"Av. da Emancipação, 3770 - Parque dos Pinheiros","addressLocality":"Hortolândia","addressRegion":"SP","postalCode":"13184-654","addressCountry":"BR"},"parentOrganization":{"@type":"Organization","name":"Prospere Consórcios","url":"https://www.prospere.com.br/"},"sameAs":["https://www.prospere.com.br/"]},{"@type":"Service","name":"Cartas de consórcio contempladas para compra de veículos","serviceType":"Crédito de veículo via consórcio contemplado","provider":{"@id":"https://www.bidcon.com.br/#org"},"areaServed":"BR","audience":{"@type":"Audience","audienceType":"Lojistas e compradores de veículos"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"bidcon","item":"https://www.bidcon.com.br/"},{"@type":"ListItem","position":2,"name":"Lojista","item":"https://www.bidcon.com.br/bidcon-lojista"}]}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --preto:#08080b;--carvao:#101015;--carvao2:#16161c;--linha:#26262e;--linha2:#34343d;
-    --branco:#f6f6f8;--cinza:#8e8e98;--cinza2:#56565f;
-    --vermelho:#D4111E;--vermelho-l:#ff4651;--vermelho-d:#9c0c16;
-    --verde:#1faa59;--verde-l:#3ad17e;--ambar:#e3a008;--ambar-l:#f3c34a;
-    --azul:#2f6df0;--azul-l:#5b93ff;--raio:22px;--raio-sm:14px;
+    --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);--linha2:rgba(255,255,255,.15);
+    --branco:#f6f6f8;--cinza:#93A0B8;--cinza2:#5E6B85;
+    /* marca bidcon = azul fintech (o "n" do logo e seleção). --vermelho* remapeado p/ azul */
+    --vermelho:#1E6FE6;--vermelho-l:#36C5F0;--vermelho-d:#1657c2;
+    --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
+    --azul:#2E7BF0;--azul-l:#5b93ff;--raio:22px;--raio-sm:14px;
+    /* tokens de marca */
+    --b1:#8FB7FF;--b2:#36C5F0;--b3:#1E6FE6;--accent:#2E7BF0;
+    --grad-azul:linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6);
     --sombra:0 1px 2px rgba(0,0,0,.4),0 12px 32px -12px rgba(0,0,0,.7);
     --sombra-ambar:0 8px 30px -10px rgba(227,160,8,.4);
     --pill:999px;
-    --f-display:'Sora',system-ui,sans-serif;--f-body:'Inter',system-ui,sans-serif;--f-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --f-display:'Poppins','Sora',system-ui,sans-serif;--f-body:'Inter',system-ui,sans-serif;--f-mono:'IBM Plex Mono',ui-monospace,monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--preto);color:var(--branco);font-family:var(--f-body);line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
   body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(1100px 520px at 78% -8%,rgba(227,160,8,.08),transparent 60%),radial-gradient(900px 480px at 8% 0%,rgba(31,170,89,.06),transparent 55%)}
   .wrap{max-width:1240px;margin:0 auto;padding:0 26px}
-  ::selection{background:var(--vermelho);color:#fff}
+  ::selection{background:var(--b2);color:#04121f}
   a{color:inherit}
 
   /* HEADER */
@@ -54,7 +62,7 @@
   .hbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:13px}
   .blogo{display:inline-flex;align-items:baseline;font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1;color:#fff}
-  .blogo b{color:var(--vermelho-l);font-weight:700}
+  .blogo b{font-weight:800;background:var(--grad-azul);-webkit-background-clip:text;background-clip:text;color:transparent}
   .blogo .seg{color:var(--ambar-l);font-weight:700}
   .blogo .seal{display:inline-flex;width:.86em;height:.86em;margin:0 -.02em;transform:translateY(.06em)}
   .blogo .seal svg{width:100%;height:100%;display:block}
@@ -220,6 +228,43 @@
   .cpsteps li b{color:#fff;font-weight:800}
   .cpsteps .ps{flex:0 0 18px;width:18px;height:18px;border-radius:50%;background:var(--linha2);color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:1px}
   .cpsteps .ps.pix{background:var(--verde);color:#04210f}
+  /* ===== RESUMO escaneável (frente do card) ===== */
+  .vres{background:var(--carvao);border:1px solid var(--linha);border-radius:11px;padding:11px 12px;display:flex;flex-direction:column;gap:9px}
+  .vres.ok{border-color:rgba(58,209,126,.34);background:linear-gradient(135deg,rgba(31,170,89,.07),rgba(255,255,255,.012))}
+  .vres.none{border-color:var(--linha)}
+  .vres-cobre{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:#eaf1ff;line-height:1.3}
+  .vres.ok .vres-cobre{color:var(--verde-l)}
+  .vres-cobre b{color:#fff;font-weight:800}
+  .vres.ok .vres-cobre b{color:var(--verde-l)}
+  .vres-cobre .ico{flex:0 0 auto;width:17px;height:17px}
+  .vres-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .vrc{display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,.03);border:1px solid var(--linha);border-radius:9px;padding:8px 10px;min-width:0}
+  .vrc .vrl{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--cinza);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vrc .vrl small{font-weight:600;text-transform:none;letter-spacing:0;color:var(--verde-l)}
+  .vrc .vrv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vrc .vrv.pos{color:var(--verde-l)}
+  .vres-cartas{font-size:11px;color:var(--cinza);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .vres-cartas b{color:#eaf1ff;font-weight:700}
+  .mhn{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:7px;background:var(--azul);color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:11px}
+  /* ===== DETALHES (<details>) ===== */
+  .vdet{border:1px solid var(--linha);border-radius:10px;background:rgba(255,255,255,.018);overflow:hidden}
+  .vdet>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;color:var(--azul-l);padding:10px 12px;user-select:none;transition:.15s}
+  .vdet>summary::-webkit-details-marker{display:none}
+  .vdet>summary .ico{width:15px;height:15px}
+  .vdet>summary:hover{background:rgba(46,123,240,.07)}
+  .vdet[open]>summary{border-bottom:1px solid var(--linha);color:#eaf1ff}
+  .vdet-in{padding:11px 12px;display:flex;flex-direction:column;gap:11px}
+  .dlbl{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--cinza);font-weight:800}
+  .dcards{display:flex;flex-direction:column;gap:6px}
+  .dcarta{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--linha);border-radius:8px;padding:7px 10px}
+  .dcarta .dn{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:12px;color:#eaf1ff;flex:0 0 auto}
+  .dcarta .dd{font-size:11px;color:var(--cinza);text-align:right}
+  .dcarta .dd b{color:#cfdcff;font-weight:700;font-family:var(--f-mono)}
+  .dmais{font-size:10.5px;color:var(--cinza);text-align:center;padding:5px;font-style:italic}
+  .vdet .ccusto{margin-top:0}
+  .vzap.alt{background:var(--azul);color:#fff;box-shadow:0 6px 18px -8px rgba(46,123,240,.6)}
+  .vzap.alt:hover{background:var(--azul-l)}
+  @media(max-width:360px){.vres-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -227,7 +272,7 @@
 <header>
   <div class="wrap hbar">
     <div class="brand">
-      <div class="blogo" aria-label="bidcon Lojista">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--vermelho-l)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="var(--vermelho-l)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b> <span class="seg">Lojista</span></div>
+      <div class="blogo" aria-label="bidcon Lojista">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><linearGradient id="bgrad" x1="0" y1=".15" x2="1" y2=".85"><stop offset="0" stop-color="#8FB7FF"/><stop offset=".45" stop-color="#36C5F0"/><stop offset="1" stop-color="#1E6FE6"/></linearGradient></defs><circle cx="50" cy="50" r="44" fill="none" stroke="url(#bgrad)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="url(#bgrad)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b> <span class="seg">Lojista</span></div>
       <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
     </div>
     <div class="hcta">
@@ -383,7 +428,9 @@ const IMG_FALLBACK=ic('carro').replace(/"/g,'&quot;');
 // custo efetivo (% a.m.) sobre crédito - entrada
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
-const pctAm=co=>co.x?amCota(co).toFixed(2).replace('.',',')+'% a.m.':'à vista';
+// Rotulado como "custo mensal ~X%" para NÃO confundir com taxa de juros de
+// financiamento — consórcio não tem juros (é taxa de adm. diluída).
+const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
 
 // cartas que cobrem um preço (credito >= preco), ranqueadas pela menor sobra e menor entrada
 function cartasPara(preco){
@@ -547,6 +594,16 @@ function estoqueFiltrado(){
   if(q)arr=arr.filter(v=>v.nome.toLowerCase().includes(q));
   return arr.sort((a,b)=>a.preco-b.preco);
 }
+// lista completa de cartas que cobrem (dentro do <details>)
+function cartasDetalhe(cartas){
+  const MOSTRA=6;
+  const vis=cartas.slice(0,MOSTRA);
+  const resto=cartas.length-vis.length;
+  return `<div class="dcards">`+
+    vis.map(c=>`<div class="dcarta"><span class="dn">nº ${c.n}</span><span class="dd">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b></span></div>`).join('')+
+    (resto>0?`<div class="dmais">+${NUM(resto)} outra(s) carta(s) disponíveis no atendimento</div>`:'')+
+  `</div>`;
+}
 function renderEstoque(){
   const arr=estoqueFiltrado();
   $('vCount').innerHTML=`<b>${NUM(arr.length)}</b> veículo(s)`;
@@ -554,25 +611,46 @@ function renderEstoque(){
   if(!arr.length){grid.innerHTML='<div class="cempty">Nenhum veículo com esse filtro. Ajuste o preço, a busca ou mostre todos.</div>';$('vMore').style.display='none';return;}
   const vis=arr.slice(0,vLimite);
   grid.innerHTML=vis.map(v=>{
-    const top=v.cartas.slice(0,2);
-    let matchHtml,best=v.cartas[0],comboHtml='',pagarHtml='';
+    const best=v.cartas[0];
+    // ----- monta RESUMO (frente) + DETALHES (<details>) conforme o caso -----
+    let resumoHtml,detalheHtml='',ctaHtml;
     if(v.cartas.length){
-      const cu=custosDe(best);
-      matchHtml=`<div class="vmatch has"><div class="mh">${ic('martelo')} ${v.cartas.length} carta(s) cobrem este veículo</div>`+
-        top.map(c=>`<div class="mcarta"><span class="mn">nº ${c.n}</span><span class="md">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b> · ${pctAm(c)}</span></div>`).join('')+
-        `<div class="ccusto">${custoLinhas(cu)}</div>`+
+      const sobra=Math.max(0,best.c-v.preco), cu=custosDe(best);
+      resumoHtml=`<div class="vres ok">`+
+        `<div class="vres-cobre">${ic('check')} A carta cobre <b>100%</b> do preço da loja</div>`+
+        `<div class="vres-grid">`+
+          `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
+          `<div class="vrc"><span class="vrl">Troco pra você</span><span class="vrv ${sobra>0?'pos':''}">${sobra>0?BRL(sobra):'—'}</span></div>`+
+        `</div>`+
+        `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b></div>`+
       `</div>`;
-      pagarHtml=comoPagar(v.preco,best.sobra,best.e);
+      detalheHtml=`<details class="vdet"><summary>${ic('info')} Ver todas as cartas, custos e como pagar</summary><div class="vdet-in">`+
+        `<div class="dlbl">Cartas que cobrem este veículo</div>`+
+        cartasDetalhe(v.cartas)+
+        `<div class="ccusto">${custoLinhas(cu)}</div>`+
+        comoPagar(v.preco,best.sobra,best.e)+
+      `</div></details>`;
+      ctaHtml=`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">${ic('martelo')} Fechar com a carta nº ${best.n}</a>`;
     }else if(v.combo){
-      matchHtml='';
       const cu=custosDe(v.combo.combo);
-      comboHtml=`<div class="vcombo"><div class="mh">${ic('ia')} <span class="iatag">junção IA</span> ${v.combo.combo.length} cartas juntas cobrem este veículo</div>`+
-        v.combo.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
-        `<div class="ctot"><span>Crédito somado <b>${BRL(v.combo.cred)}</b></span><span>Entrada <b>${BRL(v.combo.ent)}</b> · sobra <b>${BRL(v.combo.sobra)}</b></span></div>`+
-        `<div class="ccusto">${custoLinhas(cu)}</div></div>`;
-      pagarHtml=comoPagar(v.preco,v.combo.sobra,v.combo.ent);
+      resumoHtml=`<div class="vres ok">`+
+        `<div class="vres-cobre">${ic('ia')} <span class="iatag">junção IA</span> <b>${NUM(v.combo.combo.length)}</b> cartas juntas cobrem <b>100%</b></div>`+
+        `<div class="vres-grid">`+
+          `<div class="vrc"><span class="vrl">Entrada somada <small>(via PIX)</small></span><span class="vrv">${BRL(v.combo.ent)}</span></div>`+
+          `<div class="vrc"><span class="vrl">Troco pra você</span><span class="vrv ${v.combo.sobra>0?'pos':''}">${v.combo.sobra>0?BRL(v.combo.sobra):'—'}</span></div>`+
+        `</div>`+
+        `<div class="vres-cartas">Crédito somado <b>${BRL(v.combo.cred)}</b></div>`+
+      `</div>`;
+      detalheHtml=`<details class="vdet"><summary>${ic('info')} Ver as cartas, custos e como pagar</summary><div class="vdet-in">`+
+        `<div class="dlbl">Cartas juntas para este veículo</div>`+
+        `<div class="dcards">`+v.combo.combo.map(c=>`<div class="dcarta"><span class="dn">nº ${c.n}</span><span class="dd">crédito <b>${BRL(c.c)}</b> · entrada <b>${BRL(c.e)}</b></span></div>`).join('')+`</div>`+
+        `<div class="ccusto">${custoLinhas(cu)}</div>`+
+        comoPagar(v.preco,v.combo.sobra,v.combo.ent)+
+      `</div></details>`;
+      ctaHtml=`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${NUM(v.combo.combo.length)} cartas</a>`;
     }else{
-      matchHtml=`<div class="vmatch"><div class="mh none">Nenhuma carta cobre este valor hoje</div><div class="mcarta"><span class="md">Fale com a gente — buscamos uma carta sob medida.</span></div></div>`;
+      resumoHtml=`<div class="vres none"><div class="vres-cobre">Nenhuma carta cobre este valor hoje</div><div class="vres-cartas">Fale com a gente — buscamos uma carta sob medida.</div></div>`;
+      ctaHtml=`<a class="vzap alt" href="${zapVeiculo({n:'—',c:v.preco,e:0},v)}" target="_blank" rel="noopener">${ic('martelo')} Quero uma carta pra este</a>`;
     }
     return `
     <div class="vcard">
@@ -584,11 +662,10 @@ function renderEstoque(){
       <div class="vbody">
         <div class="vnome">${v.nome}</div>
         <div class="vpreco"><span class="l">Preço na loja</span>${BRL(v.preco)}</div>
-        ${matchHtml}
-        ${comboHtml}
-        ${pagarHtml}
+        ${resumoHtml}
+        ${detalheHtml}
         ${v.link?`<a class="vlink" href="${v.link}" target="_blank" rel="noopener">Ver anúncio na loja ↗</a>`:''}
-        ${best?`<a class="vzap" href="${zapVeiculo(best,v)}" target="_blank" rel="noopener">${ic('martelo')} Fechar com a carta nº ${best.n}</a>`:(v.combo?`<a class="vzap combo" href="${zapCombo(v.combo.combo,v)}" target="_blank" rel="noopener">${ic('ia')} Fechar juntando ${v.combo.combo.length} cartas</a>`:`<span class="vzap off">Sem carta disponível</span>`)}
+        ${ctaHtml}
       </div>
     </div>`;}).join('');
   $('vMore').style.display=arr.length>vLimite?'block':'none';
