@@ -10,6 +10,8 @@
 <meta name="author" content="Prospere Consórcios">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#0d0d0f">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
 <link rel="canonical" href="https://www.bidcon.com.br/bidcon-imobiliaria">
 <!-- Open Graph / WhatsApp / redes -->
 <meta property="og:type" content="website">
@@ -50,9 +52,11 @@
   header{border-bottom:1px solid var(--linha);background:rgba(7,7,9,.72);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.2)}
   .hbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:13px}
-  .blogo{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1;color:#fff}
+  .blogo{display:inline-flex;align-items:baseline;font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1;color:#fff}
   .blogo b{color:var(--vermelho-l);font-weight:700}
   .blogo .seg{color:var(--azul-l);font-weight:700}
+  .blogo .seal{display:inline-flex;width:.86em;height:.86em;margin:0 -.02em;transform:translateY(.06em)}
+  .blogo .seal svg{width:100%;height:100%;display:block}
   .bsel{font-size:10.5px;color:var(--cinza);letter-spacing:.08em;text-transform:uppercase;border-left:1px solid var(--linha);padding-left:13px}
   .bsel b{color:#cfcfd4;font-weight:600}
   .hzap{display:inline-flex;align-items:center;gap:8px;background:var(--verde);color:#04210f;font-weight:700;font-size:13px;text-decoration:none;border-radius:var(--pill);padding:11px 18px;transition:.16s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 18px -8px rgba(31,170,89,.6)}
@@ -193,7 +197,7 @@
 <header>
   <div class="wrap hbar">
     <div class="brand">
-      <div class="blogo">bid<b>con</b> <span class="seg">Imobiliária</span></div>
+      <div class="blogo" aria-label="bidcon Imobiliária">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--vermelho-l)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="var(--vermelho-l)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b> <span class="seg">Imobiliária</span></div>
       <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
     </div>
     <div class="hcta">
