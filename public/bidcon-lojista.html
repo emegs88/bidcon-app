@@ -109,6 +109,19 @@
   .ccount{font-size:12px;color:var(--cinza);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
   .ccount b{color:#fff}
 
+  /* PRÉ-ANÁLISE POR RENDA */
+  .ana-head{background:var(--carvao2);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:16px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--sombra)}
+  .ana-ia{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--verde-l);font-weight:700;margin-bottom:7px}
+  .ana-txt{font-size:14px;color:#e8e8ec;line-height:1.6}
+  .ana-txt b{color:#fff}
+  .ana-sub{font-size:11.5px;color:var(--cinza);margin-top:8px;line-height:1.5}
+  .selo{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:7px}
+  .selo.ok{background:rgba(31,170,89,.16);color:var(--verde-l)}
+  .selo.lim{background:rgba(227,160,8,.16);color:var(--ambar-l)}
+  .selo.no{background:rgba(220,70,70,.16);color:#ff8c8c}
+  .ana-pct{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700}
+  .ana-empty{background:var(--carvao);border:1px solid var(--linha);border-radius:14px;padding:18px 20px;color:#cfcfd4;font-size:13.5px;line-height:1.6}
+
   /* GRID DE VEÍCULOS (estoque) */
   .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
   .vcard{background:var(--carvao2);border:1px solid var(--linha);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;transition:.18s cubic-bezier(.4,0,.2,1);box-shadow:var(--sombra)}
@@ -342,6 +355,7 @@
     <button class="tab on" data-tab="estoque"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Estoque parceiro × cartas</button>
     <button class="tab" data-tab="fipe"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16"/><path d="M7.5 15l3-3 2.5 2.5L18 9"/></svg> Consultor FIPE</button>
     <button class="tab" data-tab="cartas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6 9 11M4 21l6-6M11.5 8.5l4-4 4 4-4 4"/><path d="M8.5 11.5l4 4"/></svg> Cartas de veículo</button>
+    <button class="tab" data-tab="analise"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16 3.5 21 5l-1.5 5"/></svg> Pré-análise por renda</button>
   </div>
 
   <!-- ABA 1: ESTOQUE PARCEIRO -->
@@ -453,6 +467,28 @@
     </div>
     <div class="vgrid" id="cgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))"></div>
     <button class="cmore" id="cMore" style="display:none">Ver mais cartas</button>
+  </section>
+
+  <!-- ABA 4: PRÉ-ANÁLISE POR RENDA -->
+  <section class="panel" id="panel-analise">
+    <div class="sec-head">
+      <h2>Pré-análise <b>por renda</b></h2>
+      <p>Informe a renda do cliente e veja, na hora, quais cartas têm <b>parcela que cabe no orçamento</b> (até 30% da renda). Estimativa local — sem consulta a banco, sem compromisso.</p>
+    </div>
+    <div class="cf">
+      <div class="cf-grp">
+        <label for="anaRenda">Renda mensal bruta</label>
+        <div class="faval-in"><span>R$</span><input id="anaRenda" type="text" inputmode="numeric" autocomplete="off" placeholder="5.000"></div>
+      </div>
+      <div class="cf-grp">
+        <label for="anaBem">Valor do veículo desejado <small>(opcional)</small></label>
+        <div class="faval-in"><span>R$</span><input id="anaBem" type="text" inputmode="numeric" autocomplete="off" placeholder="opcional"></div>
+      </div>
+      <div class="cf-grp" style="align-self:flex-end">
+        <button class="lojabtn" id="anaGo">Analisar minhas opções</button>
+      </div>
+    </div>
+    <div id="anaRes"></div>
   </section>
 
   <div class="disc">
@@ -1023,7 +1059,7 @@ function renderCartas(){
     <div class="ccard">
       <div class="ctop"><span class="ccat">${ic('carro')} Veículo</span><span class="cnum">nº ${co.n}</span></div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
-      <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
+      <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Custo mensal</div><div class="v">${co.p?BRL(co.p):'—'}${co.x?`<span style="font-size:11px;color:var(--cinza)">/mês ×${co.x}</span>`:''}</div></div></div>
       <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
       <a class="czap" href="${zapCarta(co)}" target="_blank" rel="noopener">Tenho interesse</a>
     </div>`).join('');
@@ -1031,6 +1067,84 @@ function renderCartas(){
 }
 $('cOrd').addEventListener('change',()=>{cLimite=18;renderCartas();});
 $('cMore').addEventListener('click',()=>{cLimite+=18;renderCartas();});
+
+// ===== ABA 4: PRÉ-ANÁLISE POR RENDA (motor inteligente local) =====
+// Regra: parcela mensal ≤ 30% da renda bruta = "cabe no orçamento".
+// 30% < parcela ≤ 35% = "no limite". Acima de 35% = fora. Estimativa local,
+// sem consulta a banco e sem aprovação de crédito (a bidcon não é financeira).
+const TETO_OK=0.30, TETO_LIM=0.35;
+function faixaRenda(p,renda){const pct=renda>0?p/renda:1;if(pct<=TETO_OK)return{k:'ok',rot:'cabe no orçamento',pct};if(pct<=TETO_LIM)return{k:'lim',rot:'no limite',pct};return{k:'no',rot:'acima de 35%',pct};}
+function analisaRenda(renda,opts){
+  opts=opts||{};
+  const base=pontuaCartas(CARTAS.slice());
+  const com=base.map(c=>({...c,fx:faixaRenda(c.p,renda)}));
+  let cabem=com.filter(c=>c.fx.k!=='no');
+  if(opts.valorBem>0)cabem=cabem.filter(c=>c.c>=opts.valorBem); // só cartas que cobrem o bem desejado
+  const elegiveis=cabem.filter(c=>c.fx.k==='ok').sort((a,b)=>b.score-a.score||a.fx.pct-b.fx.pct);
+  const noLimite=cabem.filter(c=>c.fx.k==='lim').sort((a,b)=>b.score-a.score||a.fx.pct-b.fx.pct);
+  const melhor=elegiveis[0]||noLimite[0]||null;
+  let comboAlt=null;
+  if(!elegiveis.length&&opts.valorBem>0){const cb=comboPara(opts.valorBem);if(cb&&cb.combo)comboAlt=cb;}
+  return {elegiveis,noLimite,melhor,comboAlt,renda,valorBem:opts.valorBem||0};
+}
+function leituraInteligente(res){
+  const r=res.renda, n=res.elegiveis.length;
+  if(res.melhor){
+    const m=res.melhor, pct=(m.fx.pct*100).toFixed(0);
+    if(n>0)return `Com renda de <b>${BRL(r)}</b>, encontrei <b>${n} carta(s)</b> com parcela dentro de 30% do orçamento.`+
+      ` A mais equilibrada é a <b>nº ${m.n}</b> — crédito ${BRL(m.c)}, entrada ${BRL(m.e)} e <b>custo mensal de ${BRL(m.p)}</b> (≈${pct}% da renda).`;
+    return `Com renda de <b>${BRL(r)}</b>, nenhuma carta fica dentro dos 30% ideais, mas a <b>nº ${m.n}</b> chega perto:`+
+      ` custo mensal de <b>${BRL(m.p)}</b> (≈${pct}% da renda). Vale conversar sobre uma carta menor ou uma junção.`;
+  }
+  if(res.comboAlt)return `Nenhuma carta única cabe em 30% da renda de <b>${BRL(r)}</b> pra esse valor. Uma <b>junção de cartas</b> menores pode reduzir a parcela — veja a alternativa abaixo.`;
+  return `Com renda de <b>${BRL(r)}</b> não encontrei carta com parcela dentro do orçamento agora. Fale com a Prospere — dá pra montar uma junção ou ajustar o valor do bem.`;
+}
+function cardAnalise(c){
+  const pct=(c.fx.pct*100).toFixed(0);
+  return `<div class="ccard">
+    <div class="ctop"><span class="ccat">${ic('carro')} Veículo</span><span class="cnum">nº ${c.n}</span></div>
+    <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(c.c)}</div></div>
+    <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(c.e)}</div></div><div class="crow2"><div class="l">Custo mensal</div><div class="v">${BRL(c.p)}${c.x?`<span style="font-size:11px;color:var(--cinza)">/mês ×${c.x}</span>`:''}</div></div></div>
+    <div class="ccusto"><span><span class="selo ${c.fx.k}">${c.fx.rot}</span> · <span class="ana-pct">${pct}% da renda</span></span><span class="v">${pctAm(c)}</span></div>
+    <a class="czap" href="${zapCarta(c)}" target="_blank" rel="noopener">Tenho interesse</a>
+  </div>`;
+}
+function renderAnalise(){
+  const renda=parseBRLInput($('anaRenda').value);
+  const valorBem=parseBRLInput($('anaBem').value);
+  const box=$('anaRes');
+  if(!(renda>0)){box.innerHTML='<div class="ana-empty">Informe a <b>renda mensal</b> pra eu calcular o que cabe no orçamento.</div>';return;}
+  const res=analisaRenda(renda,{valorBem});
+  let html=`<div class="ana-head">
+    <div class="ana-ia">${ic('grafico')} análise inteligente · estimativa</div>
+    <div class="ana-txt">${leituraInteligente(res)}</div>
+    <div class="ana-sub">Critério: parcela até <b>30% da renda</b> = cabe no orçamento; até 35% = no limite. Estimativa local, <b>não é aprovação de crédito</b> — a bidcon/Prospere não é instituição financeira. Consórcio é compra programada. Valores sujeitos à análise da administradora.</div>
+  </div>`;
+  if(res.elegiveis.length){
+    html+=`<div class="ccount" style="margin:4px 2px 10px"><b>${NUM(res.elegiveis.length)}</b> carta(s) dentro de 30% da renda</div>`;
+    html+=`<div class="vgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">${res.elegiveis.slice(0,12).map(cardAnalise).join('')}</div>`;
+  }
+  if(res.noLimite.length){
+    html+=`<div class="ccount" style="margin:18px 2px 10px">No limite (30%–35% da renda) · <b>${NUM(res.noLimite.length)}</b></div>`;
+    html+=`<div class="vgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">${res.noLimite.slice(0,6).map(cardAnalise).join('')}</div>`;
+  }
+  if(res.comboAlt){
+    const cb=res.comboAlt;
+    html+=`<div class="ana-head" style="border-left-color:var(--ambar);margin-top:18px">
+      <div class="ana-ia" style="color:var(--ambar-l)">${ic('grafico')} alternativa · junção de cartas</div>
+      <div class="ana-txt">Juntando <b>${cb.combo.length} cartas</b> dá pra chegar em <b>${BRL(cb.cred)}</b> de crédito com entrada de <b>${BRL(cb.ent)}</b> e custo mensal somado de <b>${BRL(cb.combo.reduce((s,c)=>s+c.p,0))}</b>.</div>
+      <div class="ana-sub">A junção combina créditos já contemplados; viabilidade e transferência ficam sujeitas à administradora.</div>
+    </div>`;
+  }
+  if(!res.elegiveis.length&&!res.noLimite.length&&!res.comboAlt){
+    html+=`<div class="ana-empty">Nenhuma carta com parcela dentro do orçamento pra esses dados. Reduza o valor do bem ou <a href="https://wa.me/${CWA}?text=${encodeURIComponent('Olá! Fiz a pré-análise por renda na bidcon e queria ajuda pra encontrar uma carta que caiba no meu orçamento.')}" target="_blank" rel="noopener" style="color:var(--verde-l)">fale com a Prospere</a>.</div>`;
+  }
+  box.innerHTML=html;
+}
+// máscara de moeda nos inputs
+['anaRenda','anaBem'].forEach(id=>{$(id).addEventListener('input',e=>{const v=parseBRLInput(e.target.value);e.target.value=v?NUM(v):'';});});
+$('anaGo').addEventListener('click',renderAnalise);
+$('anaRenda').addEventListener('keydown',e=>{if(e.key==='Enter')renderAnalise();});
 
 // ===== STATS =====
 (function(){

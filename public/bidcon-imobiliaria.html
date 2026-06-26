@@ -102,6 +102,24 @@
   .ccount{font-size:12px;color:var(--cinza);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
   .ccount b{color:#fff}
 
+  /* PRÉ-ANÁLISE POR RENDA */
+  .lojabtn{background:var(--verde);color:#04210f;font-family:var(--f-body);font-weight:700;font-size:13px;border:0;border-radius:var(--pill);padding:12px 22px;cursor:pointer;transition:.16s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 18px -8px rgba(31,170,89,.6)}
+  .lojabtn:hover{background:var(--verde-l);transform:translateY(-1px)}
+  .faval-in{display:flex;align-items:center;gap:6px;background:var(--carvao);border:1px solid var(--linha2);border-radius:9px;padding:0 12px;height:44px;min-width:160px}
+  .faval-in span{font-family:var(--f-mono);font-weight:700;color:var(--cinza);font-size:15px}
+  .faval-in input{background:transparent;border:0;outline:none;color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;width:100%}
+  .ana-head{background:var(--carvao2);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:16px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--sombra)}
+  .ana-ia{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--verde-l);font-weight:700;margin-bottom:7px}
+  .ana-txt{font-size:14px;color:#e8e8ec;line-height:1.6}
+  .ana-txt b{color:#fff}
+  .ana-sub{font-size:11.5px;color:var(--cinza);margin-top:8px;line-height:1.5}
+  .selo{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:7px}
+  .selo.ok{background:rgba(31,170,89,.16);color:var(--verde-l)}
+  .selo.lim{background:rgba(227,160,8,.16);color:var(--ambar-l)}
+  .selo.no{background:rgba(220,70,70,.16);color:#ff8c8c}
+  .ana-pct{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700}
+  .ana-empty{background:var(--carvao);border:1px solid var(--linha);border-radius:14px;padding:18px 20px;color:#cfcfd4;font-size:13.5px;line-height:1.6}
+
   .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
   .vcard{background:var(--carvao2);border:1px solid var(--linha);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;transition:.18s cubic-bezier(.4,0,.2,1);box-shadow:var(--sombra)}
   .vcard:hover{border-color:rgba(91,147,255,.55);transform:translateY(-4px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 22px 44px -18px rgba(46,123,240,.5)}
@@ -267,6 +285,7 @@
   <div class="tabs">
     <button class="tab on" data-tab="imoveis"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis × cartas</button>
     <button class="tab" data-tab="cartas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 9.5v9M19 9.5v9M9 9.5v9M15 9.5v9"/><path d="M3.5 18.5h17"/></svg> Cartas de imóvel</button>
+    <button class="tab" data-tab="analise"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16 3.5 21 5l-1.5 5"/></svg> Pré-análise por renda</button>
   </div>
 
   <!-- ABA 1: IMÓVEIS -->
@@ -337,6 +356,28 @@
     </div>
     <div class="vgrid" id="cgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))"></div>
     <button class="cmore" id="cMore" style="display:none">Ver mais cartas</button>
+  </section>
+
+  <!-- ABA 3: PRÉ-ANÁLISE POR RENDA -->
+  <section class="panel" id="panel-analise">
+    <div class="sec-head">
+      <h2>Pré-análise <b>por renda</b></h2>
+      <p>Informe a renda do cliente e veja, na hora, quais cartas de imóvel têm <b>parcela que cabe no orçamento</b> (até 30% da renda). Estimativa local — sem consulta a banco, sem compromisso.</p>
+    </div>
+    <div class="cf">
+      <div class="cf-grp">
+        <label for="anaRenda">Renda mensal bruta</label>
+        <div class="faval-in"><span>R$</span><input id="anaRenda" type="text" inputmode="numeric" autocomplete="off" placeholder="8.000"></div>
+      </div>
+      <div class="cf-grp">
+        <label for="anaBem">Valor do imóvel desejado <small>(opcional)</small></label>
+        <div class="faval-in"><span>R$</span><input id="anaBem" type="text" inputmode="numeric" autocomplete="off" placeholder="opcional"></div>
+      </div>
+      <div class="cf-grp" style="align-self:flex-end">
+        <button class="lojabtn" id="anaGo">Analisar minhas opções</button>
+      </div>
+    </div>
+    <div id="anaRes"></div>
   </section>
 
   <div class="disc">
@@ -648,7 +689,7 @@ function renderCartas(){
     <div class="ccard">
       <div class="ctop"><span class="ccat">${ic('casa')} Imóvel</span><span class="cnum">nº ${co.n}</span></div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
-      <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">×${co.x}</span>`:''}</div></div></div>
+      <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Custo mensal</div><div class="v">${co.p?BRL(co.p):'—'}${co.x?`<span style="font-size:11px;color:var(--cinza)">/mês ×${co.x}</span>`:''}</div></div></div>
       <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
       <a class="czap" href="${zapCarta(co)}" target="_blank" rel="noopener">Tenho interesse</a>
     </div>`).join('');
@@ -657,6 +698,84 @@ function renderCartas(){
 $('cOrd').addEventListener('change',()=>{cLimite=18;renderCartas();});
 $('cBusca').addEventListener('input',()=>{cLimite=18;renderCartas();});
 $('cMore').addEventListener('click',()=>{cLimite+=18;renderCartas();});
+
+// ===== ABA 3: PRÉ-ANÁLISE POR RENDA (motor inteligente local) =====
+// Regra: parcela mensal ≤ 30% da renda bruta = "cabe no orçamento".
+// 30% < parcela ≤ 35% = "no limite". Acima de 35% = fora. Estimativa local,
+// sem consulta a banco e sem aprovação de crédito (a bidcon não é financeira).
+const anaParse=s=>{const n=Number(String(s).replace(/[^\d]/g,''));return isFinite(n)?n:0;};
+const TETO_OK=0.30, TETO_LIM=0.35;
+function faixaRenda(p,renda){const pct=renda>0?p/renda:1;if(pct<=TETO_OK)return{k:'ok',rot:'cabe no orçamento',pct};if(pct<=TETO_LIM)return{k:'lim',rot:'no limite',pct};return{k:'no',rot:'acima de 35%',pct};}
+function analisaRenda(renda,opts){
+  opts=opts||{};
+  const base=pontuaCartas(CARTAS.slice());
+  const com=base.map(c=>({...c,fx:faixaRenda(c.p,renda)}));
+  let cabem=com.filter(c=>c.fx.k!=='no');
+  if(opts.valorBem>0)cabem=cabem.filter(c=>c.c>=opts.valorBem);
+  const elegiveis=cabem.filter(c=>c.fx.k==='ok').sort((a,b)=>b.score-a.score||a.fx.pct-b.fx.pct);
+  const noLimite=cabem.filter(c=>c.fx.k==='lim').sort((a,b)=>b.score-a.score||a.fx.pct-b.fx.pct);
+  const melhor=elegiveis[0]||noLimite[0]||null;
+  let comboAlt=null;
+  if(!elegiveis.length&&opts.valorBem>0){const cb=comboPara(opts.valorBem);if(cb&&cb.combo)comboAlt=cb;}
+  return {elegiveis,noLimite,melhor,comboAlt,renda,valorBem:opts.valorBem||0};
+}
+function leituraInteligente(res){
+  const r=res.renda, n=res.elegiveis.length;
+  if(res.melhor){
+    const m=res.melhor, pct=(m.fx.pct*100).toFixed(0);
+    if(n>0)return `Com renda de <b>${BRL(r)}</b>, encontrei <b>${n} carta(s)</b> de imóvel com parcela dentro de 30% do orçamento.`+
+      ` A mais equilibrada é a <b>nº ${m.n}</b> — crédito ${BRL(m.c)}, entrada ${BRL(m.e)} e <b>custo mensal de ${BRL(m.p)}</b> (≈${pct}% da renda).`;
+    return `Com renda de <b>${BRL(r)}</b>, nenhuma carta fica dentro dos 30% ideais, mas a <b>nº ${m.n}</b> chega perto:`+
+      ` custo mensal de <b>${BRL(m.p)}</b> (≈${pct}% da renda). Vale conversar sobre uma carta menor ou uma junção.`;
+  }
+  if(res.comboAlt)return `Nenhuma carta única cabe em 30% da renda de <b>${BRL(r)}</b> pra esse valor. Uma <b>junção de cartas</b> menores pode reduzir a parcela — veja a alternativa abaixo.`;
+  return `Com renda de <b>${BRL(r)}</b> não encontrei carta com parcela dentro do orçamento agora. Fale com a Prospere — dá pra montar uma junção ou ajustar o valor do imóvel.`;
+}
+function cardAnalise(c){
+  const pct=(c.fx.pct*100).toFixed(0);
+  return `<div class="ccard">
+    <div class="ctop"><span class="ccat">${ic('casa')} Imóvel</span><span class="cnum">nº ${c.n}</span></div>
+    <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(c.c)}</div></div>
+    <div class="crows"><div class="crow2"><div class="l">Entrada</div><div class="v">${BRL(c.e)}</div></div><div class="crow2"><div class="l">Custo mensal</div><div class="v">${BRL(c.p)}${c.x?`<span style="font-size:11px;color:var(--cinza)">/mês ×${c.x}</span>`:''}</div></div></div>
+    <div class="ccusto"><span><span class="selo ${c.fx.k}">${c.fx.rot}</span> · <span class="ana-pct">${pct}% da renda</span></span><span class="v">${pctAm(c)}</span></div>
+    <a class="czap" href="${zapCarta(c)}" target="_blank" rel="noopener">Tenho interesse</a>
+  </div>`;
+}
+function renderAnalise(){
+  const renda=anaParse($('anaRenda').value);
+  const valorBem=anaParse($('anaBem').value);
+  const box=$('anaRes');
+  if(!(renda>0)){box.innerHTML='<div class="ana-empty">Informe a <b>renda mensal</b> pra eu calcular o que cabe no orçamento.</div>';return;}
+  const res=analisaRenda(renda,{valorBem});
+  let html=`<div class="ana-head">
+    <div class="ana-ia">${ic('ia')} análise inteligente · estimativa</div>
+    <div class="ana-txt">${leituraInteligente(res)}</div>
+    <div class="ana-sub">Critério: parcela até <b>30% da renda</b> = cabe no orçamento; até 35% = no limite. Estimativa local, <b>não é aprovação de crédito</b> — a bidcon/Prospere não é instituição financeira. Consórcio é compra programada. Valores sujeitos à análise da administradora.</div>
+  </div>`;
+  if(res.elegiveis.length){
+    html+=`<div class="ccount" style="margin:4px 2px 10px"><b>${NUM(res.elegiveis.length)}</b> carta(s) dentro de 30% da renda</div>`;
+    html+=`<div class="vgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">${res.elegiveis.slice(0,12).map(cardAnalise).join('')}</div>`;
+  }
+  if(res.noLimite.length){
+    html+=`<div class="ccount" style="margin:18px 2px 10px">No limite (30%–35% da renda) · <b>${NUM(res.noLimite.length)}</b></div>`;
+    html+=`<div class="vgrid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">${res.noLimite.slice(0,6).map(cardAnalise).join('')}</div>`;
+  }
+  if(res.comboAlt){
+    const cb=res.comboAlt;
+    html+=`<div class="ana-head" style="border-left-color:var(--ambar);margin-top:18px">
+      <div class="ana-ia" style="color:var(--ambar-l)">${ic('cartas')} alternativa · junção de cartas</div>
+      <div class="ana-txt">Juntando <b>${cb.combo.length} cartas</b> dá pra chegar em <b>${BRL(cb.cred)}</b> de crédito com entrada de <b>${BRL(cb.ent)}</b> e custo mensal somado de <b>${BRL(cb.combo.reduce((s,c)=>s+c.p,0))}</b>.</div>
+      <div class="ana-sub">A junção combina créditos já contemplados; viabilidade e transferência ficam sujeitas à administradora.</div>
+    </div>`;
+  }
+  if(!res.elegiveis.length&&!res.noLimite.length&&!res.comboAlt){
+    html+=`<div class="ana-empty">Nenhuma carta com parcela dentro do orçamento pra esses dados. Reduza o valor do imóvel ou <a href="https://wa.me/${CWA}?text=${encodeURIComponent('Olá! Fiz a pré-análise por renda na bidcon e queria ajuda pra encontrar uma carta de imóvel que caiba no meu orçamento.')}" target="_blank" rel="noopener" style="color:var(--verde-l)">fale com a Prospere</a>.</div>`;
+  }
+  box.innerHTML=html;
+}
+['anaRenda','anaBem'].forEach(id=>{$(id).addEventListener('input',e=>{const v=anaParse(e.target.value);e.target.value=v?NUM(v):'';});});
+$('anaGo').addEventListener('click',renderAnalise);
+$('anaRenda').addEventListener('keydown',e=>{if(e.key==='Enter')renderAnalise();});
 
 // ===== STATS =====
 (function(){
