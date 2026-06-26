@@ -268,6 +268,21 @@
   .trv.pos{color:var(--verde-l)}
   .trh-nota{margin-top:12px;font-size:12px;color:#cfcfd4;line-height:1.5}
   @media(max-width:560px){.trh-grid{grid-template-columns:1fr 1fr}}
+  /* campo Valor pra troca (avaliacao editavel) */
+  .faval{margin-top:16px;background:var(--carvao2);border:1px solid var(--linha);border-radius:12px;padding:14px 15px}
+  .faval>label{display:block;font-family:var(--f-display);font-weight:700;font-size:13px;color:#fff;margin-bottom:9px}
+  .faval>label small{font-weight:500;font-size:11px;color:var(--cinza)}
+  .faval-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .faval-in{display:flex;align-items:center;gap:6px;background:var(--carvao);border:1px solid var(--linha2);border-radius:9px;padding:0 12px;height:44px;flex:1;min-width:150px}
+  .faval-in span{font-family:var(--f-mono);font-weight:700;color:var(--cinza);font-size:15px}
+  .faval-in input{flex:1;background:none;border:0;outline:0;color:var(--ambar-l);font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:19px;min-width:0}
+  .faval-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .achip{background:var(--carvao);border:1px solid var(--linha);color:var(--cinza);font-family:var(--f-display);font-weight:700;font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:.12s}
+  .achip:hover{color:#fff;border-color:var(--linha2)}
+  .achip.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  .faval-hint{margin-top:9px;font-size:11.5px;color:var(--cinza)}
+  .faval-hint b{color:#cfcfd4}
+  @media(max-width:480px){.faval-chips{width:100%}.achip{flex:1;text-align:center}}
   .mhn{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:7px;background:var(--azul);color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:11px}
   /* ===== DETALHES (<details>) ===== */
   .vdet{border:1px solid var(--linha);border-radius:10px;background:rgba(255,255,255,.018);overflow:hidden}
@@ -398,6 +413,18 @@
         <div class="fmodo" id="fpModo" style="display:none">
           <button class="fmb on" data-modo="troca">Carro na troca <small>(o carro é a entrada)</small></button>
           <button class="fmb" data-modo="cobre">Carta que cobre o valor</button>
+        </div>
+        <div class="faval" id="fpAval" style="display:none">
+          <label for="fpAvalIn">Valor pra troca <small>(o que a loja paga pelo carro — vira a entrada)</small></label>
+          <div class="faval-row">
+            <div class="faval-in"><span>R$</span><input id="fpAvalIn" type="text" inputmode="numeric" autocomplete="off"></div>
+            <div class="faval-chips">
+              <button class="achip" data-pct="0">FIPE cheia</button>
+              <button class="achip on" data-pct="30">−30%</button>
+              <button class="achip" data-pct="40">−40%</button>
+            </div>
+          </div>
+          <div class="faval-hint" id="fpAvalHint"></div>
         </div>
         <div class="ftroca" id="fpTroca"></div>
         <div class="fcartas" id="fpCartas"></div>
@@ -813,36 +840,62 @@ $('fpAno').addEventListener('change',async e=>{
     $('fpValor').textContent=j.valorTexto||BRL(j.valor);
     $('fpMeta').textContent=`${j.marca} ${j.modelo} · ${j.anoModelo} · ${j.combustivel} · ref. ${j.referencia}`;
     FIPE_ATUAL={valor:j.valor,valorTexto:j.valorTexto||BRL(j.valor),nome:`${j.marca} ${j.modelo} ${j.anoModelo}`,modelo:j.modelo};
+    AVAL_VALOR=null; // novo carro: recalcula o valor pra troca sugerido (FIPE - AVAL_PCT)
     $('fpModo').style.display='flex';
     renderFipeModo();
   }catch(e){$('fpValor').textContent='—';$('fpMeta').textContent='Erro ao consultar a FIPE.';FIPE_ATUAL=null;}
 });
+// "Valor pra troca": valor que a loja/bidcon paga pelo carro (vira a entrada).
+// Sugerido = FIPE menos um % (padrão 30%), mas é editável livremente.
+let AVAL_PCT=30;        // % abaixo da FIPE sugerido pelo chip ativo
+let AVAL_VALOR=null;    // valor avaliado em uso (numérico)
+function avalSugerido(fipe,pct){return Math.round((fipe*(1-(pct/100)))/100)*100;} // arredonda p/ centena
+function parseBRLInput(s){const n=Number(String(s).replace(/[^\d]/g,''));return isFinite(n)?n:0;}
+function fmtAvalInput(v){return v?Number(v).toLocaleString('pt-BR'):'';}
 // alterna entre "carro na troca" (carro = entrada) e "carta que cobre o valor"
 function renderFipeModo(){
   if(!FIPE_ATUAL)return;
   const modo=(document.querySelector('.fmb.on')||{}).dataset?document.querySelector('.fmb.on').dataset.modo:'troca';
-  if(modo==='troca'){ $('fpCartas').innerHTML=''; renderTroca(FIPE_ATUAL); }
-  else { $('fpTroca').innerHTML=''; renderCobre(FIPE_ATUAL); }
+  if(modo==='troca'){
+    $('fpCartas').innerHTML='';
+    // valor avaliado padrão = FIPE - AVAL_PCT (só recalcula quando troca de carro ou chip)
+    if(AVAL_VALOR==null)AVAL_VALOR=avalSugerido(FIPE_ATUAL.valor,AVAL_PCT);
+    $('fpAval').style.display='block';
+    $('fpAvalIn').value=fmtAvalInput(AVAL_VALOR);
+    atualizaAvalHint();
+    renderTroca(FIPE_ATUAL,AVAL_VALOR);
+  }else{
+    $('fpAval').style.display='none';$('fpTroca').innerHTML='';
+    renderCobre(FIPE_ATUAL);
+  }
 }
-// CARRO NA TROCA: o valor do carro é a ENTRADA; mostra crédito liberado, custo efetivo e score
-function renderTroca(car){
-  const cs=cartasPorTroca(car.valor);
+function atualizaAvalHint(){
+  if(!FIPE_ATUAL){$('fpAvalHint').textContent='';return;}
+  const dif=FIPE_ATUAL.valor-AVAL_VALOR;
+  $('fpAvalHint').innerHTML=`FIPE de referência: <b>${FIPE_ATUAL.valorTexto}</b>`+
+    (AVAL_VALOR<FIPE_ATUAL.valor?` · troca <b>${BRL(dif)}</b> abaixo da FIPE`:(AVAL_VALOR>FIPE_ATUAL.valor?` · troca <b>${BRL(-dif)}</b> acima da FIPE`:` · igual à FIPE`));
+}
+// CARRO NA TROCA: o valor avaliado (pra troca) é a ENTRADA; mostra crédito liberado, custo efetivo e score
+function renderTroca(car,entrada){
+  const val=entrada>0?entrada:car.valor;
+  const cs=cartasPorTroca(val);
   if(!cs.length){
-    $('fpTroca').innerHTML=`<div class="cempty" style="padding:22px;grid-column:1/-1">Com ${car.valorTexto} de entrada não há carta disponível hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
+    $('fpTroca').innerHTML=`<div class="cempty" style="padding:22px;grid-column:1/-1">Com ${BRL(val)} de entrada não há carta disponível hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
     return;
   }
   const best=cs[0];
   const head=`<div class="trh" style="grid-column:1/-1">`+
     `<div class="trh-l">${ic('carro')} Carro na troca como entrada</div>`+
     `<div class="trh-grid">`+
-      `<div class="trc"><span class="trl">Vale de entrada <small>(FIPE)</small></span><span class="trv">${car.valorTexto}</span></div>`+
+      `<div class="trc"><span class="trl">Valor pra troca</span><span class="trv">${BRL(val)}</span></div>`+
       `<div class="trc"><span class="trl">Crédito que libera</span><span class="trv pos">${BRL(best.c)}</span></div>`+
       `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAm(best)}</span></div>`+
       `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
     `</div>`+
     `<div class="trh-nota">A carta sugerida é a <b>nº ${best.n}</b>: o carro cobre a entrada de ${BRL(best.e)}${best.troco>0?` e ainda sobram ${BRL(best.troco)} pra você`:''}.</div>`+
   `</div>`;
-  const lista=cs.slice(0,6).map(c=>renderTrocaMini(c,car)).join('');
+  const carRef={nome:car.nome,valor:val,modelo:car.modelo};
+  const lista=cs.slice(0,6).map(c=>renderTrocaMini(c,carRef)).join('');
   $('fpTroca').innerHTML=head+lista;
 }
 function renderTrocaMini(co,car){
@@ -878,6 +931,27 @@ document.querySelectorAll('.fmb').forEach(b=>b.addEventListener('click',()=>{
   b.classList.add('on');
   renderFipeModo();
 }));
+// chips de % (FIPE cheia / −30% / −40%) recalculam o valor pra troca sugerido
+document.querySelectorAll('.achip').forEach(ch=>ch.addEventListener('click',()=>{
+  if(!FIPE_ATUAL)return;
+  document.querySelectorAll('.achip').forEach(x=>x.classList.remove('on'));
+  ch.classList.add('on');
+  AVAL_PCT=Number(ch.dataset.pct)||0;
+  AVAL_VALOR=avalSugerido(FIPE_ATUAL.valor,AVAL_PCT);
+  $('fpAvalIn').value=fmtAvalInput(AVAL_VALOR);
+  atualizaAvalHint();
+  renderTroca(FIPE_ATUAL,AVAL_VALOR);
+}));
+// edição livre do valor pra troca (loja/bidcon ajusta) — desmarca o chip de %
+(function(){const inp=$('fpAvalIn');if(!inp)return;
+  inp.addEventListener('input',()=>{
+    const v=parseBRLInput(inp.value);
+    inp.value=fmtAvalInput(v);
+    AVAL_VALOR=v;
+    document.querySelectorAll('.achip').forEach(x=>x.classList.remove('on'));
+    if(FIPE_ATUAL){atualizaAvalHint();renderTroca(FIPE_ATUAL,AVAL_VALOR);}
+  });
+})();
 function renderCartaMini(co){
   return `<div class="ccard">
     <div class="ctop"><span class="ccat">${ic('carro')} nº ${co.n}</span><span class="cnum">sobra ${BRL(co.sobra||0)}</span></div>
