@@ -99,6 +99,11 @@
   .hero .selos{display:flex;gap:14px 26px;flex-wrap:wrap;margin-top:26px}
   .hero .selo{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#cfcfd4;font-weight:500}
   .hero .selo svg{width:18px;height:18px;flex:none}
+  /* B5 — faixa de confiança institucional (prova social verificável) */
+  .trust{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:22px auto 4px;max-width:980px}
+  .trust .tchip{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#cfcfd4;background:var(--carvao2);border:1px solid var(--linha2);border-radius:var(--pill);padding:9px 15px}
+  .trust .tchip svg{width:15px;height:15px;flex:none;color:var(--azul-l)}
+  .trust .tchip b{color:var(--branco);font-weight:700}
 
   /* O QUE É — explicação rápida */
   .oque{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0 6px}
@@ -334,6 +339,12 @@
       <div class="selo"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#1faa59"/><path d="M8 12l2.5 2.5L16 9" stroke="#04210f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Acompanhamento Prospere em cada etapa</div>
     </div>
   </section>
+
+  <div class="trust" aria-label="Sinais de confiança">
+    <span class="tchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Uma marca do <b>Grupo Prospere</b></span>
+    <span class="tchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>Administradora <b>autorizada pelo BC</b></span>
+    <span class="tchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Dados protegidos — <b>LGPD</b></span>
+  </div>
 
   <section class="oque">
     <div class="oqc">
