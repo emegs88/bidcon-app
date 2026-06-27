@@ -108,6 +108,31 @@
   .faval-in{display:flex;align-items:center;gap:6px;background:var(--carvao);border:1px solid var(--linha2);border-radius:9px;padding:0 12px;height:44px;min-width:160px}
   .faval-in span{font-family:var(--f-mono);font-weight:700;color:var(--cinza);font-size:15px}
   .faval-in input{background:transparent;border:0;outline:none;color:#fff;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;width:100%}
+  /* IMÓVEL NA TROCA → entrada da carta (espelha o bloco da lojista) */
+  .faval{margin-top:16px;background:var(--carvao2);border:1px solid var(--linha);border-radius:12px;padding:14px 15px}
+  .faval>label{display:block;font-family:var(--f-display);font-weight:700;font-size:13px;color:#fff;margin-bottom:9px}
+  .faval>label small{font-weight:500;font-size:11px;color:var(--cinza)}
+  .faval-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .faval-row .faval-in{flex:1;min-width:150px}
+  .faval-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .achip{background:var(--carvao);border:1px solid var(--linha);color:var(--cinza);font-family:var(--f-display);font-weight:700;font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:.12s}
+  .achip:hover{color:#fff;border-color:var(--linha2)}
+  .achip.on{background:var(--azul);border-color:var(--azul);color:#fff}
+  .faval-hint{margin-top:9px;font-size:11.5px;color:var(--cinza)}
+  .faval-hint b{color:#cfcfd4}
+  @media(max-width:480px){.faval-chips{width:100%}.achip{flex:1;text-align:center}}
+  .itroca{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px}
+  .itroca:empty{display:none}
+  .trh{background:linear-gradient(135deg,rgba(46,123,240,.12),rgba(46,123,240,.02));border:1px solid rgba(143,183,255,.3);border-radius:12px;padding:15px 16px}
+  .trh-l{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--azul-l);font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:11px}
+  .trh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+  .trc{display:flex;flex-direction:column;gap:3px}
+  .trl{font-size:10.5px;color:var(--cinza)}
+  .trl small{opacity:.8}
+  .trv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:17px;color:#fff;display:flex;align-items:center}
+  .trv.pos{color:var(--verde-l)}
+  .trh-nota{margin-top:12px;font-size:12px;color:#cfcfd4;line-height:1.5}
+  @media(max-width:560px){.trh-grid{grid-template-columns:1fr 1fr}}
   .ana-head{background:var(--carvao2);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:16px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--sombra)}
   .ana-ia{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--verde-l);font-weight:700;margin-bottom:7px}
   .ana-txt{font-size:14px;color:#e8e8ec;line-height:1.6}
@@ -294,6 +319,19 @@
       <h2>Imóveis <b>cruzados</b> com cartas contempladas</h2>
       <p id="imovSub">Carregando imóveis da imobiliária…</p>
     </div>
+    <div class="faval" id="imTrocaBox">
+      <label for="imTrocaIn">Imóvel ou entrada na troca <small>(o valor líquido vira a entrada da carta — pago via PIX, saldo nas parcelas)</small></label>
+      <div class="faval-row">
+        <div class="faval-in"><span>R$</span><input id="imTrocaIn" type="text" inputmode="numeric" autocomplete="off" placeholder="ex: 250.000"></div>
+        <div class="faval-chips">
+          <button class="achip on" data-pct="0">Entrada disponível</button>
+          <button class="achip" data-pct="30">Imóvel −30%</button>
+          <button class="achip" data-pct="40">Imóvel −40%</button>
+        </div>
+      </div>
+      <div class="faval-hint" id="imTrocaHint">Informe quanto você tem de entrada (ou o valor do imóvel que vai dar na troca) pra ver qual carta contemplada esse valor libera.</div>
+    </div>
+    <div class="itroca" id="imTroca"></div>
     <div class="cf">
       <div class="cf-grp">
         <label>Mostrar</label>
@@ -491,6 +529,35 @@ function comboPara(preco){
   return {combo,cred,ent,sobra:cred-preco,saldo,tetoGarantia,
           cabeGarantia:saldo<=tetoGarantia};
 }
+// JUNÇÃO POR ENTRADA: inverte o comboPara. A restrição aqui é a ENTRADA disponível
+// (o valor líquido do imóvel na troca): junta 1..3 cartas cuja SOMA das entradas
+// cabe em entradaDisp, maximizando o CRÉDITO liberado (e, em empate, menor custo
+// efetivo / menor entrada / menos cartas). Devolve {combo,cred,ent,am} ou null.
+function comboPorEntrada(entradaDisp){
+  if(!(entradaDisp>0)||!CARTAS.length)return null;
+  const MAX=3; // no máx 3 cartas por junção (transferência prática)
+  const pool=CARTAS.filter(c=>c.e>0&&c.e<=entradaDisp).sort((a,b)=>b.c-a.c);
+  if(!pool.length)return null;
+  let melhor=null;
+  const avalia=(combo)=>{
+    const ent=combo.reduce((s,c)=>s+c.e,0);
+    if(ent>entradaDisp)return;
+    const cred=combo.reduce((s,c)=>s+c.c,0);
+    const am=amCombo(combo);
+    if(!melhor||cred>melhor.cred||(cred===melhor.cred&&am<melhor.am)||(cred===melhor.cred&&am===melhor.am&&ent<melhor.ent)||(cred===melhor.cred&&am===melhor.am&&ent===melhor.ent&&combo.length<melhor.combo.length)){
+      melhor={combo:combo.slice(),cred,ent,am};
+    }
+  };
+  const top=pool.slice(0,Math.min(pool.length,40));
+  for(let i=0;i<top.length;i++){
+    avalia([top[i]]);
+    for(let j=i+1;j<top.length;j++){
+      avalia([top[i],top[j]]);
+      if(MAX>=3)for(let k=j+1;k<top.length;k++)avalia([top[i],top[j],top[k]]);
+    }
+  }
+  return melhor;
+}
 // custos de uma carta/combinação (mesmo padrão da plataforma de contempladas):
 //  saldo devedor = parcela × nº de parcelas; taxa de transferência ≈ 1% do
 //  crédito + R$ 85/carta; seguro de vida ≈ 0,0633% do crédito/mês; fundo comum
@@ -590,6 +657,83 @@ function matchDe(v){
   if(v.combo)return {credito:v.combo.cred,entrada:v.combo.ent,score:-1,custo:amCombo(v.combo.combo)};
   return null;
 }
+// ===== IMÓVEL/ENTRADA NA TROCA → entrada da carta =====
+// IMTR_PCT: 0 = o valor digitado JÁ é a entrada disponível; 30/40 = valor do imóvel
+// de troca, do qual estimamos o valor líquido (abaixo do anúncio) que vira entrada.
+let IMTR_PCT=0, IMTR_VALOR=0;
+function parseBRLInput(s){const n=Number(String(s||'').replace(/[^\d]/g,''));return Number.isFinite(n)?n:0;}
+function fmtAvalInput(v){return v>0?NUM(v):'';}
+function avalSugerido(base,pct){return Math.round(base*(1-(pct||0)/100));}
+// carta-mini pra troca de imóvel (entrada coberta pelo valor líquido / disponível)
+function renderTrocaImovelMini(co){
+  return `<div class="ccard">
+    <div class="ctop"><span class="ccat">${ic('predio')} nº ${co.n}</span><span class="cnum"><i class="dscore${co.score!=null?'':' off'}">score ${co.score!=null?co.score:'—'}</i></span></div>
+    <div class="ccredito"><div class="l">Crédito que libera</div><div class="v">${BRL(co.c)}</div></div>
+    <div class="crows"><div class="crow2"><div class="l">Entrada (o valor cobre)</div><div class="v">${BRL(co.e)}</div></div><div class="crow2"><div class="l">Parcela estimada</div><div class="v">${co.p?BRL(co.p):'—'}</div></div></div>
+    <div class="ccusto"><span>Custo efetivo</span><span class="v">${pctAm(co)}</span></div>
+    <a class="czap" href="${zapCarta(co)}" target="_blank" rel="noopener">Quero esta carta</a>
+  </div>`;
+}
+// imóveis das lojas/imobiliária que o crédito liberado consegue comprar.
+function renderTrocaImovelEstoque(credLib){
+  if(!(credLib>0)||!IMOVEIS.length)return '';
+  const compraveis=IMOVEIS.filter(v=>v.preco>0&&v.preco<=credLib).sort((a,b)=>b.preco-a.preco).slice(0,6);
+  if(!compraveis.length)return '';
+  const cards=compraveis.map(v=>
+    `<div class="ccard"><div class="ctop"><span class="ccat">${ic('predio')} ${v.tipo||'Imóvel'}${v.codigo?` · ${v.codigo}`:''}</span></div>`+
+    `<div class="ccredito"><div class="l">Preço${v.bairro?` · ${v.bairro}`:''}</div><div class="v">${BRL(v.preco)}</div></div>`+
+    `<div class="crows"><div class="crow2"><div class="l">Cabe no crédito de</div><div class="v">${BRL(credLib)}</div></div>${v.area?`<div class="crow2"><div class="l">Área</div><div class="v">${v.area} m²</div></div>`:''}</div>`+
+    (v.link?`<a class="czap" href="${v.link}" target="_blank" rel="noopener">Ver imóvel</a>`:'')+
+    `</div>`).join('');
+  return `<div class="trh" style="grid-column:1/-1"><div class="trh-l">${ic('predio')} Imóveis que esse crédito compra</div>`+
+    `<div class="trh-nota">Com o crédito de <b>${BRL(credLib)}</b> liberado pela troca, estes imóveis cabem hoje. Estimativa, sujeita à análise da administradora.</div></div>`+cards;
+}
+// IMÓVEL/ENTRADA NA TROCA: o valor líquido (ou entrada disponível) é a ENTRADA da
+// carta; mostra crédito liberado, custo efetivo, junção e imóveis que cabem.
+function renderTrocaImovel(){
+  const box=$('imTroca'); if(!box)return;
+  if(!(IMTR_VALOR>0)){ box.innerHTML=''; return; }
+  const val=IMTR_VALOR;
+  const elegiveis=pontuaCartas(CARTAS.filter(c=>c.e>0&&c.e<=val).slice());
+  if(!elegiveis.length){
+    box.innerHTML=`<div class="cempty" style="padding:22px;grid-column:1/-1">Com ${BRL(val)} de entrada não há carta de imóvel disponível hoje — fale com a gente pra buscar uma carta sob medida.</div>`;
+    return;
+  }
+  // melhor carta única por score (menor entrada + menor custo efetivo)
+  const best=elegiveis.slice().sort((a,b)=>b.score-a.score||amCota(a)-amCota(b))[0];
+  // alternativa juntando cartas (mesma entrada disponível) que libera mais crédito
+  const cb=comboPorEntrada(val);
+  const temCombo=cb&&cb.combo.length>1&&cb.cred>=best.c*1.15;
+  const credLib=Math.max(best.c, cb?cb.cred:0);
+  const head=`<div class="trh" style="grid-column:1/-1">`+
+    `<div class="trh-l">${ic('predio')} Imóvel/entrada na troca vira entrada da carta</div>`+
+    `<div class="trh-grid">`+
+      `<div class="trc"><span class="trl">Entrada disponível</span><span class="trv">${BRL(val)}</span></div>`+
+      `<div class="trc"><span class="trl">Crédito que libera</span><span class="trv pos">${BRL(best.c)}</span></div>`+
+      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAm(best)}</span></div>`+
+      `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
+    `</div>`+
+    `<div class="trh-nota">O <b>valor líquido</b> da sua entrada (${BRL(val)}) cobre a <b>entrada</b> da carta nº <b>${best.n}</b>, que libera <b>${BRL(best.c)}</b> de crédito pra comprar um imóvel maior. Entrada paga via PIX, saldo nas parcelas.</div>`+
+  `</div>`;
+  const comboBox=temCombo?
+    `<div class="vcombo" style="grid-column:1/-1"><div class="mh">${ic('ia')} <span class="iatag">análise inteligente</span> Juntando ${cb.combo.length} cartas, sua entrada de ${BRL(val)} libera mais crédito</div>`+
+      cb.combo.map(c=>`<div class="cline"><span class="mn">nº ${c.n}</span><span>crédito ${BRL(c.c)} · entrada ${BRL(c.e)}</span></div>`).join('')+
+      `<div class="ctot"><span>Crédito somado <b>${BRL(cb.cred)}</b></span><span>Entrada somada <b>${BRL(cb.ent)}</b> · custo mensal ~<b>${cb.am.toFixed(2).replace('.',',')}%</b></span></div>`+
+      `<div class="trh-nota" style="margin-top:8px">Estimativa de junção, sujeita à análise da administradora. Consórcio é compra programada.</div>`+
+      `<a class="vzap combo" style="margin-top:11px" href="${zapCombo(cb.combo,{nome:'imóvel',preco:cb.cred})}" target="_blank" rel="noopener">${ic('ia')} Falar sobre juntar ${cb.combo.length} cartas</a></div>`:'';
+  const lista=elegiveis.slice().sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)).slice(0,6).map(renderTrocaImovelMini).join('');
+  const estoqueBox=renderTrocaImovelEstoque(credLib);
+  box.innerHTML=head+comboBox+lista+estoqueBox;
+}
+function atualizaImTrocaHint(){
+  const base=parseBRLInput($('imTrocaIn').value);
+  if(!(base>0)){$('imTrocaHint').textContent='Informe quanto você tem de entrada (ou o valor do imóvel que vai dar na troca) pra ver qual carta contemplada esse valor libera.';return;}
+  if(IMTR_PCT>0){
+    $('imTrocaHint').innerHTML=`Imóvel-troca de <b>${BRL(base)}</b> · valor líquido estimado (${IMTR_PCT}% abaixo do anúncio): <b>${BRL(IMTR_VALOR)}</b> que vira a entrada da carta.`;
+  }else{
+    $('imTrocaHint').innerHTML=`Entrada disponível: <b>${BRL(IMTR_VALOR)}</b> — vamos ver qual carta de imóvel esse valor libera.`;
+  }
+}
 const ORDC_KEY='bidcon_ordc';
 const ORDC_LABEL={'oferta':'melhor oferta','custo':'menor custo efetivo','entrada':'menor entrada','score':'melhor score','-credito':'maior crédito','credito':'menor crédito'};
 function ordenaPorCarta(arr){
@@ -673,6 +817,27 @@ function renderImoveis(){
 // ordenação pela carta — restaura escolha salva e persiste no localStorage
 (function(){const sel=$('ordc');if(!sel)return;const salvo=localStorage.getItem(ORDC_KEY);if(salvo&&ORDC_LABEL[salvo])sel.value=salvo;sel.addEventListener('change',()=>{localStorage.setItem(ORDC_KEY,sel.value);vLimite=18;renderImoveis();});})();
 $('vMore').addEventListener('click',()=>{vLimite+=18;renderImoveis();});
+// ===== IMÓVEL/ENTRADA NA TROCA: chips de % + input livre =====
+// recalcula IMTR_VALOR (entrada disponível) e re-renderiza as cartas/imóveis que ele libera
+function recalcImTroca(){
+  const base=parseBRLInput($('imTrocaIn').value);
+  IMTR_VALOR=IMTR_PCT>0?avalSugerido(base,IMTR_PCT):base;
+  atualizaImTrocaHint();
+  renderTrocaImovel();
+}
+document.querySelectorAll('#imTrocaBox .achip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#imTrocaBox .achip').forEach(x=>x.classList.remove('on'));
+  ch.classList.add('on');
+  IMTR_PCT=Number(ch.dataset.pct)||0;
+  recalcImTroca();
+}));
+(function(){const inp=$('imTrocaIn');if(!inp)return;
+  inp.addEventListener('input',()=>{
+    const v=parseBRLInput(inp.value);
+    inp.value=fmtAvalInput(v);
+    recalcImTroca();
+  });
+})();
 
 // ===== ABA 2: CARTAS DE IMÓVEL =====
 let cLimite=18;
