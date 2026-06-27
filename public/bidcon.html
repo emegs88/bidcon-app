@@ -660,7 +660,8 @@
 const API360=window.API360||'';
 const DADOS=(window.PROSPERE_COTAS)||{cotas:[],whatsapp:'5519997561909'};
 // só cotas DISPONÍVEIS: as reservadas/vendidas vêm com r:1 e não aparecem aqui
-const COTAS=(DADOS.cotas||[]).filter(c=>c.c>0&&!c.r);
+let COTAS=(DADOS.cotas||[]).filter(c=>c.c>0&&!c.r);
+let bidconAtualizado=DADOS.atualizado||'';
 const LEILAO_SET=new Set((DADOS.leilao||[]).map(Number)); // cartas selecionadas pela equipe
 const CWA=DADOS.whatsapp||'5519997561909';
 const BRL=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
@@ -902,11 +903,9 @@ $('bemSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!
 
 // header zap
 $('hzap').href=`https://wa.me/${CWA}?text=${encodeURIComponent('Olá! Quero saber mais sobre as cotas contempladas disponíveis.')}`;
-// src line
-$('srcLine').textContent=`${COTAS.length} cartas disponíveis · atualizado ${DADOS.atualizado||''}`;
-
-// stats / prova social (dinâmico do cotas.js)
-(function(){
+// src line + stats / prova social (dinâmico — atualizado ao vivo)
+function renderStats(){
+  $('srcLine').textContent=`${COTAS.length} cartas disponíveis · atualizado ${bidconAtualizado}`;
   const total=COTAS.length;
   const credito=COTAS.reduce((s,c)=>s+c.c,0);
   const imov=COTAS.filter(c=>c.t==='imovel').length;
@@ -917,9 +916,24 @@ $('srcLine').textContent=`${COTAS.length} cartas disponíveis · atualizado ${DA
     <div class="stat"><div class="sv">R$ ${milhoes}</div><div class="sl">Em crédito disponível</div></div>
     <div class="stat"><div class="sv">${NUM(imov)}</div><div class="sl">Imóvel ${ic('casa')}</div></div>
     <div class="stat"><div class="sv">${NUM(veic)}</div><div class="sl">Veículo ${ic('carro')}</div></div>`;
-})();
-
+}
+renderStats();
 render();
+
+// carteira 100% em tempo real: puxa /api/cotas (padrão = só disponíveis; reservadas ficam de fora)
+async function cotasAoVivo(){
+  try{
+    const r=await fetch(API360+'/api/cotas',{cache:'no-store'});
+    if(!r.ok)return;
+    const j=await r.json();
+    if(j&&j.ok&&Array.isArray(j.cotas)){
+      COTAS=j.cotas.filter(c=>c.c>0&&!c.r);
+      if(j.atualizado)bidconAtualizado=new Date(j.atualizado).toLocaleString('pt-BR');
+      renderStats();render();
+    }
+  }catch(e){}
+}
+cotasAoVivo();setInterval(cotasAoVivo,180000);
 </script>
 </body>
 </html>
