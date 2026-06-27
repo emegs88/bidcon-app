@@ -474,6 +474,10 @@ function amCombo(cartas){
 // Custo mensal estimado do plano (NÃO é taxa de juros de financiamento — consórcio
 // não tem juros). Rotulado como "custo mensal ~X%" pra não confundir com taxa mensal de financiamento.
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
+// versão COMPACTA pro valor dentro de células estreitas (cards de troca): só
+// "~X,XX%/mês" — o rótulo da célula já diz "Custo efetivo" e o "/mês" deixa claro
+// que é custo mensal (não taxa de juros). Evita o texto quebrar/estourar a célula.
+const pctAmV=co=>co.x?'~'+amCota(co).toFixed(2).replace('.',',')+'%/mês':'à vista';
 
 // SCORE de 0 a 100 por carta: quanto MENOR a entrada e MENOR o custo efetivo mensal,
 // MAIOR o score. Entrada e custo são normalizados (min-max) dentro das cartas que
@@ -491,13 +495,19 @@ function pontuaCartas(lista){
     return {...c,score};
   });
 }
+// REGRA-CHAVE (negócio): o CRÉDITO deve corresponder ao valor do imóvel e a
+// ENTRADA nunca pode passar do valor do bem — a entrada é o sinal e a dívida que
+// sobra (entrada + saldo das parcelas) tem que caber no valor do imóvel. Por isso
+// DESCARTAMOS de vez as cartas cuja ENTRADA passa do valor; se nenhuma carta única
+// servir, a tela cai na JUNÇÃO de cartas ou no "fale com a gente".
 const SOBRA_TETO=0.60; // até 60% acima do valor do imóvel ainda é uma oferta sensata
 function cartasPara(preco){
   if(!(preco>0))return [];
-  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,ratio:c.c/preco}));
+  // cobre o crédito (>=valor) E entrada cabe no valor do bem (<=valor): filtro RÍGIDO.
+  const cobrem=CARTAS.filter(c=>c.c>=preco&&c.e<=preco).map(c=>({...c,ratio:c.c/preco}));
   if(!cobrem.length)return [];
-  const justas=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
-  const base=justas.length?justas:cobrem;
+  const justasCred=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
+  const base=justasCred.length?justasCred:cobrem;
   return pontuaCartas(base)
     .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
@@ -523,6 +533,8 @@ function comboPara(preco){
     const novoSaldo=saldo+saldoCota(c);
     // só vincula a carta se o saldo devedor somado ainda cabe na garantia do bem
     if(novoSaldo>tetoGarantia && combo.length>0)continue;
+    // e a entrada somada não pode passar do valor do bem
+    if(ent+c.e>preco && combo.length>0)continue;
     combo.push(c); cred+=c.c; ent+=c.e; saldo=novoSaldo;
   }
   if(cred<preco)return null; // nem somando tudo que cabe na garantia cobre
@@ -710,7 +722,7 @@ function renderTrocaImovel(){
     `<div class="trh-grid">`+
       `<div class="trc"><span class="trl">Entrada disponível</span><span class="trv">${BRL(val)}</span></div>`+
       `<div class="trc"><span class="trl">Crédito que libera</span><span class="trv pos">${BRL(best.c)}</span></div>`+
-      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAm(best)}</span></div>`+
+      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAmV(best)}</span></div>`+
       `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
     `</div>`+
     `<div class="trh-nota">O <b>valor líquido</b> da sua entrada (${BRL(val)}) cobre a <b>entrada</b> da carta nº <b>${best.n}</b>, que libera <b>${BRL(best.c)}</b> de crédito pra comprar um imóvel maior. Entrada paga via PIX, saldo nas parcelas.</div>`+

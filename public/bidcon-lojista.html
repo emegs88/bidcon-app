@@ -546,6 +546,11 @@ function amCombo(cartas){
 // Rotulado como "custo mensal ~X%" para NÃO confundir com taxa de juros de
 // financiamento — consórcio não tem juros (é taxa de adm. diluída).
 const pctAm=co=>co.x?'custo mensal ~'+amCota(co).toFixed(2).replace('.',',')+'%':'à vista';
+// versão COMPACTA pro valor dentro de células estreitas (cards de veículo):
+// só "~X,XX%/mês" — o rótulo da célula já diz "Custo efetivo" e o "/mês" mantém
+// claro que é custo mensal (não taxa de juros). Evita o texto cortar com "...".
+const pctAmV=co=>co.x?'~'+amCota(co).toFixed(2).replace('.',',')+'%/mês':'à vista';
+const pctAmComboV=arr=>{const t=amCombo(arr);return t?'~'+t.toFixed(2).replace('.',',')+'%/mês':'à vista';};
 
 // cartas que cobrem um preço (credito >= preco). Cada carta ganha um SCORE de 0 a 100:
 // quanto MENOR a entrada e MENOR o custo efetivo mensal, MAIOR o score. Entrada e custo
@@ -569,14 +574,22 @@ function pontuaCartas(lista){
 // e, em empate, a menor entrada. Para não puxar uma carta absurdamente maior que
 // o carro, descartamos as que passam muito do valor (ratio > teto) quando há
 // alternativa dentro do teto.
+// REGRA-CHAVE (negócio): o CRÉDITO deve corresponder ao valor do carro e a ENTRADA
+// nunca pode passar do preço do bem — a entrada é o "sinal" e a dívida que sobra
+// (entrada + saldo das parcelas) tem que caber no valor do carro. Por isso
+// DESCARTAMOS de vez as cartas cuja ENTRADA passa do preço (não faz sentido pagar
+// de entrada mais do que o próprio carro vale). Se nenhuma carta única servir, a
+// tela cai na JUNÇÃO de cartas ou no "fale com a gente" — nunca numa entrada absurda.
 const SOBRA_TETO=0.60; // até 60% acima do preço ainda é uma oferta sensata
 function cartasPara(preco){
   if(!(preco>0))return [];
-  const cobrem=CARTAS.filter(c=>c.c>=preco).map(c=>({...c,ratio:c.c/preco}));
+  // cobre o crédito (>=preço) E entrada cabe no valor do carro (<=preço): filtro RÍGIDO.
+  const cobrem=CARTAS.filter(c=>c.c>=preco&&c.e<=preco).map(c=>({...c,ratio:c.c/preco}));
   if(!cobrem.length)return [];
-  // preferimos as que encaixam bem (crédito <= preço × (1+teto)); senão, todas
-  const justas=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
-  const base=justas.length?justas:cobrem;
+  // crédito encaixa bem (crédito <= preço × (1+teto)): mantém o crédito perto do
+  // valor do carro, sem puxar carta gigante. Se nenhuma ficar no teto, usa todas.
+  const justasCred=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
+  const base=justasCred.length?justasCred:cobrem;
   return pontuaCartas(base)
     .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
@@ -667,6 +680,7 @@ function comboPara(preco){
     const cred=combo.reduce((s,c)=>s+c.c,0);
     if(cred<preco)return;
     const ent=combo.reduce((s,c)=>s+c.e,0);
+    if(ent>preco)return; // entrada somada não pode passar do valor do bem
     const sobra=cred-preco;
     if(!melhor||sobra<melhor.sobra||(sobra===melhor.sobra&&ent<melhor.ent)||(sobra===melhor.sobra&&ent===melhor.ent&&combo.length<melhor.combo.length)){
       melhor={combo:combo.slice(),cred,ent,sobra};
@@ -861,7 +875,7 @@ function renderEstoque(){
         `<div class="vres-cobre">${ic('check')} A carta cobre <b>100%</b> do preço da loja</div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAm(best)}</span></div>`+
+          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmV(best)}</span></div>`+
         `</div>`+
         `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b>${best.score!=null?` <span class="cscore" title="Menor entrada e menor custo = score maior">${ic('check')} score ${best.score}</span>`:''}</div>`+
       `</div>`;
@@ -878,7 +892,7 @@ function renderEstoque(){
         `<div class="vres-cobre">${ic('ia')} <span class="iatag">junção IA</span> <b>${NUM(v.combo.combo.length)}</b> cartas juntas cobrem <b>100%</b></div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada somada <small>(via PIX)</small></span><span class="vrv">${BRL(v.combo.ent)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">custo mensal ~${amCombo(v.combo.combo).toFixed(2).replace('.',',')}%</span></div>`+
+          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmComboV(v.combo.combo)}</span></div>`+
         `</div>`+
         `<div class="vres-cartas">Crédito somado <b>${BRL(v.combo.cred)}</b></div>`+
       `</div>`;
