@@ -1,0 +1,53 @@
+.stack {
+  display: grid;
+  gap: 16px;
+}
+.top {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.credito {
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.creditoLbl {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 2px;
+  margin-bottom: 16px;
+}
+
+.dl {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.row dt {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.row dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+.texto {
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}

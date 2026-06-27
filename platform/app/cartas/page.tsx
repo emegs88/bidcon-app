@@ -1,0 +1,94 @@
+// /cartas — vitrine logada de cartas contempladas disponíveis.
+// Server Component. Lê via Supabase (RLS): a leitura pública das cartas
+// 'disponivel' depende da policy da migration 0005 (cartas_vitrine_select).
+// Filtro opcional por tipo via query param (?tipo=imovel|veiculo).
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/AppShell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { CartaCard, type CartaVitrine } from "@/components/CartaCard";
+import styles from "./cartas.module.css";
+
+const WA = "5519997561909";
+const TIPOS = ["imovel", "veiculo"] as const;
+
+export default async function CartasPage({
+  searchParams,
+}: {
+  searchParams: { tipo?: string };
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nome")
+    .eq("id", user.id)
+    .single();
+  const nome = profile?.nome ?? user.email ?? null;
+
+  const tipoFiltro = TIPOS.includes(searchParams.tipo as (typeof TIPOS)[number])
+    ? (searchParams.tipo as string)
+    : null;
+
+  let query = supabase
+    .from("cartas")
+    .select("id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas")
+    .eq("status", "disponivel")
+    .order("valor_credito", { ascending: true });
+
+  if (tipoFiltro) query = query.eq("tipo", tipoFiltro);
+
+  const { data: cartas } = await query;
+  const lista = (cartas ?? []) as CartaVitrine[];
+
+  return (
+    <AppShell nome={nome}>
+      <PageHeader
+        title="Cartas disponíveis"
+        backHref="/"
+        subtitle="Cotas de consórcio já contempladas. Os valores são da carta; a transferência é feita pela administradora do consórcio."
+      />
+
+      <nav className={styles.filtros} aria-label="Filtrar por tipo de bem">
+        <Button href="/cartas" variant={!tipoFiltro ? "primary" : "ghost"} size="sm">
+          Todas
+        </Button>
+        <Button
+          href="/cartas?tipo=imovel"
+          variant={tipoFiltro === "imovel" ? "primary" : "ghost"}
+          size="sm"
+        >
+          Imóvel
+        </Button>
+        <Button
+          href="/cartas?tipo=veiculo"
+          variant={tipoFiltro === "veiculo" ? "primary" : "ghost"}
+          size="sm"
+        >
+          Veículo
+        </Button>
+      </nav>
+
+      {lista.length === 0 ? (
+        <EmptyState
+          icon="🔎"
+          title="Nenhuma carta disponível agora"
+          description="No momento não há cartas que atendam a este filtro. Fale com o atendimento para receber novas oportunidades."
+          action={<Button href={`https://wa.me/${WA}`}>Falar com o atendimento</Button>}
+        />
+      ) : (
+        <div className={styles.grid}>
+          {lista.map((c) => (
+            <CartaCard key={c.id} carta={c} />
+          ))}
+        </div>
+      )}
+    </AppShell>
+  );
+}
