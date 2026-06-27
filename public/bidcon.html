@@ -150,7 +150,7 @@
   .ccount b{color:#fff;font-weight:600}
 
   /* CARDS MARKETPLACE */
-  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;min-height:360px}
   .ccard{background:linear-gradient(165deg,var(--carvao2),var(--carvao));border:1px solid var(--linha);border-radius:var(--raio);padding:20px 21px;display:flex;flex-direction:column;gap:13px;transition:.22s cubic-bezier(.4,0,.2,1);position:relative;box-shadow:var(--sombra);overflow:hidden}
   .ccard::before{content:'';position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:0;transition:.22s}
   .ccard:hover{border-color:rgba(54,197,240,.45);transform:translateY(-5px);box-shadow:0 1px 2px rgba(0,0,0,.4),0 26px 52px -20px rgba(46,123,240,.42)}
