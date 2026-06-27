@@ -1,41 +1,65 @@
-# Bidcon — Plataforma logada (Fase 0)
+# Bidcon — Plataforma logada
 
-> **Status:** esqueleto. **Nada foi executado** — nenhum projeto Supabase/Vercel
-> criado, nenhuma credencial usada, nenhuma chave no repositório. Os arquivos aqui
-> são código-fonte para revisão. Ver `docs/plataforma-arquitetura.md` (decisões) e
-> `docs/privacidade-rascunho-adicoes.md` (privacidade, já aplicada).
+> **Status:** código-fonte para revisão. **Nada foi executado pelo agente** —
+> nenhum projeto Supabase/Vercel criado, nenhuma credencial usada, nenhuma chave
+> no repositório. Ver `docs/plataforma-arquitetura.md` (decisões) e
+> `docs/privacidade-rascunho-adicoes.md` (privacidade).
 
 Projeto **separado** do site estático. O site de marketing (`bidcon.com.br`,
-pasta `/public`) continua intocado. Esta pasta vira, no futuro, o projeto Vercel
-de `app.bidcon.com.br`.
+pasta `/public`) continua intocado. Esta pasta vira o projeto Vercel de
+`app.bidcon.com.br`.
 
-## O que esta Fase 0 entrega
-- Esqueleto Next.js (App Router) com login por **magic link** e home "Olá, {nome}".
-- Clientes Supabase para browser e servidor (`lib/`), usando só a **anon key**.
-- Migrations SQL: `supabase/migrations/0001_schema.sql` (schema) e
-  `0002_rls.sql` (RLS estrito em todas as tabelas).
-- Sem telas de negócio (processo/cartas/comissões) — chegam nas Fases 1–3.
+## O que já está construído
+- Login por **magic link** e home "Olá, {nome}" com próximo passo do processo.
+- **Área do cliente:** `/meu-processo` (timeline de status) e vitrine `/cartas`
+  (+ detalhe `/cartas/[id]`, CTA WhatsApp).
+- **Área do parceiro** (`tipo='parceiro'`): painel, carteira de cartas, cadastro
+  de carta própria, indicações e comissões (somente leitura do que é seu).
+- **Painel admin** (`tipo='admin'`): visão geral, parceiros (aprovar/suspender
+  conta), processos (avançar status), estoque de cartas e comissões
+  (liberar/marcar paga).
+- Clientes Supabase para browser e servidor (`lib/`). RLS estrito em todas as
+  tabelas: cada usuário só enxerga os próprios dados; admin enxerga tudo.
 - **Sem dado bancário** em nenhuma tabela; comissão só rastreia status.
 
-## Para colocar de pé (passos do Emerson — o agente NÃO faz)
-1. Criar projeto no Supabase (você loga; o agente nunca loga).
-2. Rodar as migrations (SQL Editor do Supabase ou `supabase db push`):
-   `0001_schema.sql` depois `0002_rls.sql`.
-3. Criar projeto Vercel apontando para esta pasta (`platform/`) e ligar o
-   domínio `app.bidcon.com.br` (CNAME no DNS — feito por você).
-4. Copiar `.env.example` → `.env.local` e preencher:
-   - `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (públicas);
-   - `SUPABASE_SERVICE_ROLE_KEY` (**secreta** — só em env var de servidor na Vercel,
-     nunca no repo).
-5. `npm install && npm run dev` para testar localmente.
+## Arquitetura, em uma frase
+Server Components leem via **RLS** (anon key + cookies). **Mutações** vivem em
+Route Handlers (`app/api/.../route.ts`) — nunca Server Actions. Mudança de status
+de processo/carta/comissão acontece dentro de **RPCs SQL `security definer`**
+(migration 0006) com checagem de papel embutida; escrita privilegiada de conta de
+parceiro usa `createAdminClient()` (service_role) **após** confirmar admin no
+servidor.
+
+## Rodar localmente
+1. `cp .env.example .env.local` e preencher:
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (públicas);
+   - `SUPABASE_SERVICE_ROLE_KEY` (**secreta** — só em env var de servidor, nunca
+     no repo).
+2. `npm install`
+3. `npm run dev` → http://localhost:3000
+
+Checagens: `npx tsc --noEmit` e `npm run build`.
+
+## Migrations (ordem) — aplicadas pelo Emerson, não pelo agente
+No SQL Editor do Supabase ou `supabase db push`, nesta ordem:
+1. `0001_schema.sql` — schema (tabelas, enums).
+2. `0002_rls.sql` — RLS estrito + `is_admin()`.
+3. `0003_processo_eventos.sql` — trilha de status do processo.
+4. `0004_cartas_sync.sql` — sync de cotas (RPC atômico) + `indisponivel`.
+5. `0005_cartas_vitrine.sql` — leitura pública das cartas `disponivel`.
+6. `0006_status_rpc.sql` — RPCs de mudança de status (processo/carta/comissão).
+
+`supabase/seed_dev.sql` **não é migration**: é massa de teste para um projeto de
+desenvolvimento (admin, parceiros, clientes, cartas, processos, comissão). **Não
+rodar em produção.**
 
 ## Segurança
 - `.env*` está no `.gitignore` — chaves nunca vão ao Git.
 - `anon key` pode ir ao client; `service_role` só no servidor.
-- RLS em todas as tabelas: cada usuário só enxerga os próprios dados.
-- Mudança de status de processo/comissão = server-side (Fase 2/3), nunca do client.
+- RLS em todas as tabelas; mudança de status = server-side via RPC.
+- Área logada com `robots: noindex` no `app/layout.tsx`.
 
 ## Pendências que travam fases (Emerson)
 - Números de comissão (percentual/base/teto/escalonamento + liberação auto vs.
   manual) → travam a Fase 3.
-- DNS `app.bidcon.com.br`.
+- DNS `app.bidcon.com.br` e criação do projeto Vercel.
