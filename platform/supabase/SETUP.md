@@ -173,6 +173,47 @@ Abra http://localhost:3000.
 
 ---
 
+## 9. Sync automático de cotas (cron horário) — Fase 1.5
+
+> Só ative depois do banco de pé (passos 1–6) **e** do app publicado num projeto
+> Vercel próprio. Em dev local o cron não roda; dá para testar a rota na mão.
+
+A migration **0004** já entra no `db push` (passo 4): adiciona em `cartas` as
+colunas de sync (`numero_externo` único, `fonte`, `valor_parcela`, `qtd_parcelas`,
+`sincronizada_em`, `criado_via`), o enum `indisponivel`, a tabela `eventos_sync`
+e a função atômica `sync_aplicar_cotas()`.
+
+**Env vars (Vercel ▸ Project Settings ▸ Environment Variables):**
+- `CRON_SECRET` — gere com `openssl rand -hex 32`. A Vercel manda
+  `Authorization: Bearer <CRON_SECRET>` no cron; a rota recusa qualquer chamada
+  sem esse header. **Server-only**, nunca no repo.
+- `SUPABASE_SERVICE_ROLE_KEY` — a mesma do passo 7, marcada como secreta.
+- `SYNC_MIN_COTAS` (default 50) e `SYNC_MAX_QUEDA` (default 0.6) — opcionais.
+
+**O cron já está agendado** em `platform/vercel.json`:
+```json
+{ "crons": [ { "path": "/api/sync-cotas", "schedule": "0 * * * *" } ] }
+```
+`0 * * * *` = 1×/hora. A Vercel só ativa crons em deploy de produção.
+
+**Testar a rota localmente (sem esperar o cron):**
+```bash
+# no .env.local, defina CRON_SECRET=um-valor-qualquer-para-teste
+npm run dev
+curl -s http://localhost:3000/api/sync-cotas \
+  -H "Authorization: Bearer um-valor-qualquer-para-teste" | jq
+```
+Resposta esperada no caminho feliz:
+`{ ok: true, lidas: ~373, novas, atualizadas, indisponibilizadas }`.
+Sem o header correto → `401 nao_autorizado`. Se a fonte estiver fora do ar ou o
+volume despencar, vem `{ ok:false, abortado:true, motivo:... }` **e o estoque não
+é tocado** (as 5 guardas) — confira o registro em `eventos_sync`.
+
+**Push:** cartas novas nascem com evento `push_pendente=true`. O disparo real só
+entra quando o OneSignal for plugado (`lib/notificar.ts` é stub hoje).
+
+---
+
 ## Pronto
 
 Com o `pg_tables` mostrando `rowsecurity = true` em tudo e o `/meu-processo`
