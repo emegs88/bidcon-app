@@ -262,6 +262,11 @@
   .vrc.ce .vrv{color:var(--verde-l)}
   .vres-cartas{font-size:11px;color:var(--cinza);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .vres-cartas b{color:#eaf1ff;font-weight:700}
+  /* linha crédito x preço do veículo: mostra a sobra que abate o saldo devedor */
+  .vres-cred{display:flex;align-items:center;flex-wrap:wrap;gap:4px 9px;font-size:11px;color:var(--cinza);margin-top:2px}
+  .vres-cred b{color:#eaf1ff;font-weight:700;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+  .vres-cred .sobra{color:var(--verde-l);font-weight:700}
+  .vres-cred .sep{opacity:.45}
   .cscore{display:inline-flex;align-items:center;gap:4px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:10px;font-weight:800;letter-spacing:.02em;color:#04210f;background:var(--verde-l);border-radius:6px;padding:2px 7px}
   .cscore .ico{width:12px;height:12px}
   .dscore{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-style:normal;font-size:9.5px;font-weight:800;color:var(--verde-l);background:rgba(58,209,126,.14);border:1px solid rgba(58,209,126,.34);border-radius:5px;padding:1px 5px;margin-left:5px}
@@ -875,8 +880,11 @@ function renderEstoque(){
     let resumoHtml,detalheHtml='',ctaHtml;
     if(v.melhor==='carta'){
       const cu=custosDe(best,v.preco);
+      // sobra do crédito (crédito − preço): quando > 0, abate o saldo devedor.
+      const sobraCred=Math.max(0,(best.c||0)-(v.preco||0));
       resumoHtml=`<div class="vres ok">`+
         `<div class="vres-cobre">${ic('check')} A carta cobre <b>100%</b> do preço da loja</div>`+
+        `<div class="vres-cred">Crédito <b>${BRL(best.c)}</b> <span class="sep">·</span> Veículo <b>${BRL(v.preco)}</b>${sobraCred>0?` <span class="sep">·</span> <span class="sobra">sobra ${BRL(sobraCred)} abate o saldo devedor</span>`:''}</div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
           `<div class="vrc ce"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmV(best)}</span></div>`+
