@@ -2,7 +2,7 @@
 // Usa a anon key + cookies da sessão do usuário (continua sujeito à RLS).
 // A service_role key NÃO é usada aqui — fica reservada a rotas administrativas
 // específicas da Fase 2/3 (mudança de status), nunca exposta ao client.
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export function createClient() {
@@ -15,7 +15,9 @@ export function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(
+          cookiesToSet: { name: string; value: string; options?: CookieOptions }[]
+        ) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
