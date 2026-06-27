@@ -61,11 +61,21 @@ async function postOpenAI(
 }
 
 // ----------------------------------------------------------------------------
-// COMPLIANCE — termos proibidos no consórcio (mesma lista da régua do projeto).
-// Casa em limite de palavra, case-insensitive, ignorando acento. Permite a
-// forma NEGADA ("não é investimento") porque a negação é institucional/correta.
+// COMPLIANCE — barreira reforçada (última linha de defesa de TODA saída de IA).
+// Pensada para envolver não só a fraseDeEncaixe (Nível 3) mas QUALQUER resposta
+// futura do agente (Níveis 4/5). Duas frentes independentes:
+//   (A) violaTermo — lista de termos proibidos (régua regulatória + SIGILO de
+//       mecânica interna). Casa em limite de palavra, sem acento, case-insensitive,
+//       e LIBERA a forma negada ("não é investimento") por ser institucional.
+//   (B) prometeDataContemplacao — detecta o PADRÃO "contemplação + tempo" (data,
+//       mês, prazo) que a lista de termos não pega. Contemplação é por SORTEIO ou
+//       LANCE: prometer quando ela acontece é a violação mais grave do projeto.
 // ----------------------------------------------------------------------------
+
+// (A) Termos proibidos. Inclui mecânica interna (CCB/FIDC/funding/custo de
+//     aquisição etc.) que NUNCA pode chegar ao cliente — é sigilo de estrutura.
 const TERMOS_PROIBIDOS = [
+  // régua regulatória de consórcio
   "investimento",
   "investidor",
   "rendimento",
@@ -78,6 +88,17 @@ const TERMOS_PROIBIDOS = [
   "limite de crédito",
   "contemplacao garantida",
   "contemplação garantida",
+  // mecânica interna (sigilo) — nunca verbalizar ao cliente
+  "ccb",
+  "fidc",
+  "funding",
+  "custo de aquisicao",
+  "custo de aquisição",
+  "custo de capital",
+  "cedula de credito bancario",
+  "cédula de crédito bancário",
+  "estrutura de aquisicao",
+  "estrutura de aquisição",
 ];
 
 const NEGACOES = ["nao ", "não ", "sem ", "nunca "];
@@ -86,23 +107,97 @@ function semAcento(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// true se o texto contém termo proibido NÃO precedido de negação.
-export function violaCompliance(texto: string): boolean {
-  const base = semAcento(texto.toLowerCase());
+// (A) true se há termo proibido em LIMITE DE PALAVRA e NÃO negado.
+//     A fronteira de palavra evita que siglas curtas (ccb/fidc) casem dentro de
+//     outra palavra (ex.: "fundinG" em "profundamente" não dispara).
+function violaTermo(base: string): boolean {
   return TERMOS_PROIBIDOS.some((termoRaw) => {
     const termo = semAcento(termoRaw.toLowerCase());
     let idx = base.indexOf(termo);
     while (idx !== -1) {
-      const antes = base.slice(Math.max(0, idx - 8), idx);
-      const negado = NEGACOES.some((n) => antes.includes(semAcento(n)));
-      if (!negado) return true; // achou ocorrência não-negada → viola
+      const ant = base[idx - 1] ?? " ";
+      const dep = base[idx + termo.length] ?? " ";
+      const fronteira = /[^a-z0-9]/.test(ant) && /[^a-z0-9]/.test(dep);
+      if (fronteira) {
+        const antes = base.slice(Math.max(0, idx - 8), idx);
+        const negado = NEGACOES.some((n) => antes.includes(semAcento(n)));
+        if (!negado) return true; // ocorrência não-negada em fronteira → viola
+      }
       idx = base.indexOf(termo, idx + termo.length);
     }
     return false;
   });
 }
 
-// Devolve a frase só se passar no compliance; senão, um fallback neutro seguro.
+// (B) Promessa de DATA/PRAZO de contemplação. Estratégia: achar uma ÂNCORA de
+//     contemplação e checar se há um token TEMPORAL numa janela curta DEPOIS dela
+//     ("contemplado EM março"). Exigir a âncora controla o falso-positivo: um
+//     calendário factual de OUTRO sujeito (assembleia/parcela/sorteio em tal data)
+//     não tem âncora de contemplação na janela e, portanto, não dispara.
+const CONTEMPLA_ANCORAS = [
+  "contempl", // contemplado/contemplada/contempla/contemplação/contemplar
+  "ser contempl",
+  "vai ser contempl",
+  "sera contempl",
+  "saida da carta", // gíria "quando a carta sai"
+];
+
+const TEMPORAIS = [
+  // meses
+  "janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto",
+  "setembro", "outubro", "novembro", "dezembro",
+  // relativos
+  "ano que vem", "mes que vem", "semana que vem", "proximo mes", "proximos meses",
+  "ate dezembro", "ate o fim do ano", "no fim do ano", "ainda este ano", "este ano",
+  // prazos por extenso
+  "dias", "dia ", "semanas", "meses", "mes ", "ano ", "anos",
+  // ordinais usados como prazo de contemplação
+  "1o mes", "2o mes", "3o mes", "primeiro mes", "segundo mes", "terceiro mes",
+];
+
+// Negações que LIBERAM a promessa ("não há data", "sem prazo de contemplação").
+const NEGA_PROMESSA = [
+  "nao prom", "sem prom", "nunca prom", "nao garant", "sem garant",
+  "nao prevemos", "nao ha data", "sem data", "nao tem data",
+];
+
+const JANELA_CONTEMPLA = 40; // caracteres após a âncora de contemplação
+
+function temTemporalNaJanela(janela: string): boolean {
+  if (/\b(19|20)\d{2}\b/.test(janela)) return true; // ano com 4 dígitos
+  // "90 dias", "3 meses", "1 ano" colados à contemplação
+  if (/\b\d{1,3}\s*(dias|dia|semanas|semana|meses|mes|anos|ano)\b/.test(janela)) {
+    return true;
+  }
+  return TEMPORAIS.some((t) => janela.includes(semAcento(t)));
+}
+
+function prometeDataContemplacao(base: string): boolean {
+  for (const ancoraRaw of CONTEMPLA_ANCORAS) {
+    const ancora = semAcento(ancoraRaw);
+    let idx = base.indexOf(ancora);
+    while (idx !== -1) {
+      const janela = base.slice(idx, idx + ancora.length + JANELA_CONTEMPLA);
+      const antes = base.slice(Math.max(0, idx - 16), idx);
+      const negado = NEGA_PROMESSA.some(
+        (n) => antes.includes(semAcento(n)) || janela.includes(semAcento(n))
+      );
+      if (!negado && temTemporalNaJanela(janela)) return true;
+      idx = base.indexOf(ancora, idx + ancora.length);
+    }
+  }
+  return false;
+}
+
+// true se o texto viola compliance por QUALQUER frente (termo OU promessa de data).
+export function violaCompliance(texto: string): boolean {
+  const base = semAcento(texto.toLowerCase());
+  return violaTermo(base) || prometeDataContemplacao(base);
+}
+
+// Última barreira de saída. Devolve a frase só se passar em TODAS as frentes de
+// compliance; senão, um fallback neutro seguro. Use isto para envolver QUALQUER
+// texto gerado por IA antes de exibir/transmitir ao cliente (Níveis 3/4/5+).
 export function sanitizarCompliance(frase: string, fallback: string): string {
   const limpa = frase.trim();
   if (!limpa) return fallback;
