@@ -6,6 +6,11 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://www.bidcon.com.br/bidcon</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://www.bidcon.com.br/bidcon-lojista</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -14,5 +19,20 @@
     <loc>https://www.bidcon.com.br/bidcon-imobiliaria</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.bidcon.com.br/blog/como-funciona-carta-de-credito-do-consorcio</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.bidcon.com.br/blog/como-vender-carta-de-consorcio-contemplada</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.bidcon.com.br/blog/vale-a-pena-comprar-carta-de-consorcio-contemplada</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

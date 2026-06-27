@@ -4,7 +4,7 @@
 <script src="config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>bidcon Imobiliária · Imóveis × Cartas contempladas | Prospere Consórcios</title>
+<title>Cartas Contempladas de Imóvel | bidcon</title>
 <meta name="description" content="Encontre o imóvel e veja na hora qual carta de consórcio já contemplada cobre o valor — crédito, entrada e custo. Imóveis da Prospere Hortolândia cruzados com cartas. Prospere Consórcios.">
 <meta name="keywords" content="carta contemplada imóvel, consórcio imobiliário contemplado, comprar imóvel com carta de crédito, imóveis Hortolândia, crédito imobiliário, carta de crédito imóvel, Prospere Consórcios, bidcon imobiliária">
 <meta name="author" content="Prospere Consórcios">
@@ -259,6 +259,28 @@
   .sec-head h2{font-family:var(--f-display);font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:.02em}
   .sec-head h2 b{color:var(--azul-l)}
   .sec-head p{font-size:13px;color:var(--cinza);margin-top:3px}
+
+  /* BLOCO SEO / CONTEÚDO EDITORIAL + FAQ */
+  .seo{margin-top:34px;background:var(--carvao);border:1px solid var(--linha);border-radius:16px;padding:30px 30px 26px;box-shadow:var(--sombra);font-size:14px;color:#cfcfd4;line-height:1.7}
+  .seo h2{font-family:var(--f-display);font-weight:700;font-size:21px;letter-spacing:-.01em;color:var(--branco);margin:26px 0 10px}
+  .seo h2:first-child{margin-top:0}
+  .seo h3{font-family:var(--f-display);font-weight:600;font-size:16px;color:var(--ambar-l);margin:20px 0 6px}
+  .seo p{margin:0 0 12px}
+  .seo b{color:var(--branco)}
+  .seo a{color:var(--ambar-l);text-decoration:underline}
+  .seo ul{margin:0 0 12px 20px}
+  .seo li{margin:4px 0}
+  .seo .faq details{border-top:1px solid var(--linha);padding:14px 0}
+  .seo .faq details:last-child{border-bottom:1px solid var(--linha)}
+  .seo .faq summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:15px;color:var(--branco);list-style:none}
+  .seo .faq summary::-webkit-details-marker{display:none}
+  .seo .faq summary::before{content:"+";color:var(--ambar-l);font-weight:700;margin-right:9px}
+  .seo .faq details[open] summary::before{content:"–"}
+  .seo .faq p{margin:10px 0 0;font-size:13.5px}
+  .seo .xlinks{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .seo .xlinks a{display:inline-flex;align-items:center;gap:7px;background:var(--carvao2);border:1px solid var(--linha2);border-radius:var(--pill);padding:9px 16px;font-weight:600;font-size:13px;color:#cfcfd4;text-decoration:none;transition:.16s}
+  .seo .xlinks a:hover{border-color:var(--ambar);color:#fff}
+
   /* reordenação: fade-up com stagger curto (premium, leve) */
   @keyframes vcardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .vcard.fadein{animation:vcardIn .34s cubic-bezier(.4,0,.2,1) both;animation-delay:calc(var(--i,0)*25ms)}
@@ -274,8 +296,8 @@
       <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
     </div>
     <div class="hcta">
-      <a class="hnav" href="/bidcon.html">← Marketplace</a>
-      <a class="hnav veic" href="/bidcon-lojista.html"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Lojista</a>
+      <a class="hnav" href="/bidcon">← Marketplace</a>
+      <a class="hnav veic" href="/bidcon-lojista"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16.5h14M4 16.5v-3.2l1.8-4.3A2 2 0 0 1 7.6 7.7h8.8a2 2 0 0 1 1.8 1.3L20 13.3v3.2"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg> Lojista</a>
       <a class="hzap" id="hzap" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
         Falar no WhatsApp
@@ -421,6 +443,45 @@
   <div class="disc">
     <b>Importante.</b> A bidcon / Prospere Consórcios intermedia cotas de consórcio já contempladas — <b>não somos instituição financeira e não aprovamos crédito</b>. Os imóveis exibidos são da imobiliária parceira <b id="discParceiro">Prospere Hortolândia</b>; preços e disponibilidade são responsabilidade da imobiliária e podem mudar. A <b>junção de cartas</b> é uma simulação de combinação de créditos contemplados — viabilidade e transferência ficam sujeitas à análise da administradora. Consórcio é <b>compra programada</b>, não investimento.
   </div>
+
+  <section class="seo" aria-label="Como funciona a carta de consórcio para imóveis">
+    <h2>Como funciona a carta de crédito do consórcio para comprar imóveis</h2>
+    <p>A <b>carta de consórcio contemplada</b> de imóvel é uma cota que já foi sorteada ou teve o lance aprovado, com o <b>crédito liberado para uso imediato</b>. Em vez de aguardar a contemplação, você assume uma cota já contemplada, paga a entrada combinada e usa a <b>carta de crédito de consórcio</b> para comprar casa, apartamento, terreno ou sala comercial — com a força de uma compra à vista.</p>
+    <p>A <b>carta de crédito do consórcio</b> funciona como um valor de compra pré-definido: você escolhe o imóvel dentro do crédito disponível e o pagamento ao vendedor é feito à vista. O saldo restante segue sendo quitado em parcelas mensais, de acordo com as condições da administradora.</p>
+
+    <h2>Por que comprar uma carta de consórcio contemplada de imóvel</h2>
+    <p>Quem decide <b>comprar carta de consórcio contemplada</b> para imóvel aproveita algumas vantagens claras:</p>
+    <ul>
+      <li><b>Crédito disponível na hora:</b> sem esperar sorteio nem depender de lance.</li>
+      <li><b>Poder de compra à vista:</b> melhora a negociação com o vendedor do imóvel.</li>
+      <li><b>Sem juros de financiamento imobiliário:</b> consórcio é compra programada, com custo mensal mais previsível.</li>
+      <li><b>Junção de cartas:</b> é possível somar créditos de cartas contempladas para alcançar o valor do imóvel desejado.</li>
+    </ul>
+    <p>No bidcon você compara os <b>imóveis da imobiliária parceira</b> com as <b>cartas contempladas disponíveis</b> e visualiza crédito, parcela, prazo e custo mensal estimado de cada combinação antes de falar com um consultor.</p>
+
+    <h2>Como vender e como comprar pela bidcon</h2>
+    <p>A bidcon atua na <b>venda de carta de consórcio</b> e na intermediação de cotas já contempladas de imóvel. Para o comprador, exibimos crédito, parcela, prazo e custo mensal estimado. Toda combinação é uma <b>estimativa, sujeita à análise e à transferência pela administradora</b> — a bidcon não é instituição financeira e não aprova crédito.</p>
+
+    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+      <details><summary>Como funciona a carta de consórcio contemplada de imóvel?</summary>
+        <p>É uma cota de consórcio imobiliário já contemplada, com crédito liberado. Ao assumir a cota, você paga a entrada combinada e usa o crédito para comprar o imóvel à vista, quitando o saldo nas parcelas mensais conforme a administradora.</p></details>
+      <details><summary>Qual a diferença entre carta de crédito e financiamento imobiliário?</summary>
+        <p>O financiamento imobiliário cobra juros sobre o saldo devedor por muitos anos. O consórcio é compra programada: você paga parcelas e taxa de administração, em geral com custo mensal menor. A carta de crédito de consórcio dá poder de compra à vista do imóvel.</p></details>
+      <details><summary>É seguro comprar carta de consórcio contemplada?</summary>
+        <p>A transferência da cota contemplada é feita formalmente junto à administradora do consórcio, que valida o novo titular. A bidcon intermedia a operação e organiza a documentação; a viabilidade final é sempre confirmada pela administradora.</p></details>
+      <details><summary>Posso juntar mais de uma carta para comprar um imóvel?</summary>
+        <p>Sim. A junção de cartas soma os créditos de cotas contempladas para chegar ao valor do imóvel desejado. O bidcon simula essas combinações; a viabilidade e a transferência ficam sujeitas à análise da administradora.</p></details>
+      <details><summary>O que está incluído no valor exibido?</summary>
+        <p>Exibimos crédito, entrada, parcela, prazo e custo mensal estimado da cota. Preços e disponibilidade dos imóveis são responsabilidade da imobiliária parceira e podem mudar. Os números são estimativas e ficam sujeitos à análise da administradora.</p></details>
+    </div>
+
+    <div class="xlinks">
+      <a href="/bidcon-lojista">Ver cartas contempladas de veículos</a>
+      <a href="/bidcon">Marketplace de cotas contempladas</a>
+      <a href="/blog/vale-a-pena-comprar-carta-de-consorcio-contemplada">Vale a pena comprar carta de consórcio contemplada?</a>
+    </div>
+  </section>
 
   <div class="foot">
     bidcon Imobiliária · Imóveis × cartas contempladas<br>

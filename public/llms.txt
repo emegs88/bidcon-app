@@ -1,0 +1,29 @@
+# bidcon
+
+> Marketplace de cartas de consórcio contempladas da Prospere Consórcios. A bidcon intermedia a compra e a venda de cotas de consórcio já contempladas (com crédito liberado) e cruza, lado a lado, o estoque de veículos e imóveis das lojas parceiras com as cartas disponíveis — mostrando crédito, entrada, parcela, prazo e custo mensal estimado. A bidcon não é instituição financeira e não aprova crédito; toda combinação é uma estimativa sujeita à análise da administradora do consórcio.
+
+## Páginas principais
+
+- [bidcon — Marketplace de cotas contempladas](https://www.bidcon.com.br/bidcon): Catálogo geral de cotas de consórcio contempladas (veículos e imóveis), com filtros, junção de cartas e custo mensal estimado.
+- [Cartas contempladas para lojistas (veículos)](https://www.bidcon.com.br/bidcon-lojista): Cruza o estoque de veículos da loja parceira com cartas de consórcio contempladas. Inclui consultor FIPE e uso do carro na troca como entrada da carta.
+- [Cartas contempladas de imóvel](https://www.bidcon.com.br/bidcon-imobiliaria): Cruza os imóveis da imobiliária parceira com cartas de consórcio contempladas de imóvel, com pré-análise por renda e junção de cartas.
+- [Página inicial bidcon](https://www.bidcon.com.br/): Apresentação do marketplace e acesso às áreas de veículos e imóveis.
+
+## Tipo de serviço
+
+- Intermediação de cartas de consórcio contempladas (compra e venda de cotas com crédito liberado).
+- Segmentos: veículos (lojistas) e imóveis (residencial e comercial).
+- Atuação: Brasil. Operação local em Hortolândia/SP (Prospere Consórcios).
+
+## Observações de conformidade
+
+- Consórcio é compra programada, não investimento.
+- A bidcon / Prospere Consórcios não é instituição financeira e não aprova crédito.
+- Valores exibidos (crédito, entrada, parcela, prazo, custo mensal) são estimativas e ficam sujeitos à análise e à transferência pela administradora do consórcio.
+- A entrada é paga via PIX e o saldo é quitado nas parcelas, conforme a administradora.
+
+## Contato
+
+- Site institucional: https://www.prospere.com.br/
+- WhatsApp: +55 19 99756-1909
+- E-mail: contato@prospere.com.br
