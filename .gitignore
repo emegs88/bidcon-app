@@ -2,3 +2,10 @@
 .DS_Store
 node_modules
 *.log
+
+# plataforma logada (Fase 0+) — segredos e build nunca vão ao repo
+.env
+.env.*
+platform/.next
+platform/node_modules
+platform/.vercel
