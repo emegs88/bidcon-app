@@ -1,0 +1,33 @@
+.header {
+  margin-bottom: 18px;
+}
+.back {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+.back:hover {
+  color: var(--text-soft);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.title {
+  font-weight: 800;
+  font-size: 26px;
+  margin: 0;
+}
+.action {
+  flex: 0 0 auto;
+}
+.subtitle {
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  font-size: 14px;
+}

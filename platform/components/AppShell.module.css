@@ -1,0 +1,102 @@
+.shell {
+  min-height: 100dvh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(8, 11, 20, 0.82);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.bar {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.brandAccent {
+  color: var(--brand);
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  flex: 1 1 auto;
+  overflow-x: auto;
+}
+.navLink {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+.navLink:hover {
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+.navActive {
+  color: var(--text);
+  background: rgba(54, 197, 240, 0.12);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.hello {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signout {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.signout:hover {
+  color: var(--text-soft);
+  border-color: var(--border-strong);
+}
+
+.main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+}
+
+@media (max-width: 560px) {
+  .hello {
+    display: none;
+  }
+  .bar {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+}

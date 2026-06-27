@@ -1,0 +1,55 @@
+.base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--r-pill);
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.06s ease, opacity 0.15s ease, background 0.15s ease;
+}
+.base:active {
+  transform: translateY(1px);
+}
+
+.md {
+  padding: 12px 18px;
+  font-size: 15px;
+}
+.sm {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.block {
+  width: 100%;
+}
+
+.primary {
+  background: var(--grad-brand);
+  color: #04121f;
+}
+.primary:hover {
+  opacity: 0.92;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-soft);
+  border: 1px solid var(--border-strong);
+}
+.ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.link {
+  background: transparent;
+  color: var(--brand);
+  padding: 4px 2px;
+  font-weight: 600;
+}
+.link:hover {
+  text-decoration: underline;
+}

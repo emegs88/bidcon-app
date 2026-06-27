@@ -1,0 +1,72 @@
+/* Tokens globais da área logada Bidcon.
+   Derivados das cores já usadas nas telas (fundo #080B14, superfície #10182B,
+   texto secundário #93A0B8, ciano #36C5F0, gradiente azul). Importado uma única
+   vez no layout. Sem framework de CSS — só variáveis + resets mínimos. */
+:root {
+  /* superfícies */
+  --bg: #080b14;
+  --surface: #10182b;
+  --surface-2: #0d1424;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  /* texto */
+  --text: #f6f6f8;
+  --text-soft: #d4d8e2;
+  --text-muted: #93a0b8;
+
+  /* marca / acentos */
+  --brand: #36c5f0;
+  --brand-deep: #1e6fe6;
+  --grad-brand: linear-gradient(100deg, #8fb7ff, #36c5f0 45%, #1e6fe6);
+  --accent-amber: #f3c34a;
+
+  /* feedback de status */
+  --ok: #34d399;
+  --info: #36c5f0;
+  --warn: #f3c34a;
+
+  /* raios / sombras / espaços */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --maxw: 760px;
+
+  /* tipografia */
+  --font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--brand);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}

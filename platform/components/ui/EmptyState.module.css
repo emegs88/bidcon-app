@@ -1,0 +1,25 @@
+.box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 36px 24px;
+  text-align: center;
+}
+.icon {
+  font-size: 34px;
+  margin-bottom: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.desc {
+  color: var(--text-muted);
+  margin: 0 auto;
+  max-width: 42ch;
+  font-size: 14px;
+}
+.action {
+  margin-top: 18px;
+}
