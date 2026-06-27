@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script src="config.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidade | bidcon</title>
+<meta name="description" content="Política de Privacidade da bidcon (Prospere Consórcios): como tratamos seus dados pessoais conforme a LGPD — finalidade, bases legais, retenção e seus direitos.">
+<meta name="author" content="Prospere Consórcios">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#080B14">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="512x512" href="/img/bidcon-icone-selo.png">
+<link rel="apple-touch-icon" href="/img/bidcon-app-icon.png">
+<link rel="canonical" href="https://www.bidcon.com.br/privacidade">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="bidcon">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:url" content="https://www.bidcon.com.br/privacidade">
+<meta property="og:title" content="Política de Privacidade | bidcon">
+<meta property="og:description" content="Como a bidcon trata seus dados pessoais conforme a LGPD.">
+<meta property="og:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Política de Privacidade | bidcon">
+<meta name="twitter:image" content="https://www.bidcon.com.br/img/bidcon-og-banner.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);--linha2:rgba(255,255,255,.15);
+    --branco:#f6f6f8;--cinza:#93A0B8;--cinza2:#5E6B85;
+    --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
+    --azul:#2E7BF0;--azul-l:#5b93ff;--raio:22px;--raio-sm:14px;--pill:999px;
+    --b1:#8FB7FF;--b2:#36C5F0;--b3:#1E6FE6;
+    --grad-azul:linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6);
+    --sombra:0 1px 2px rgba(0,0,0,.4),0 12px 32px -12px rgba(0,0,0,.7);
+    --f-display:'Sora',system-ui,sans-serif;--f-body:'Inter',system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--preto);color:var(--branco);font-family:var(--f-body);line-height:1.6;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(1100px 520px at 78% -8%,rgba(46,123,240,.08),transparent 60%),radial-gradient(900px 480px at 8% 0%,rgba(31,170,89,.05),transparent 55%)}
+  .wrap{max-width:880px;margin:0 auto;padding:0 26px}
+  ::selection{background:var(--b2);color:#04121f}
+  a{color:var(--azul-l)}
+  header{border-bottom:1px solid var(--linha);background:rgba(7,7,9,.72);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.2)}
+  .hbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0;flex-wrap:wrap;max-width:1240px;margin:0 auto;padding-left:26px;padding-right:26px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .blogo{display:inline-flex;align-items:baseline;font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1;color:#fff;text-decoration:none}
+  .blogo b{font-weight:800;background:var(--grad-azul);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .blogo .seal{display:inline-flex;width:.86em;height:.86em;margin:0 -.02em;transform:translateY(.06em)}
+  .blogo .seal svg{width:100%;height:100%;display:block}
+  .bsel{font-size:10.5px;color:var(--cinza);letter-spacing:.08em;text-transform:uppercase;border-left:1px solid var(--linha);padding-left:13px}
+  .bsel b{color:#cfcfd4;font-weight:600}
+  .hnav{display:inline-flex;align-items:center;gap:7px;background:transparent;color:#cfcfd4;font-weight:700;font-size:13px;text-decoration:none;border:1px solid var(--linha2);border-radius:var(--pill);padding:10px 17px;transition:.16s}
+  .hnav:hover{border-color:var(--branco);color:#fff;transform:translateY(-1px)}
+  main{padding:44px 0 40px}
+  h1{font-family:var(--f-display);font-weight:800;font-size:clamp(1.7rem,3.4vw,34px);line-height:1.1;letter-spacing:-.03em;margin-bottom:10px}
+  .upd{font-size:12.5px;color:var(--cinza);margin-bottom:8px}
+  .lead{color:#cfcfd4;font-size:15px;margin:18px 0 8px;max-width:66ch}
+  h2{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-.01em;margin:34px 0 10px;padding-top:14px;border-top:1px solid var(--linha)}
+  h3{font-family:var(--f-display);font-weight:600;font-size:15px;margin:18px 0 6px;color:var(--azul-l)}
+  p{color:#d4d8e2;font-size:14.5px;margin:8px 0;max-width:70ch}
+  ul{margin:8px 0 8px 4px;padding-left:20px}
+  li{color:#d4d8e2;font-size:14.5px;margin:5px 0;max-width:68ch}
+  b,strong{color:#fff}
+  .ph{background:rgba(227,160,8,.16);color:var(--ambar-l);border:1px solid rgba(227,160,8,.35);border-radius:6px;padding:1px 7px;font-family:var(--f-body);font-weight:700;font-size:12.5px;white-space:nowrap}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border:1px solid var(--linha);vertical-align:top}
+  th{background:var(--carvao);color:#fff;font-weight:600}
+  td{color:#d4d8e2}
+  .box{background:var(--carvao);border:1px solid var(--linha2);border-radius:var(--raio-sm);padding:18px 20px;margin:16px 0}
+  .box p{margin:4px 0}
+  .disc{background:var(--carvao);border:1px solid var(--linha);border-left:3px solid var(--ambar);border-radius:14px;padding:16px 18px;margin:30px 0 0;font-size:12.5px;color:#cfcfd4;line-height:1.6}
+  .disc b{color:var(--ambar-l)}
+  .foot{margin-top:26px;text-align:center;color:var(--cinza2);font-size:11px;letter-spacing:.1em;text-transform:uppercase;line-height:1.8}
+  .foot a{color:inherit}
+  .footlinks{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:20px 0 4px}
+  .footlinks a{color:var(--cinza);font-size:12px;text-decoration:none;letter-spacing:.02em;text-transform:none}
+  .footlinks a:hover{color:#fff}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbar">
+    <div class="brand">
+      <a class="blogo" href="/" aria-label="bidcon">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><linearGradient id="bgrad" x1="0" y1=".15" x2="1" y2=".85"><stop offset="0" stop-color="#8FB7FF"/><stop offset=".45" stop-color="#36C5F0"/><stop offset="1" stop-color="#1E6FE6"/></linearGradient></defs><circle cx="50" cy="50" r="44" fill="none" stroke="url(#bgrad)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="url(#bgrad)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b></a>
+      <div class="bsel">by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a></div>
+    </div>
+    <div class="hcta">
+      <a class="hnav" href="/bidcon">← Marketplace</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Política de Privacidade</h1>
+  <p class="upd">Última atualização: <b>27 de junho de 2026</b></p>
+  <p class="lead">Esta Política explica como a <b>bidcon</b>, marca operada pela <b>Prospere Consórcios</b>, coleta, usa, compartilha e protege seus dados pessoais, em conformidade com a <b>Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD)</b>. Ao usar o site e enviar seus dados, você declara estar ciente desta Política.</p>
+
+  <h2>1. Quem é o controlador dos dados</h2>
+  <div class="box">
+    <p><b>Razão social:</b> <span class="ph">[PREENCHER: razão social]</span></p>
+    <p><b>CNPJ:</b> <span class="ph">[PREENCHER: CNPJ]</span></p>
+    <p><b>Marca:</b> bidcon</p>
+    <p><b>Endereço:</b> Av. da Emancipação, 3770 — Parque dos Pinheiros, Hortolândia/SP, CEP 13184-654</p>
+    <p><b>E-mail de contato:</b> <a href="mailto:contato@prospere.com.br">contato@prospere.com.br</a></p>
+    <p><b>Encarregado pelo Tratamento de Dados (DPO):</b> <span class="ph">[PREENCHER: nome e e-mail do encarregado]</span></p>
+  </div>
+
+  <h2>2. Quais dados coletamos</h2>
+  <p>Coletamos apenas os dados necessários para conectar você ao nosso atendimento e conduzir a negociação de cotas de consórcio contempladas:</p>
+  <h3>Dados que você nos fornece</h3>
+  <ul>
+    <li><b>Identificação e contato:</b> nome e número de WhatsApp/telefone informados nos formulários.</li>
+    <li><b>Interesse:</b> tipo de bem, faixa de valor e demais informações que você decide compartilhar sobre a carta que quer comprar ou vender.</li>
+    <li><b>Comprovantes (etapa avançada):</b> documentos de identificação e comprovantes de renda (ex.: contracheque, DECORE) — solicitados <b>somente</b> na fase formal de análise/transferência conduzida pela administradora do consórcio, nunca no primeiro contato.</li>
+  </ul>
+  <h3>Dados coletados automaticamente</h3>
+  <ul>
+    <li><b>Dados de navegação:</b> com o seu consentimento, métricas de uso (páginas visitadas, origem do acesso, tipo de dispositivo) por meio de ferramentas de analytics. Detalhes na seção <a href="#cookies">Cookies</a>.</li>
+  </ul>
+  <p><b>Não solicitamos</b> senhas, dados bancários ou códigos por canais não oficiais. Desconfie de qualquer pedido nesse sentido.</p>
+
+  <h2>3. Para que usamos seus dados (finalidades)</h2>
+  <ul>
+    <li>Entrar em contato e dar andamento ao seu interesse de compra ou venda de carta contemplada;</li>
+    <li>Intermediar a negociação e apoiar a documentação junto à administradora do consórcio;</li>
+    <li>Responder solicitações e prestar atendimento;</li>
+    <li>Entender o uso do site e melhorar a experiência (analytics), mediante consentimento;</li>
+    <li>Cumprir obrigações legais e regulatórias.</li>
+  </ul>
+
+  <h2>4. Bases legais (art. 7º da LGPD)</h2>
+  <table>
+    <tr><th>Tratamento</th><th>Base legal</th></tr>
+    <tr><td>Contato e condução da negociação a seu pedido</td><td>Execução de procedimentos preliminares a contrato e diligências a pedido do titular (art. 7º, V)</td></tr>
+    <tr><td>Atendimento e relacionamento</td><td>Legítimo interesse (art. 7º, IX)</td></tr>
+    <tr><td>Cookies de analytics e marketing</td><td>Consentimento (art. 7º, I)</td></tr>
+    <tr><td>Guarda de registros e cumprimento de obrigações</td><td>Cumprimento de obrigação legal/regulatória (art. 7º, II)</td></tr>
+  </table>
+
+  <h2>5. Com quem compartilhamos</h2>
+  <p>Não vendemos seus dados. Compartilhamos apenas o necessário, com:</p>
+  <ul>
+    <li><b>Administradoras de consórcio parceiras:</b> para validar e formalizar a transferência da cota;</li>
+    <li><b>Prestadores de tecnologia:</b> hospedagem (Vercel Inc.) e ferramentas de analytics (Google Analytics, Microsoft Clarity), quando autorizadas por você;</li>
+    <li><b>Autoridades:</b> quando exigido por lei ou ordem judicial.</li>
+  </ul>
+  <p>Alguns prestadores podem tratar dados fora do Brasil; nesses casos, adotamos salvaguardas compatíveis com a LGPD.</p>
+
+  <h2>6. Por quanto tempo guardamos</h2>
+  <p>Mantemos os dados pelo tempo necessário às finalidades acima e ao cumprimento de obrigações legais. Dados de contato de leads sem negociação são mantidos por até <b>24 meses</b> e depois eliminados ou anonimizados, salvo dever legal de guarda.</p>
+
+  <h2 id="cookies">7. Cookies e tecnologias de rastreamento</h2>
+  <p>Usamos cookies essenciais (necessários ao funcionamento do site) e, <b>somente após o seu consentimento</b>, cookies de analytics para entender o uso do site. Você pode aceitar ou recusar os cookies não essenciais no banner exibido na primeira visita e alterar a escolha a qualquer momento limpando os cookies do navegador. Enquanto você não aceitar, nenhuma ferramenta de analytics é carregada.</p>
+
+  <h2>8. Seus direitos (art. 18 da LGPD)</h2>
+  <p>Você pode, a qualquer momento, solicitar:</p>
+  <ul>
+    <li>Confirmação da existência de tratamento e acesso aos seus dados;</li>
+    <li>Correção de dados incompletos, inexatos ou desatualizados;</li>
+    <li>Anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade;</li>
+    <li>Portabilidade e informação sobre compartilhamento;</li>
+    <li>Revogação do consentimento e eliminação dos dados tratados com base nele.</li>
+  </ul>
+  <p>Para exercer seus direitos, escreva para <a href="mailto:contato@prospere.com.br">contato@prospere.com.br</a>. Responderemos no menor prazo possível, conforme a LGPD.</p>
+
+  <h2>9. Segurança</h2>
+  <p>Adotamos medidas técnicas e organizacionais para proteger seus dados, como conexão criptografada (HTTPS/TLS), controles de acesso e cabeçalhos de segurança. Nenhum sistema é 100% infalível; em caso de incidente relevante, agiremos conforme a LGPD e comunicaremos quando exigido.</p>
+
+  <h2>10. Alterações desta Política</h2>
+  <p>Podemos atualizar esta Política periodicamente. A data de "Última atualização" no topo indica a versão vigente. Mudanças relevantes serão sinalizadas no site.</p>
+
+  <div class="disc"><b>Importante.</b> A bidcon / Prospere Consórcios intermedia cotas de consórcio já contempladas — não é instituição financeira e não aprova crédito. Consórcio é compra programada / planejamento patrimonial, não investimento. Os valores são estimativas e ficam sujeitos à análise e à transferência pela administradora do consórcio.</div>
+
+  <div class="footlinks">
+    <a href="/">Início</a>
+    <a href="/bidcon">Marketplace</a>
+    <a href="/bidcon-lojista">Veículos</a>
+    <a href="/bidcon-imobiliaria">Imóveis</a>
+    <a href="/vender-consorcio-contemplado">Vender carta</a>
+    <a href="/privacidade">Privacidade</a>
+  </div>
+  <div class="foot">
+    bidcon · Política de Privacidade<br>
+    by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Prospere Consórcios</b></a>
+  </div>
+</main>
+
+</body>
+</html>

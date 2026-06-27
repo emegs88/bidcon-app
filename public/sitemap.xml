@@ -26,6 +26,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.bidcon.com.br/privacidade</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
     <loc>https://www.bidcon.com.br/blog/como-funciona-carta-de-credito-do-consorcio</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
