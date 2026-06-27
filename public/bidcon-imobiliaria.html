@@ -313,6 +313,127 @@
     <p>Pesquise os imóveis da <b>Prospere Hortolândia</b> e descubra na hora qual carta de consórcio já contemplada fecha o negócio — crédito, entrada e custo. Quando uma carta sozinha não cobre, a <b>junção inteligente de cartas</b> monta a melhor combinação.</p>
   </section>
 
+  <!-- INÍCIO COMPRAR-OU-VENDER -->
+  <style>
+    .cv-sec{
+      --cv-bg:#080B14;
+      --cv-card:#0E1322;
+      --cv-border:#1E2740;
+      --cv-text:#EAEFFA;
+      --cv-muted:#9FB0CE;
+      --cv-blue:#2F6BFF;
+      --cv-blue-soft:#5B8DEF;
+      --cv-amber:#F5A623;
+      --cv-amber-soft:#FFC15E;
+      background:var(--cv-bg);
+      padding:72px 24px;
+      font-family:'Inter',system-ui,-apple-system,sans-serif;
+    }
+    .cv-wrap{max-width:1120px;margin:0 auto;}
+    .cv-eyebrow{
+      display:inline-block;font-size:12px;font-weight:600;letter-spacing:.14em;
+      text-transform:uppercase;color:var(--cv-blue-soft);margin:0 0 14px;
+    }
+    .cv-title{
+      font-family:'Poppins','Inter',sans-serif;
+      font-size:clamp(26px,4vw,40px);font-weight:800;line-height:1.12;
+      color:var(--cv-text);margin:0 0 12px;letter-spacing:-.01em;
+    }
+    .cv-title em{font-style:normal;color:var(--cv-blue-soft);}
+    .cv-sub{font-size:16px;line-height:1.6;color:var(--cv-muted);max-width:620px;margin:0 0 40px;}
+  
+    .cv-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+    @media (max-width:760px){.cv-grid{grid-template-columns:1fr;}}
+  
+    .cv-card{
+      position:relative;background:var(--cv-card);border:1px solid var(--cv-border);
+      border-radius:18px;padding:32px 28px 30px;overflow:hidden;
+      transition:transform .18s ease,border-color .18s ease;
+    }
+    .cv-card:hover{transform:translateY(-4px);}
+    .cv-card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;}
+    .cv-card.buy::before{background:linear-gradient(90deg,var(--cv-blue),var(--cv-blue-soft));}
+    .cv-card.sell::before{background:linear-gradient(90deg,var(--cv-amber),var(--cv-amber-soft));}
+    .cv-card.buy:hover{border-color:var(--cv-blue);}
+    .cv-card.sell:hover{border-color:var(--cv-amber);}
+  
+    .cv-tag{
+      display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+      padding:6px 12px;border-radius:999px;margin:0 0 16px;
+    }
+    .cv-card.buy .cv-tag{color:var(--cv-blue-soft);background:rgba(47,107,255,.12);}
+    .cv-card.sell .cv-tag{color:var(--cv-amber-soft);background:rgba(245,166,35,.12);}
+  
+    .cv-ch{
+      font-family:'Poppins','Inter',sans-serif;
+      font-size:22px;font-weight:700;color:var(--cv-text);margin:0 0 10px;line-height:1.2;
+    }
+    .cv-cp{font-size:15px;line-height:1.6;color:var(--cv-muted);margin:0 0 24px;}
+  
+    .cv-btn{
+      display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:700;
+      padding:13px 22px;border-radius:11px;text-decoration:none;
+      transition:filter .15s ease,transform .15s ease;
+    }
+    .cv-btn:hover{filter:brightness(1.08);}
+    .cv-btn:active{transform:scale(.98);}
+    .cv-btn:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+    .cv-card.buy .cv-btn{background:var(--cv-blue);color:#fff;}
+    .cv-card.sell .cv-btn{background:var(--cv-amber);color:#1A1206;}
+    .cv-btn svg{width:16px;height:16px;}
+  </style>
+  
+  <section class="cv-sec" aria-labelledby="cv-h2">
+    <div class="cv-wrap">
+      <span class="cv-eyebrow">Você escolhe o lado</span>
+      <h2 class="cv-title" id="cv-h2">Quer <em>comprar</em> ou <em>vender</em> uma carta?</h2>
+      <p class="cv-sub">
+        Ache o imóvel da imobiliária e veja na hora a carta de consórcio já contemplada que cobre o
+      negócio — ou anuncie a sua cota contemplada para compradores verificados. Os dois caminhos
+      com contrato, transferência oficial e acompanhamento Prospere.
+      </p>
+  
+      <div class="cv-grid">
+        <!-- COMPRAR -->
+        <article class="cv-card buy">
+          <span class="cv-tag">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            Quero comprar
+          </span>
+          <h3 class="cv-ch">Ache o imóvel e a carta que cobre</h3>
+          <p class="cv-cp">
+            Pesquise os imóveis e descubra na hora qual carta de crédito já contemplada fecha a compra.
+          Você paga a entrada, segue com as parcelas e a transferência passa pela administradora do consórcio.
+          </p>
+          <!-- TROQUE o href pelo id real da seção de cotas (ex.: #cotas ou #marketplace) -->
+          <a class="cv-btn" href="#cotas">
+            Ver imóveis e cartas
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+  
+        <!-- VENDER -->
+        <article class="cv-card sell">
+          <span class="cv-tag">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            Tenho uma carta
+          </span>
+          <h3 class="cv-ch">Venda sua cota contemplada com segurança</h3>
+          <p class="cv-cp">
+            Mudou de planos e não vai usar o crédito? Anuncie sua carta para compradores
+            verificados, com negociação intermediada e sem burocracia. Você cuida do anúncio;
+            a gente conduz o contato e a documentação.
+          </p>
+          <a class="cv-btn" href="/vender-consorcio-contemplado">
+            Quero vender minha carta
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+  <!-- FIM COMPRAR-OU-VENDER -->
+
   <div class="stats" id="stats"></div>
 
   <div class="links">
@@ -328,7 +449,7 @@
     <a class="fontecad" id="cadImob" href="#" target="_blank" rel="noopener">+ Cadastre o site da sua imobiliária</a>
   </div>
 
-  <div class="tabs">
+  <div class="tabs" id="cotas">
     <button class="tab on" data-tab="imoveis"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9.5h14V10"/><path d="M9.5 19.5v-5h5v5"/></svg> Imóveis × cartas</button>
     <button class="tab" data-tab="cartas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 9.5v9M19 9.5v9M9 9.5v9M15 9.5v9"/><path d="M3.5 18.5h17"/></svg> Cartas de imóvel</button>
     <button class="tab" data-tab="analise"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/><path d="M16 3.5 21 5l-1.5 5"/></svg> Pré-análise por renda</button>
