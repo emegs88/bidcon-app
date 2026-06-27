@@ -722,7 +722,7 @@ function renderTrocaImovel(){
     `<div class="trh-grid">`+
       `<div class="trc"><span class="trl">Entrada disponível</span><span class="trv">${BRL(val)}</span></div>`+
       `<div class="trc"><span class="trl">Crédito que libera</span><span class="trv pos">${BRL(best.c)}</span></div>`+
-      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv">${pctAmV(best)}</span></div>`+
+      `<div class="trc"><span class="trl">Custo efetivo</span><span class="trv pos">${pctAmV(best)}</span></div>`+
       `<div class="trc"><span class="trl">Score da carta</span><span class="trv"><i class="dscore best">score ${best.score}</i></span></div>`+
     `</div>`+
     `<div class="trh-nota">O <b>valor líquido</b> da sua entrada (${BRL(val)}) cobre a <b>entrada</b> da carta nº <b>${best.n}</b>, que libera <b>${BRL(best.c)}</b> de crédito pra comprar um imóvel maior. Entrada paga via PIX, saldo nas parcelas.</div>`+

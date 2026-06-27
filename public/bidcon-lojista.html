@@ -256,6 +256,10 @@
   .vrc .vrl small{font-weight:600;text-transform:none;letter-spacing:0;color:var(--verde-l)}
   .vrc .vrv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .vrc .vrv.pos{color:var(--verde-l)}
+  /* custo efetivo: destaque verde + célula levemente colorida pra leitura rápida */
+  .vrc.ce{background:rgba(31,170,89,.12);border-color:rgba(52,211,153,.45)}
+  .vrc.ce .vrl{color:var(--verde-l)}
+  .vrc.ce .vrv{color:var(--verde-l)}
   .vres-cartas{font-size:11px;color:var(--cinza);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .vres-cartas b{color:#eaf1ff;font-weight:700}
   .cscore{display:inline-flex;align-items:center;gap:4px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:10px;font-weight:800;letter-spacing:.02em;color:#04210f;background:var(--verde-l);border-radius:6px;padding:2px 7px}
@@ -875,7 +879,7 @@ function renderEstoque(){
         `<div class="vres-cobre">${ic('check')} A carta cobre <b>100%</b> do preço da loja</div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada <small>(via PIX)</small></span><span class="vrv">${BRL(best.e)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmV(best)}</span></div>`+
+          `<div class="vrc ce"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmV(best)}</span></div>`+
         `</div>`+
         `<div class="vres-cartas"><span class="mhn">${NUM(v.cartas.length)}</span> carta(s) cobrem · sugerida <b>nº ${best.n}</b>${best.score!=null?` <span class="cscore" title="Menor entrada e menor custo = score maior">${ic('check')} score ${best.score}</span>`:''}</div>`+
       `</div>`;
@@ -892,7 +896,7 @@ function renderEstoque(){
         `<div class="vres-cobre">${ic('ia')} <span class="iatag">junção IA</span> <b>${NUM(v.combo.combo.length)}</b> cartas juntas cobrem <b>100%</b></div>`+
         `<div class="vres-grid">`+
           `<div class="vrc"><span class="vrl">Entrada somada <small>(via PIX)</small></span><span class="vrv">${BRL(v.combo.ent)}</span></div>`+
-          `<div class="vrc"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmComboV(v.combo.combo)}</span></div>`+
+          `<div class="vrc ce"><span class="vrl">Custo efetivo</span><span class="vrv">${pctAmComboV(v.combo.combo)}</span></div>`+
         `</div>`+
         `<div class="vres-cartas">Crédito somado <b>${BRL(v.combo.cred)}</b></div>`+
       `</div>`;
