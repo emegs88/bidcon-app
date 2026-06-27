@@ -657,10 +657,12 @@ function cartasPara(preco){
   const cobrem=CARTAS.filter(c=>c.c>=preco&&c.e<=preco).map(c=>({...c,ratio:c.c/preco}));
   if(!cobrem.length)return [];
   // crédito encaixa bem (crédito <= preço × (1+teto)): mantém o crédito perto do
-  // valor do carro, sem puxar carta gigante. Se nenhuma ficar no teto, usa todas.
+  // valor do carro, sem puxar carta gigante. Se NENHUMA carta única fica no teto,
+  // não force uma carta gigante (ex.: R$605k p/ carro de R$320k) — retorna vazio e
+  // deixa a render cair na junção de cartas menores (comboPara), que encaixa melhor.
   const justasCred=cobrem.filter(c=>c.ratio<=1+SOBRA_TETO);
-  const base=justasCred.length?justasCred:cobrem;
-  return pontuaCartas(base)
+  if(!justasCred.length)return [];
+  return pontuaCartas(justasCred)
     .sort((a,b)=>b.score-a.score||amCota(a)-amCota(b)||a.e-b.e);
 }
 
