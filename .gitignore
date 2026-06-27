@@ -6,6 +6,9 @@ node_modules
 # plataforma logada (Fase 0+) — segredos e build nunca vão ao repo
 .env
 .env.*
+# exceção: .env.example só tem placeholders (nenhum segredo) e é versionado
+!.env.example
+!platform/.env.example
 platform/.next
 platform/node_modules
 platform/.vercel
