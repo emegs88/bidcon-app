@@ -26,10 +26,11 @@ export default async function MeuProcesso() {
   // identificação do usuário para a casca
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nome")
+    .select("nome, tipo")
     .eq("id", user.id)
     .single();
   const nome = profile?.nome ?? user.email ?? null;
+  const tipo = profile?.tipo as "cliente" | "parceiro" | "admin" | undefined;
 
   // RLS: retorna apenas processos do próprio cliente
   const { data: processo } = await supabase
@@ -42,7 +43,7 @@ export default async function MeuProcesso() {
   // ----- estado vazio -----
   if (!processo) {
     return (
-      <AppShell nome={nome}>
+      <AppShell nome={nome} tipo={tipo}>
         <PageHeader title="Meu processo" backHref="/" />
         <EmptyState
           title="Nenhum processo em andamento"
@@ -77,7 +78,7 @@ export default async function MeuProcesso() {
   const statusAtual = processo.status as StatusProcesso;
 
   return (
-    <AppShell nome={nome}>
+    <AppShell nome={nome} tipo={tipo}>
       <PageHeader
         title="Meu processo"
         backHref="/"

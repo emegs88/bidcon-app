@@ -27,10 +27,11 @@ export default async function CartasPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nome")
+    .select("nome, tipo")
     .eq("id", user.id)
     .single();
   const nome = profile?.nome ?? user.email ?? null;
+  const tipo = profile?.tipo as "cliente" | "parceiro" | "admin" | undefined;
 
   const tipoFiltro = TIPOS.includes(searchParams.tipo as (typeof TIPOS)[number])
     ? (searchParams.tipo as string)
@@ -47,8 +48,17 @@ export default async function CartasPage({
   const { data: cartas } = await query;
   const lista = (cartas ?? []) as CartaVitrine[];
 
+  // texto de contagem — neutro, sem promessa
+  const total = lista.length;
+  const contagem =
+    total === 0
+      ? null
+      : total === 1
+        ? "1 carta encontrada"
+        : `${total} cartas encontradas`;
+
   return (
-    <AppShell nome={nome}>
+    <AppShell nome={nome} tipo={tipo}>
       <PageHeader
         title="Cartas disponíveis"
         backHref="/"
@@ -74,6 +84,12 @@ export default async function CartasPage({
           Veículo
         </Button>
       </nav>
+
+      {contagem && (
+        <p className={styles.contagem} aria-live="polite">
+          {contagem}
+        </p>
+      )}
 
       {lista.length === 0 ? (
         <EmptyState

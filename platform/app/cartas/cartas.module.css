@@ -1,8 +1,13 @@
 .filtros {
   display: flex;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
+}
+.contagem {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 16px;
 }
 .grid {
   display: grid;

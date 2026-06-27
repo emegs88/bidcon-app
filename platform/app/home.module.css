@@ -8,10 +8,23 @@
   margin: 0 0 28px;
   max-width: 52ch;
 }
+.destaque {
+  margin-bottom: 14px;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
+}
+.cardKicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-soft);
+  margin-bottom: 8px;
 }
 .cardTitle {
   display: block;
