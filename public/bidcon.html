@@ -667,18 +667,22 @@
 
 <!-- Base das APIs/dados. No 360 fica vazia (mesmo domínio). Na bidcon (domínio
      separado) config.js define window.BIDCON_API='https://360prospere.vercel.app'. -->
-<script>window.API360=(window.BIDCON_API||'').replace(/\/$/,'');document.write('<scr'+'ipt src="'+window.API360+'/cotas.js"></scr'+'ipt>');</script>
+<script>window.API360=(window.BIDCON_API||'').replace(/\/$/,'');</script>
 <script>
 const API360=window.API360||'';
-const DADOS=(window.PROSPERE_COTAS)||{cotas:[],whatsapp:'5519997561909'};
+// snapshot estático (cotas.js) carregado de forma não-bloqueante no fim do body. Lemos
+// window.PROSPERE_COTAS de forma lazy (no momento do uso), porque o script só executa
+// depois do parsing; até lá DADOS é só o default seguro abaixo.
+const snap=()=>window.PROSPERE_COTAS||{cotas:[],whatsapp:'5519997561909'};
+const DADOS=snap();
 // Fonte única da verdade = dados AO VIVO (cotasAoVivo). NÃO pintamos o snapshot
 // estático do cotas.js no primeiro paint pra evitar o "mostra 373 velho, clica e
 // corrige": começamos vazio + estado "carregando" até a sincronização ao vivo chegar.
 let COTAS=[];
 let cotasCarregadas=false;
 let bidconAtualizado=DADOS.atualizado||'';
-const LEILAO_SET=new Set((DADOS.leilao||[]).map(Number)); // cartas selecionadas pela equipe
-const CWA=DADOS.whatsapp||'5519997561909';
+let LEILAO_SET=new Set((DADOS.leilao||[]).map(Number)); // cartas do leilão (rebuild via snapshot lazy)
+const CWA=(DADOS.whatsapp)||(snap().whatsapp)||'5519997561909';
 const BRL=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
 const NUM=v=>Number(v).toLocaleString('pt-BR');
 const tipoLabel=t=>t==='imovel'?'Imóvel':'Veículo';
@@ -990,6 +994,8 @@ function normExtra(o,seq){
 // carteira 100% em tempo real: junta /api/cotas (Lance) + /api/cotas-extra (CBC/Piffer/Cartas)
 // no MESMO grid. Padrão = só disponíveis; reservadas ficam de fora.
 async function cotasAoVivo(){
+  // rebuild do conjunto de leilão a partir do snapshot lazy (script já executou neste ponto)
+  const sl=snap().leilao; if(Array.isArray(sl))LEILAO_SET=new Set(sl.map(Number));
   let lance=null, extras=[];
   try{
     const r=await fetch(API360+'/api/cotas',{cache:'no-store'});
@@ -1009,14 +1015,19 @@ async function cotasAoVivo(){
     cotasCarregadas=true;
     renderStats();render();
   } else if(!cotasCarregadas){
-    // nenhuma fonte respondeu ainda: fallback pro snapshot estático (melhor que tela vazia),
+    // nenhuma fonte respondeu ainda: fallback pro snapshot estático (lazy) — melhor que tela vazia,
     // mas já filtrando reservadas. A próxima sincronização corrige.
-    COTAS=(DADOS.cotas||[]).filter(c=>c.c>0&&!c.r);
+    COTAS=((snap().cotas)||[]).filter(c=>c.c>0&&!c.r);
     cotasCarregadas=true;
     renderStats();render();
   }
 }
 cotasAoVivo();setInterval(cotasAoVivo,180000);
+// snapshot estático (cotas.js) carregado de forma assíncrona/não-bloqueante. Quando chegar,
+// repinta com o fallback caso nenhuma API tenha respondido ainda (offline-safe).
+(function(){var s=document.createElement('script');s.src=API360+'/cotas.js';s.async=true;
+  s.onload=function(){if(!cotasCarregadas){var sl=snap().leilao;if(Array.isArray(sl))LEILAO_SET=new Set(sl.map(Number));COTAS=((snap().cotas)||[]).filter(c=>c.c>0&&!c.r);cotasCarregadas=true;renderStats();render();}};
+  document.body.appendChild(s);})();
 </script>
 <script src="/consent.js" defer></script>
 </body>
