@@ -1,0 +1,118 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── campo de busca ───────────────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.label {
+  font-size: 14px;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.linha {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.input {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: var(--font);
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(54, 197, 240, 0.25);
+}
+.input:disabled {
+  opacity: 0.6;
+}
+
+/* ── exemplos clicáveis ───────────────────────────────────────────────────── */
+.exemplos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.exLbl {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.chip {
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.chip:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(54, 197, 240, 0.25);
+}
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── feedback ─────────────────────────────────────────────────────────────── */
+.status {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+.erro {
+  color: var(--accent-amber);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── resultados ───────────────────────────────────────────────────────────── */
+.resultados {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.encaixe {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-soft);
+  border-left: 2px solid var(--brand);
+  padding-left: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}
