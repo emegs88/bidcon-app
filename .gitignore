@@ -9,3 +9,8 @@ node_modules
 platform/.next
 platform/node_modules
 platform/.vercel
+
+# artefatos de build/CLI gerados (não versionar)
+platform/next-env.d.ts
+platform/tsconfig.tsbuildinfo
+platform/supabase/.temp/
