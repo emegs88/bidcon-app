@@ -1,0 +1,49 @@
+.wrap {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 72px 24px;
+}
+.brand {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+  margin-bottom: 22px;
+}
+.brandAccent {
+  color: var(--brand);
+}
+.title {
+  font-weight: 800;
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+.sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+.input:focus {
+  border-color: var(--brand);
+  outline: none;
+}
+.ok {
+  color: var(--ok);
+}
+.erro {
+  color: var(--accent-amber);
+  font-size: 13px;
+  margin-top: 10px;
+}

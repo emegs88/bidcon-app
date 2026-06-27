@@ -4,12 +4,14 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { Timeline } from "./Timeline";
-import {
-  LABEL_STATUS,
-  LABEL_TIPO_BEM,
-  brl,
-  type StatusProcesso,
-} from "@/lib/status";
+import { AppShell } from "@/components/AppShell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { LABEL_STATUS, LABEL_TIPO_BEM, type StatusProcesso } from "@/lib/status";
+import { brl, dataBR } from "@/lib/format";
+import styles from "./processo.module.css";
 
 // número de atendimento (mesmo do site)
 const WA = "5519997561909";
@@ -21,6 +23,14 @@ export default async function MeuProcesso() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // identificação do usuário para a casca
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nome")
+    .eq("id", user.id)
+    .single();
+  const nome = profile?.nome ?? user.email ?? null;
+
   // RLS: retorna apenas processos do próprio cliente
   const { data: processo } = await supabase
     .from("processos")
@@ -29,34 +39,19 @@ export default async function MeuProcesso() {
     .limit(1)
     .maybeSingle();
 
-  const wrap: React.CSSProperties = { maxWidth: 620, margin: "0 auto", padding: "56px 24px" };
-
   // ----- estado vazio -----
   if (!processo) {
     return (
-      <main style={wrap}>
-        <a href="/" style={{ color: "#93A0B8", fontSize: 13, textDecoration: "none" }}>← Início</a>
-        <h1 style={{ fontWeight: 800, marginTop: 16 }}>Meu processo</h1>
-        <p style={{ color: "#93A0B8" }}>
-          Você ainda não tem um processo em andamento por aqui. Assim que uma
-          negociação começar, o andamento aparece nesta tela.
-        </p>
-        <a
-          href={`https://wa.me/${WA}`}
-          style={{
-            display: "inline-block",
-            marginTop: 16,
-            padding: "12px 18px",
-            borderRadius: 999,
-            background: "linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6)",
-            color: "#04121f",
-            fontWeight: 800,
-            textDecoration: "none",
-          }}
-        >
-          Falar com o atendimento
-        </a>
-      </main>
+      <AppShell nome={nome}>
+        <PageHeader title="Meu processo" backHref="/" />
+        <EmptyState
+          title="Nenhum processo em andamento"
+          description="Assim que uma negociação começar, o andamento aparece nesta tela."
+          action={
+            <Button href={`https://wa.me/${WA}`}>Falar com o atendimento</Button>
+          }
+        />
+      </AppShell>
     );
   }
 
@@ -81,61 +76,55 @@ export default async function MeuProcesso() {
 
   const statusAtual = processo.status as StatusProcesso;
 
-  const card: React.CSSProperties = {
-    background: "#10182B",
-    border: "1px solid rgba(255,255,255,.12)",
-    borderRadius: 16,
-    padding: "20px 22px",
-    margin: "18px 0",
-  };
-
   return (
-    <main style={wrap}>
-      <a href="/" style={{ color: "#93A0B8", fontSize: 13, textDecoration: "none" }}>← Início</a>
-      <h1 style={{ fontWeight: 800, marginTop: 16 }}>Meu processo</h1>
-      <p style={{ color: "#93A0B8", marginTop: 0 }}>
-        Acompanhe cada etapa. As datas dependem da administradora do consórcio;
-        esta tela não promete prazo de contemplação.
-      </p>
+    <AppShell nome={nome}>
+      <PageHeader
+        title="Meu processo"
+        backHref="/"
+        subtitle="Acompanhe cada etapa. As datas dependem da administradora do consórcio; esta tela não promete prazo de contemplação."
+      />
 
-      <section style={card}>
-        <h2 style={{ fontSize: 16, margin: "0 0 14px" }}>Andamento</h2>
-        <Timeline atual={statusAtual} />
-      </section>
+      <div className={styles.stack}>
+        <Card>
+          <h2 className={styles.h2}>Andamento</h2>
+          <Timeline atual={statusAtual} />
+        </Card>
 
-      {carta && (
-        <section style={card}>
-          <h2 style={{ fontSize: 16, margin: "0 0 10px" }}>Carta em negociação</h2>
-          <p style={{ margin: "4px 0", color: "#d4d8e2" }}>
-            Tipo: <b style={{ color: "#fff" }}>{LABEL_TIPO_BEM[carta.tipo] ?? carta.tipo}</b>
-          </p>
-          <p style={{ margin: "4px 0", color: "#d4d8e2" }}>
-            Crédito: <b style={{ color: "#fff" }}>{brl(carta.valor_credito)}</b>
-          </p>
-          <p style={{ margin: "4px 0", color: "#d4d8e2" }}>
-            Entrada estimada: <b style={{ color: "#fff" }}>{brl(carta.valor_entrada)}</b>
-          </p>
-        </section>
-      )}
+        {carta && (
+          <Card>
+            <h2 className={styles.h2}>Carta em negociação</h2>
+            <dl className={styles.dl}>
+              <div className={styles.row}>
+                <dt>Tipo</dt>
+                <dd>{LABEL_TIPO_BEM[carta.tipo] ?? carta.tipo}</dd>
+              </div>
+              <div className={styles.row}>
+                <dt>Crédito</dt>
+                <dd>{brl(carta.valor_credito)}</dd>
+              </div>
+              <div className={styles.row}>
+                <dt>Entrada estimada</dt>
+                <dd>{brl(carta.valor_entrada)}</dd>
+              </div>
+            </dl>
+          </Card>
+        )}
 
-      {eventos && eventos.length > 0 && (
-        <section style={card}>
-          <h2 style={{ fontSize: 16, margin: "0 0 12px" }}>Histórico</h2>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-            {eventos.map((ev, i) => (
-              <li key={i} style={{ color: "#d4d8e2", fontSize: 14 }}>
-                <b style={{ color: "#fff" }}>
-                  {LABEL_STATUS[ev.para_status as StatusProcesso]}
-                </b>
-                {ev.nota ? ` — ${ev.nota}` : ""}
-                <span style={{ color: "#93A0B8", fontSize: 12, display: "block" }}>
-                  {new Date(ev.em).toLocaleDateString("pt-BR")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </main>
+        {eventos && eventos.length > 0 && (
+          <Card>
+            <h2 className={styles.h2}>Histórico</h2>
+            <ul className={styles.hist}>
+              {eventos.map((ev, i) => (
+                <li key={i}>
+                  <b>{LABEL_STATUS[ev.para_status as StatusProcesso]}</b>
+                  {ev.nota ? ` — ${ev.nota}` : ""}
+                  <span className={styles.data}>{dataBR(ev.em)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </div>
+    </AppShell>
   );
 }
