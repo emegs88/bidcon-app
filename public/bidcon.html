@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<script src="config.js"></script>
+<script>window.BIDCON_API='https://360prospere.vercel.app';</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotas de Consórcio Contempladas | bidcon</title>
@@ -33,14 +33,15 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.bidcon.com.br/#org","name":"Prospere Consórcios","alternateName":"bidcon","url":"https://www.bidcon.com.br/","description":"Marketplace de cotas de consórcio já contempladas (crédito imobiliário e de veículo).","areaServed":"BR","contactPoint":{"@type":"ContactPoint","contactType":"sales","telephone":"+55-19-99756-1909","email":"contato@prospere.com.br","availableLanguage":["pt-BR"]},"email":"contato@prospere.com.br","address":{"@type":"PostalAddress","streetAddress":"Av. da Emancipação, 3770 - Parque dos Pinheiros","addressLocality":"Hortolândia","addressRegion":"SP","postalCode":"13184-654","addressCountry":"BR"},"parentOrganization":{"@type":"Organization","name":"Prospere Consórcios","url":"https://www.prospere.com.br/"},"sameAs":["https://www.prospere.com.br/"]},{"@type":"WebSite","@id":"https://www.bidcon.com.br/#site","url":"https://www.bidcon.com.br/","name":"bidcon · Marketplace de Cotas Contempladas","inLanguage":"pt-BR","publisher":{"@id":"https://www.bidcon.com.br/#org"}},{"@type":"Service","name":"Compra e venda de cotas de consórcio contempladas","serviceType":"Cotas de consórcio contempladas","provider":{"@id":"https://www.bidcon.com.br/#org"},"areaServed":"BR","audience":{"@type":"Audience","audienceType":"Compradores de crédito imobiliário e de veículos"}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"></noscript>
 <style>
   :root{
     /* paleta premium fintech — navy base, AZUL da marca como acento principal.
        Os tokens --vermelho* foram remapeados para o azul bidcon (identidade própria
        de plataforma, padrão fintech), mantendo todo o CSS existente sem reescrita. */
     --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);--linha2:rgba(255,255,255,.15);
-    --branco:#FFFFFF;--cinza:#93A0B8;--cinza2:#5E6B85;
+    --branco:#FFFFFF;--cinza:#93A0B8;--cinza2:#8E9AB8;
     /* acento da marca = azul bidcon (#1E6FE6 base, #36C5F0 claro) */
     --vermelho:#1E6FE6;--vermelho-l:#36C5F0;--vermelho-d:#1657c2;--vermelho-soft:rgba(46,123,240,.14);
     --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
@@ -111,7 +112,7 @@
   .oqc:hover{border-color:var(--linha2);transform:translateY(-2px)}
   .oqc .n{position:absolute;top:14px;right:18px;font-family:var(--f-mono);font-weight:600;font-size:30px;color:rgba(255,255,255,.1);line-height:1}
   .oqc .ic{font-size:22px;line-height:1}
-  .oqc h3{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:-.01em;margin:12px 0 6px;color:#fff}
+  .oqc h2{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:-.01em;margin:12px 0 6px;color:#fff}
   .oqc p{font-size:13px;color:var(--cinza);line-height:1.58}
   .oqc b{color:#cfcfd4;font-weight:600}
   @media(max-width:720px){.oque{grid-template-columns:1fr}}
@@ -350,19 +351,19 @@
     <div class="oqc">
       <span class="n">1</span>
       <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></div>
-      <h3>O que é uma carta contemplada</h3>
+      <h2>O que é uma carta contemplada</h2>
       <p>É uma cota de consórcio que <b>já foi sorteada</b> — o crédito está liberado. Você assume o lugar do titular e usa o valor pra comprar o bem.</p>
     </div>
     <div class="oqc">
       <span class="n">2</span>
       <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></div>
-      <h3>Você paga só a entrada</h3>
+      <h2>Você paga só a entrada</h2>
       <p>Para assumir a carta, paga a <b>entrada</b> (à vista ou dando um bem na troca) e segue com as parcelas. Nada de entrada de banco nem juros de financiamento.</p>
     </div>
     <div class="oqc">
       <span class="n">3</span>
       <div class="ic"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="4"/><path d="m11 11 8 8M16 16l2-2M19 19l1.5-1.5"/></svg></div>
-      <h3>Crédito na mão, sem espera</h3>
+      <h2>Crédito na mão, sem espera</h2>
       <p>Com a transferência aprovada pela administradora, o <b>crédito fica disponível</b> pra usar — sem depender de sorteio ou lance, com contrato e acompanhamento Prospere.</p>
     </div>
   </section>
@@ -394,7 +395,7 @@
     </div>
     <div class="cf-grp">
       <label>Crédito</label>
-      <select id="cotasFaixa">
+      <select id="cotasFaixa" aria-label="Filtrar cotas por faixa de crédito">
         <option value="todos">Qualquer valor</option>
         <option value="0-100000">Até R$ 100 mil</option>
         <option value="100000-300000">R$ 100–300 mil</option>
@@ -405,7 +406,7 @@
     </div>
     <div class="cf-grp" id="grpOrd">
       <label>Ordenar</label>
-      <select id="cotasOrd">
+      <select id="cotasOrd" aria-label="Ordenar cotas">
         <option value="credito-desc">Maior crédito</option>
         <option value="credito-asc">Menor crédito</option>
         <option value="entrada-asc">Menor entrada</option>
@@ -414,7 +415,7 @@
     </div>
     <div class="cf-grp">
       <label>Buscar</label>
-      <input id="cotasBusca" placeholder="nº da cota ou valor...">
+      <input id="cotasBusca" aria-label="Buscar cota por número ou valor" placeholder="nº da cota ou valor...">
     </div>
     <div class="cf-spacer"></div>
     <div class="ccount" id="cotasCount"></div>
