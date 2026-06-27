@@ -700,14 +700,10 @@ function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co
 //  - Extras (CBC/Piffer/Cartas): só o CÓDIGO mascarado da administradora ("ADM-01").
 //    Nunca expomos o nome real da administradora nem o id interno (n negativo).
 function cotaId(co){return co._x?(co.ac||'ADM-00'):('nº '+co.n);}
-// Custo efetivo pro cliente:
-//  - Lance: taxa mensal real estimada (amCota) → "% a.m."
-//  - Extras: custo efetivo total sobre o crédito já calculado na fonte (ceExtra) → "sobre o crédito"
+// Custo efetivo pro cliente: taxa mensal real estimada (amCota) → "% a.m." para
+// TODAS as cartas (Lance e extras). Mesma unidade no card e no modal, evitando
+// misturar custo mensal com custo total acumulado sobre o crédito.
 function custoCotaHTML(co){
-  if(co._x){
-    if(co.ceExtra==null)return '';
-    return `<span class="l">Custo efetivo</span><span class="v">${String(co.ceExtra).replace('.',',')}% sobre o crédito</span>`;
-  }
   return co.x?`<span class="l">Custo efetivo</span><span class="v">${amCota(co).toFixed(2).replace('.',',')}% a.m.</span>`:'';
 }
 
@@ -734,10 +730,9 @@ function abrirDetalhe(num){
   const veic=co.t==='veiculo';
   const pctEntrada=co.c>0?((co.e/co.c)*100).toFixed(0):0;
   const trocaTxt=veic?'um carro na troca':'um imóvel ou veículo na troca';
-  // custo efetivo: extras já trazem ceExtra (% sobre o crédito); Lance usa amCota (% a.m.)
-  const custo=co._x
-    ?(co.ceExtra!=null?`${String(co.ceExtra).replace('.',',')}% sobre o crédito (referência)`:'—')
-    :(co.x?`${amCota(co).toFixed(2).replace('.',',')}% a.m. (referência)`:'—');
+  // custo efetivo mensal (referência): mesma unidade pra todas as cartas (Lance e extras).
+  // Calculado sobre crédito−entrada / parcela / prazo via amCota -> sempre "% a.m.".
+  const custo=co.x?`${amCota(co).toFixed(2).replace('.',',')}% a.m. (referência)`:'—';
   const cu=custosDe(co);
   $('mbox').innerHTML=`
     <div class="mhead">
@@ -976,7 +971,7 @@ function normExtra(o,seq){
     _x:1,                  // marca: carta de fonte externa
     ac:o.ac||'ADM-00',     // administradora mascarada (cliente só vê o código)
     fonte:o.fonte||'',
-    ceExtra:o.custoEfetivo // custo efetivo (% sobre o crédito) já calculado na fonte
+    ceExtra:o.custoEfetivo // custo total da fonte (% sobre o crédito) — NÃO usado no card; exibimos custo mensal (amCota)
   };
 }
 
