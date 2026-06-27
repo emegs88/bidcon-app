@@ -1,0 +1,15 @@
+.form {
+  display: grid;
+  gap: 16px;
+  max-width: 460px;
+}
+.acoes {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.erro {
+  margin: 0;
+  color: #f3a4a4;
+  font-size: 14px;
+}
