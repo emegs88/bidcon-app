@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<script src="config.js"></script>
+<script>window.BIDCON_API='https://360prospere.vercel.app';</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cartas Contempladas para Lojistas | bidcon</title>
@@ -33,11 +33,12 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.bidcon.com.br/#org","name":"Prospere Consórcios","alternateName":"bidcon","url":"https://www.bidcon.com.br/","areaServed":"BR","contactPoint":{"@type":"ContactPoint","contactType":"sales","telephone":"+55-19-99756-1909","email":"contato@prospere.com.br","availableLanguage":["pt-BR"]},"email":"contato@prospere.com.br","address":{"@type":"PostalAddress","streetAddress":"Av. da Emancipação, 3770 - Parque dos Pinheiros","addressLocality":"Hortolândia","addressRegion":"SP","postalCode":"13184-654","addressCountry":"BR"},"parentOrganization":{"@type":"Organization","name":"Prospere Consórcios","url":"https://www.prospere.com.br/"},"sameAs":["https://www.prospere.com.br/"]},{"@type":"Service","name":"Cartas de consórcio contempladas para compra de veículos","serviceType":"Crédito de veículo via consórcio contemplado","provider":{"@id":"https://www.bidcon.com.br/#org"},"areaServed":"BR","audience":{"@type":"Audience","audienceType":"Lojistas e compradores de veículos"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"bidcon","item":"https://www.bidcon.com.br/"},{"@type":"ListItem","position":2,"name":"Lojista","item":"https://www.bidcon.com.br/bidcon-lojista"}]}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"></noscript>
 <style>
   :root{
     --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);--linha2:rgba(255,255,255,.15);
-    --branco:#f6f6f8;--cinza:#93A0B8;--cinza2:#5E6B85;
+    --branco:#f6f6f8;--cinza:#93A0B8;--cinza2:#8E9AB8;
     /* marca bidcon = azul fintech (o "n" do logo e seleção). --vermelho* remapeado p/ azul */
     --vermelho:#1E6FE6;--vermelho-l:#36C5F0;--vermelho-d:#1657c2;
     --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
@@ -407,7 +408,7 @@
     <div class="cf">
       <div class="cf-grp">
         <label>Mostrar</label>
-        <select id="fMatch">
+        <select id="fMatch" aria-label="Mostrar veículos">
           <option value="todos">Todos os veículos</option>
           <option value="ok" selected>Só os que dá pra fechar</option>
         </select>
@@ -422,7 +423,7 @@
       </div>
       <div class="cf-grp">
         <label>Ordenar pela carta</label>
-        <select id="ordc">
+        <select id="ordc" aria-label="Ordenar pela carta">
           <option value="oferta" selected>Melhor oferta</option>
           <option value="custo">Menor custo efetivo</option>
           <option value="entrada">Menor entrada</option>
@@ -447,9 +448,9 @@
     </div>
     <div class="fipe">
       <div class="fipe-row">
-        <div class="cf-grp"><label>Marca</label><select id="fpMarca"><option value="">Carregando…</option></select></div>
-        <div class="cf-grp"><label>Modelo</label><select id="fpModelo" disabled><option value="">Escolha a marca</option></select></div>
-        <div class="cf-grp"><label>Ano</label><select id="fpAno" disabled><option value="">Escolha o modelo</option></select></div>
+        <div class="cf-grp"><label>Marca</label><select id="fpMarca" aria-label="Marca do veículo"><option value="">Carregando…</option></select></div>
+        <div class="cf-grp"><label>Modelo</label><select id="fpModelo" disabled aria-label="Modelo do veículo"><option value="">Escolha a marca</option></select></div>
+        <div class="cf-grp"><label>Ano</label><select id="fpAno" disabled aria-label="Ano do veículo"><option value="">Escolha o modelo</option></select></div>
       </div>
       <div class="fres" id="fpRes">
         <div class="fl">Valor FIPE</div>
@@ -486,7 +487,7 @@
     <div class="cf">
       <div class="cf-grp">
         <label>Ordenar</label>
-        <select id="cOrd">
+        <select id="cOrd" aria-label="Ordenar cartas">
           <option value="entrada-asc">Menor entrada</option>
           <option value="credito-desc">Maior crédito</option>
           <option value="credito-asc">Menor crédito</option>
