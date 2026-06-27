@@ -659,8 +659,11 @@
 <script>
 const API360=window.API360||'';
 const DADOS=(window.PROSPERE_COTAS)||{cotas:[],whatsapp:'5519997561909'};
-// só cotas DISPONÍVEIS: as reservadas/vendidas vêm com r:1 e não aparecem aqui
-let COTAS=(DADOS.cotas||[]).filter(c=>c.c>0&&!c.r);
+// Fonte única da verdade = dados AO VIVO (cotasAoVivo). NÃO pintamos o snapshot
+// estático do cotas.js no primeiro paint pra evitar o "mostra 373 velho, clica e
+// corrige": começamos vazio + estado "carregando" até a sincronização ao vivo chegar.
+let COTAS=[];
+let cotasCarregadas=false;
 let bidconAtualizado=DADOS.atualizado||'';
 const LEILAO_SET=new Set((DADOS.leilao||[]).map(Number)); // cartas selecionadas pela equipe
 const CWA=DADOS.whatsapp||'5519997561909';
@@ -692,6 +695,22 @@ function ic(n,cls){return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24"
 function taxaEfetiva(pv,pmt,n){if(pv<=0||pmt<=0||n<=0)return 0;if(pmt*n<=pv)return 0;const vp=i=>i===0?pmt*n:pmt*(1-Math.pow(1+i,-n))/i;let lo=1e-9,hi=1.0;if(vp(hi)>pv)return hi*100;for(let k=0;k<200;k++){const mid=(lo+hi)/2,v=vp(mid);if(Math.abs(v-pv)<1e-6)return mid*100;if(v>pv)lo=mid;else hi=mid;}return((lo+hi)/2)*100;}
 function amCota(co){const pv=Math.max(0,co.c-co.e);return co.x?taxaEfetiva(pv,co.p,co.x):0;}
 
+// Identificador que o CLIENTE vê na carta:
+//  - Lance: número da carta ("nº 123")
+//  - Extras (CBC/Piffer/Cartas): só o CÓDIGO mascarado da administradora ("ADM-01").
+//    Nunca expomos o nome real da administradora nem o id interno (n negativo).
+function cotaId(co){return co._x?(co.ac||'ADM-00'):('nº '+co.n);}
+// Custo efetivo pro cliente:
+//  - Lance: taxa mensal real estimada (amCota) → "% a.m."
+//  - Extras: custo efetivo total sobre o crédito já calculado na fonte (ceExtra) → "sobre o crédito"
+function custoCotaHTML(co){
+  if(co._x){
+    if(co.ceExtra==null)return '';
+    return `<span class="l">Custo efetivo</span><span class="v">${String(co.ceExtra).replace('.',',')}% sobre o crédito</span>`;
+  }
+  return co.x?`<span class="l">Custo efetivo</span><span class="v">${amCota(co).toFixed(2).replace('.',',')}% a.m.</span>`:'';
+}
+
 let fTipo='todos',limite=24,modo='market';
 const $=id=>document.getElementById(id);
 
@@ -715,13 +734,16 @@ function abrirDetalhe(num){
   const veic=co.t==='veiculo';
   const pctEntrada=co.c>0?((co.e/co.c)*100).toFixed(0):0;
   const trocaTxt=veic?'um carro na troca':'um imóvel ou veículo na troca';
-  const custo=co.x?`${amCota(co).toFixed(2).replace('.',',')}% a.m. (referência)`:'—';
+  // custo efetivo: extras já trazem ceExtra (% sobre o crédito); Lance usa amCota (% a.m.)
+  const custo=co._x
+    ?(co.ceExtra!=null?`${String(co.ceExtra).replace('.',',')}% sobre o crédito (referência)`:'—')
+    :(co.x?`${amCota(co).toFixed(2).replace('.',',')}% a.m. (referência)`:'—');
   const cu=custosDe(co);
   $('mbox').innerHTML=`
     <div class="mhead">
       <div>
         <span class="mtag ${co.t}"><span>${veic?ic('carro'):ic('casa')}</span>${veic?'Carta de Veículo':'Carta de Imóvel'}</span>
-        <div class="mnum">Carta contemplada nº ${co.n} · verificada pela Prospere</div>
+        <div class="mnum">Carta contemplada ${co._x?`· ${co.ac||'ADM-00'}`:`nº ${co.n}`} · verificada pela Prospere</div>
       </div>
       <button class="mclose" onclick="fecharDetalhe()" aria-label="Fechar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
@@ -734,13 +756,13 @@ function abrirDetalhe(num){
         ${co.x?`<div class="mcell full"><div class="l">Custo efetivo (referência)</div><div class="v">${custo}</div></div>`:''}
       </div>
 
-      <div class="mcustos">
+      ${co._x?'':`<div class="mcustos">
         <div class="t">Custos de transferência <small>(estimativa)</small></div>
         <div class="crow"><span>Saldo devedor</span><b>${BRL(cu.saldo)}</b></div>
         <div class="crow"><span>Taxa de transferência</span><b>${BRL(cu.transf)}</b></div>
         <div class="crow"><span>Seguro de vida <i>/mês</i></span><b>${BRL(cu.seguro)}</b></div>
         <div class="cnote">Estimativas pelo padrão de mercado — os valores finais são definidos pela administradora do consórcio na transferência.</div>
-      </div>
+      </div>`}
 
       <div class="mpaga">
         <div class="t">${ic('dinheiro')} A entrada pode ser paga de 2 formas</div>
@@ -783,20 +805,32 @@ function filtrar(){
   if(fTipo!=='todos')arr=arr.filter(c=>c.t===fTipo);
   const fx=$('cotasFaixa').value;
   if(fx!=='todos'){const[a,b]=fx.split('-').map(Number);arr=arr.filter(c=>c.c>=a&&c.c<b);}
-  const q=($('cotasBusca').value||'').replace(/\D/g,'');
-  if(q)arr=arr.filter(c=>String(c.n).includes(q)||String(c.c).includes(q));
+  const qRaw=($('cotasBusca').value||'').trim();
+  const q=qRaw.replace(/\D/g,'');
+  if(qRaw){
+    const qu=qRaw.toUpperCase();
+    arr=arr.filter(c=>{
+      // extras: busca pelo código ADM-NN; Lance: pelo número da carta. Ambos: pelo crédito.
+      const porCodigo=c._x&&(c.ac||'').toUpperCase().includes(qu);
+      const porNum=q&&!c._x&&String(c.n).includes(q);
+      const porCred=q&&String(c.c).includes(q);
+      return porCodigo||porNum||porCred;
+    });
+  }
   return arr;
 }
 
 function zapMarket(co){
   const tipo=tipoLabel(co.t).toLowerCase();
-  const msg=`Olá! Tenho interesse na carta contemplada de ${tipo} nº ${co.n} — crédito de ${BRL(co.c)}, entrada de ${BRL(co.e)} e parcela de ${BRL(co.p)}${co.x?`×${co.x}`:''}. Ainda está disponível?`;
+  const ref=co._x?`(${co.ac||'ADM-00'})`:`nº ${co.n}`;
+  const msg=`Olá! Tenho interesse na carta contemplada de ${tipo} ${ref} — crédito de ${BRL(co.c)}, entrada de ${BRL(co.e)} e parcela de ${BRL(co.p)}${co.x?`×${co.x}`:''}. Ainda está disponível?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(msg)}`;
 }
 function zapLeilao(co){
   const tipo=tipoLabel(co.t).toLowerCase();
+  const ref=co._x?`(${co.ac||'ADM-00'})`:`nº ${co.n}`;
   const pct=co.c>0?((co.e/co.c)*100).toFixed(0):0;
-  const msg=`Olá! Vi a carta de ${tipo} nº ${co.n} no leilão da bidcon — crédito de ${BRL(co.c)}, entrada de ${BRL(co.e)} (${pct}% do crédito) pra assumir, parcelas de ${BRL(co.p)}${co.x?`×${co.x}`:''}. Essa oportunidade ainda está disponível?`;
+  const msg=`Olá! Vi a carta de ${tipo} ${ref} no leilão da bidcon — crédito de ${BRL(co.c)}, entrada de ${BRL(co.e)} (${pct}% do crédito) pra assumir, parcelas de ${BRL(co.p)}${co.x?`×${co.x}`:''}. Essa oportunidade ainda está disponível?`;
   return `https://wa.me/${CWA}?text=${encodeURIComponent(msg)}`;
 }
 
@@ -806,6 +840,7 @@ function renderMarket(){
   arr.sort((a,b)=>ord==='credito-asc'?a.c-b.c:ord==='entrada-asc'?a.e-b.e:ord==='entrada-desc'?b.e-a.e:b.c-a.c);
   $('cotasCount').innerHTML=`<b>${NUM(arr.length)}</b> cota(s)`;
   const grid=$('cotasGrid');
+  if(!cotasCarregadas){grid.innerHTML='<div class="cempty">Carregando cartas disponíveis…</div>';$('cotasMore').style.display='none';return;}
   if(!arr.length){grid.innerHTML='<div class="cempty">Nenhuma cota com esses filtros. Ajuste a busca ou a faixa de crédito.</div>';$('cotasMore').style.display='none';return;}
   const vis=arr.slice(0,limite);
   grid.innerHTML=vis.map(co=>{
@@ -813,7 +848,7 @@ function renderMarket(){
     <div class="ccard ${co.t}">
       <div class="ctop">
         <span class="ccat"><span class="emo">${co.t==='imovel'?ic('casa'):ic('carro')}</span>${co.t==='imovel'?'Imóvel':'Automóvel'}</span>
-        <span class="cnum">nº ${co.n}</span>
+        <span class="cnum">${cotaId(co)}</span>
       </div>
       <div class="ccredito"><div class="l">Crédito contemplado</div><div class="v">${BRL(co.c)}</div></div>
       <div class="crows">
@@ -821,7 +856,7 @@ function renderMarket(){
         <div class="crow2"><div class="l">Parcela${co.x?` <span style="font-size:9px;color:var(--cinza2)">(${co.x}×)</span>`:''}</div><div class="v">${BRL(co.p)}${co.x?`<span style="font-size:11px;color:var(--cinza)">/mês</span>`:''}</div></div>
       </div>
       <div class="cpaga">${ic('dinheiro')}<span>Entrada em <b>dinheiro</b> ou <b>${co.t==='imovel'?'imóvel/veículo':'carro'} na troca</b></span></div>
-      ${co.x?`<div class="ccusto"><span class="l">Custo efetivo</span><span class="v">${amCota(co).toFixed(2).replace('.',',')}% a.m.</span></div>`:''}
+      ${(()=>{const ch=custoCotaHTML(co);return ch?`<div class="ccusto">${ch}</div>`:'';})()}
       <div class="cbtns">
         <a class="czap" href="${zapMarket(co)}" target="_blank" rel="noopener">Tenho interesse</a>
         <button class="cdet" onclick="abrirDetalhe(${co.n})">Ver detalhes</button>
@@ -835,6 +870,7 @@ function renderLeilao(){
   arr.sort((a,b)=>a.e-b.e); // menor entrada primeiro = melhor oportunidade
   $('cotasCount').innerHTML=`<b>${NUM(arr.length)}</b> carta(s) em leilão`;
   const grid=$('cotasGrid');
+  if(!cotasCarregadas){grid.innerHTML='<div class="cempty">Carregando cartas disponíveis…</div>';$('cotasMore').style.display='none';return;}
   if(!LEILAO_SET.size){grid.innerHTML='<div class="cempty">Nenhuma carta em leilão no momento. Volte em breve — ou fale com a gente pra avisarmos a próxima rodada.</div>';$('cotasMore').style.display='none';return;}
   if(!arr.length){grid.innerHTML='<div class="cempty">Nenhuma carta de leilão com esses filtros. Ajuste o tipo ou a faixa.</div>';$('cotasMore').style.display='none';return;}
   const vis=arr.slice(0,limite);
@@ -905,6 +941,15 @@ $('bemSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!
 $('hzap').href=`https://wa.me/${CWA}?text=${encodeURIComponent('Olá! Quero saber mais sobre as cotas contempladas disponíveis.')}`;
 // src line + stats / prova social (dinâmico — atualizado ao vivo)
 function renderStats(){
+  if(!cotasCarregadas){
+    $('srcLine').textContent='Carregando cartas disponíveis…';
+    $('stats').innerHTML=`
+      <div class="stat"><div class="sv"><b>—</b></div><div class="sl">Cartas contempladas</div></div>
+      <div class="stat"><div class="sv">—</div><div class="sl">Em crédito disponível</div></div>
+      <div class="stat"><div class="sv">—</div><div class="sl">Imóvel ${ic('casa')}</div></div>
+      <div class="stat"><div class="sv">—</div><div class="sl">Veículo ${ic('carro')}</div></div>`;
+    return;
+  }
   $('srcLine').textContent=`${COTAS.length} cartas disponíveis · atualizado ${bidconAtualizado}`;
   const total=COTAS.length;
   const credito=COTAS.reduce((s,c)=>s+c.c,0);
@@ -920,18 +965,49 @@ function renderStats(){
 renderStats();
 render();
 
-// carteira 100% em tempo real: puxa /api/cotas (padrão = só disponíveis; reservadas ficam de fora)
+// Normaliza uma carta das fontes EXTRAS (/api/cotas-extra) pro mesmo shape das da Lance.
+// As extras têm {id, fonte, ac (ADM-NN mascarado), c, e (já com comissão), p, x, custoEfetivo}
+// mas NÃO têm `n`. Damos um `n` sintético (negativo, fora da faixa das da Lance) só pra
+// os lookups internos (abrirDetalhe, chaves) seguirem funcionando — o cliente vê o código `ac`.
+function normExtra(o,seq){
+  return {
+    n:-(seq+1),            // id sintético interno (negativo, não colide com as da Lance)
+    t:o.t, c:o.c, e:o.e, p:o.p, x:o.x,
+    _x:1,                  // marca: carta de fonte externa
+    ac:o.ac||'ADM-00',     // administradora mascarada (cliente só vê o código)
+    fonte:o.fonte||'',
+    ceExtra:o.custoEfetivo // custo efetivo (% sobre o crédito) já calculado na fonte
+  };
+}
+
+// carteira 100% em tempo real: junta /api/cotas (Lance) + /api/cotas-extra (CBC/Piffer/Cartas)
+// no MESMO grid. Padrão = só disponíveis; reservadas ficam de fora.
 async function cotasAoVivo(){
+  let lance=null, extras=[];
   try{
     const r=await fetch(API360+'/api/cotas',{cache:'no-store'});
-    if(!r.ok)return;
-    const j=await r.json();
-    if(j&&j.ok&&Array.isArray(j.cotas)){
-      COTAS=j.cotas.filter(c=>c.c>0&&!c.r);
+    if(r.ok){const j=await r.json(); if(j&&j.ok&&Array.isArray(j.cotas)){
+      lance=j.cotas.filter(c=>c.c>0&&!c.r);
       if(j.atualizado)bidconAtualizado=new Date(j.atualizado).toLocaleString('pt-BR');
-      renderStats();render();
-    }
+    }}
   }catch(e){}
+  try{
+    const r=await fetch(API360+'/api/cotas-extra',{cache:'no-store'});
+    if(r.ok){const j=await r.json(); if(j&&j.ok&&Array.isArray(j.cotas)){
+      extras=j.cotas.filter(c=>c.c>0).map(normExtra);
+    }}
+  }catch(e){}
+  if(lance!==null||extras.length){
+    COTAS=[...(lance!==null?lance:COTAS.filter(c=>!c._x)),...extras];
+    cotasCarregadas=true;
+    renderStats();render();
+  } else if(!cotasCarregadas){
+    // nenhuma fonte respondeu ainda: fallback pro snapshot estático (melhor que tela vazia),
+    // mas já filtrando reservadas. A próxima sincronização corrige.
+    COTAS=(DADOS.cotas||[]).filter(c=>c.c>0&&!c.r);
+    cotasCarregadas=true;
+    renderStats();render();
+  }
 }
 cotasAoVivo();setInterval(cotasAoVivo,180000);
 </script>
