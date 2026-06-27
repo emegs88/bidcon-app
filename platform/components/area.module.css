@@ -1,0 +1,36 @@
+/* Layout comum das áreas restritas (parceiro/admin): pilha vertical + listas. */
+.stack {
+  display: grid;
+  gap: 22px;
+}
+.section {
+  display: grid;
+  gap: 12px;
+}
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sectionTitle {
+  font-size: 16px;
+  margin: 0;
+  color: var(--text);
+}
+.count {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

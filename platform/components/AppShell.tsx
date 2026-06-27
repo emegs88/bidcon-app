@@ -7,9 +7,11 @@ import styles from "./AppShell.module.css";
 
 export function AppShell({
   nome,
+  tipo,
   children,
 }: {
   nome?: string | null;
+  tipo?: "cliente" | "parceiro" | "admin";
   children: ReactNode;
 }) {
   return (
@@ -19,7 +21,7 @@ export function AppShell({
           <a className={styles.brand} href="/">
             bid<span className={styles.brandAccent}>con</span>
           </a>
-          <ShellNav />
+          <ShellNav tipo={tipo} />
           <div className={styles.user}>
             {nome && <span className={styles.hello}>{nome}</span>}
             <form action="/auth/signout" method="post">

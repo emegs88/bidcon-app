@@ -1,0 +1,23 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.info {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.cliente {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+.meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
