@@ -29,10 +29,27 @@ export default async function Home() {
       <p style={{ color: "#93A0B8" }}>
         Você está na área logada da Bidcon{profile?.tipo ? ` (${profile.tipo})` : ""}.
       </p>
-      <p style={{ color: "#93A0B8", fontSize: 14 }}>
-        Fase 0 — fundação. As telas de processo, cartas e comissões chegam nas
-        próximas fases.
-      </p>
+      <nav style={{ marginTop: 24, display: "grid", gap: 10 }}>
+        <a
+          href="/meu-processo"
+          style={{
+            display: "block",
+            padding: "16px 18px",
+            borderRadius: 16,
+            background: "#10182B",
+            border: "1px solid rgba(255,255,255,.12)",
+            color: "#f6f6f8",
+            textDecoration: "none",
+            fontWeight: 700,
+          }}
+        >
+          Meu processo
+          <span style={{ display: "block", color: "#93A0B8", fontSize: 13, fontWeight: 400 }}>
+            Acompanhe o andamento da sua carta contemplada.
+          </span>
+        </a>
+      </nav>
+
       <form action="/auth/signout" method="post" style={{ marginTop: 24 }}>
         <button
           type="submit"
