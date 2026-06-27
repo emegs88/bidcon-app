@@ -22,8 +22,9 @@
 -- POR QUE PRECISAMOS DE `descricao`:
 --   Carta hoje é só número (crédito, entrada, parcela). Número não tem nuance
 --   semântica útil para embeddings. Adicionamos um texto curto, COMPLIANCE-SAFE,
---   gerado pelo backfill (scripts/backfill-embeddings.ts) — é ELE que é
---   vetorizado. Sem isso, embedding não agrega nada sobre o SQL puro.
+--   gerado pelo backfill (app/api/backfill-embeddings/route.ts, via
+--   descricaoDeCarta() em lib/ia.ts) — é ELE que é vetorizado. Sem isso, o
+--   embedding não agrega nada sobre o SQL puro.
 --
 -- COMPLIANCE: nada aqui gera ou guarda promessa de contemplação/prazo. A
 --   `descricao` é texto neutro de catálogo (poder de compra, planejamento
