@@ -1,0 +1,14 @@
+.wrap {
+  display: grid;
+  gap: 8px;
+}
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.erro {
+  margin: 0;
+  color: #f3a4a4;
+  font-size: 13px;
+}
