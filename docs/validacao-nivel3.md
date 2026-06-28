@@ -340,5 +340,44 @@ depois, abrir o Nível 4.
 
 ---
 
+## (e) Resultado da validação executada no DEV
+
+> Banco DEV `fpgimirtiryivnrjdyxb` (ref do `.env.local`). App rodando local
+> (`npm run dev`, localhost:3000). Buscas feitas pelo Emerson logado
+> (`eme.santos123@…`), via UI `/buscar`, com evidência em print. **PROD não tocado.**
+
+### Placar dos critérios de aceite
+
+- [x] **Backfill** chegou a `{"ok":true,"processadas":6,"falhas":[],"restantes":0}`
+      — todas as cartas disponíveis do DEV (6, do seed) com embedding.
+- [x] **Auth** — `POST /api/buscar-cartas` sem cookie → **HTTP 401**
+      (`{"erro":"Não autenticado."}`). Barreira de sessão confirmada.
+- [x] **Busca 1** (filtro duro) — "Carro até 80 mil pra trocar o meu" → só
+      **Veículos**, todos **≤ R$ 70.000** (70.000 / 30.590 / 37.949). A carta de
+      R$ 196.735 (vista numa busca sem teto) **some** aqui. Teto = parede provado.
+- [x] **Busca 2** (ranking por nuance, sem número) — "Primeiro imóvel pra família"
+      → só **Imóveis**, zero veículo. O `tipo=imovel` foi extraído da nuance, não de
+      número no texto. Prova que o **vetor ordena** quando não há preço pra filtrar.
+- [x] **Apartamento de uns 300 mil com entrada baixa** → só Imóveis, crédito
+      R$ 250.000 (dentro do teto de 300k). Teto + tipo respeitados juntos.
+- [x] **Veículo de trabalho parcelado** → só Veículos (70.000 / 57.526), frases
+      neutras ("compra programada", "de forma planejada").
+- [x] **Busca 4** (compliance) — "quero garantir que vou ser contemplado mês que
+      vem" → responde normalmente; **nenhuma** frase de encaixe promete contemplação,
+      cita prazo/data ou mecânica interna (administradora/taxa/fundo). Frases tipo
+      "oferece poder de compra para adquirir o veículo desejado".
+- [x] **Ordenação por custo efetivo** coerente dentro de cada resposta (ex.: 1,04% <
+      1,06% a.m. nos imóveis; 2,27% nos veículos).
+- [ ] **Busca 3** (degradação 503) — **opcional, pendente.** É teste de infra:
+      esvaziar `OPENAI_API_KEY` no `.env.local` (DEV), reiniciar `npm run dev`, refazer
+      uma busca → esperar HTTP **503** sem inventar lista; depois restaurar a chave.
+
+**Veredito:** núcleo do Nível 3 **validado no DEV**. A busca semântica se comporta
+como projetada — **filtro duro como parede + vetor só na ordenação** — e a barreira
+de compliance segura as frases de encaixe. Resta apenas o teste 503 (opcional) antes
+de considerar push/PROD.
+
+---
+
 *Documento de validação. Não executa nada por si. Os comandos da seção (d) são para
 o banco DEV NOVO; o banco `nnvjeijsrwpzsggwqpcu` (PROD) não é tocado.*
