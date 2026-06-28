@@ -60,6 +60,13 @@ export default async function CartaDetalhePage({
   const ref = c.numero_externo ? `nº ${c.numero_externo}` : `ref. ${c.id.slice(0, 8)}`;
   const tipoLabel = LABEL_TIPO_BEM[c.tipo] ?? c.tipo;
 
+  // Saldo devedor do consórcio = parcela × parcelas restantes (a entrada/ágio
+  // NÃO abate o saldo junto à administradora). Só exibe se houver os dois dados.
+  const saldoDevedor =
+    c.valor_parcela != null && c.qtd_parcelas != null
+      ? c.valor_parcela * c.qtd_parcelas
+      : null;
+
   const mensagem =
     `Olá! Tenho interesse na carta de ${tipoLabel.toLowerCase()} (${ref}), ` +
     `crédito de ${brl(c.valor_credito)}. Pode me passar mais informações?`;
@@ -106,6 +113,12 @@ export default async function CartaDetalhePage({
               <div className={styles.row}>
                 <dt>Parcelas restantes</dt>
                 <dd>{c.qtd_parcelas}x</dd>
+              </div>
+            )}
+            {saldoDevedor != null && (
+              <div className={styles.row}>
+                <dt>Saldo devedor</dt>
+                <dd>{brl(saldoDevedor)}</dd>
               </div>
             )}
           </dl>

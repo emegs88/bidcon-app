@@ -8,7 +8,8 @@ import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
-import { CartaCard, type CartaVitrine } from "@/components/CartaCard";
+import { type CartaVitrine } from "@/components/CartaCard";
+import { CartasExplorer } from "@/components/CartasExplorer";
 import styles from "./cartas.module.css";
 
 const WA = "5519997561909";
@@ -48,15 +49,6 @@ export default async function CartasPage({
   const { data: cartas } = await query;
   const lista = (cartas ?? []) as CartaVitrine[];
 
-  // texto de contagem — neutro, sem promessa
-  const total = lista.length;
-  const contagem =
-    total === 0
-      ? null
-      : total === 1
-        ? "1 carta encontrada"
-        : `${total} cartas encontradas`;
-
   return (
     <AppShell nome={nome} tipo={tipo}>
       <PageHeader
@@ -85,12 +77,6 @@ export default async function CartasPage({
         </Button>
       </nav>
 
-      {contagem && (
-        <p className={styles.contagem} aria-live="polite">
-          {contagem}
-        </p>
-      )}
-
       {lista.length === 0 ? (
         <EmptyState
           icon="🔎"
@@ -99,11 +85,7 @@ export default async function CartasPage({
           action={<Button href={`https://wa.me/${WA}`}>Falar com o atendimento</Button>}
         />
       ) : (
-        <div className={styles.grid}>
-          {lista.map((c) => (
-            <CartaCard key={c.id} carta={c} />
-          ))}
-        </div>
+        <CartasExplorer cartas={lista} />
       )}
     </AppShell>
   );

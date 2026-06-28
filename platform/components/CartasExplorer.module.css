@@ -1,0 +1,250 @@
+/* Explorador de cartas — filtros de análise + junção de crédito. */
+/* Identidade azul/âmbar; sem Tailwind (CSS Module). Harmoniza com cartas.module.css. */
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, color-mix(in srgb, var(--text) 12%, transparent));
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.campo label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.campo input,
+.campo select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, color-mix(in srgb, var(--text) 16%, transparent));
+  background: var(--bg, #fff);
+  color: var(--text);
+  font-size: 14px;
+}
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+.limpar {
+  align-self: end;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  background: transparent;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.limpar:hover {
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+.contagem {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+/* --- junção de crédito --- */
+.juncao {
+  margin: 0 0 18px;
+  padding: 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+}
+.juncaoTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.juncaoAcoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.imprimir {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.imprimir:hover {
+  background: color-mix(in srgb, var(--brand) 88%, #000);
+}
+.juncaoTitulo {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--brand);
+  letter-spacing: -0.01em;
+}
+.juncaoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.juncaoGrid dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.juncaoGrid dd {
+  margin: 2px 0 0;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.juncaoLista {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.juncaoLista li {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr 0.8fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, transparent);
+  font-size: 13px;
+}
+.juncaoLista li span:nth-child(1) {
+  font-weight: 700;
+  color: var(--text);
+}
+.juncaoLista li span:nth-child(n + 2) {
+  color: var(--text-muted);
+}
+.juncaoLista li span:last-child {
+  text-align: right;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.juncaoNota {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.disclaimer {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Cabeçalho que só aparece no PDF/impressão. */
+.printHead {
+  display: none;
+}
+
+/* --- impressão: isola a simulação numa folha limpa --- */
+@media print {
+  .filtros,
+  .contagem,
+  .grid,
+  .juncaoAcoes {
+    display: none !important;
+  }
+  .juncao {
+    margin: 0;
+    border: none;
+    background: #fff;
+  }
+  .printHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--brand);
+  }
+  .printHead strong {
+    color: var(--brand);
+    font-size: 16px;
+  }
+  .printHead span {
+    color: #555;
+    font-size: 12px;
+  }
+  .juncaoTitulo {
+    font-size: 15px;
+  }
+  .juncaoLista li {
+    border-color: #ddd;
+    break-inside: avoid;
+  }
+  .disclaimer {
+    background: #fff;
+  }
+}
+
+/* --- grade de itens (checkbox + cartão) --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.itemAtivo {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 14px;
+}
+.itemBloqueado {
+  opacity: 0.45;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.check input:disabled {
+  cursor: not-allowed;
+}
