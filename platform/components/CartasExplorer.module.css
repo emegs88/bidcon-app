@@ -59,20 +59,24 @@
   margin: 0 0 16px;
 }
 
-/* --- junção de crédito --- */
+/* --- painel de simulação (estilo fintech: superfície + cards de métrica) --- */
 .juncao {
   margin: 0 0 18px;
-  padding: 14px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--brand) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, color-mix(in srgb, var(--text) 10%, transparent));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 6%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text) 5%, transparent);
 }
 .juncaoTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border, color-mix(in srgb, var(--text) 8%, transparent));
   flex-wrap: wrap;
 }
 .juncaoAcoes {
@@ -94,44 +98,80 @@
   background: color-mix(in srgb, var(--brand) 88%, #000);
 }
 .juncaoTitulo {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
   font-weight: 800;
-  color: var(--brand);
-  letter-spacing: -0.01em;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.juncaoTitulo::before {
+  content: "";
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--brand);
 }
 .juncaoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
   margin: 0;
+}
+.juncaoGrid > div {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  border: 1px solid var(--border, color-mix(in srgb, var(--text) 8%, transparent));
 }
 .juncaoGrid dt {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .juncaoGrid dd {
-  margin: 2px 0 0;
+  margin: 6px 0 0;
   font-weight: 800;
-  font-size: 16px;
-  letter-spacing: -0.01em;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* Destaque do custo efetivo médio: o número-chave da simulação. */
+.juncaoGrid > div:nth-child(8) {
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+.juncaoGrid > div:nth-child(8) dd {
+  color: var(--brand);
 }
 .juncaoLista {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border, color-mix(in srgb, var(--text) 8%, transparent));
+  overflow: hidden;
 }
 .juncaoLista li {
   display: grid;
   grid-template-columns: 1fr 1fr 1.2fr 0.8fr;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 12px 14px;
   background: var(--surface, #fff);
-  border: 1px solid color-mix(in srgb, var(--brand) 14%, transparent);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.juncaoLista li + li {
+  border-top: 1px solid var(--border, color-mix(in srgb, var(--text) 7%, transparent));
+}
+.juncaoLista li:hover {
+  background: color-mix(in srgb, var(--brand) 4%, transparent);
 }
 .juncaoLista li span:nth-child(1) {
   font-weight: 700;
@@ -168,45 +208,107 @@
   display: none;
 }
 
-/* --- impressão: isola a simulação numa folha limpa --- */
+/* --- impressão: isola a simulação numa folha A4 limpa e alinhada --- */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
   .filtros,
   .contagem,
   .grid,
-  .juncaoAcoes {
+  .juncaoAcoes,
+  .juncaoTop {
     display: none !important;
   }
   .juncao {
     margin: 0;
+    padding: 0;
     border: none;
+    border-radius: 0;
     background: #fff;
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+  /* cabeçalho de marca: único topo no PDF (substitui .juncaoTop) */
   .printHead {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 14px;
+    margin: 0 0 16px;
     padding-bottom: 10px;
     border-bottom: 2px solid var(--brand);
   }
   .printHead strong {
     color: var(--brand);
-    font-size: 16px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
   .printHead span {
-    color: #555;
-    font-size: 12px;
+    color: #5b6577;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
   }
-  .juncaoTitulo {
-    font-size: 15px;
+  /* métricas: grade fixa 3×3 — sem cartão órfão na 2ª linha */
+  .juncaoGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 0 0 16px;
   }
-  .juncaoLista li {
-    border-color: #ddd;
+  .juncaoGrid > div {
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e2e6ee;
+    border-radius: 8px;
     break-inside: avoid;
   }
-  .disclaimer {
+  .juncaoGrid dt {
+    font-size: 9px;
+    color: #5b6577;
+  }
+  .juncaoGrid dd {
+    margin-top: 3px;
+    font-size: 14px;
+    color: #14213a;
+  }
+  /* destaque do custo efetivo médio mantém o tom da marca no papel */
+  .juncaoGrid > div:nth-child(8) {
+    background: #eef9ff;
+    border-color: #bfe6f7;
+  }
+  .juncaoGrid > div:nth-child(8) dd {
+    color: var(--brand);
+  }
+  /* lista de cartas: tabela enxuta, linhas inteiras na mesma página */
+  .juncaoLista {
+    margin: 0;
+    border-color: #e2e6ee;
+    break-inside: avoid;
+  }
+  .juncaoLista li {
+    padding: 8px 10px;
     background: #fff;
+    border-color: #e2e6ee;
+    break-inside: avoid;
+  }
+  .juncaoLista li span:nth-child(1) {
+    color: #14213a;
+  }
+  .juncaoLista li span:nth-child(n + 2) {
+    color: #5b6577;
+  }
+  .juncaoNota {
+    color: #5b6577;
+  }
+  .disclaimer {
+    margin-top: 14px;
+    background: #fff;
+    border-color: #cdd3df;
+    color: #5b6577;
+    break-inside: avoid;
   }
 }
 

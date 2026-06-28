@@ -16,7 +16,7 @@ export function AppShell({
 }) {
   return (
     <div className={styles.shell}>
-      <header className={styles.topbar}>
+      <header className={styles.topbar} data-print="hide">
         <div className={styles.bar}>
           <a className={styles.brand} href="/">
             bid<span className={styles.brandAccent}>con</span>

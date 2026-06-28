@@ -51,13 +51,15 @@ export default async function CartasPage({
 
   return (
     <AppShell nome={nome} tipo={tipo}>
-      <PageHeader
-        title="Cartas disponíveis"
-        backHref="/"
-        subtitle="Cotas de consórcio já contempladas. Os valores são da carta; a transferência é feita pela administradora do consórcio."
-      />
+      <div data-print="hide">
+        <PageHeader
+          title="Cartas disponíveis"
+          backHref="/"
+          subtitle="Cotas de consórcio já contempladas. Os valores são da carta; a transferência é feita pela administradora do consórcio."
+        />
+      </div>
 
-      <nav className={styles.filtros} aria-label="Filtrar por tipo de bem">
+      <nav className={styles.filtros} aria-label="Filtrar por tipo de bem" data-print="hide">
         <Button href="/cartas" variant={!tipoFiltro ? "primary" : "ghost"} size="sm">
           Todas
         </Button>

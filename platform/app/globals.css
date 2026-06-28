@@ -70,3 +70,38 @@ h3 {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Impressão / Salvar como PDF                                        */
+/* A área logada é dark; ao imprimir a simulação, isolamos a folha:   */
+/* fundo branco, sem topo (marca/nav/sair), sem cabeçalho de página   */
+/* nem filtros. O painel de simulação cuida do próprio layout claro   */
+/* (ver CartasExplorer.module.css → @media print). Marcamos os blocos */
+/* a esconder com [data-print="hide"] no markup correspondente.       */
+/* ------------------------------------------------------------------ */
+@media print {
+  :root {
+    --bg: #fff;
+    --surface: #fff;
+    --surface-2: #fff;
+    --text: #14213a;
+    --text-soft: #3a4257;
+    --text-muted: #5b6577;
+    --border: #e2e6ee;
+    --border-strong: #cdd3df;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #14213a !important;
+  }
+  [data-print="hide"] {
+    display: none !important;
+  }
+  /* a casca logada e o cabeçalho de página não entram no PDF */
+  main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
