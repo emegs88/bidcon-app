@@ -4,6 +4,10 @@
     {
       "path": "/api/sync-cotas",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/backfill-embeddings",
+      "schedule": "30 * * * *"
     }
   ]
 }
