@@ -24,7 +24,11 @@ const PARCEIRO: Link[] = [
   { href: "/parceiro/comissoes", label: "Comissões" },
 ];
 
-const ADMIN: Link[] = [{ href: "/admin", label: "Admin", exato: true }];
+const ADMIN: Link[] = [
+  { href: "/admin", label: "Admin", exato: true },
+  { href: "/admin/perfis", label: "Perfis" },
+  { href: "/admin/audit-logs", label: "Auditoria" },
+];
 
 function linksPara(tipo?: Tipo): Link[] {
   if (tipo === "admin") return [...BASE, ...ADMIN];

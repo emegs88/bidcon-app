@@ -100,6 +100,34 @@ export const TONE_STATUS_PERFIL: Record<StatusPerfilLabel, "info" | "ok" | "mute
   suspenso: "muted",
 };
 
+// ---------------------------------------------------------------------------
+// Status de KYC (verificação de identidade do cliente). Usado no onboarding do
+// cliente e no painel admin de perfis. Os rótulos descrevem o estado real da
+// verificação; nada aqui promete contemplação ou aprovação de crédito.
+// ---------------------------------------------------------------------------
+export type StatusKYC =
+  | "pendente"
+  | "em_analise"
+  | "verificado"
+  | "rejeitado"
+  | "bloqueado";
+
+export const LABEL_STATUS_KYC: Record<StatusKYC, string> = {
+  pendente: "Não enviado",
+  em_analise: "Em análise",
+  verificado: "Verificado",
+  rejeitado: "Rejeitado",
+  bloqueado: "Bloqueado",
+};
+
+export const TONE_STATUS_KYC: Record<StatusKYC, "info" | "ok" | "muted" | "amber"> = {
+  pendente: "muted",
+  em_analise: "amber",
+  verificado: "ok",
+  rejeitado: "amber",
+  bloqueado: "muted",
+};
+
 export function brl(v: number | null | undefined): string {
   if (v == null) return "—";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
