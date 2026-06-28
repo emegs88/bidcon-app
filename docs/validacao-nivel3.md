@@ -368,14 +368,15 @@ depois, abrir o Nível 4.
       "oferece poder de compra para adquirir o veículo desejado".
 - [x] **Ordenação por custo efetivo** coerente dentro de cada resposta (ex.: 1,04% <
       1,06% a.m. nos imóveis; 2,27% nos veículos).
-- [ ] **Busca 3** (degradação 503) — **opcional, pendente.** É teste de infra:
-      esvaziar `OPENAI_API_KEY` no `.env.local` (DEV), reiniciar `npm run dev`, refazer
-      uma busca → esperar HTTP **503** sem inventar lista; depois restaurar a chave.
+- [x] **Busca 3** (degradação 503) — com `OPENAI_API_KEY` esvaziada e `npm run dev`
+      reiniciado, a busca retornou a mensagem honesta **"Não foi possível processar a
+      busca agora. Tente de novo."** (âmbar) e **nenhuma carta inventada**. Sem IA, o
+      sistema **degrada**, não chuta. Chave restaurada e server reiniciado em seguida.
 
-**Veredito:** núcleo do Nível 3 **validado no DEV**. A busca semântica se comporta
-como projetada — **filtro duro como parede + vetor só na ordenação** — e a barreira
-de compliance segura as frases de encaixe. Resta apenas o teste 503 (opcional) antes
-de considerar push/PROD.
+**Veredito:** Nível 3 **validado no DEV — todos os critérios passaram.** A busca
+semântica se comporta como projetada — **filtro duro como parede + vetor só na
+ordenação** — a barreira de compliance segura as frases de encaixe, e a degradação
+sem IA é honesta (503, sem inventar). Pronto para avaliar push/PROD quando autorizado.
 
 ---
 
