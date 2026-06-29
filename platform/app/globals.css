@@ -3,19 +3,7 @@
    texto secundário #93A0B8, ciano #36C5F0, gradiente azul). Importado uma única
    vez no layout. Sem framework de CSS — só variáveis + resets mínimos. */
 :root {
-  /* superfícies */
-  --bg: #080b14;
-  --surface: #10182b;
-  --surface-2: #0d1424;
-  --border: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.22);
-
-  /* texto */
-  --text: #f6f6f8;
-  --text-soft: #d4d8e2;
-  --text-muted: #93a0b8;
-
-  /* marca / acentos */
+  /* marca / acentos (estáveis entre temas) */
   --brand: #36c5f0;
   --brand-deep: #1e6fe6;
   --grad-brand: linear-gradient(100deg, #8fb7ff, #36c5f0 45%, #1e6fe6);
@@ -26,7 +14,11 @@
   --info: #36c5f0;
   --warn: #f3c34a;
 
-  /* raios / sombras / espaços */
+  /* ----------------------------------------------------------------
+     Acessibilidade — escala de tipografia.
+     Tudo na área logada usa rem; mudar este font-size base aumenta o
+     texto inteiro de uma vez. [data-font] é setado no <html> pelo
+     ThemeControls (A- / A / A+ / A++), default no html abaixo. */
   --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 16px;
@@ -43,6 +35,66 @@
   --font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+/* ==================================================================
+   TEMAS — paleta por [data-theme] no <html>.
+   O tema é escolhido no ThemeControls (topbar) e persiste em
+   localStorage; um script no <head> aplica antes do paint (sem flash).
+   "auto" não existe como valor final: o script resolve para dark/light
+   conforme prefers-color-scheme e grava o resultado.
+   ================================================================== */
+
+/* DARK — padrão histórico da plataforma (fallback quando sem atributo) */
+:root,
+[data-theme="dark"] {
+  --bg: #080b14;
+  --surface: #10182b;
+  --surface-2: #0d1424;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --text: #f6f6f8;
+  --text-soft: #d4d8e2;
+  --text-muted: #93a0b8;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* LIGHT — claro, alinhado à folha de impressão já existente */
+[data-theme="light"] {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #eef1f8;
+  --border: rgba(20, 33, 58, 0.12);
+  --border-strong: rgba(20, 33, 58, 0.22);
+  --text: #14213a;
+  --text-soft: #34405a;
+  --text-muted: #5b6577;
+  --brand-deep: #1656bd;
+  --shadow: 0 8px 30px rgba(20, 33, 58, 0.12);
+}
+
+/* ALTO CONTRASTE — baixa visão: preto puro, texto branco, bordas fortes,
+   amarelo de marca para máximo contraste sobre fundo escuro (WCAG AAA). */
+[data-theme="contrast"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-2: #0a0a0a;
+  --border: #ffffff;
+  --border-strong: #ffffff;
+  --text: #ffffff;
+  --text-soft: #ffffff;
+  --text-muted: #e8e8e8;
+  --brand: #ffe600;
+  --brand-deep: #ffe600;
+  --grad-brand: linear-gradient(100deg, #ffe600, #ffe600);
+  --ok: #00e676;
+  --info: #4dd2ff;
+  --warn: #ffd000;
+  --shadow: none;
+}
+/* No alto contraste, reforça bordas e remove transparências sutis. */
+[data-theme="contrast"] * {
+  text-shadow: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -51,6 +103,21 @@ html,
 body {
   margin: 0;
   padding: 0;
+}
+
+/* Escala de tipografia acessível — base em <html>, conteúdo usa rem.
+   [data-font] é setado pelo ThemeControls; default = padrão (100%). */
+html {
+  font-size: 100%;
+}
+html[data-font="sm"] {
+  font-size: 90%;
+}
+html[data-font="lg"] {
+  font-size: 112.5%;
+}
+html[data-font="xl"] {
+  font-size: 125%;
 }
 
 body {

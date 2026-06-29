@@ -1,0 +1,77 @@
+/* Controles de acessibilidade na topbar (tema + tamanho de fonte). */
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.fonte,
+.temas {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px;
+}
+
+.fbtn,
+.tbtn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fbtn {
+  min-width: 34px;
+  height: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+.tbtn {
+  width: 32px;
+  height: 30px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.fbtn:hover:not(:disabled),
+.tbtn:hover {
+  color: var(--text);
+  background: rgba(143, 183, 255, 0.1);
+}
+
+.fbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tbtn.on {
+  background: var(--grad-brand);
+  color: #04203f;
+}
+
+.minus,
+.plus {
+  font-size: 10px;
+  vertical-align: super;
+  margin-left: 1px;
+}
+
+/* Em telas estreitas, escondemos o seletor de fonte (fica só o tema)
+   para a topbar não estourar. A escala continua acessível em telas
+   maiores e a preferência salva permanece ativa. */
+@media (max-width: 680px) {
+  .fonte {
+    display: none;
+  }
+}

@@ -3,6 +3,7 @@
 // O <form action="/auth/signout"> mantém o mesmo endpoint POST já existente.
 import type { ReactNode } from "react";
 import { ShellNav } from "./ShellNav";
+import { ThemeControls } from "./ThemeControls";
 import styles from "./AppShell.module.css";
 
 export function AppShell({
@@ -23,6 +24,7 @@ export function AppShell({
           </a>
           <ShellNav tipo={tipo} />
           <div className={styles.user}>
+            <ThemeControls />
             {nome && <span className={styles.hello}>{nome}</span>}
             <form action="/auth/signout" method="post">
               <button type="submit" className={styles.signout}>
