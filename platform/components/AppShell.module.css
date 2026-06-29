@@ -14,7 +14,8 @@
 .bar {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 12px 24px;
+  /* O respiro lateral já vem do --maxw (100% - 48px); aqui só o vertical. */
+  padding: 14px 0;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -88,7 +89,8 @@
 .main {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 40px 24px 72px;
+  /* Respiro lateral vem do --maxw; só o vertical aqui. Mais ar no topo/rodapé. */
+  padding: 44px 0 88px;
 }
 
 @media (max-width: 560px) {
@@ -96,7 +98,10 @@
     display: none;
   }
   .bar {
-    padding: 10px 16px;
+    padding: 12px 0;
     gap: 10px;
+  }
+  .main {
+    padding: 28px 0 64px;
   }
 }

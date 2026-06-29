@@ -32,7 +32,12 @@
   --r-lg: 16px;
   --r-pill: 999px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  --maxw: 760px;
+  /* Largura do conteúdo da área logada. Fluido: ocupa a tela (com respiro lateral)
+     até um teto generoso, deixando todas as telas "tela cheia" e elegantes. */
+  --maxw: min(1320px, 100% - 48px);
+  /* Largura de leitura para blocos densos de texto (ex.: formulários longos),
+     usada pontualmente quando full-width prejudicaria a legibilidade. */
+  --maxw-prosa: 760px;
 
   /* tipografia */
   --font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
