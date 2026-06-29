@@ -14,6 +14,7 @@ const BASE: Link[] = [
   { href: "/", label: "Início", exato: true },
   { href: "/meu-processo", label: "Meu processo" },
   { href: "/cartas", label: "Cartas" },
+  { href: "/reservar", label: "Reservar" },
   { href: "/buscar", label: "Buscar" },
 ];
 

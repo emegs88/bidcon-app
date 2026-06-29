@@ -1,0 +1,178 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ----- stepper ----- */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.st {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.st.on {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--text);
+}
+.st.done {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.stNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface-2, color-mix(in srgb, var(--text) 8%, transparent));
+  font-size: 12px;
+  font-weight: 800;
+}
+.st.on .stNum {
+  background: var(--brand);
+  color: #fff;
+}
+.st.done .stNum {
+  background: var(--ok);
+  color: #fff;
+}
+.stLbl {
+  white-space: nowrap;
+}
+
+/* ----- grade de cartas (passo 1) ----- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.disp {
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 700;
+}
+.credito {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.creditoLbl {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.specs dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.specs dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ----- revisão (passo 2) ----- */
+.h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+}
+.resumo {
+  margin: 8px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.row dt {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.row dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: right;
+}
+.aviso {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.erro {
+  color: var(--danger, #c0392b);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ----- sucesso (passo 3) ----- */
+.okBig {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+  font-size: 28px;
+  font-weight: 900;
+  margin: 0 auto 14px;
+}
+
+/* ----- gate de KYC ----- */
+.kycHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}

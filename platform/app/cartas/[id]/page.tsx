@@ -127,14 +127,19 @@ export default async function CartaDetalhePage({
         <Card>
           <h2 className={styles.h2}>Tem interesse nesta carta?</h2>
           <p className={styles.texto}>
-            Fale com o atendimento pelo WhatsApp para tirar dúvidas e entender as
-            condições de transferência da cota junto à administradora do consórcio.
-            Nenhuma contemplação é prometida: trata-se de uma cota já contemplada
-            sendo transferida.
+            Inicie a reserva pela plataforma ou fale com o atendimento pelo
+            WhatsApp para tirar dúvidas sobre a transferência da cota junto à
+            administradora do consórcio. Nenhuma contemplação é prometida:
+            trata-se de uma cota já contemplada sendo transferida.
           </p>
-          <Button href={linkWhatsApp(WA, mensagem)} block>
-            Tenho interesse
+          <Button href={`/reservar?carta=${c.id}`} block>
+            Reservar esta carta
           </Button>
+          <div className={styles.ctaSecundario}>
+            <Button href={linkWhatsApp(WA, mensagem)} variant="ghost" block>
+              Falar no WhatsApp
+            </Button>
+          </div>
         </Card>
       </div>
     </AppShell>
