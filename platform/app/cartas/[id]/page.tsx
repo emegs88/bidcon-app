@@ -25,6 +25,8 @@ type CartaDetalhe = {
   valor_parcela: number | null;
   qtd_parcelas: number | null;
   status: string;
+  // marca pública do bem (join administradoras, RLS p/ logado). NUNCA fornecedor.
+  administradora: { nome: string; aceita_assuncao: boolean } | null;
 };
 
 export default async function CartaDetalhePage({
@@ -45,17 +47,21 @@ export default async function CartaDetalhePage({
     .single();
   const nome = profile?.nome ?? user.email ?? null;
 
+  // Join SÓ com administradoras (marca pública). NUNCA selecionar fornecedor.
   const { data: carta } = await supabase
     .from("cartas")
     .select(
-      "id, tipo, numero_externo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status"
+      "id, tipo, numero_externo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, administradora:administradora_id ( nome, aceita_assuncao )"
     )
     .eq("id", params.id)
     .eq("status", "disponivel")
     .maybeSingle();
 
   if (!carta) notFound();
-  const c = carta as CartaDetalhe;
+  // PostgREST tipa o embed como array; normalizamos para objeto | null.
+  const adm = (carta as { administradora?: unknown }).administradora;
+  const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
+  const c = { ...carta, administradora } as CartaDetalhe;
 
   const ref = c.numero_externo ? `nº ${c.numero_externo}` : `ref. ${c.id.slice(0, 8)}`;
   const tipoLabel = LABEL_TIPO_BEM[c.tipo] ?? c.tipo;
@@ -95,6 +101,18 @@ export default async function CartaDetalhePage({
               <dt>Tipo de bem</dt>
               <dd>{tipoLabel}</dd>
             </div>
+            {c.administradora?.nome && (
+              <div className={styles.row}>
+                <dt>Administradora</dt>
+                <dd>{c.administradora.nome}</dd>
+              </div>
+            )}
+            {c.administradora?.aceita_assuncao && (
+              <div className={styles.row}>
+                <dt>Transferência</dt>
+                <dd>Aceita assunção de cota</dd>
+              </div>
+            )}
             <div className={styles.row}>
               <dt>Crédito da carta</dt>
               <dd>{brl(c.valor_credito)}</dd>

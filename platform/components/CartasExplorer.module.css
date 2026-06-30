@@ -52,6 +52,24 @@
 .limpar:hover {
   background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
+/* checkbox "só aceita assunção" — alinha com os campos do grid de filtros. */
+.checkFiltro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  padding: 8px 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.checkFiltro input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
 
 .contagem {
   color: var(--text-muted);

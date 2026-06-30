@@ -37,12 +37,24 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
     [cartas]
   );
 
+  // Administradoras distintas presentes na lista (marca pública do bem), p/ o
+  // filtro. Ordenadas alfabeticamente. Vazio = nenhuma carta tem administradora.
+  const administradoras = useMemo(() => {
+    const nomes = new Set<string>();
+    for (const c of cartas) {
+      if (c.administradora?.nome) nomes.add(c.administradora.nome);
+    }
+    return [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [cartas]);
+
   // --- estado dos filtros (todos opcionais; vazio = sem restrição) ---
   const [creditoMin, setCreditoMin] = useState<string>("");
   const [creditoMax, setCreditoMax] = useState<string>("");
   const [entradaMax, setEntradaMax] = useState<string>("");
   const [pctEntradaMax, setPctEntradaMax] = useState<string>("");
   const [custoMax, setCustoMax] = useState<string>("");
+  const [administradora, setAdministradora] = useState<string>(""); // "" = todas
+  const [soAssuncao, setSoAssuncao] = useState<boolean>(false);
   const [ordenar, setOrdenar] = useState<Ordenacao>("credito");
 
   // --- junção de crédito: ids selecionados ---
@@ -73,6 +85,10 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
         // sem custo calculável fica de fora quando há teto de custo
         if (ce == null || ce > ceMax) return false;
       }
+      // filtros factuais da administradora (marca pública do bem)
+      if (administradora !== "" && c.administradora?.nome !== administradora)
+        return false;
+      if (soAssuncao && !c.administradora?.aceita_assuncao) return false;
       return true;
     });
 
@@ -89,7 +105,17 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
       return ca - cb;
     });
     return ordenadas;
-  }, [cartas, creditoMin, creditoMax, entradaMax, pctEntradaMax, custoMax, ordenar]);
+  }, [
+    cartas,
+    creditoMin,
+    creditoMax,
+    entradaMax,
+    pctEntradaMax,
+    custoMax,
+    administradora,
+    soAssuncao,
+    ordenar,
+  ]);
 
   // Carta(s) selecionada(s) para a junção (a partir da lista completa).
   const selecionadas = useMemo(
@@ -122,6 +148,8 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
     setEntradaMax("");
     setPctEntradaMax("");
     setCustoMax("");
+    setAdministradora("");
+    setSoAssuncao(false);
     setOrdenar("credito");
   };
 
@@ -232,6 +260,23 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
             onChange={(e) => setCustoMax(e.target.value)}
           />
         </div>
+        {administradoras.length > 0 && (
+          <div className={styles.campo}>
+            <label htmlFor="adm">Administradora</label>
+            <select
+              id="adm"
+              value={administradora}
+              onChange={(e) => setAdministradora(e.target.value)}
+            >
+              <option value="">Todas</option>
+              {administradoras.map((nome) => (
+                <option key={nome} value={nome}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className={styles.campo}>
           <label htmlFor="ord">Ordenar por</label>
           <select
@@ -244,6 +289,14 @@ export function CartasExplorer({ cartas }: { cartas: CartaVitrine[] }) {
             <option value="entrada">Entrada (menor → maior)</option>
           </select>
         </div>
+        <label className={styles.checkFiltro}>
+          <input
+            type="checkbox"
+            checked={soAssuncao}
+            onChange={(e) => setSoAssuncao(e.target.checked)}
+          />
+          <span>Só aceita assunção</span>
+        </label>
         <button type="button" className={styles.limpar} onClick={limparFiltros}>
           Limpar filtros
         </button>

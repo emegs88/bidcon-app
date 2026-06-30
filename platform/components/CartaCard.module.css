@@ -20,6 +20,12 @@
   font-size: 12px;
   margin-bottom: 14px;
 }
+.atributos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -6px 0 14px;
+}
 .specs {
   display: flex;
   flex-wrap: wrap;

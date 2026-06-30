@@ -38,16 +38,34 @@ export default async function CartasPage({
     ? (searchParams.tipo as string)
     : null;
 
+  // Join SÓ com administradoras (marca pública do bem; RLS libera p/ logado).
+  // NUNCA selecionar fornecedor_id/fornecedores aqui — é segredo admin-only.
+  // O embed do PostgREST devolve `administradora` como objeto (ou null).
   let query = supabase
     .from("cartas")
-    .select("id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas")
+    .select(
+      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, administradora:administradora_id ( nome, aceita_assuncao )"
+    )
     .eq("status", "disponivel")
     .order("valor_credito", { ascending: true });
 
   if (tipoFiltro) query = query.eq("tipo", tipoFiltro);
 
   const { data: cartas } = await query;
-  const lista = (cartas ?? []) as CartaVitrine[];
+  // PostgREST tipa o embed como array; normalizamos para objeto | null.
+  const lista: CartaVitrine[] = (cartas ?? []).map((c) => {
+    const adm = (c as { administradora?: unknown }).administradora;
+    const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
+    return {
+      id: c.id,
+      tipo: c.tipo,
+      valor_credito: c.valor_credito,
+      valor_entrada: c.valor_entrada,
+      valor_parcela: c.valor_parcela,
+      qtd_parcelas: c.qtd_parcelas,
+      administradora: administradora as CartaVitrine["administradora"],
+    };
+  });
 
   return (
     <AppShell nome={nome} tipo={tipo}>

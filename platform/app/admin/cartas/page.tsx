@@ -16,6 +16,7 @@ import {
 } from "@/lib/status";
 import { brl } from "@/lib/format";
 import { CartaAcoes } from "./CartaAcoes";
+import { CartaVinculo, type Opcao } from "./CartaVinculo";
 import styles from "@/components/area.module.css";
 import row from "@/components/ProcessoRow.module.css";
 
@@ -43,7 +44,7 @@ export default async function AdminCartas({
   let query = supabase
     .from("cartas")
     .select(
-      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, parceiro_id",
+      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, parceiro_id, administradora_id, fornecedor_id",
     )
     .order("criado_em", { ascending: false });
   if (filtroStatus) query = query.eq("status", filtroStatus);
@@ -51,6 +52,15 @@ export default async function AdminCartas({
 
   const { data } = await query;
   const lista = data ?? [];
+
+  // Opções de vínculo (admin enxerga ambas as tabelas por RLS).
+  // fornecedores: leitura só-admin (RLS de 0011) — esta página é exigirPapel("admin").
+  const [{ data: admins }, { data: forns }] = await Promise.all([
+    supabase.from("administradoras").select("id, nome").eq("ativo", true).order("nome"),
+    supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome"),
+  ]);
+  const administradoras = (admins ?? []) as Opcao[];
+  const fornecedores = (forns ?? []) as Opcao[];
 
   function comFiltros(extra: { status?: string | null; tipo?: string | null }) {
     const sp = new URLSearchParams();
@@ -128,6 +138,13 @@ export default async function AdminCartas({
                 </Badge>
               </div>
               <CartaAcoes cartaId={c.id} atual={c.status as StatusCarta} />
+              <CartaVinculo
+                cartaId={c.id}
+                administradoras={administradoras}
+                fornecedores={fornecedores}
+                administradoraAtual={(c as { administradora_id: string | null }).administradora_id}
+                fornecedorAtual={(c as { fornecedor_id: string | null }).fornecedor_id}
+              />
             </Card>
           ))}
         </ul>

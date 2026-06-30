@@ -6,6 +6,14 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import styles from "./CartaCard.module.css";
 
+// Atributos PÚBLICOS da administradora (marca do bem). Vêm do join cartas →
+// administradoras, liberado por RLS para usuário logado (migration 0011).
+// NUNCA inclui fornecedor (de quem compramos) — esse é segredo admin-only.
+export type AdministradoraVitrine = {
+  nome: string;
+  aceita_assuncao: boolean;
+};
+
 export type CartaVitrine = {
   id: string;
   tipo: string;
@@ -13,6 +21,8 @@ export type CartaVitrine = {
   valor_entrada: number | null;
   valor_parcela: number | null;
   qtd_parcelas: number | null;
+  // pode ser null quando a carta ainda não tem administradora vinculada.
+  administradora: AdministradoraVitrine | null;
 };
 
 export function CartaCard({ carta }: { carta: CartaVitrine }) {
@@ -29,7 +39,16 @@ export function CartaCard({ carta }: { carta: CartaVitrine }) {
       </div>
 
       <div className={styles.credito}>{brl(carta.valor_credito)}</div>
-      <div className={styles.creditoLbl}>crédito da carta</div>
+      <div className={styles.creditoLbl}>
+        crédito da carta
+        {carta.administradora?.nome ? ` · ${carta.administradora.nome}` : ""}
+      </div>
+
+      {carta.administradora?.aceita_assuncao && (
+        <div className={styles.atributos}>
+          <Badge tone="ok">Aceita assunção</Badge>
+        </div>
+      )}
 
       <dl className={styles.specs}>
         <div>
