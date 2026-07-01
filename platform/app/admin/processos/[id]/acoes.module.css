@@ -17,3 +17,28 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* Grupo de ações por documento do check-list */
+.grupo {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.grupoLbl {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.linhaLbl {
+  color: var(--text);
+  font-size: 14px;
+}

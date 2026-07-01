@@ -1,0 +1,80 @@
+/* Detalhe do processo (admin). Classes próprias para não depender do módulo
+   compartilhado de cartas/[id]. Inclui a lista de documentos do check-list,
+   badges de sub-etapa e seções de sinal/contratos. */
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.dl {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.row dt {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.row dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.subetapa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Documentos do check-list */
+.docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.docItem {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+.docTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.docRotulo {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+}
+.docMotivo {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.docLink {
+  color: var(--accent, #6ea8fe);
+  font-size: 13px;
+  text-decoration: underline;
+  width: fit-content;
+}
