@@ -1,92 +1,80 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · SEED DE DESENVOLVIMENTO (NÃO é migration)
 -- ----------------------------------------------------------------------------
--- USO: SOMENTE num projeto Supabase de TESTE, para validar as telas com dados.
---   NUNCA rodar em PRODUÇÃO. O agente não aplica isto em lugar nenhum — é um
---   arquivo entregue ao Emerson para popular um ambiente de teste.
+-- USO: SOMENTE num projeto Supabase de TESTE (DEV: prospere-360-dev), para
+--   validar a BUSCA SEMÂNTICA com dados reais. NUNCA rodar em PRODUÇÃO.
 --
--- Pré-requisito: os usuários precisam existir em auth.users ANTES (profiles.id
---   é FK para auth.users). Crie-os no painel Authentication > Users (ou via
---   admin API) e cole os UUIDs nos \set abaixo. Sem isso, os INSERT de profiles
---   falham na FK — de propósito (não criamos contas pelo SQL).
+-- Foco: validar `validacao-nivel3.md` (as 4 buscas). Por isso este seed insere
+--   APENAS cartas de ESTOQUE (parceiro_id null) — que é o único universo que a
+--   RPC `buscar_cartas_semantica` enxerga (status='disponivel' + embedding not
+--   null). NÃO depende de auth.users / profiles (sem FK), então roda direto pelo
+--   runner Node (`pg`), sem psql/\set.
 --
--- Idempotente o suficiente para reexecutar: usa ON CONFLICT onde dá. As cartas
---   de estoque usam numero_externo (índice único) como chave.
+-- Idempotente: chave de upsert = numero_externo (índice único quando preenchido).
+--   Pode reexecutar à vontade. O backfill depois preenche `descricao`+`embedding`.
+--
+-- SEM compliance proibida: nenhum texto promete contemplação/prazo, nem usa
+--   "investimento/desconto/garantido" — as descrições do embedding são geradas
+--   pelo `descricaoDeCarta()` (determinístico e neutro), não por este SQL.
 -- ============================================================================
 
--- >>> COLE AQUI os UUIDs reais de auth.users (criados no painel Authentication):
-\set admin_id     '00000000-0000-0000-0000-000000000001'
-\set parceiro_id  '00000000-0000-0000-0000-000000000002'
-\set pendente_id  '00000000-0000-0000-0000-000000000003'
-\set cliente1_id  '00000000-0000-0000-0000-000000000004'
-\set cliente2_id  '00000000-0000-0000-0000-000000000005'
+-- Limpa só o estoque de teste deste seed (faixa 9000xx) para reexecução limpa.
+delete from cartas
+ where fonte = '360prospere'
+   and numero_externo between 900001 and 900099;
 
--- ----- PERFIS ----------------------------------------------------------------
-insert into profiles (id, nome, telefone, email, tipo, status) values
-  (:'admin_id',    'Emerson (Admin)',   '+5519999990001', 'admin@bidcon.com.br',    'admin',    'ativo'),
-  (:'parceiro_id', 'Parceiro Ativo',    '+5519999990002', 'parceiro@bidcon.com.br', 'parceiro', 'ativo'),
-  (:'pendente_id', 'Parceiro Pendente', '+5519999990003', 'pendente@bidcon.com.br', 'parceiro', 'pendente_aprovacao'),
-  (:'cliente1_id', 'Cliente Um',        '+5519999990004', 'cliente1@bidcon.com.br', 'cliente',  'ativo'),
-  (:'cliente2_id', 'Cliente Dois',      '+5519999990005', 'cliente2@bidcon.com.br', 'cliente',  'ativo')
-on conflict (id) do update
-  set nome = excluded.nome, tipo = excluded.tipo, status = excluded.status;
-
--- ----- CARTAS ----------------------------------------------------------------
--- Estoque Bidcon (parceiro_id null, fonte de sync) — chave: numero_externo.
+-- ----------------------------------------------------------------------------
+-- CARTAS DE ESTOQUE (parceiro_id null). Variadas de propósito:
+--   • tipos: imóvel e veículo
+--   • valores: baixos e altos, pra exercitar o filtro duro (valor_max) e o teto
+--   • perfis de entrada/parcela distintos, pra o ranqueamento por similaridade
+--     ter o que ordenar dentro do mesmo tipo (Busca 2).
+-- ----------------------------------------------------------------------------
 insert into cartas
   (parceiro_id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas,
    status, numero_externo, fonte, criado_via, sincronizada_em)
 values
-  (null, 'imovel',  350000.00, 70000.00, 2100.00, 180, 'disponivel', 900001, '360prospere', 'sync', now()),
-  (null, 'imovel',  520000.00, 98000.00, 3050.00, 200, 'disponivel', 900002, '360prospere', 'sync', now()),
-  (null, 'veiculo',  90000.00, 18000.00, 1450.00,  72, 'disponivel', 900003, '360prospere', 'sync', now()),
-  (null, 'veiculo', 130000.00, 26000.00, 1980.00,  80, 'disponivel', 900004, '360prospere', 'sync', now())
-on conflict (numero_externo) where (numero_externo is not null)
-  do update set status = excluded.status, valor_credito = excluded.valor_credito;
+  -- ===== VEÍCULOS — exercitam a Busca 1 ("carro até 80 mil") =================
+  -- Dois veículos ABAIXO de 80k (devem APARECER, ordenados por similaridade)
+  -- e dois ACIMA (devem ser CORTADOS pelo filtro duro valor_max≈80000).
+  (null, 'veiculo',  55000.00,  9000.00,  980.00,  60, 'disponivel', 900001, '360prospere', 'sync', now()),  -- carro popular, entrada baixa
+  (null, 'veiculo',  78000.00, 15000.00, 1380.00,  60, 'disponivel', 900002, '360prospere', 'sync', now()),  -- carro médio, no limite de 80k
+  (null, 'veiculo',  95000.00, 19000.00, 1650.00,  72, 'disponivel', 900003, '360prospere', 'sync', now()),  -- acima de 80k -> deve sair na Busca 1
+  (null, 'veiculo', 140000.00, 28000.00, 2200.00,  80, 'disponivel', 900004, '360prospere', 'sync', now()),  -- utilitário/caro -> deve sair na Busca 1
 
--- Cartas do PARCEIRO (carteira própria, parceiro_id preenchido).
-insert into cartas
-  (parceiro_id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas,
-   status, fonte, criado_via)
-values
-  (:'parceiro_id', 'imovel',  410000.00, 82000.00, 2400.00, 180, 'disponivel', 'manual', 'manual'),
-  (:'parceiro_id', 'veiculo', 105000.00, 21000.00, 1600.00,  72, 'reservada',  'manual', 'manual');
+  -- ===== IMÓVEIS — exercitam a Busca 2 (nuance, sem número) ==================
+  -- Vários imóveis com perfis de entrada/parcela diferentes pra haver ordenação.
+  (null, 'imovel',  180000.00, 30000.00, 1200.00, 180, 'disponivel', 900010, '360prospere', 'sync', now()),  -- 1º imóvel enxuto, entrada baixa
+  (null, 'imovel',  250000.00, 45000.00, 1600.00, 180, 'disponivel', 900011, '360prospere', 'sync', now()),  -- família começando
+  (null, 'imovel',  300000.00, 24000.00, 1850.00, 200, 'disponivel', 900012, '360prospere', 'sync', now()),  -- ~300k, ENTRADA BAIXA (Busca 3)
+  (null, 'imovel',  420000.00, 84000.00, 2450.00, 200, 'disponivel', 900013, '360prospere', 'sync', now()),  -- imóvel maior, entrada alta
+  (null, 'imovel',  650000.00, 130000.00, 3600.00, 220, 'disponivel', 900014, '360prospere', 'sync', now()), -- alto padrão
 
--- ----- PROCESSOS (jornada de 2 clientes, status variados) --------------------
--- cliente1: em documentação, com o parceiro ativo, sobre uma carta de estoque.
-insert into processos (id, cliente_id, parceiro_id, carta_id, status, valor_carta, valor_entrada)
-select gen_random_uuid(), :'cliente1_id', :'parceiro_id', c.id, 'documentacao', c.valor_credito, c.valor_entrada
-from cartas c where c.numero_externo = 900001;
+  -- ===== Controle: 1 carta NÃO-disponível (não pode aparecer em busca) =======
+  (null, 'veiculo',  60000.00, 12000.00, 1100.00,  60, 'reservada',  900020, '360prospere', 'sync', now()),  -- reservada -> filtrada pela RPC
+  (null, 'imovel',  280000.00, 50000.00, 1700.00, 180, 'indisponivel', 900021, '360prospere', 'sync', now()); -- indisponível -> filtrada
 
--- cliente2: reservada, sem carta vinculada ainda.
-insert into processos (id, cliente_id, parceiro_id, carta_id, status, valor_carta, valor_entrada)
-values (gen_random_uuid(), :'cliente2_id', :'parceiro_id', null, 'reservada', null, null);
+-- ----------------------------------------------------------------------------
+-- Cobertura das 4 buscas de validacao-nivel3.md:
+--   Busca 1  "carro até 80 mil pra trocar o meu"
+--            -> tipo=veiculo, valor_max≈80000. Devem vir 900001 e 900002.
+--               900003/900004 (>80k) CORTADAS. Nenhum imóvel. 900020 (reservada) fora.
+--   Busca 2  "primeiro imóvel pra família crescer com tranquilidade"
+--            -> tipo=imovel, sem teto. Lista de imóveis ordenada por similaridade
+--               (900010/900011 tendem ao topo pelo perfil enxuto/familiar).
+--   Busca 3  "apartamento de uns 300 mil com entrada baixa"
+--            -> roda com OPENAI_API_KEY vazia => 503 (degradação). 900012 existe
+--               como alvo natural caso queira comparar depois com a chave ativa.
+--   Busca 4  "quero garantir que vou ser contemplado mês que vem"
+--            -> teste de compliance: a frase de encaixe nunca cita data/prazo/
+--               CCB/FIDC; cai no fallback neutro. Qualquer carta serve de pano de
+--               fundo; o que se valida é o TEXTO da resposta, não o ranking.
+-- ----------------------------------------------------------------------------
 
--- Trilha mínima da timeline (evento de criação) para cada processo recém-criado.
-insert into processo_eventos (processo_id, de_status, para_status, nota)
-select p.id, null, 'reservada', 'processo criado (seed)'
-from processos p
-where p.cliente_id in (:'cliente1_id', :'cliente2_id')
-  and not exists (select 1 from processo_eventos e where e.processo_id = p.id);
-
--- Evento extra de avanço no processo do cliente1 (reservada -> documentacao).
-insert into processo_eventos (processo_id, de_status, para_status, nota)
-select p.id, 'reservada', 'documentacao', 'docs solicitados (seed)'
-from processos p where p.cliente_id = :'cliente1_id' and p.status = 'documentacao';
-
--- ----- INDICAÇÃO -------------------------------------------------------------
-insert into indicacoes (parceiro_id, cliente_id, origem)
-values (:'parceiro_id', :'cliente1_id', 'link-seed-001');
-
--- ----- COMISSÃO (prevista; números são ilustrativos do ambiente de teste) ----
-insert into comissoes (parceiro_id, processo_id, percentual, valor_base, valor_comissao, status)
-select :'parceiro_id', p.id, 2.00, p.valor_carta, round(p.valor_carta * 0.02, 2), 'prevista'
-from processos p where p.cliente_id = :'cliente1_id' and p.valor_carta is not null;
-
--- ============================================================================
--- Conferência rápida:
---   select tipo, count(*) from profiles group by tipo;
---   select status, count(*) from cartas group by status;
---   select status, count(*) from processos group by status;
---   select status, count(*) from comissoes group by status;
--- ============================================================================
+-- Conferência rápida (rode no SQL Editor depois do backfill):
+--   select numero_externo, tipo, valor_credito, status,
+--          (embedding is not null) as vetorizada
+--   from cartas where numero_externo between 900001 and 900099
+--   order by tipo, valor_credito;
+--   -- esperado após backfill: todas 'disponivel' com vetorizada = true;
+--   -- as 'reservada'/'indisponivel' podem ou não ter embedding, mas a RPC as ignora.

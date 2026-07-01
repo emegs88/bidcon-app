@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bidcon · Mockup de Dashboards (cliente / parceiro / admin)</title>
+<!--
+  MOCKUP ESTÁTICO PARA APROVAÇÃO DE LAYOUT. Não faz parte do build.
+  - Dados são ILUSTRATIVOS (amostra). No port real, vêm do Supabase via RLS.
+  - Tokens iguais aos de app/globals.css (mesma paleta da plataforma).
+  - Copy já em conformidade: sem nome de administradora, sem termos proibidos.
+  - Sem Tailwind, sem libs: só CSS + SVG inline (igual ao padrão da plataforma).
+-->
+<style>
+  :root{
+    --bg:#080b14; --surface:#10182b; --surface-2:#0d1424;
+    --border:rgba(255,255,255,.12); --border-strong:rgba(255,255,255,.22);
+    --text:#f6f6f8; --text-soft:#d4d8e2; --text-muted:#93a0b8;
+    --brand:#36c5f0; --brand-deep:#1e6fe6;
+    --grad-brand:linear-gradient(100deg,#8fb7ff,#36c5f0 45%,#1e6fe6);
+    --accent-amber:#f3c34a; --ok:#34d399; --info:#36c5f0; --warn:#f3c34a;
+    --r-sm:10px; --r-md:14px; --r-lg:16px; --r-pill:999px;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+    --maxw:min(1320px,100% - 48px);
+    --font:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5}
+  .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .gradtext{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .gradbg{background:var(--grad-brand)}
+
+  /* topbar (igual AppShell) */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(8,11,20,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+  .bar{max-width:var(--maxw);margin:0 auto;padding:14px 0;display:flex;align-items:center;gap:16px}
+  .brand{font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--text);text-decoration:none}
+  .nav{display:flex;gap:4px;margin-left:8px;flex:1 1 auto;overflow-x:auto}
+  .navlink{color:var(--text-muted);text-decoration:none;font-size:14px;font-weight:600;padding:6px 10px;border-radius:var(--r-sm);white-space:nowrap;border:0;background:transparent;cursor:pointer}
+  .navlink.active{color:var(--text);background:rgba(54,197,240,.12)}
+  .user{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .hello{color:var(--text-muted);font-size:13px}
+  .signout{background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:var(--r-pill);padding:6px 14px;font-size:13px;cursor:pointer}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:32px 0 80px}
+
+  /* role switcher (só do mockup) */
+  .switch{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
+  .switch .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-muted);margin-right:6px}
+  .pill{border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft);border-radius:var(--r-pill);padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .pill.on{border-color:transparent;background:var(--grad-brand);color:#04203f}
+
+  .card{position:relative;background:rgba(255,255,255,.022);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px}
+  .card.glow{box-shadow:0 0 0 1px rgba(143,183,255,.10),0 20px 60px -30px rgba(54,197,240,.45)}
+  .kicker{display:inline-flex;align-items:center;gap:6px;font-size:11px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;color:#7fd0f0;background:rgba(54,197,240,.10);padding:4px 10px;border-radius:var(--r-pill)}
+  h1.hi{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:14px 0 6px}
+  .sub{color:var(--text-muted);font-size:14px;margin:0}
+  h2.sec{font-size:18px;font-weight:700;margin:0 0 14px}
+  .muted{color:var(--text-muted)} .soft{color:var(--text-soft)}
+
+  .hero{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px;background:linear-gradient(135deg,rgba(30,111,230,.10),rgba(255,255,255,.02));overflow:hidden}
+  .btn{border:0;border-radius:var(--r-md);padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+  .btn.primary{background:var(--grad-brand);color:#04203f}
+  .btn.ghost{background:transparent;color:var(--text-soft);border:1px solid var(--border)}
+
+  .grid{display:grid;gap:16px}
+  .g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+  .col23{grid-template-columns:2fr 1fr}
+  @media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr)}.g3,.col23{grid-template-columns:1fr}}
+  @media(max-width:560px){.g2,.g4{grid-template-columns:1fr}}
+
+  .stat .ic{width:38px;height:38px;border-radius:var(--r-sm);display:grid;place-items:center;background:rgba(143,183,255,.08);margin-bottom:12px}
+  .stat .lab{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:4px}
+  .stat .val{font-size:22px;font-weight:700}
+  .stat .val.sm{font-size:16px;color:var(--text-soft)}
+  .delta{font-size:12px;font-weight:600;margin-left:8px}
+  .delta.up{color:var(--ok)} .delta.down{color:#f87171}
+
+  /* timeline */
+  ol.tl{list-style:none;margin:0;padding:0;position:relative}
+  ol.tl li{position:relative;display:flex;gap:16px;padding-bottom:26px}
+  ol.tl li:last-child{padding-bottom:0}
+  ol.tl .line{position:absolute;left:19px;top:42px;bottom:0;width:1px;background:rgba(143,183,255,.12)}
+  ol.tl .line.done{background:linear-gradient(#36c5f0,rgba(54,197,240,.2))}
+  .node{position:relative;z-index:1;width:40px;height:40px;border-radius:var(--r-md);display:grid;place-items:center;flex:0 0 auto}
+  .node.done{background:linear-gradient(135deg,#36c5f0,#1e6fe6)}
+  .node.now{background:rgba(54,197,240,.14);box-shadow:0 0 0 4px rgba(54,197,240,.08)}
+  .node.todo{background:rgba(143,183,255,.05)}
+  .tl .t{font-weight:700;font-size:15px} .tl .d{font-size:13px;color:var(--text-muted);margin-top:2px}
+  .nowtag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7fd0f0;background:rgba(54,197,240,.15);padding:2px 8px;border-radius:var(--r-pill);margin-left:8px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{ text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.1em;padding:8px 10px;border-bottom:1px solid var(--border)}
+  td{padding:11px 10px;border-bottom:1px solid var(--border);color:var(--text-soft)}
+  tr:last-child td{border-bottom:0}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--r-pill);display:inline-block}
+  .b-ok{background:rgba(52,211,153,.14);color:#5be0a8} .b-info{background:rgba(54,197,240,.14);color:#7fd0f0}
+  .b-warn{background:rgba(243,195,74,.16);color:#f3c34a} .b-mut{background:rgba(147,160,184,.14);color:#aeb8cc}
+
+  .seal{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-muted);background:rgba(143,183,255,.04);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;margin-top:18px}
+
+  .chip{font-size:12px;padding:7px 11px;border-radius:var(--r-sm);border:1px solid var(--border);color:var(--text-muted);background:transparent;text-align:left;cursor:pointer}
+  .inp{width:100%;font-size:14px;padding:11px 13px;border-radius:var(--r-md);border:1px solid var(--border);background:transparent;color:var(--text);margin-bottom:10px}
+  .inp::placeholder{color:var(--text-muted)}
+  .mini .price{font-size:22px;font-weight:700;margin:8px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:10px}
+  .dot{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:middle}
+  .hide{display:none}
+  .note{font-size:12px;color:var(--text-muted);background:rgba(243,195,74,.06);border:1px solid rgba(243,195,74,.18);border-radius:var(--r-md);padding:12px 16px;margin:0 0 22px}
+
+  /* avatar + nível (equipe) */
+  .avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:16px;color:#04203f;background:var(--grad-brand);flex:0 0 auto;letter-spacing:-.02em}
+  .avatar.lg{width:64px;height:64px;font-size:22px}
+  .lvl{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:3px 10px;border-radius:var(--r-pill)}
+  .lvl-parceiro{background:rgba(147,160,184,.16);color:#aeb8cc}
+  .lvl-lider{background:rgba(54,197,240,.14);color:#7fd0f0}
+  .lvl-gestor{background:rgba(143,183,255,.16);color:#b9cdff}
+  .lvl-diretor{background:var(--grad-brand);color:#04203f}
+  .team{display:flex;align-items:center;gap:13px}
+  .team .meta{min-width:0}
+  .team .nm{font-weight:700;font-size:14px}
+  .team .rl{font-size:12px;color:var(--text-muted);margin-top:1px}
+  .prog{height:7px;border-radius:5px;background:rgba(143,183,255,.10);overflow:hidden}
+  .prog>span{display:block;height:100%;border-radius:5px;background:var(--grad-brand)}
+
+  /* cascata de comissão */
+  .casc{display:flex;flex-direction:column;gap:0}
+  .casc .row{display:flex;align-items:center;gap:14px;padding:13px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:rgba(143,183,255,.04)}
+  .casc .arr{align-self:center;color:#5c6883;font-size:15px;padding:4px 0;text-align:center}
+  .casc .ic{width:42px;height:42px;border-radius:var(--r-sm);display:grid;place-items:center;background:rgba(54,197,240,.12);flex:0 0 auto;font-size:18px}
+
+  /* compra online (reserva) — catálogo + wizard */
+  .cardcarta{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:rgba(255,255,255,.022)}
+  .cardcarta .top{padding:18px 18px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .cardcarta .tipo{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted)}
+  .cardcarta .credito{font-size:22px;font-weight:800;margin-top:4px}
+  .cardcarta .linhas{padding:0 18px 14px;display:grid;gap:7px;font-size:13px}
+  .cardcarta .linha{display:flex;justify-content:space-between}
+  .cardcarta .foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+  .cardcarta .ent{flex:1}.cardcarta .ent .k{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em}.cardcarta .ent .v{font-weight:700;font-size:16px}
+
+  /* stepper do wizard */
+  .steps{display:flex;align-items:center;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+  .steps .st{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted)}
+  .steps .st .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;border:1px solid var(--border);flex:0 0 auto}
+  .steps .st.on{color:var(--text)} .steps .st.on .n{background:var(--grad-brand);color:#04203f;border-color:transparent}
+  .steps .st.done .n{background:rgba(52,211,153,.18);color:#5be0a8;border-color:transparent}
+  .steps .sep{flex:1;height:1px;background:var(--border);min-width:16px}
+  .field{display:grid;gap:6px;margin-bottom:14px}
+  .field>label{font-size:12px;color:var(--text-muted)}
+  .field .req{color:#f3c34a}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.row2{grid-template-columns:1fr}}
+  .up{border:1px dashed var(--border-strong);border-radius:var(--r-md);padding:18px;text-align:center;color:var(--text-muted);font-size:13px;cursor:pointer}
+  .up b{color:var(--text-soft)}
+  .resumo{display:grid;gap:9px;font-size:13px}
+  .resumo .l{display:flex;justify-content:space-between;gap:12px}
+  .ok-big{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:rgba(52,211,153,.14);color:#5be0a8;font-size:30px;margin:0 auto 16px}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="bar">
+      <a class="brand" href="#">bid<span class="gradtext">con</span></a>
+      <nav class="nav" id="nav"></nav>
+      <div class="user">
+        <span class="hello" id="userlabel">eme.santos…</span>
+        <button class="signout">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="switch">
+      <span class="lbl">Pré-visualizar como</span>
+      <button class="pill on" data-role="cliente" onclick="setRole('cliente')">Cliente</button>
+      <button class="pill" data-role="comprar" onclick="setRole('comprar')">Cliente · Comprar</button>
+      <button class="pill" data-role="parceiro" onclick="setRole('parceiro')">Parceiro</button>
+      <button class="pill" data-role="admin" onclick="setRole('admin')">Admin</button>
+    </div>
+
+    <p class="note">Mockup de layout · dados ilustrativos. No app real, tudo vem do Supabase (RLS) e a copy segue as regras de compliance (sem nome de administradora, sem termos de crédito/investimento ao cliente).</p>
+
+    <!-- ============ CLIENTE ============ -->
+    <section id="view-cliente">
+      <div class="card glow hero">
+        <div style="max-width:520px">
+          <span class="kicker">▴ Seu processo está andando</span>
+          <h1 class="hi">Olá, Emerson 👋</h1>
+          <p class="sub">Sua carta de <b class="gradtext num">R$ 350.000</b> está na etapa de <b class="soft">documentação</b>. Falta pouco para concluir a transferência.</p>
+          <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+            <a class="btn primary" href="#">Continuar documentação →</a>
+            <a class="btn ghost" href="#">Ver meu processo</a>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px">
+          <div id="ring-cliente"></div>
+          <div>
+            <div class="num gradtext" style="font-size:30px;font-weight:800;line-height:1">2<span class="muted" style="font-size:18px">/4</span></div>
+            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-top:4px">etapas concluídas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid g4" style="margin:16px 0">
+        <div class="card stat"><div class="ic">$</div><div class="lab">Valor da carta</div><div class="val gradtext num">R$ 350.000</div></div>
+        <div class="card stat"><div class="ic">▤</div><div class="lab">Recursos próprios</div><div class="val num soft">R$ 84.000</div></div>
+        <div class="card stat"><div class="ic">◷</div><div class="lab">Etapa atual</div><div class="val sm">Documentação</div></div>
+        <div class="card stat"><div class="ic">♥</div><div class="lab">Favoritas</div><div class="val sm">3 cartas</div></div>
+      </div>
+
+      <div class="grid col23">
+        <section class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <h2 class="sec" style="margin:0">Acompanhamento da carta</h2>
+            <span class="badge b-info num">BC-7801</span>
+          </div>
+          <ol class="tl" id="tl-cliente"></ol>
+        </section>
+        <div class="grid" style="align-content:start">
+          <section class="card">
+            <h2 class="sec">Buscar com suas palavras</h2>
+            <p class="sub" style="margin-bottom:12px">Descreva o que procura; achamos as cartas que combinam.</p>
+            <input class="inp" placeholder="Ex.: apê de 300 mil, entrada baixa…" />
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="chip">Apartamento ~300 mil, entrada baixa</button>
+              <button class="chip">Carro até 80 mil pra trocar o meu</button>
+            </div>
+          </section>
+          <section class="card" style="background:linear-gradient(135deg,rgba(54,197,240,.08),rgba(255,255,255,.02))">
+            <div class="ic" style="width:44px;height:44px;border-radius:12px;background:var(--grad-brand);color:#04203f;display:grid;place-items:center;font-size:20px;margin-bottom:12px">✆</div>
+            <h2 class="sec" style="margin-bottom:6px">Fale com um especialista</h2>
+            <p class="sub" style="margin-bottom:14px">Dúvidas sobre a transferência ou ajuda para escolher.</p>
+            <a class="btn primary" style="width:100%;justify-content:center" href="#">Falar com atendimento</a>
+          </section>
+        </div>
+      </div>
+
+      <section style="margin-top:22px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h2 class="sec" style="margin:0">Cartas para você</h2>
+          <a href="#" style="font-size:13px;color:#8fb7ff;text-decoration:none">Ver todas →</a>
+        </div>
+        <div class="grid g3" id="cards-cliente"></div>
+      </section>
+
+      <div class="seal">
+        <span style="color:#5be0a8;font-size:16px">⛉</span>
+        Cartas de consórcio contempladas com transferência de titularidade formal e segura, em parceria com administradora autorizada. Consórcio é compra programada e planejamento — não é investimento nem crédito aprovado.
+      </div>
+    </section>
+
+    <!-- ============ CLIENTE · COMPRAR ONLINE (RESERVA) ============ -->
+    <section id="view-comprar" class="hide">
+      <span class="kicker">▴ Compra online · reserva</span>
+      <h1 class="hi">Reserve sua carta online</h1>
+      <p class="sub" style="max-width:640px">Escolha a carta, confirme seus dados e envie a reserva. Um especialista conduz a transferência de titularidade — você acompanha tudo por aqui. Sem pagamento online: nenhum valor é cobrado nesta etapa.</p>
+
+      <!-- stepper -->
+      <div class="steps" id="steps" style="margin-top:24px">
+        <div class="st on" data-step="1"><span class="n">1</span> Escolher carta</div>
+        <div class="sep"></div>
+        <div class="st" data-step="2"><span class="n">2</span> Seus dados</div>
+        <div class="sep"></div>
+        <div class="st" data-step="3"><span class="n">3</span> Documentos</div>
+        <div class="sep"></div>
+        <div class="st" data-step="4"><span class="n">4</span> Revisar e enviar</div>
+      </div>
+
+      <!-- PASSO 1: catálogo -->
+      <div id="step-1">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+          <input class="inp" style="flex:1;min-width:220px;margin:0" placeholder="Buscar: imóvel, veículo, valor…" />
+          <button class="chip">Imóvel</button>
+          <button class="chip">Veículo</button>
+          <button class="chip">Até R$ 200 mil</button>
+        </div>
+        <div class="grid g3" id="catalogo"></div>
+      </div>
+
+      <!-- PASSO 2: dados pessoais -->
+      <div id="step-2" class="hide">
+        <div class="grid col23" style="align-items:start">
+          <section class="card">
+            <h2 class="sec">Seus dados</h2>
+            <div class="row2">
+              <div class="field"><label>Nome completo <span class="req">*</span></label><input class="inp" style="margin:0" placeholder="Como no documento" /></div>
+              <div class="field"><label>CPF <span class="req">*</span></label><input class="inp" style="margin:0" placeholder="000.000.000-00" /></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>Data de nascimento <span class="req">*</span></label><input class="inp" style="margin:0" placeholder="dd/mm/aaaa" /></div>
+              <div class="field"><label>Telefone <span class="req">*</span></label><input class="inp" style="margin:0" placeholder="(00) 00000-0000" /></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>CEP <span class="req">*</span></label><input class="inp" style="margin:0" placeholder="00000-000" /></div>
+              <div class="field"><label>Cidade / UF</label><input class="inp" style="margin:0" placeholder="Preenchido pelo CEP" /></div>
+            </div>
+            <div class="field"><label>Endereço</label><input class="inp" style="margin:0" placeholder="Rua, número, complemento, bairro" /></div>
+          </section>
+          <aside class="card" id="resumo-2" style="background:rgba(54,197,240,.05);position:sticky;top:90px"></aside>
+        </div>
+      </div>
+
+      <!-- PASSO 3: documentos (KYC) -->
+      <div id="step-3" class="hide">
+        <div class="grid col23" style="align-items:start">
+          <section class="card">
+            <h2 class="sec">Documentos para verificação</h2>
+            <p class="sub" style="margin:0 0 16px">Seus dados são tratados com sigilo (LGPD). Arquivos ficam em armazenamento privado e só a equipe de verificação acessa.</p>
+            <div class="grid g3">
+              <div class="up"><div style="font-size:24px">🪪</div><b>Documento</b><br>CNH ou RG (frente)</div>
+              <div class="up"><div style="font-size:24px">🤳</div><b>Selfie</b><br>com o documento</div>
+              <div class="up"><div style="font-size:24px">📄</div><b>Renda</b><br>holerite/extrato</div>
+            </div>
+          </section>
+          <aside class="card" id="resumo-3" style="background:rgba(54,197,240,.05);position:sticky;top:90px"></aside>
+        </div>
+      </div>
+
+      <!-- PASSO 4: revisão -->
+      <div id="step-4" class="hide">
+        <div class="grid col23" style="align-items:start">
+          <section class="card">
+            <h2 class="sec">Revise sua reserva</h2>
+            <div class="resumo" id="revisao"></div>
+            <label style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;font-size:13px;color:var(--text-soft)">
+              <input type="checkbox" style="margin-top:3px" />
+              <span>Confirmo que os dados são verdadeiros e autorizo a verificação. Entendo que esta é uma <b class="soft">reserva</b> — nenhum valor é cobrado agora e a transferência segue com acompanhamento da equipe.</span>
+            </label>
+          </section>
+          <aside class="card" id="resumo-4" style="background:rgba(54,197,240,.05);position:sticky;top:90px"></aside>
+        </div>
+      </div>
+
+      <!-- SUCESSO -->
+      <div id="step-ok" class="hide">
+        <section class="card glow" style="text-align:center;max-width:560px;margin:0 auto;padding:40px 28px">
+          <div class="ok-big">✓</div>
+          <h2 class="sec" style="font-size:22px;margin-bottom:8px">Reserva enviada!</h2>
+          <p class="sub" style="margin-bottom:6px">Protocolo <b class="gradtext num">BC-7990</b>. Sua reserva entrou em análise.</p>
+          <p class="sub" style="margin-bottom:22px">A equipe valida seus documentos e entra em contato para conduzir a transferência. Acompanhe o status na sua área.</p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn primary" onclick="setRole('cliente')">Ir para meu processo →</button>
+            <button class="btn ghost" onclick="goStep(1)">Reservar outra carta</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- navegação do wizard -->
+      <div id="wiz-nav" class="hide" style="display:flex;justify-content:space-between;gap:10px;margin-top:22px">
+        <button class="btn ghost" id="btn-voltar" onclick="prevStep()">← Voltar</button>
+        <button class="btn primary" id="btn-avancar" onclick="nextStep()">Avançar →</button>
+      </div>
+
+      <div class="seal" style="margin-top:22px">
+        <span style="color:#5be0a8;font-size:16px">⛉</span>
+        Reserva de carta de consórcio contemplada, com transferência de titularidade formal junto à administradora autorizada. Nenhum pagamento é feito online nesta etapa. Consórcio é compra programada — não é investimento, crédito aprovado nem garantia de contemplação.
+      </div>
+    </section>
+
+    <!-- ============ PARCEIRO ============ -->
+    <section id="view-parceiro" class="hide">
+      <div class="card glow hero">
+        <div style="display:flex;align-items:center;gap:18px;min-width:0">
+          <div class="avatar lg">RM</div>
+          <div style="min-width:0">
+            <span class="lvl lvl-gestor">★ Gestor</span>
+            <h1 class="hi" style="margin:10px 0 4px">Olá, Rodrigo 👋</h1>
+            <p class="sub">Sua equipe tem <b class="soft">6 parceiros ativos</b> e <b class="gradtext num">R$ 12.480</b> em comissões neste mês.</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px">
+          <div id="ring-meta"></div>
+          <div>
+            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em">Meta do mês</div>
+            <div class="num soft" style="font-size:15px;margin-top:4px">R$ 12,5k <span class="muted">/ R$ 20k</span></div>
+            <div class="num gradtext" style="font-size:13px;font-weight:700;margin-top:2px">62% atingido</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid g4" style="margin:16px 0">
+        <div class="card stat"><div class="ic">↗</div><div class="lab">Comissões (mês)</div><div class="val gradtext num">R$ 12.480<span class="delta up">+18%</span></div></div>
+        <div class="card stat"><div class="ic">⚇</div><div class="lab">Equipe ativa</div><div class="val num">6 <span class="val sm" style="font-weight:400">parceiros</span></div></div>
+        <div class="card stat"><div class="ic">▦</div><div class="lab">Processos ativos</div><div class="val num">7</div></div>
+        <div class="card stat"><div class="ic">✓</div><div class="lab">Conversão</div><div class="val num">34%<span class="delta up">+5%</span></div></div>
+      </div>
+
+      <!-- Metas + Minha equipe -->
+      <div class="grid col23">
+        <section class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 class="sec" style="margin:0">Minha equipe · níveis</h2>
+            <a href="#" style="font-size:13px;color:#8fb7ff;text-decoration:none">+ Cadastrar parceiro</a>
+          </div>
+          <div class="grid" id="team-parceiro" style="gap:12px"></div>
+        </section>
+        <section class="card">
+          <h2 class="sec">Metas</h2>
+          <div id="goals-parceiro" style="display:grid;gap:16px"></div>
+        </section>
+      </div>
+
+      <!-- Cascata da comissão (distribuição por níveis) -->
+      <section class="card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+          <h2 class="sec" style="margin:0">Distribuição da comissão por níveis</h2>
+          <span class="badge b-info num">Venda BC-7782 · R$ 350.000</span>
+        </div>
+        <p class="sub" style="margin:0 0 16px">Quando a transferência é efetivada, a comissão se distribui na cadeia da equipe.</p>
+        <div class="grid col23" style="align-items:start">
+          <div class="casc" id="casc-parceiro"></div>
+          <div class="card" style="background:rgba(54,197,240,.05)">
+            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em">Total distribuído</div>
+            <div class="num gradtext" style="font-size:26px;font-weight:800;margin:6px 0 2px">R$ 8.750</div>
+            <div class="num muted" style="font-size:12px">2,5% do crédito</div>
+            <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;display:grid;gap:9px;font-size:13px">
+              <div style="display:flex;justify-content:space-between"><span class="muted">Venda direta</span><span class="num soft">R$ 5.250</span></div>
+              <div style="display:flex;justify-content:space-between"><span class="muted">Override líder (G1)</span><span class="num soft">R$ 1.750</span></div>
+              <div style="display:flex;justify-content:space-between"><span class="muted">Override gestor (G2)</span><span class="num soft">R$ 1.750</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid col23" style="margin-top:16px">
+        <section class="card">
+          <h2 class="sec">Comissões — últimos 6 meses</h2>
+          <div id="bars-parceiro"></div>
+          <div class="legend"><span><i class="dot" style="background:#36c5f0"></i>Liberada</span><span><i class="dot" style="background:rgba(143,183,255,.3)"></i>Prevista</span></div>
+        </section>
+        <section class="card">
+          <h2 class="sec">Funil de processos</h2>
+          <div id="funnel-parceiro"></div>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:16px">
+        <h2 class="sec">Indicações recentes</h2>
+        <table>
+          <thead><tr><th>Carta</th><th>Cliente</th><th>Valor</th><th>Etapa</th><th>Comissão</th></tr></thead>
+          <tbody id="rows-parceiro"></tbody>
+        </table>
+      </section>
+
+      <div class="seal">
+        <span style="color:#5be0a8;font-size:16px">⛉</span>
+        Comissão sempre sobre carta vendida com <b class="soft">transferência efetivada</b> junto à administradora — nunca por cadastrar pessoas. O override de liderança remunera a produção real da equipe.
+      </div>
+    </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section id="view-admin" class="hide">
+      <span class="kicker">▴ Visão geral</span>
+      <h1 class="hi">Administração</h1>
+      <p class="sub">Saúde do estoque, pipeline e verificações pendentes.</p>
+
+      <div class="grid g4" style="margin:18px 0">
+        <div class="card stat"><div class="ic">◰</div><div class="lab">Cartas em estoque</div><div class="val num">379</div></div>
+        <div class="card stat"><div class="ic">⚑</div><div class="lab">KYC pendentes</div><div class="val num" style="color:#f3c34a">5</div></div>
+        <div class="card stat"><div class="ic">▦</div><div class="lab">Processos ativos</div><div class="val num">42</div></div>
+        <div class="card stat"><div class="ic">↗</div><div class="lab">Comissões previstas</div><div class="val gradtext num">R$ 96.300</div></div>
+      </div>
+
+      <div class="grid g2">
+        <section class="card">
+          <h2 class="sec">Estoque por tipo</h2>
+          <div style="display:flex;align-items:center;gap:24px">
+            <div id="donut-admin"></div>
+            <div style="font-size:13px;display:grid;gap:10px">
+              <div><i class="dot" style="background:#36c5f0"></i> Imóvel · <b class="soft">214</b></div>
+              <div><i class="dot" style="background:#1e6fe6"></i> Automóvel · <b class="soft">128</b></div>
+              <div><i class="dot" style="background:#8fb7ff"></i> Serviços · <b class="soft">37</b></div>
+            </div>
+          </div>
+        </section>
+        <section class="card">
+          <h2 class="sec">Pipeline por etapa</h2>
+          <div id="funnel-admin"></div>
+        </section>
+      </div>
+
+      <!-- Rede de parceiros por nível -->
+      <section class="card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h2 class="sec" style="margin:0">Rede de parceiros · por nível</h2>
+          <span class="muted" style="font-size:13px">38 parceiros · 7 equipes</span>
+        </div>
+        <table>
+          <thead><tr><th>Líder / Gestor</th><th>Nível</th><th>Equipe</th><th>Vendas (mês)</th><th>Comissão distribuída</th></tr></thead>
+          <tbody id="rows-rede"></tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2 class="sec" style="margin:0">KYC aguardando verificação</h2>
+          <span class="badge b-warn">5 pendentes</span>
+        </div>
+        <table>
+          <thead><tr><th>Cliente</th><th>CPF</th><th>Documento</th><th>Enviado</th><th>Status</th></tr></thead>
+          <tbody id="rows-admin"></tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+<script>
+  const NAV = {
+    cliente:[["Início",1],["Meu processo",0],["Cartas",0],["Comprar",0]],
+    comprar:[["Início",0],["Meu processo",0],["Cartas",0],["Comprar",1]],
+    parceiro:[["Início",1],["Minha equipe",0],["Comissões",0],["Cartas",0]],
+    admin:[["Início",1],["Administração",0],["Rede",0],["Perfis",0],["Auditoria",0]],
+  };
+  const brl = n => "R$ " + n.toLocaleString("pt-BR",{maximumFractionDigits:0});
+
+  function setRole(r){
+    document.querySelectorAll(".pill").forEach(p=>p.classList.toggle("on",p.dataset.role===r));
+    ["cliente","comprar","parceiro","admin"].forEach(x=>document.getElementById("view-"+x).classList.toggle("hide",x!==r));
+    const nav=document.getElementById("nav"); nav.innerHTML="";
+    (NAV[r]||[]).forEach(([label,on])=>{const b=document.createElement("button");b.className="navlink"+(on?" active":"");b.textContent=label;nav.appendChild(b);});
+    if(r==="comprar"){ initCompra(); goStep(1); }
+  }
+
+  function ring(el,val){
+    const r=34,c=2*Math.PI*r,off=c-(val/100)*c;
+    el.innerHTML=`<svg width="84" height="84" viewBox="0 0 84 84" style="transform:rotate(-90deg)">
+      <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8fb7ff"/><stop offset="55%" stop-color="#36c5f0"/><stop offset="100%" stop-color="#1e6fe6"/></linearGradient></defs>
+      <circle cx="42" cy="42" r="${r}" fill="none" stroke="rgba(143,183,255,.12)" stroke-width="7"/>
+      <circle cx="42" cy="42" r="${r}" fill="none" stroke="url(#rg)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/></svg>`;
+  }
+
+  const ETAPAS=[
+    {t:"Reserva confirmada",d:"Carta BC-7801 reservada no seu nome",s:"done",i:"✓"},
+    {t:"Documentação",d:"Envie os documentos para análise",s:"now",i:"▤"},
+    {t:"Transferência de titularidade",d:"Formalização junto à administradora",s:"todo",i:"⇄"},
+    {t:"Carta disponível para uso",d:"Poder de compra liberado para você",s:"todo",i:"⚷"},
+  ];
+  function timeline(el){
+    el.innerHTML=ETAPAS.map((e,i)=>{
+      const last=i===ETAPAS.length-1;
+      return `<li>${last?"":`<span class="line ${e.s==='done'?'done':''}"></span>`}
+        <div class="node ${e.s}" style="color:${e.s==='done'?'#04203f':e.s==='now'?'#7fd0f0':'#5c6883'};font-size:17px">${e.i}</div>
+        <div style="padding-top:6px"><div class="t" style="color:${e.s==='now'?'#fff':e.s==='done'?'#d5def0':'#7b86a0'}">${e.t}${e.s==='now'?'<span class="nowtag">◷ agora</span>':''}</div><div class="d">${e.d}</div></div></li>`;
+    }).join("");
+  }
+
+  const CARTAS=[
+    {id:"BC-7782",v:350000,e:84000,t:"Imóvel",ic:"⌂"},
+    {id:"BC-7765",v:120000,e:30000,t:"Automóvel",ic:"⛍"},
+    {id:"BC-7801",v:250000,e:58000,t:"Imóvel",ic:"⌂"},
+  ];
+  function cards(el){
+    el.innerHTML=CARTAS.map(c=>`<article class="card mini">
+      <div style="display:flex;justify-content:space-between">
+        <div class="ic" style="width:36px;height:36px;border-radius:10px;background:rgba(143,183,255,.08);display:grid;place-items:center">${c.ic}</div>
+        <span style="color:#5c6883">♡</span>
+      </div>
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-top:10px">${c.t} · ${c.id}</div>
+      <div class="price gradtext num">${brl(c.v)}</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span class="muted">Recursos próprios</span><span class="num soft">${brl(c.e)}</span></div>
+      <a class="btn primary" style="width:100%;justify-content:center;margin-top:14px" href="#">Tenho interesse</a>
+    </article>`).join("");
+  }
+
+  // bar chart (comissões 6 meses) — SVG
+  function bars(el){
+    const data=[[5.2,1.1],[6.8,1.4],[7.9,2.0],[9.1,2.2],[10.4,2.8],[12.5,3.1]];
+    const labels=["Jan","Fev","Mar","Abr","Mai","Jun"];
+    const W=480,H=180,pad=24,bw=34,gap=(W-pad*2)/6;
+    const max=16;
+    let bars="";
+    data.forEach((d,i)=>{
+      const x=pad+i*gap+gap/2-bw/2;
+      const h1=(d[0]/max)*(H-40), h2=(d[1]/max)*(H-40);
+      bars+=`<rect x="${x}" y="${H-20-h1-h2}" width="${bw}" height="${h2}" rx="3" fill="rgba(143,183,255,.3)"/>
+             <rect x="${x}" y="${H-20-h1}" width="${bw}" height="${h1}" rx="3" fill="#36c5f0"/>
+             <text x="${x+bw/2}" y="${H-4}" fill="#6b7794" font-size="11" text-anchor="middle">${labels[i]}</text>`;
+    });
+    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">${bars}</svg>`;
+  }
+
+  function funnel(el,rows){
+    const max=Math.max(...rows.map(r=>r[1]));
+    el.innerHTML=rows.map(r=>`<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span class="soft">${r[0]}</span><span class="num muted">${r[1]}</span></div>
+      <div style="height:9px;border-radius:5px;background:rgba(143,183,255,.08)"><div style="height:100%;border-radius:5px;width:${(r[1]/max)*100}%;background:var(--grad-brand)"></div></div></div>`).join("");
+  }
+
+  function donut(el){
+    const segs=[[214,"#36c5f0"],[128,"#1e6fe6"],[37,"#8fb7ff"]];
+    const total=segs.reduce((a,s)=>a+s[0],0),r=46,c=2*Math.PI*r;let off=0;
+    let circ=segs.map(s=>{const len=(s[0]/total)*c;const el=`<circle cx="60" cy="60" r="${r}" fill="none" stroke="${s[1]}" stroke-width="16" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}"/>`;off+=len;return el;}).join("");
+    el.innerHTML=`<svg width="120" height="120" viewBox="0 0 120 120" style="transform:rotate(-90deg)">${circ}<circle cx="60" cy="60" r="30" fill="#080b14"/></svg>`;
+  }
+
+  // ---- equipe / metas / cascata (parceiro) ----
+  const LVL={parceiro:["Parceiro","lvl-parceiro","•"],lider:["Líder","lvl-lider","★"],gestor:["Gestor","lvl-gestor","★"],diretor:["Diretor","lvl-diretor","♛"]};
+  const EQUIPE=[
+    {nome:"Ana Beatriz",ini:"AB",nivel:"lider",vendas:4,com:6200},
+    {nome:"Carlos Mendes",ini:"CM",nivel:"parceiro",vendas:2,com:2400},
+    {nome:"Júlia Rocha",ini:"JR",nivel:"parceiro",vendas:3,com:3600},
+    {nome:"Diego Alves",ini:"DA",nivel:"parceiro",vendas:1,com:1200},
+  ];
+  function teamCards(el){
+    el.innerHTML=EQUIPE.map(m=>{const[lab,cls,ic]=LVL[m.nivel];return `<div class="card team" style="padding:14px">
+      <div class="avatar">${m.ini}</div>
+      <div class="meta" style="flex:1">
+        <div class="nm">${m.nome}</div>
+        <div class="rl"><span class="lvl ${cls}">${ic} ${lab}</span></div>
+      </div>
+      <div style="text-align:right"><div class="num soft" style="font-size:14px;font-weight:700">${m.vendas} vendas</div><div class="num gradtext" style="font-size:12px;font-weight:700">${brl(m.com)}</div></div>
+    </div>`;}).join("");
+  }
+  function goals(el){
+    const G=[["Vendas do mês",4,7],["Comissão (R$ mil)",12.5,20],["Novos parceiros",2,3]];
+    el.innerHTML=G.map(([lab,v,m])=>{const p=Math.round((v/m)*100);return `<div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span class="soft">${lab}</span><span class="num muted">${v} / ${m} · ${p}%</span></div>
+      <div class="prog"><span style="width:${p}%"></span></div></div>`;}).join("");
+  }
+  function cascata(el){
+    const C=[
+      {papel:"Venda direta",sub:"Você · Gestor",p:"1,5%",v:5250,ic:"⚇"},
+      {papel:"Override líder (G1)",sub:"Ana Beatriz · Líder",p:"0,5%",v:1750,ic:"★"},
+      {papel:"Override gestor (G2)",sub:"Você · Gestor",p:"0,5%",v:1750,ic:"♛"},
+    ];
+    el.innerHTML=C.map((c,i)=>`<div class="row">
+        <div class="ic">${c.ic}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">${c.papel}</div><div class="muted" style="font-size:12px">${c.sub} · ${c.p} do crédito</div></div>
+        <div class="num gradtext" style="font-weight:800;font-size:18px">${brl(c.v)}</div>
+      </div>${i<C.length-1?'<div class="arr">↓</div>':''}`).join("");
+  }
+
+  // ---- wizard de compra online (reserva) ----
+  let cartaSel = null;   // carta escolhida
+  let passo = 1;         // passo atual (1..4)
+
+  function initCompra(){
+    const el = document.getElementById("catalogo");
+    el.innerHTML = CARTAS.map(c=>`<article class="cardcarta">
+      <div class="top"><div class="ic" style="width:38px;height:38px;border-radius:10px;background:rgba(143,183,255,.08);display:grid;place-items:center;font-size:18px">${c.ic}</div>
+        <span class="tipo">${c.t}</span></div>
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-top:10px">Carta ${c.id}</div>
+      <div class="credito gradtext num">${brl(c.v)}</div>
+      <div class="linhas">
+        <div class="linha"><span class="muted">Recursos próprios</span><span class="num soft">${brl(c.e)}</span></div>
+        <div class="linha"><span class="muted">Saldo a transferir</span><span class="num soft">${brl(c.v-c.e)}</span></div>
+      </div>
+      <div class="foot"><button class="btn primary" style="width:100%;justify-content:center" onclick="escolherCarta('${c.id}')">Reservar esta carta</button></div>
+    </article>`).join("");
+  }
+
+  function escolherCarta(id){
+    cartaSel = CARTAS.find(c=>c.id===id) || null;
+    goStep(2);
+  }
+
+  function resumoCarta(){
+    if(!cartaSel) return '<p class="muted" style="font-size:13px">Nenhuma carta selecionada.</p>';
+    const c = cartaSel;
+    return `<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.12em">Sua reserva</div>
+      <div style="font-weight:800;font-size:16px;margin:6px 0 2px">${c.t} · ${c.id}</div>
+      <div class="credito gradtext num" style="font-size:26px;margin:2px 0 12px">${brl(c.v)}</div>
+      <div class="resumo">
+        <div class="l"><span class="muted">Recursos próprios</span><span class="num soft">${brl(c.e)}</span></div>
+        <div class="l"><span class="muted">Saldo a transferir</span><span class="num soft">${brl(c.v-c.e)}</span></div>
+      </div>
+      <div class="seal" style="margin-top:14px;font-size:12px"><span style="color:#5be0a8">⛉</span> Reserva sem pagamento online. Valores e condições confirmados antes da transferência.</div>`;
+  }
+
+  function goStep(n){
+    passo = n;
+    // mostra/esconde os passos e o sucesso
+    [1,2,3,4].forEach(i=>document.getElementById("step-"+i).classList.toggle("hide", i!==n));
+    document.getElementById("step-ok").classList.add("hide");
+    // estado do stepper
+    document.querySelectorAll("#steps .st").forEach(st=>{
+      const i = +st.dataset.step;
+      st.classList.toggle("on", i===n);
+      st.classList.toggle("done", i<n);
+    });
+    // navegação (esconde no passo 1 do catálogo)
+    const nav = document.getElementById("wiz-nav");
+    nav.classList.toggle("hide", n===1);
+    document.getElementById("btn-voltar").classList.toggle("hide", n<=1);
+    document.getElementById("btn-avancar").textContent = n===4 ? "Enviar reserva ✓" : "Avançar →";
+    // preenche resumos
+    if(n>=2){
+      const r = resumoCarta();
+      const a2=document.getElementById("resumo-2"); if(a2) a2.innerHTML=r;
+      const a3=document.getElementById("resumo-3"); if(a3) a3.innerHTML=r;
+      const a4=document.getElementById("resumo-4"); if(a4) a4.innerHTML=r;
+    }
+    if(n===4 && cartaSel){
+      document.getElementById("revisao").innerHTML=`
+        <div class="l"><span class="muted">Carta</span><span class="soft">${cartaSel.t} · ${cartaSel.id}</span></div>
+        <div class="l"><span class="muted">Valor da carta</span><span class="num gradtext">${brl(cartaSel.v)}</span></div>
+        <div class="l"><span class="muted">Recursos próprios</span><span class="num soft">${brl(cartaSel.e)}</span></div>
+        <div class="l"><span class="muted">Titular</span><span class="soft">Você (dados informados)</span></div>
+        <div class="l"><span class="muted">Documentos</span><span class="soft">Documento · Selfie · Renda</span></div>`;
+    }
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  function nextStep(){
+    if(passo>=4){ enviarReserva(); return; }
+    goStep(passo+1);
+  }
+  function prevStep(){ if(passo>1) goStep(passo-1); }
+
+  function enviarReserva(){
+    [1,2,3,4].forEach(i=>document.getElementById("step-"+i).classList.add("hide"));
+    document.getElementById("wiz-nav").classList.add("hide");
+    document.getElementById("step-ok").classList.remove("hide");
+    document.querySelectorAll("#steps .st").forEach(st=>{st.classList.remove("on");st.classList.add("done");});
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  // build dynamic content
+  setRole("cliente");
+  ring(document.getElementById("ring-cliente"),38);
+  timeline(document.getElementById("tl-cliente"));
+  cards(document.getElementById("cards-cliente"));
+  ring(document.getElementById("ring-meta"),62);
+  teamCards(document.getElementById("team-parceiro"));
+  goals(document.getElementById("goals-parceiro"));
+  cascata(document.getElementById("casc-parceiro"));
+  bars(document.getElementById("bars-parceiro"));
+  funnel(document.getElementById("funnel-parceiro"),[["Reservada",7],["Documentação",4],["Análise",3],["Transferência",2],["Concluído",9]]);
+  funnel(document.getElementById("funnel-admin"),[["Reservada",12],["Documentação",10],["Análise",8],["Transferência",6],["Concluído",24]]);
+  donut(document.getElementById("donut-admin"));
+  document.getElementById("rows-parceiro").innerHTML=[
+    ["BC-7782","M. Souza",350000,'<span class="badge b-info">Documentação</span>',1680],
+    ["BC-7651","A. Lima",180000,'<span class="badge b-warn">Análise</span>',900],
+    ["BC-7490","R. Dias",420000,'<span class="badge b-ok">Concluído</span>',2100],
+  ].map(r=>`<tr><td class="num">${r[0]}</td><td>${r[1]}</td><td class="num">${brl(r[2])}</td><td>${r[3]}</td><td class="num gradtext">${brl(r[4])}</td></tr>`).join("");
+  document.getElementById("rows-admin").innerHTML=[
+    ["E. Santos","***.***.***-88","CNH","há 2h"],
+    ["J. Pereira","***.***.***-12","RG","há 5h"],
+    ["M. Costa","***.***.***-47","CNH","ontem"],
+  ].map(r=>`<tr><td>${r[0]}</td><td class="num muted">${r[1]}</td><td>${r[2]}</td><td class="muted">${r[3]}</td><td><span class="badge b-warn">Em análise</span></td></tr>`).join("");
+  document.getElementById("rows-rede").innerHTML=[
+    ["Rodrigo M.","gestor",6,9,8750,"lvl-gestor","★"],
+    ["Ana Beatriz","lider",3,4,4200,"lvl-lider","★"],
+    ["Marina Diretora","diretor",14,21,18900,"lvl-diretor","♛"],
+  ].map(r=>`<tr>
+      <td><div class="team" style="gap:10px"><div class="avatar" style="width:32px;height:32px;font-size:12px">${r[0].split(" ").map(s=>s[0]).join("").slice(0,2)}</div><span class="soft">${r[0]}</span></div></td>
+      <td><span class="lvl ${r[5]}">${r[6]} ${LVL[r[1]][0]}</span></td>
+      <td class="num">${r[2]} parceiros</td>
+      <td class="num soft">${r[3]}</td>
+      <td class="num gradtext">${brl(r[4])}</td></tr>`).join("");
+</script>
+</body>
+</html>
