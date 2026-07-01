@@ -243,3 +243,110 @@
   color: var(--text-soft);
   font-weight: 600;
 }
+
+/* --- Acúmulo de patrimônio: gráficos inline (SVG) e plano de contemplações --- */
+
+.grafico {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.graficoTitulo {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.graficoValor {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.graficoSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+/* Legenda das séries do gráfico. */
+.graficoLegenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.graficoLegenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendaMarca {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* Plano de contemplações: cabeçalho da tabela e linhas por mês. */
+.planoLista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planoLinha {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(70px, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+}
+
+.planoLinha .lanceCampo {
+  min-width: 0;
+}
+
+/* Resumo final (patrimônio, fluxo, lucro) em destaque. */
+.resumoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.resumoItem {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resumoRotulo {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.resumoValor {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
