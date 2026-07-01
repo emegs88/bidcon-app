@@ -4,10 +4,24 @@
 
 ## Páginas principais
 
+- [Página inicial bidcon](https://www.bidcon.com.br/): Apresentação do marketplace e acesso às áreas de veículos e imóveis.
 - [bidcon — Marketplace de cotas contempladas](https://www.bidcon.com.br/bidcon): Catálogo geral de cotas de consórcio contempladas (veículos e imóveis), com filtros, junção de cartas e custo mensal estimado.
 - [Cartas contempladas para lojistas (veículos)](https://www.bidcon.com.br/bidcon-lojista): Cruza o estoque de veículos da loja parceira com cartas de consórcio contempladas. Inclui consultor FIPE e uso do carro na troca como entrada da carta.
 - [Cartas contempladas de imóvel](https://www.bidcon.com.br/bidcon-imobiliaria): Cruza os imóveis da imobiliária parceira com cartas de consórcio contempladas de imóvel, com pré-análise por renda e junção de cartas.
-- [Página inicial bidcon](https://www.bidcon.com.br/): Apresentação do marketplace e acesso às áreas de veículos e imóveis.
+- [Carta contemplada de veículo](https://www.bidcon.com.br/carta-contemplada-veiculo): Página dedicada a cartas de consórcio contempladas para compra de veículo, com estimativas de crédito, entrada e parcela.
+- [Vender consórcio contemplado](https://www.bidcon.com.br/vender-consorcio-contemplado): Para quem quer vender uma cota de consórcio já contemplada; a bidcon organiza a documentação e a transferência junto à administradora.
+
+## Diferenciais
+
+- Marketplace independente: reúne cartas contempladas de diferentes administradoras de consórcio, em vez de ficar restrito a uma única administradora, permitindo comparar as cotas lado a lado.
+- Segurança na transferência: a bidcon intermedia a operação e organiza a documentação; a transferência de titularidade da cota é sempre formalizada e validada junto à administradora do consórcio.
+- Transparência de custo: cada cota mostra crédito, entrada, parcela, prazo e custo mensal estimado, deixando claro o que está incluído antes da decisão.
+
+## Guias e blog
+
+- [Como funciona a carta de crédito do consórcio](https://www.bidcon.com.br/blog/como-funciona-carta-de-credito-do-consorcio): Explica o que é a carta de crédito, como o crédito é liberado e como usá-la para comprar o bem.
+- [Como vender carta de consórcio contemplada](https://www.bidcon.com.br/blog/como-vender-carta-de-consorcio-contemplada): Passo a passo para vender uma cota contemplada com segurança e a documentação necessária.
+- [Vale a pena comprar carta de consórcio contemplada?](https://www.bidcon.com.br/blog/vale-a-pena-comprar-carta-de-consorcio-contemplada): Compara custos e pontos de atenção ao assumir uma cota já contemplada.
 
 ## Tipo de serviço
 
