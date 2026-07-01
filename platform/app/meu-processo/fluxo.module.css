@@ -1,0 +1,199 @@
+/* Estilos do fluxo guiado pós-reserva (cliente). Sem Tailwind — CSS Modules.
+   Reaproveita as variáveis de tema já usadas em processo/acoes. */
+
+.painel {
+  display: grid;
+  gap: 12px;
+}
+
+.passo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.passoTitulo {
+  font-size: 16px;
+  margin: 0;
+}
+.passoDica {
+  color: var(--text-soft, #b7bcc4);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* aviso factual (sem promessa) — tom neutro */
+.aviso {
+  color: var(--text-muted, #9aa0aa);
+  font-size: 12px;
+  margin: 0;
+}
+
+/* check-list de documentos */
+.docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.doc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda, #2c2f36);
+  border-radius: 10px;
+  background: var(--cor-fundo-2, #1a1d21);
+}
+.docNome {
+  font-size: 14px;
+  color: var(--text, #e8eaed);
+}
+.docObrig {
+  color: #f3a4a4;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.docAcao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fileInput {
+  font-size: 13px;
+  color: var(--text-soft, #b7bcc4);
+  max-width: 190px;
+}
+
+/* valores do sinal / entrada */
+.valores {
+  display: grid;
+  gap: 6px;
+}
+.valorLinha {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.valorLbl {
+  color: var(--text-muted, #9aa0aa);
+}
+.valorNum {
+  color: var(--text, #e8eaed);
+  font-weight: 700;
+}
+
+/* bloco de contrato (texto) */
+.contrato {
+  display: grid;
+  gap: 8px;
+}
+.contratoTitulo {
+  font-size: 15px;
+  margin: 0;
+}
+.contratoTexto {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda, #2c2f36);
+  border-radius: 10px;
+  background: var(--cor-fundo-2, #1a1d21);
+}
+.contratoTexto p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-soft, #b7bcc4);
+}
+
+/* QR / copia-e-cola do PIX (quando o provedor estiver ligado) */
+.pixBox {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--cor-borda, #2c2f36);
+  border-radius: 10px;
+}
+.pixCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--text, #e8eaed);
+}
+
+/* chat do agente */
+.chat {
+  display: grid;
+  gap: 10px;
+}
+.chatLog {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+.msgUser,
+.msgBot {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 92%;
+}
+.msgUser {
+  justify-self: end;
+  background: var(--cor-fundo-3, #23262c);
+  color: var(--text, #e8eaed);
+}
+.msgBot {
+  justify-self: start;
+  background: var(--cor-fundo-2, #1a1d21);
+  border: 1px solid var(--cor-borda, #2c2f36);
+  color: var(--text-soft, #b7bcc4);
+}
+.chatEntrada {
+  display: flex;
+  gap: 8px;
+}
+.chatInput {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text, #e8eaed);
+  background: var(--cor-fundo-2, #1a1d21);
+  border: 1px solid var(--cor-borda, #2c2f36);
+  border-radius: 8px;
+}
+
+/* rodapé de contatos oficiais (WhatsApp / e-mail / Instagram @bidcon.br) */
+.contatos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.contatoItem {
+  color: var(--text-soft, #b7bcc4);
+  font-size: 13px;
+  text-decoration: none;
+}
+.contatoItem:hover {
+  color: var(--text, #e8eaed);
+}
+
+.erro {
+  margin: 0;
+  color: #f3a4a4;
+  font-size: 13px;
+}
+.ok {
+  margin: 0;
+  color: #a4f3b8;
+  font-size: 13px;
+}

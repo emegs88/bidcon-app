@@ -433,18 +433,102 @@ begin
 end;
 $$;
 
+-- 5.6 checklist_do_processo — resolve o check-list do processo JÁ com o status
+--     de cada documento enviado, devolvendo SÓ colunas seguras ao cliente.
+--
+--     COMPLIANCE (crítico): o nome da administradora é usado APENAS internamente
+--     para achar o modelo — NUNCA sai desta função. O cliente recebe só o rótulo
+--     do documento e o status do envio. Sem administradora vinculada ⇒ 0 linhas
+--     (o cliente vê a mensagem de "check-list ainda não disponível").
+--
+--     tipo_pessoa: o KYC só guarda CPF ⇒ modelamos como 'pf' por ora. Quando
+--     houver PJ no KYC, trocar este literal por uma coluna de pessoa.
+--
+--     security definer: precisa ler `cartas.administradora_id` (RLS de cartas é
+--     restrita a admin/parceiro), mas só expõe rótulos — nada sensível vaza.
+create or replace function public.checklist_do_processo(p_processo uuid)
+returns table (
+  checklist_item_id uuid,
+  rotulo            text,
+  obrigatorio       boolean,
+  ordem             int,
+  doc_status        text,
+  doc_motivo        text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cliente uuid;
+  v_carta   uuid;
+  v_adm     uuid;
+  v_modelo  uuid;
+begin
+  -- 1) só o dono do processo (ou admin) enxerga o próprio check-list.
+  select cliente_id, carta_id into v_cliente, v_carta
+    from processos where id = p_processo;
+  if not found then
+    raise exception 'processo_inexistente' using errcode = 'P0002';
+  end if;
+  if not (is_admin() or v_cliente = auth.uid()) then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
+
+  -- 2) administradora da carta → modelo ativo (pf). Uso interno; não é retornado.
+  if v_carta is null then
+    return;  -- sem carta vinculada ⇒ sem check-list
+  end if;
+  select administradora_id into v_adm from cartas where id = v_carta;
+  if v_adm is null then
+    return;  -- carta sem administradora ⇒ sem check-list (equipe vincula depois)
+  end if;
+
+  select id into v_modelo
+    from checklist_modelos
+   where administradora_id = v_adm and tipo_pessoa = 'pf' and ativo = true
+   limit 1;
+  if v_modelo is null then
+    return;  -- administradora sem modelo cadastrado ⇒ sem check-list
+  end if;
+
+  -- 3) itens do modelo + status do último documento enviado por item (se houver).
+  return query
+    select
+      ci.id                          as checklist_item_id,
+      ci.rotulo                      as rotulo,
+      ci.obrigatorio                 as obrigatorio,
+      ci.ordem                       as ordem,
+      ultimo.status                  as doc_status,
+      ultimo.motivo                  as doc_motivo
+    from checklist_itens ci
+    left join lateral (
+      select pd.status, pd.motivo
+        from processo_documentos pd
+       where pd.processo_id = p_processo
+         and pd.checklist_item_id = ci.id
+       order by pd.enviado_em desc
+       limit 1
+    ) ultimo on true
+    where ci.modelo_id = v_modelo
+    order by ci.ordem asc, ci.rotulo asc;
+end;
+$$;
+
 -- grants: client autenticado CHAMA; papel é checado DENTRO. anon não chama nada.
 revoke all on function public.processo_avancar_subetapa(uuid, processo_subetapa, text) from public;
 revoke all on function public.registrar_pagamento_sinal(uuid, numeric, text, text)     from public;
 revoke all on function public.confirmar_pagamento_sinal(uuid)                          from public;
 revoke all on function public.gerar_contrato(uuid, text, jsonb, text)                  from public;
 revoke all on function public.decidir_documento(uuid, text, text)                      from public;
+revoke all on function public.checklist_do_processo(uuid)                              from public;
 
 grant execute on function public.processo_avancar_subetapa(uuid, processo_subetapa, text) to authenticated;
 grant execute on function public.registrar_pagamento_sinal(uuid, numeric, text, text)     to authenticated;
 grant execute on function public.confirmar_pagamento_sinal(uuid)                          to authenticated;
 grant execute on function public.gerar_contrato(uuid, text, jsonb, text)                  to authenticated;
 grant execute on function public.decidir_documento(uuid, text, text)                      to authenticated;
+grant execute on function public.checklist_do_processo(uuid)                              to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 6) STORAGE — buckets PRIVADOS + policies.
