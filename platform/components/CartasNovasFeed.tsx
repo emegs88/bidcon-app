@@ -23,7 +23,11 @@ export function CartasNovasFeed({
   if (novas.quantidade <= 0) return null;
 
   return (
-    <section className={styles.novas} aria-label="Cartas novas disponíveis">
+    <section
+      className={styles.novas}
+      aria-label="Cartas novas disponíveis"
+      aria-live="polite"
+    >
       <div className={styles.novasHead}>
         <h2 className={styles.novasTitulo}>
           {novas.quantidade} carta{novas.quantidade === 1 ? "" : "s"} nova
