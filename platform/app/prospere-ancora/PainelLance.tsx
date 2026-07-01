@@ -22,6 +22,7 @@ import {
   type ModalidadeLance,
   type ModoAmortizacao,
 } from "@/lib/lance-ancora";
+import { taxaEfetivaMensal, fmtCustoEfetivo } from "@/lib/custo-efetivo";
 import styles from "./prospere-ancora.module.css";
 
 // Converte string de input em número, ou null se vazio/ilegível (nunca 0 inventado).
@@ -86,6 +87,24 @@ export function PainelLance({ creditoBase }: { creditoBase: number | null }) {
       modo,
     });
   }, [creditoNum, reajuste, modalidade, embutido, teto, recurso, parcela, prazo, modo]);
+
+  // Custo efetivo pós-lance — mesma fórmula das cartas (lib/custo-efetivo).
+  // Após o lance, mantém-se o crédito líquido pagando a parcela vigente pelo
+  // prazo vigente. Dois lados: R$/mês (parcela) e % a.m. (taxa efetiva).
+  //   reduzir_parcela → paga nova parcela pelo prazo restante
+  //   reduzir_prazo   → paga a parcela atual pelo novo prazo
+  const custoEfetivo = useMemo(() => {
+    if (resultado == null) return null;
+    const mensalRs =
+      modo === "reduzir_parcela" ? resultado.novaParcela : num(parcela);
+    const meses =
+      modo === "reduzir_parcela" ? num(prazo) : resultado.novoPrazo;
+    if (mensalRs == null || meses == null || meses <= 0) return null;
+    return {
+      mensalRs,
+      taxaAm: taxaEfetivaMensal(resultado.creditoLiquido, mensalRs, meses),
+    };
+  }, [resultado, modo, parcela, prazo]);
 
   if (!aberto) {
     return (
@@ -247,6 +266,15 @@ export function PainelLance({ creditoBase }: { creditoBase: number | null }) {
               <div className={styles.row}>
                 <dt>Novo prazo</dt>
                 <dd>{resultado.novoPrazo}m</dd>
+              </div>
+            )}
+            {custoEfetivo != null && (
+              <div className={styles.row}>
+                <dt>Custo efetivo</dt>
+                <dd>
+                  {fmtValor(custoEfetivo.mensalRs)}/mês ·{" "}
+                  {fmtCustoEfetivo(custoEfetivo.taxaAm)}
+                </dd>
               </div>
             )}
           </dl>

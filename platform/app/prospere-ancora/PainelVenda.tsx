@@ -19,6 +19,7 @@ import {
   LABEL_MODALIDADE_VENDA,
   type ModalidadeVenda,
 } from "@/lib/venda-ancora";
+import { taxaEfetivaMensal, fmtCustoEfetivo } from "@/lib/custo-efetivo";
 import styles from "./prospere-ancora.module.css";
 
 function num(v: string): number | null {
@@ -65,6 +66,7 @@ export function PainelVenda({ creditoBase }: { creditoBase: number | null }) {
   const [parcelaComprador, setParcelaComprador] = useState<string>(""); // R$
   const [juroMes, setJuroMes] = useState<string>(""); // pontos %/mês
   const [mesesVenda, setMesesVenda] = useState<string>(""); // meses
+  const [prazoComprador, setPrazoComprador] = useState<string>(""); // meses restantes p/ o comprador
 
   const creditoNum = num(credito);
 
@@ -96,6 +98,23 @@ export function PainelVenda({ creditoBase }: { creditoBase: number | null }) {
     juroMes,
     mesesVenda,
   ]);
+
+  // Custo efetivo do COMPRADOR da carta — mesma fórmula das cartas
+  // (lib/custo-efetivo). O comprador paga `vendaRs` hoje para receber o
+  // crédito líquido e assume as parcelas restantes. Saldo financiado do
+  // comprador = crédito líquido − venda paga à vista. Dois lados: R$/mês
+  // (a própria parcela do comprador) e % a.m. (taxa efetiva).
+  const custoComprador = useMemo(() => {
+    if (resultado == null) return null;
+    const parcela = resultado.parcelaComprador;
+    const prazo = num(prazoComprador);
+    if (parcela == null || prazo == null || prazo <= 0) return null;
+    const saldoComprador = resultado.creditoLiquido - resultado.vendaRs;
+    return {
+      mensalRs: parcela,
+      taxaAm: taxaEfetivaMensal(saldoComprador, parcela, prazo),
+    };
+  }, [resultado, prazoComprador]);
 
   if (!aberto) {
     return (
@@ -230,6 +249,16 @@ export function PainelVenda({ creditoBase }: { creditoBase: number | null }) {
             placeholder="0"
           />
         </label>
+
+        <label className={styles.lanceCampo}>
+          <span>Prazo restante comprador (meses)</span>
+          <input
+            inputMode="numeric"
+            value={prazoComprador}
+            onChange={(e) => setPrazoComprador(e.target.value)}
+            placeholder="0"
+          />
+        </label>
       </div>
 
       {resultado == null ? (
@@ -275,6 +304,15 @@ export function PainelVenda({ creditoBase }: { creditoBase: number | null }) {
               <div className={styles.row}>
                 <dt>Parcela comprador</dt>
                 <dd>{fmtValor(resultado.parcelaComprador)}</dd>
+              </div>
+            )}
+            {custoComprador != null && (
+              <div className={styles.row}>
+                <dt>Custo efetivo comprador</dt>
+                <dd>
+                  {fmtValor(custoComprador.mensalRs)}/mês ·{" "}
+                  {fmtCustoEfetivo(custoComprador.taxaAm)}
+                </dd>
               </div>
             )}
           </dl>
