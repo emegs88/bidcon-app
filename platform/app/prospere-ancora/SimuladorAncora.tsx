@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { brl } from "@/lib/format";
 import { PainelLance } from "./PainelLance";
+import { PainelVenda } from "./PainelVenda";
 import styles from "./prospere-ancora.module.css";
 
 // Espelha as colunas snake_case lidas no server (page.tsx).
@@ -177,6 +178,7 @@ export function SimuladorAncora({ linhas }: { linhas: LinhaAncora[] }) {
             </div>
 
             <PainelLance creditoBase={l.valor_do_bem} />
+            <PainelVenda creditoBase={l.valor_do_bem} />
           </Card>
         ))}
       </div>
