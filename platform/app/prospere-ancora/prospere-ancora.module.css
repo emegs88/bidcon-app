@@ -217,3 +217,29 @@
   gap: 8px;
   align-items: center;
 }
+
+/* --- Locação de veículo: sugestões de valor (só preenchem o campo) --- */
+
+.sugestoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.sugestoesRotulo {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+/* Destaque neutro do resultado de cobertura (positivo/negativo). */
+.coberturaPos {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.coberturaNeg {
+  color: var(--text-soft);
+  font-weight: 600;
+}
