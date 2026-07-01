@@ -37,3 +37,67 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* Feed neutro de cartas novas (cliente). Factual: só tipo + crédito + data.
+   Sem ranking, sem "oportunidade", sem custo — compliance. */
+.novas {
+  margin: 22px 0 0;
+}
+.novasHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.novasTitulo {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+.novasLink {
+  color: var(--accent, #6ea8fe);
+  font-size: 14px;
+  text-decoration: none;
+}
+.novasLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.novaItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.novaItem:hover {
+  border-color: var(--accent, #6ea8fe);
+}
+.novaInfo {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.novaTipo {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 15px;
+}
+.novaData {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.novaCredito {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+}

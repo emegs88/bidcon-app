@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { CartasNovasFeed } from "@/components/CartasNovasFeed";
 import { LABEL_STATUS, TONE_STATUS_PROCESSO, type StatusProcesso } from "@/lib/status";
+import { cartasNovas, type CartaFluxo } from "@/lib/cartas-fluxo";
 import styles from "./home.module.css";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,18 @@ export default async function Home() {
     .maybeSingle();
   const status = processo?.status as StatusProcesso | undefined;
 
+  // Feed NEUTRO de cartas novas (client-safe): só cartas disponíveis, recorte
+  // factual por janela de dias. RLS limita a leitura ao que o usuário pode ver.
+  // Sem ranking/score/custo — compliance (ver lib/cartas-fluxo.cartasNovas).
+  const { data: cartasDisp } = await supabase
+    .from("cartas")
+    .select("id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, criado_em")
+    .eq("status", "disponivel")
+    .order("criado_em", { ascending: false })
+    .limit(60);
+  const listaCartas = (cartasDisp ?? []) as (CartaFluxo & { tipo?: string })[];
+  const novas = cartasNovas(listaCartas, { dias: 7, limite: 6 });
+
   const nome = profile?.nome ?? user.email ?? "visitante";
   const primeiroNome = nome.split(" ")[0];
 
@@ -71,6 +85,8 @@ export default async function Home() {
           </Card>
         </div>
       )}
+
+      <CartasNovasFeed novas={novas} />
 
       <div className={styles.grid}>
         <Card href="/meu-processo">
