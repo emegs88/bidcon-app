@@ -128,6 +128,115 @@ export const TONE_STATUS_KYC: Record<StatusKYC, "info" | "ok" | "muted" | "amber
   bloqueado: "muted",
 };
 
+// ---------------------------------------------------------------------------
+// SUB-ETAPA do processo (fluxo pós-reserva, modelo Lance — migration 0014).
+// Vive DENTRO dos 5 status de topo; a régua de topo (0006) não muda. Os rótulos
+// descrevem o passo real do cliente; NUNCA prometem contemplação/prazo.
+// ---------------------------------------------------------------------------
+export type SubetapaProcesso =
+  | "docs_enviados"
+  | "pre_analise"
+  | "sinal_pix"
+  | "contrato_cota"
+  | "entrada"
+  | "formulario"
+  | "link_transferencia"
+  | "efetivacao"
+  | "faturamento";
+
+// Ordem canônica do fluxo Lance (para exibição do "próximo passo").
+export const ORDEM_SUBETAPA: SubetapaProcesso[] = [
+  "docs_enviados",
+  "pre_analise",
+  "sinal_pix",
+  "contrato_cota",
+  "entrada",
+  "formulario",
+  "link_transferencia",
+  "efetivacao",
+  "faturamento",
+];
+
+export const LABEL_SUBETAPA: Record<SubetapaProcesso, string> = {
+  docs_enviados: "Documentos enviados",
+  pre_analise: "Análise da documentação",
+  sinal_pix: "Reserva da cota (sinal)",
+  contrato_cota: "Assinatura do contrato da cota",
+  entrada: "Pagamento da entrada",
+  formulario: "Envio do formulário",
+  link_transferencia: "Assinatura da transferência",
+  efetivacao: "Efetivação da transferência",
+  faturamento: "Faturamento",
+};
+
+export const TONE_SUBETAPA: Record<SubetapaProcesso, "info" | "ok" | "muted" | "amber"> = {
+  docs_enviados: "info",
+  pre_analise: "info",
+  sinal_pix: "amber",
+  contrato_cota: "amber",
+  entrada: "amber",
+  formulario: "info",
+  link_transferencia: "info",
+  efetivacao: "info",
+  faturamento: "ok",
+};
+
+// ---------------------------------------------------------------------------
+// Status de DOCUMENTO do processo (item do check-list enviado pelo cliente).
+// ---------------------------------------------------------------------------
+export type StatusDocumento = "pendente" | "aprovado" | "reprovado";
+
+export const LABEL_STATUS_DOCUMENTO: Record<StatusDocumento, string> = {
+  pendente: "Em análise",
+  aprovado: "Aprovado",
+  reprovado: "Reenviar",
+};
+
+export const TONE_STATUS_DOCUMENTO: Record<StatusDocumento, "info" | "ok" | "muted" | "amber"> = {
+  pendente: "amber",
+  aprovado: "ok",
+  reprovado: "muted",
+};
+
+// ---------------------------------------------------------------------------
+// Status do PAGAMENTO do sinal (PIX). "manual" = comprovante anexado, à espera
+// de conferência da equipe (fallback sem gateway). Sem dado bancário do cliente.
+// ---------------------------------------------------------------------------
+export type StatusPagamento = "pendente" | "pago" | "expirado" | "manual";
+
+export const LABEL_STATUS_PAGAMENTO: Record<StatusPagamento, string> = {
+  pendente: "Aguardando pagamento",
+  pago: "Pago",
+  expirado: "Expirado",
+  manual: "Comprovante em conferência",
+};
+
+export const TONE_STATUS_PAGAMENTO: Record<StatusPagamento, "info" | "ok" | "muted" | "amber"> = {
+  pendente: "amber",
+  pago: "ok",
+  expirado: "muted",
+  manual: "info",
+};
+
+// ---------------------------------------------------------------------------
+// Status de CONTRATO (serviço e cota).
+// ---------------------------------------------------------------------------
+export type StatusContrato = "gerado" | "enviado" | "assinado" | "cancelado";
+
+export const LABEL_STATUS_CONTRATO: Record<StatusContrato, string> = {
+  gerado: "Disponível",
+  enviado: "Enviado",
+  assinado: "Assinado",
+  cancelado: "Cancelado",
+};
+
+export const TONE_STATUS_CONTRATO: Record<StatusContrato, "info" | "ok" | "muted" | "amber"> = {
+  gerado: "info",
+  enviado: "amber",
+  assinado: "ok",
+  cancelado: "muted",
+};
+
 export function brl(v: number | null | undefined): string {
   if (v == null) return "—";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
