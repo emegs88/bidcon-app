@@ -9,6 +9,7 @@ import { brl } from "@/lib/format";
 import { PainelLance } from "./PainelLance";
 import { PainelVenda } from "./PainelVenda";
 import { PainelCompra } from "./PainelCompra";
+import { PainelGuardaChuva } from "./PainelGuardaChuva";
 import styles from "./prospere-ancora.module.css";
 
 // Espelha as colunas snake_case lidas no server (page.tsx).
@@ -181,6 +182,7 @@ export function SimuladorAncora({ linhas }: { linhas: LinhaAncora[] }) {
             <PainelLance creditoBase={l.valor_do_bem} />
             <PainelVenda creditoBase={l.valor_do_bem} />
             <PainelCompra creditoBase={l.valor_do_bem} />
+            <PainelGuardaChuva creditoBase={l.valor_do_bem} />
           </Card>
         ))}
       </div>

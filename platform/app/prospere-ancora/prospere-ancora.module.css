@@ -189,3 +189,31 @@
   font-size: 0.82rem;
   color: var(--text-soft);
 }
+
+/* --- Guarda-chuva: linhas dinâmicas (junção de cartas / escalonamento) --- */
+
+.gcLista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gcLinha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+}
+
+.gcLinha .lanceCampo {
+  min-width: 0;
+}
+
+.gcAcoes {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
