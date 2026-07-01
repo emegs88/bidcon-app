@@ -44,7 +44,7 @@ export default async function AdminCartas({
   let query = supabase
     .from("cartas")
     .select(
-      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, parceiro_id, administradora_id, fornecedor_id",
+      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, parceiro_id, administradora_id, fornecedor_id, fonte, comissao_percentual",
     )
     .order("criado_em", { ascending: false });
   if (filtroStatus) query = query.eq("status", filtroStatus);
@@ -131,6 +131,13 @@ export default async function AdminCartas({
                     {c.valor_entrada != null ? ` · entrada ${brl(c.valor_entrada)}` : ""}
                     {c.qtd_parcelas != null ? ` · ${c.qtd_parcelas}x` : ""}
                     {c.parceiro_id ? " · parceiro" : " · estoque Bidcon"}
+                    {/* metadados admin-only (nunca vão a tela de cliente/parceiro) */}
+                    {(c as { fonte: string | null }).fonte
+                      ? ` · origem ${(c as { fonte: string | null }).fonte}`
+                      : ""}
+                    {(c as { comissao_percentual: number | null }).comissao_percentual != null
+                      ? ` · comissão ${(c as { comissao_percentual: number | null }).comissao_percentual}%`
+                      : ""}
                   </span>
                 </div>
                 <Badge tone={TONE_STATUS_CARTA[c.status as StatusCarta]}>
@@ -144,6 +151,8 @@ export default async function AdminCartas({
                 fornecedores={fornecedores}
                 administradoraAtual={(c as { administradora_id: string | null }).administradora_id}
                 fornecedorAtual={(c as { fornecedor_id: string | null }).fornecedor_id}
+                fonteAtual={(c as { fonte: string | null }).fonte}
+                comissaoAtual={(c as { comissao_percentual: number | null }).comissao_percentual}
               />
             </Card>
           ))}

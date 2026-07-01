@@ -20,22 +20,35 @@ export function CartaVinculo({
   fornecedores,
   administradoraAtual,
   fornecedorAtual,
+  fonteAtual,
+  comissaoAtual,
 }: {
   cartaId: string;
   administradoras: Opcao[];
   fornecedores: Opcao[];
   administradoraAtual: string | null;
   fornecedorAtual: string | null;
+  // metadados admin-only da carta (nunca vão ao payload de cliente/parceiro):
+  fonteAtual: string | null;
+  comissaoAtual: number | null;
 }) {
   const router = useRouter();
   const [adminId, setAdminId] = useState<string>(administradoraAtual ?? "");
   const [fornId, setFornId] = useState<string>(fornecedorAtual ?? "");
+  const [fonte, setFonte] = useState<string>(fonteAtual ?? "");
+  // comissão como string no input (permite vazio = limpar); validação no server.
+  const [comissao, setComissao] = useState<string>(
+    comissaoAtual != null ? String(comissaoAtual) : ""
+  );
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
   const mudou =
-    adminId !== (administradoraAtual ?? "") || fornId !== (fornecedorAtual ?? "");
+    adminId !== (administradoraAtual ?? "") ||
+    fornId !== (fornecedorAtual ?? "") ||
+    fonte.trim() !== (fonteAtual ?? "") ||
+    comissao.trim() !== (comissaoAtual != null ? String(comissaoAtual) : "");
 
   async function salvar() {
     if (!mudou || enviando) return;
@@ -49,6 +62,10 @@ export function CartaVinculo({
         body: JSON.stringify({
           administradora_id: adminId === "" ? null : adminId,
           fornecedor_id: fornId === "" ? null : fornId,
+          // "" => o server normaliza para null (limpa). Comissão vai como string;
+          // normalizarPercentual aceita string numérica ou "" (=> null).
+          fonte: fonte.trim() === "" ? null : fonte.trim(),
+          comissao_percentual: comissao.trim() === "" ? null : comissao.trim(),
         }),
       });
       if (!res.ok) {
@@ -105,6 +122,41 @@ export function CartaVinculo({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className={styles.campo}>
+          <span className={styles.rotulo}>Origem / site (interno)</span>
+          <input
+            className={styles.select}
+            type="text"
+            value={fonte}
+            maxLength={120}
+            placeholder="— não definida —"
+            onChange={(e) => {
+              setFonte(e.target.value);
+              setOk(false);
+            }}
+            disabled={enviando}
+          />
+        </label>
+
+        <label className={styles.campo}>
+          <span className={styles.rotulo}>Comissão da carta (%)</span>
+          <input
+            className={styles.select}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={100}
+            step="0.01"
+            value={comissao}
+            placeholder="— não definida —"
+            onChange={(e) => {
+              setComissao(e.target.value);
+              setOk(false);
+            }}
+            disabled={enviando}
+          />
         </label>
 
         <Button size="sm" onClick={salvar} disabled={!mudou || enviando}>

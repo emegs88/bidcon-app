@@ -15,7 +15,13 @@ import { createAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-type Body = { administradora_id?: unknown; fornecedor_id?: unknown };
+type Body = {
+  administradora_id?: unknown;
+  fornecedor_id?: unknown;
+  // metadados admin-only da carta (nunca vão ao payload de cliente/parceiro):
+  fonte?: unknown; // site de origem (texto curto)
+  comissao_percentual?: unknown; // % da carta (0..100), null p/ limpar
+};
 
 // aceita string uuid ou null (para desvincular). Qualquer outra coisa => inválido.
 function normalizarUuid(v: unknown): string | null | undefined {
@@ -30,6 +36,27 @@ function normalizarUuid(v: unknown): string | null | undefined {
     return undefined; // string não-uuid => rejeita
   }
   return undefined; // campo ausente => não mexe
+}
+
+// fonte: texto curto (origem interna). "" => null (limpa). >120 => rejeita.
+function normalizarFonte(v: unknown): string | null | undefined {
+  if (v === null) return null;
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (s === "") return null;
+    if (s.length > 120) return undefined;
+    return s;
+  }
+  return undefined;
+}
+
+// comissao_percentual: número 0..100 (2 casas) ou null. String numérica aceita.
+function normalizarPercentual(v: unknown): number | null | undefined {
+  if (v === null) return null;
+  if (v === "") return null;
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return undefined;
+  return Math.round(n * 100) / 100;
 }
 
 export async function POST(
@@ -58,7 +85,12 @@ export async function POST(
   const body = (await req.json().catch(() => ({}))) as Body;
 
   // só inclui no update os campos realmente enviados (undefined = não mexe).
-  const patch: { administradora_id?: string | null; fornecedor_id?: string | null } = {};
+  const patch: {
+    administradora_id?: string | null;
+    fornecedor_id?: string | null;
+    fonte?: string | null;
+    comissao_percentual?: number | null;
+  } = {};
 
   if ("administradora_id" in body) {
     const a = normalizarUuid(body.administradora_id);
@@ -73,6 +105,23 @@ export async function POST(
       return NextResponse.json({ erro: "fornecedor_id inválido." }, { status: 422 });
     }
     patch.fornecedor_id = f;
+  }
+  if ("fonte" in body) {
+    const s = normalizarFonte(body.fonte);
+    if (s === undefined) {
+      return NextResponse.json({ erro: "fonte inválida." }, { status: 422 });
+    }
+    patch.fonte = s;
+  }
+  if ("comissao_percentual" in body) {
+    const c = normalizarPercentual(body.comissao_percentual);
+    if (c === undefined) {
+      return NextResponse.json(
+        { erro: "comissao_percentual deve ser um número entre 0 e 100." },
+        { status: 422 }
+      );
+    }
+    patch.comissao_percentual = c;
   }
 
   if (Object.keys(patch).length === 0) {
