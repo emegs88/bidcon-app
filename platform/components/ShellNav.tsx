@@ -31,15 +31,23 @@ const ADMIN: Link[] = [
   { href: "/admin/audit-logs", label: "Auditoria" },
 ];
 
-function linksPara(tipo?: Tipo): Link[] {
-  if (tipo === "admin") return [...BASE, ...ADMIN];
-  if (tipo === "parceiro") return [...BASE, ...PARCEIRO];
-  return BASE;
+// Link exclusivo da equipe Prospere (gate por e-mail @prospere.com.br, decidido
+// no servidor). Não depende de `tipo`: um cliente da equipe também o vê, um admin
+// fora da equipe não. A RLS da migration 0013 reforça o sigilo no banco.
+const EQUIPE: Link[] = [{ href: "/prospere-ancora", label: "byAncora" }];
+
+function linksPara(tipo?: Tipo, equipe?: boolean): Link[] {
+  let links: Link[];
+  if (tipo === "admin") links = [...BASE, ...ADMIN];
+  else if (tipo === "parceiro") links = [...BASE, ...PARCEIRO];
+  else links = [...BASE];
+  if (equipe) links = [...links, ...EQUIPE];
+  return links;
 }
 
-export function ShellNav({ tipo }: { tipo?: Tipo }) {
+export function ShellNav({ tipo, equipe }: { tipo?: Tipo; equipe?: boolean }) {
   const path = usePathname();
-  const links = linksPara(tipo);
+  const links = linksPara(tipo, equipe);
   return (
     <nav className={styles.nav}>
       {links.map((l) => {

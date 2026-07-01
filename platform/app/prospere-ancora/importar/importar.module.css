@@ -1,0 +1,89 @@
+/* Importar tabela Âncora — uso interno da equipe. Só CSS Modules + tokens. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campo > span {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 280px;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.botoes {
+  display: flex;
+  gap: 8px;
+}
+
+.ok,
+.erro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ok strong {
+  color: var(--text);
+}
+
+.erro strong {
+  color: var(--text);
+}
+
+.ok span,
+.erro span {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.dica {
+  color: var(--text-muted) !important;
+}
+
+.voltar {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.voltar:hover {
+  text-decoration: underline;
+}

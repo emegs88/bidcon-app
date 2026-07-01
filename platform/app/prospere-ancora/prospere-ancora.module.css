@@ -1,0 +1,191 @@
+/* PROSPERE byAncora — simulador interno da equipe. Só CSS Modules + tokens. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.campo > span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.campo select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+
+.contagem {
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.grupoTag {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.bem {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.valorBem {
+  font-weight: 400;
+  color: var(--text-soft);
+}
+
+.dl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.row dt {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.row dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.parcelasTitulo {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-bottom: 8px;
+}
+
+.rodape {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* --- Painel "Simular lance" (interno) --- */
+
+.lanceToggle {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.lancePainel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lanceCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lanceCabecalho .parcelasTitulo {
+  border-top: none;
+  padding-top: 0;
+  margin-bottom: 0;
+}
+
+.lanceForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.lanceCampo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lanceCampo > span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.lanceCampo input,
+.lanceCampo select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lanceDica {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.lanceAvisos {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
