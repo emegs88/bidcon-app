@@ -97,6 +97,15 @@ main{padding:20px 0 60px}
 .aviso-lex.show{display:block}
 .aviso-lex.bloq{background:rgba(227,160,8,.12);border-color:rgba(227,160,8,.35);color:var(--ambar-l)}
 
+/* ── Cadastro / operação (JSON) — import/export offline (sem rede) ── */
+.json-io textarea{width:100%;min-height:78px;resize:vertical;background:var(--carvao);border:1px solid var(--linha2);color:#cfe0ff;border-radius:10px;padding:10px 12px;font-family:var(--f-mono);font-size:12px;line-height:1.5;outline:0}
+.json-io textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(46,123,240,.18)}
+.json-io .io-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 2px}
+.json-io .io-acoes .btn{padding:9px 14px;font-size:12.5px;flex:1}
+.json-io .io-msg{font-size:11px;line-height:1.45;min-height:14px;margin-top:2px}
+.json-io .io-msg.ok{color:var(--verde-l)}
+.json-io .io-msg.bad{color:var(--ambar-l)}
+
 /* ── Contrato (direita) ── */
 .doc{background:#fff;color:#1a1a2e;border-radius:var(--raio);padding:44px 46px;font-family:Georgia,'Times New Roman',serif;font-size:13.5px;line-height:1.7;box-shadow:var(--sombra)}
 .doc h1{font-family:var(--f-display);font-size:20px;text-align:center;color:#0c1330;letter-spacing:-.01em;margin-bottom:2px}
@@ -149,6 +158,17 @@ main{padding:20px 0 60px}
 
     <!-- ══════════ ESQUERDA: FORMULÁRIO ══════════ -->
     <form class="painel form" id="form" novalidate>
+
+      <fieldset class="grp json-io">
+        <legend>Cadastro / operação (JSON)</legend>
+        <p class="hint" style="margin-bottom:8px">Contrato de dados <code>cedente</code>/<code>cessionario</code>/<code>adm</code>/<code>cotas[]</code> — mesmo formato do futuro fluxo logado. Cole um cadastro e <b>Carregar</b>, ou <b>Copiar operação</b> para reaproveitar. Tudo local: nada sai deste navegador.</p>
+        <textarea id="jsonBox" spellcheck="false" placeholder='{ "cedente": { "nome": "", "doc": "" }, "cessionario": { "nome": "", "doc": "" }, "adm": "", "cotas": [ { "grupo": "", "tipo": "contemplada", "credito": 0, "saldo": 0, "agio": 0 } ] }'></textarea>
+        <div class="io-acoes">
+          <button type="button" class="btn sec" id="btnCarregar">Carregar cadastro</button>
+          <button type="button" class="btn sec" id="btnCopiar">Copiar operação</button>
+        </div>
+        <p class="io-msg" id="jsonMsg"></p>
+      </fieldset>
 
       <fieldset class="grp" style="border-color:var(--linha2)">
         <legend>Modalidade da operação</legend>
@@ -694,15 +714,122 @@ function render(){
   }
 }
 
-/* ── wiring ── */
-$("form").addEventListener("input", render);
-$("form").addEventListener("change", render);
+/* ════════════════════════════════════════════════════════════════════════════
+   CADASTRO / OPERAÇÃO — import/export por JSON (100% local, sem rede).
+   ----------------------------------------------------------------------------
+   Contrato de dados (mesmo do futuro fluxo logado — spec viva):
+     { cedente:{nome,doc}, cessionario:{nome,doc},
+       parceiros?:{sourcing?,selling?}, adm?:string,
+       cotas:[ {admin?,grupo,tipo,credito,saldo,agio} ],
+       sinal?, validade?, corte?, foro?, mediador? }
+   "adm" é a administradora da operação; quando uma cota não traz "admin"
+   próprio, herda "adm". A ferramenta NÃO chama IA nem rede: só lê/escreve texto.
+   ════════════════════════════════════════════════════════════════════════════ */
+function ioMsg(txt, cls){ const el=$("jsonMsg"); el.textContent=txt||""; el.className="io-msg"+(cls?" "+cls:""); }
+
+/* form → objeto no schema do contrato de dados */
+function coletarOperacao(){
+  const cotas = lerCotas().map(c=>({
+    admin:c.admin||"", grupo:c.grupo||"", tipo:c.tipo,
+    credito:c.credito, saldo:c.saldo, agio:c.agio,
+  }));
+  const admOper = (cotas.find(c=>c.admin)||{}).admin || "";
+  return {
+    cedente:{ nome:$("v-nome").value.trim(), doc:$("v-doc").value.trim() },
+    cessionario:{ nome:$("c-nome").value.trim(), doc:$("c-doc").value.trim() },
+    parceiros:{ sourcing:$("p-sourcing").value.trim(), selling:$("p-selling").value.trim() },
+    adm: admOper,
+    cotas,
+    sinal: parseNum($("sinal").value),
+    validade: $("validade").value.trim(),
+    corte: $("corte").value.trim(),
+    foro: $("foro").value.trim(),
+    mediador: $("mediador").value.trim(),
+  };
+}
+
+/* serializa a operação atual e copia (clipboard quando disponível; sempre no textarea) */
+function copiarOperacao(){
+  const json = JSON.stringify(coletarOperacao(), null, 2);
+  $("jsonBox").value = json;
+  let copiou = false;
+  try{
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(json).then(()=>{}, ()=>{});
+      copiou = true;
+    } else {
+      $("jsonBox").select(); copiou = document.execCommand && document.execCommand("copy");
+    }
+  }catch(_){ copiou = false; }
+  ioMsg(copiou ? "Operação copiada para a área de transferência (e exibida acima)."
+              : "Operação serializada acima — selecione e copie manualmente (Ctrl/Cmd+C).", "ok");
+}
+
+/* helpers de leitura tolerante do JSON colado */
+function _s(v){ return v==null ? "" : String(v).trim(); }
+function _n(v){ return typeof v==="number" ? v : parseNum(v); }
+function _tipo(v){ const t=_s(v).toLowerCase(); return t==="cancelada" ? "cancelada" : "contemplada"; }
+
+/* objeto → preenche o form (só o que veio; campos ausentes ficam como estão) */
+function carregarCadastro(obj){
+  if (!obj || typeof obj!=="object") throw new Error("estrutura inválida");
+  const ced = obj.cedente || obj.vendedor || {};
+  const ces = obj.cessionario || obj.comprador || {};
+  const par = obj.parceiros || {};
+  if ("nome" in ced || "doc" in ced){ $("v-nome").value=_s(ced.nome); $("v-doc").value=_s(ced.doc); }
+  if ("nome" in ces || "doc" in ces){ $("c-nome").value=_s(ces.nome); $("c-doc").value=_s(ces.doc); }
+  if (par.sourcing!=null) $("p-sourcing").value=_s(par.sourcing);
+  if (par.selling!=null)  $("p-selling").value=_s(par.selling);
+  if (obj.sinal!=null)    $("sinal").value=_s(obj.sinal);
+  if (obj.validade!=null) $("validade").value=_s(obj.validade)||"45";
+  if (obj.corte!=null)    $("corte").value=_s(obj.corte)||"7";
+  if (obj.foro!=null)     $("foro").value=_s(obj.foro);
+  if (obj.mediador!=null) $("mediador").value=_s(obj.mediador);
+
+  const admOper = _s(obj.adm);
+  const arr = Array.isArray(obj.cotas) ? obj.cotas : [];
+  if (arr.length){
+    cotasBox.innerHTML=""; cotaSeq=0;
+    arr.forEach(c=>{
+      const id=++cotaSeq;
+      cotasBox.insertAdjacentHTML("beforeend", novaCotaHTML(id));
+      const el=cotasBox.querySelector(`.cota[data-id="${id}"]`);
+      el.querySelector(".k-admin").value   = _s(c.admin)||admOper;
+      el.querySelector(".k-grupo").value   = _s(c.grupo);
+      el.querySelector(".k-tipo").value    = _tipo(c.tipo);
+      el.querySelector(".k-credito").value = c.credito!=null ? _s(c.credito) : "";
+      el.querySelector(".k-saldo").value   = c.saldo!=null   ? _s(c.saldo)   : "";
+      el.querySelector(".k-agio").value    = c.agio!=null    ? _s(c.agio)    : "";
+    });
+    if (!cotasBox.children.length) addCota();
+  }
+  render();
+}
+
+$("btnCarregar").addEventListener("click", ()=>{
+  const raw = $("jsonBox").value.trim();
+  if (!raw){ ioMsg("Cole um cadastro JSON no campo acima antes de carregar.", "bad"); return; }
+  let obj;
+  try{ obj = JSON.parse(raw); }
+  catch(_){ ioMsg("JSON inválido — verifique aspas, vírgulas e chaves.", "bad"); return; }
+  try{
+    carregarCadastro(obj);
+    ioMsg("Cadastro carregado no formulário. Confira os campos e ajuste o que faltar.", "ok");
+  }catch(err){ ioMsg("Não consegui carregar: "+err.message+".", "bad"); }
+});
+$("btnCopiar").addEventListener("click", copiarOperacao);
+
+/* ── wiring ──
+   (o textarea de JSON não alimenta o contrato; digitar nele não re-renderiza) */
+$("form").addEventListener("input", (e)=>{ if (e.target && e.target.id==="jsonBox") return; render(); });
+$("form").addEventListener("change", (e)=>{ if (e.target && e.target.id==="jsonBox") return; render(); });
 $("addCota").addEventListener("click", addCota);
 $("btnPdf").addEventListener("click", ()=>{ if(!$("btnPdf").disabled) window.print(); });
 $("btnLimpar").addEventListener("click", ()=>{
   if (!confirm("Limpar todos os campos?")) return;
   $("form").reset();
   cotasBox.innerHTML=""; cotaSeq=0; addCota();
+  ioMsg("", "");
 });
 
 /* init */
