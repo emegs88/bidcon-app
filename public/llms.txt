@@ -10,6 +10,7 @@
 - [Cartas contempladas de imóvel](https://www.bidcon.com.br/bidcon-imobiliaria): Cruza os imóveis da imobiliária parceira com cartas de consórcio contempladas de imóvel, com pré-análise por renda e junção de cartas.
 - [Carta contemplada de veículo](https://www.bidcon.com.br/carta-contemplada-veiculo): Página dedicada a cartas de consórcio contempladas para compra de veículo, com estimativas de crédito, entrada e parcela.
 - [Vender consórcio contemplado](https://www.bidcon.com.br/vender-consorcio-contemplado): Para quem quer vender uma cota de consórcio já contemplada; a bidcon organiza a documentação e a transferência junto à administradora.
+- [Repasse de consórcio (assunção de dívida)](https://www.bidcon.com.br/repasse): Assunção de dívida de cotas de consórcio já com o crédito utilizado. Quem sai da dívida deposita o valor combinado em Conta Notarial; quem assume as parcelas apresenta bem próprio em garantia e recebe o líquido após a anuência da administradora. Não é venda de crédito; sujeito à anuência, sem promessa de contemplação.
 
 ## Diferenciais
 
