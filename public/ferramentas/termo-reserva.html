@@ -168,6 +168,22 @@ main{padding:20px 0 60px}
           <button type="button" class="btn sec" id="btnCopiar">Copiar operação</button>
         </div>
         <p class="io-msg" id="jsonMsg"></p>
+
+        <!-- Verificador IA (progressivo): só aparece quando a ferramenta é
+             servida por http(s) na plataforma logada. Aberto por duplo-clique
+             (file://), este bloco permanece oculto e NADA de rede é referenciado
+             — o arquivo continua puro-estático e offline. -->
+        <div id="iaBox" class="ia-box" hidden>
+          <p class="hint" style="margin:2px 0 8px">
+            <b>Extrair por IA</b> — anexe o extrato/documento (PDF, JPG ou PNG; até 5, 10MB cada)
+            e a IA preenche o cadastro. Você confere e ajusta. Disponível apenas no ambiente logado.
+          </p>
+          <input type="file" id="iaFiles" accept="application/pdf,image/jpeg,image/png" multiple>
+          <div class="io-acoes">
+            <button type="button" class="btn sec" id="btnExtrair">Extrair e preencher</button>
+          </div>
+          <p class="io-msg" id="iaMsg"></p>
+        </div>
       </fieldset>
 
       <fieldset class="grp" style="border-color:var(--linha2)">
@@ -831,6 +847,96 @@ $("btnLimpar").addEventListener("click", ()=>{
   cotasBox.innerHTML=""; cotaSeq=0; addCota();
   ioMsg("", "");
 });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VERIFICADOR IA (progressivo) — só liga quando servido por http(s).
+   ----------------------------------------------------------------------------
+   O arquivo continua PURO-ESTÁTICO: aberto por duplo-clique (file:) o bloco fica
+   oculto e nenhuma chamada de rede acontece. Na plataforma logada (mesma origem),
+   o botão chama /api/verificador por CAMINHO RELATIVO; a rota exige sessão. O
+   resultado (§7) é mapeado para o MESMO contrato de dados do cadastro JSON e
+   carregado por carregarCadastro(). A IA é progressiva: falha/ausência nunca
+   quebra o modo manual.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var httpish = location.protocol === "http:" || location.protocol === "https:";
+  var box = $("iaBox");
+  if (!httpish || !box) return;            // file:// → some rede, some botão
+  box.hidden = false;
+
+  function iaMsg(txt, cls){ var el=$("iaMsg"); el.textContent=txt||""; el.className="io-msg"+(cls?" "+cls:""); }
+
+  /* File → base64 (sem prefixo data:) */
+  function lerBase64(file){
+    return new Promise(function(res, rej){
+      var r = new FileReader();
+      r.onload = function(){
+        var s = String(r.result||"");
+        var i = s.indexOf(",");
+        res(i>=0 ? s.slice(i+1) : s);
+      };
+      r.onerror = function(){ rej(new Error("falha ao ler "+file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  /* segmento (§7) → tipo de cota do form: Automóvel/Imóvel não altera
+     contemplada/cancelada; o tipo do form é natureza (contemplada|cancelada),
+     então derivamos de cota.contemplada. */
+  function tipoNatureza(cota){ return cota && cota.contemplada === false ? "cancelada" : "contemplada"; }
+
+  /* resultado do verificador (§7) → objeto no contrato de dados do cadastro */
+  function paraCadastro(r){
+    var c = (r && r.cota) || {}, b = (r && r.bem) || {};
+    var cota = {
+      admin: c.administradora || "",
+      grupo: "",                       // grupo/cota não fazem parte do §7 v1; usuário completa
+      tipo: tipoNatureza(c),
+      credito: (b.valor_referencia != null ? b.valor_referencia : null),
+      saldo: (c.saldo_devedor != null ? c.saldo_devedor : null),
+      agio: null                       // ágio é comercial; nunca inferido pela IA
+    };
+    return {
+      adm: c.administradora || "",
+      cotas: [cota]
+      // cedente/cessionario/parceiros ficam como estão: a IA lê o documento da
+      // cota, não as partes da operação.
+    };
+  }
+
+  $("btnExtrair").addEventListener("click", function(){
+    var input = $("iaFiles");
+    var files = input && input.files ? Array.prototype.slice.call(input.files) : [];
+    if (!files.length){ iaMsg("Anexe ao menos um arquivo (PDF, JPG ou PNG).", "bad"); return; }
+    if (files.length > 5){ iaMsg("No máximo 5 arquivos por vez.", "bad"); return; }
+    for (var i=0;i<files.length;i++){ if (files[i].size > 10*1024*1024){ iaMsg("Cada arquivo deve ter no máximo 10MB.", "bad"); return; } }
+
+    var btn = $("btnExtrair"); btn.disabled = true; iaMsg("Lendo documento(s)…");
+    Promise.all(files.map(function(f){
+      return lerBase64(f).then(function(b64){ return { media_type: f.type, data_base64: b64 }; });
+    })).then(function(arquivos){
+      return fetch("/api/verificador", {
+        method: "POST",
+        headers: { "content-type":"application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ arquivos: arquivos })
+      });
+    }).then(function(resp){
+      if (resp.status === 401){ throw new Error("Sessão necessária — entre na plataforma para usar a IA."); }
+      if (resp.status === 429){ throw new Error("Muitas solicitações. Aguarde um instante."); }
+      if (resp.status === 503){ throw new Error("Verificador ainda não configurado neste ambiente."); }
+      if (!resp.ok){ throw new Error("Não foi possível ler o documento agora."); }
+      return resp.json();
+    }).then(function(r){
+      if (!r || r.ok === false){ throw new Error((r && r.erro) || "Extração indisponível."); }
+      carregarCadastro(paraCadastro(r));
+      var al = (r.alertas && r.alertas.length) ? " Alertas: "+r.alertas.join(" · ") : "";
+      iaMsg("Cadastro preenchido pela IA — confira e complete grupo/cota e ágio."+al, "ok");
+    }).catch(function(err){
+      iaMsg(err.message || "Falha na extração.", "bad");
+    }).finally(function(){ btn.disabled = false; });
+  });
+})();
 
 /* init */
 addCota();
