@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repasse de Consórcio · Assunção de Dívida | bidcon</title>
+<meta name="description" content="Repasse de cota de consórcio já com crédito utilizado: quem quer sair da dívida deposita o valor combinado na Conta Notarial; quem assume as parcelas apresenta bem próprio em garantia. Simuladores das duas pontas. Prospere Consórcios.">
+<meta name="author" content="Prospere Consórcios">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#080B14">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="bidcon">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Repasse de Consórcio · Assunção de Dívida · bidcon | Prospere">
+<meta property="og:description" content="Saia da dívida da cota ou assuma as parcelas com bem próprio em garantia. Simule as duas pontas.">
+<style>
+/* ============================================================================
+   repasse.html — página PÚBLICA, 100% ESTÁTICA (abre por duplo-clique, offline).
+   Sem framework, sem build, sem fetch de rede, sem /fonts/ externas, sem
+   window.BIDCON_API. Fontes: system-ui (fallback local, nunca .woff externo).
+   Paleta/tokens reusados de carta-contemplada-veiculo.html.
+   ========================================================================== */
+:root{
+  --preto:#080B14;--carvao:#10182B;--carvao2:#16213A;--linha:rgba(255,255,255,.08);
+  --linha2:rgba(255,255,255,.15);--branco:#f6f6f8;--cinza:#93A0B8;--cinza2:#8E9AB8;
+  --verde:#1faa59;--verde-l:#34D399;--ambar:#e3a008;--ambar-l:#f3c34a;
+  --azul:#2E7BF0;--azul-l:#5b93ff;--vermelho-l:#36C5F0;
+  --raio:22px;--raio-sm:14px;--pill:999px;
+  --grad-azul:linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6);
+  --sombra:0 1px 2px rgba(0,0,0,.4),0 12px 32px -12px rgba(0,0,0,.7);
+  --sombra-ambar:0 8px 30px -10px rgba(227,160,8,.4);
+  --f-display:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--preto);color:var(--branco);font-family:var(--f-body);line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(1100px 520px at 78% -8%,rgba(46,123,240,.08),transparent 60%),radial-gradient(900px 480px at 8% 0,rgba(31,170,89,.06),transparent 55%)}
+.wrap{max-width:1160px;margin:0 auto;padding:0 26px}
+a{color:inherit}
+::selection{background:var(--vermelho-l);color:#04121f}
+
+/* ---- Header ---- */
+header{border-bottom:1px solid var(--linha);background:rgba(7,7,9,.72);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.2)}
+.hbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:13px}
+.blogo{display:inline-flex;align-items:baseline;font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1;color:#fff}
+.blogo b{font-weight:800;background:var(--grad-azul);-webkit-background-clip:text;background-clip:text;color:transparent}
+.blogo .seg{color:var(--azul-l);font-weight:700}
+.blogo .seal{display:inline-flex;width:.86em;height:.86em;margin:0 -.02em;transform:translateY(.06em)}
+.blogo .seal svg{width:100%;height:100%;display:block}
+.bsel{font-size:10.5px;color:var(--cinza);letter-spacing:.08em;text-transform:uppercase;border-left:1px solid var(--linha);padding-left:13px}
+.bsel b{color:#cfcfd4;font-weight:600}
+.hcta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hnav{display:inline-flex;align-items:center;gap:7px;background:0 0;color:#cfcfd4;font-weight:700;font-size:13px;text-decoration:none;border:1px solid var(--linha2);border-radius:var(--pill);padding:10px 17px;transition:.16s cubic-bezier(.4,0,.2,1)}
+.hnav:hover{border-color:var(--branco);color:#fff;transform:translateY(-1px)}
+.hzap{display:inline-flex;align-items:center;gap:8px;background:var(--verde);color:#04210f;font-weight:700;font-size:13px;text-decoration:none;border-radius:var(--pill);padding:11px 18px;transition:.16s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 18px -8px rgba(31,170,89,.6)}
+.hzap:hover{background:var(--verde-l);transform:translateY(-1px)}
+
+/* ---- Hero ---- */
+.hero{margin:40px 0 8px;background:linear-gradient(150deg,rgba(46,123,240,.12),rgba(46,123,240,.015));border:1px solid rgba(46,123,240,.2);border-radius:var(--raio);padding:42px 40px 38px;box-shadow:var(--sombra)}
+.hero .eyebrow{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--azul-l);font-weight:700}
+.hero h1{font-family:var(--f-display);font-weight:800;font-size:clamp(2.1rem,4.2vw,44px);line-height:1.05;letter-spacing:-.035em;margin:14px 0 12px;max-width:24ch}
+.hero h1 b{color:var(--azul-l)}
+.hero p{color:#cfcfd4;font-size:15.5px;max-width:64ch;line-height:1.6}
+@media(max-width:780px){.hero{padding:30px 24px}.hero h1{font-size:30px}}
+
+/* ---- Diagrama SVG passo a passo ---- */
+.diag{margin:22px 0 4px;background:var(--carvao2);border:1px solid var(--linha);border-radius:16px;padding:20px;box-shadow:var(--sombra)}
+.diag .dh{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--azul-l);font-weight:700;margin-bottom:14px}
+.diag svg{width:100%;height:auto;display:block}
+.diag .cap{margin-top:12px;font-size:12px;color:var(--cinza);line-height:1.6}
+.diag .cap b{color:#cfcfd4}
+
+/* ---- Tabs ---- */
+.tabs{display:flex;gap:8px;margin:34px 0 16px;flex-wrap:wrap}
+.tab{background:var(--carvao2);border:1px solid var(--linha);color:var(--cinza);font-family:var(--f-display);font-weight:700;font-size:14px;letter-spacing:.02em;padding:12px 22px;border-radius:var(--pill);cursor:pointer;transition:.16s cubic-bezier(.4,0,.2,1);display:inline-flex;align-items:center;gap:9px}
+.tab:hover{color:#fff;border-color:var(--linha2)}
+.tab.on{background:var(--azul);border-color:var(--azul);color:#fff;box-shadow:0 8px 30px -10px rgba(46,123,240,.5)}
+.tab .ico{width:17px;height:17px}
+.panel{display:none}
+.panel.on{display:block;animation:fade .3s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---- Simulador (form + resultado) ---- */
+.sim{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:860px){.sim{grid-template-columns:1fr}}
+.card{background:var(--carvao2);border:1px solid var(--linha);border-radius:18px;padding:22px;box-shadow:var(--sombra)}
+.card h3{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:-.01em;margin-bottom:4px}
+.card .csub{font-size:12.5px;color:var(--cinza);margin-bottom:16px;line-height:1.5}
+.fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.fld label{font-size:10.5px;color:var(--cinza);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.fld label small{text-transform:none;letter-spacing:0;font-weight:500;color:var(--cinza2)}
+.fld input,.fld select{background:var(--carvao);border:1px solid var(--linha2);color:#fff;border-radius:11px;padding:12px 13px;font-family:var(--f-body);font-size:14px;outline:0;transition:.16s}
+.fld input:focus,.fld select:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(46,123,240,.18)}
+.fld.mono input{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.frow{grid-template-columns:1fr}}
+.hint{font-size:11.5px;color:var(--cinza);line-height:1.5;margin-top:-6px;margin-bottom:12px}
+.cetbox{background:var(--carvao);border:1px dashed var(--linha2);border-radius:12px;padding:13px 14px;margin-bottom:14px}
+.cetbox .ch{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--azul-l);font-weight:700;margin-bottom:9px}
+.cetrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.cetrow .fld{margin-bottom:0;flex:1;min-width:120px}
+.btn-sug{background:var(--carvao2);border:1px solid var(--linha2);color:#cfcfd4;font-family:var(--f-body);font-weight:700;font-size:12px;padding:11px 15px;border-radius:10px;cursor:pointer;transition:.14s;white-space:nowrap}
+.btn-sug:hover{border-color:var(--azul);color:#fff}
+
+/* ---- Painel de resultado ---- */
+.res{background:linear-gradient(150deg,rgba(31,170,89,.07),rgba(255,255,255,.012));border:1px solid rgba(52,211,153,.28);border-radius:18px;padding:22px;box-shadow:var(--sombra)}
+.res h3{font-family:var(--f-display);font-weight:700;font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.res h3 .ico{width:18px;height:18px;color:var(--verde-l)}
+.big{background:var(--carvao);border:1px solid var(--linha);border-radius:13px;padding:16px 18px;margin-bottom:12px}
+.big .bl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700}
+.big .bv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:30px;color:var(--verde-l);line-height:1.1;margin-top:5px}
+.big .bm{font-size:12px;color:#cfcfd4;margin-top:5px;line-height:1.4}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.mini{background:var(--carvao);border:1px solid var(--linha);border-radius:11px;padding:12px 13px}
+.mini .ml{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);font-weight:700}
+.mini .mv{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:17px;color:#fff;margin-top:4px}
+.mini.ce{background:rgba(31,170,89,.1);border-color:rgba(52,211,153,.4)}
+.mini.ce .ml,.mini.ce .mv{color:var(--verde-l)}
+
+/* Cascata detalhada */
+.casc{background:var(--carvao);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:12px}
+.casc .cah{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:10px}
+.caline{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;padding:6px 0;border-top:1px dashed var(--linha);color:#cfcfd4}
+.caline:first-of-type{border-top:0}
+.caline .cn{font-family:var(--f-body);font-weight:600;color:#cfcfd4}
+.caline.tot{border-top:1px solid var(--linha2);margin-top:4px;padding-top:9px;color:#fff;font-weight:800}
+.caline.tot .cn{color:var(--verde-l);font-weight:800}
+.caline .cv{color:#fff;font-weight:700}
+.caline.neg .cv{color:#ff9a9a}
+
+/* Selo garantia */
+.selo{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 11px;border-radius:8px;margin-bottom:10px}
+.selo.ok{background:rgba(31,170,89,.16);color:var(--verde-l)}
+.selo.folga{background:rgba(52,211,153,.2);color:var(--verde-l)}
+.selo.no{background:rgba(220,70,70,.16);color:#ff8c8c}
+.gcover{font-size:12px;color:var(--cinza);margin-bottom:10px;line-height:1.5}
+.gcover b{color:#fff;font-family:var(--f-mono)}
+.bloq{background:rgba(220,70,70,.1);border:1px solid rgba(220,70,70,.35);border-radius:11px;padding:12px 14px;font-size:12.5px;color:#ffb3b3;line-height:1.5;margin-bottom:12px}
+.bloq b{color:#ff8c8c}
+
+/* Como funciona / passos pagamento */
+.steps{list-style:none;display:flex;flex-direction:column;gap:9px;margin:4px 0 12px}
+.steps li{display:flex;align-items:flex-start;gap:10px;font-size:12.5px;color:#d2d2d8;line-height:1.45}
+.steps li b{color:#fff}
+.steps .ps{flex:0 0 20px;width:20px;height:20px;border-radius:50%;background:var(--linha2);color:#fff;font-family:var(--f-mono);font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+
+.reszap{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--verde);color:#04210f;font-family:var(--f-body);font-weight:700;font-size:14.5px;text-decoration:none;border-radius:var(--pill);padding:14px;transition:.16s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 18px -8px rgba(31,170,89,.6);margin-top:2px}
+.reszap:hover{background:var(--verde-l);transform:translateY(-1px)}
+.reszap svg{width:18px;height:18px;fill:currentColor}
+
+/* ---- Disclaimer / footer ---- */
+.disc{background:var(--carvao);border:1px solid var(--linha);border-left:3px solid var(--azul);border-radius:16px;padding:18px 20px;margin-top:34px;font-size:12.5px;color:#cfcfd4;line-height:1.65;box-shadow:var(--sombra)}
+.disc b{color:var(--azul-l)}
+.disc + .disc{margin-top:14px;border-left-color:var(--ambar)}
+.disc + .disc b{color:var(--ambar-l)}
+.foot{margin:26px 0 40px;text-align:center;color:var(--cinza2);font-size:11px;letter-spacing:.08em;line-height:1.8}
+.foot b{color:var(--cinza)}
+.foot a{color:var(--cinza);text-decoration:underline}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hbar">
+    <div class="brand">
+      <div class="blogo" aria-label="bidcon Repasse">bidc<span class="seal" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><linearGradient id="bgrad" x1="0" y1=".15" x2="1" y2=".85"><stop offset="0" stop-color="#8FB7FF"/><stop offset=".45" stop-color="#36C5F0"/><stop offset="1" stop-color="#1E6FE6"/></linearGradient></defs><circle cx="50" cy="50" r="44" fill="none" stroke="url(#bgrad)" stroke-width="11"/><path d="M33 51 L45 63 L69 38" fill="none" stroke="url(#bgrad)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>n</b> <span class="seg">Repasse</span></div>
+      <div class="bsel">by <b>Prospere Consórcios</b></div>
+    </div>
+    <div class="hcta">
+      <a class="hnav" href="/bidcon">← Marketplace</a>
+      <a class="hzap" id="hzap" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
+        Falar no WhatsApp
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="eyebrow">Repasse de consórcio · assunção de dívida</div>
+    <h1>Saia da dívida da cota — ou <b>assuma as parcelas</b> apresentando um bem em garantia</h1>
+    <p>O repasse é a passagem de uma cota de consórcio <b>já com o crédito utilizado</b>. Não é venda de crédito: é troca de dívida e de garantia. Quem quer <b>sair</b> deposita o valor combinado na Conta Notarial e, na <b>anuência da administradora</b>, tem o bem alienado liberado. Quem quer <b>assumir</b> apresenta bem próprio em garantia e recebe o líquido só depois dessa anuência. Simule as duas pontas abaixo.</p>
+  </section>
+
+  <!-- Diagrama passo a passo -->
+  <section class="diag" aria-label="Como funciona o repasse, passo a passo">
+    <div class="dh">Como funciona, do começo ao fim</div>
+    <svg viewBox="0 0 980 150" role="img" aria-label="Fluxo: repassante deposita na Conta Notarial, administradora dá anuência, garantia é substituída, captador recebe o líquido">
+      <defs>
+        <linearGradient id="gline" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5b93ff"/><stop offset="1" stop-color="#34D399"/></linearGradient>
+        <marker id="arw" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#5b93ff"/></marker>
+      </defs>
+      <line x1="120" y1="52" x2="250" y2="52" stroke="url(#gline)" stroke-width="2.5" marker-end="url(#arw)"/>
+      <line x1="370" y1="52" x2="500" y2="52" stroke="url(#gline)" stroke-width="2.5" marker-end="url(#arw)"/>
+      <line x1="620" y1="52" x2="750" y2="52" stroke="url(#gline)" stroke-width="2.5" marker-end="url(#arw)"/>
+      <g font-family="system-ui,sans-serif">
+        <!-- passo 1 -->
+        <circle cx="60" cy="52" r="26" fill="none" stroke="#5b93ff" stroke-width="2.5"/>
+        <text x="60" y="59" text-anchor="middle" fill="#5b93ff" font-size="22" font-weight="800">1</text>
+        <text x="60" y="104" text-anchor="middle" fill="#cfcfd4" font-size="12.5" font-weight="700">Repassante deposita</text>
+        <text x="60" y="122" text-anchor="middle" fill="#93A0B8" font-size="11">o valor combinado na</text>
+        <text x="60" y="138" text-anchor="middle" fill="#93A0B8" font-size="11">Conta Notarial</text>
+        <!-- passo 2 -->
+        <circle cx="310" cy="52" r="26" fill="none" stroke="#5b93ff" stroke-width="2.5"/>
+        <text x="310" y="59" text-anchor="middle" fill="#5b93ff" font-size="22" font-weight="800">2</text>
+        <text x="310" y="104" text-anchor="middle" fill="#cfcfd4" font-size="12.5" font-weight="700">Administradora</text>
+        <text x="310" y="122" text-anchor="middle" fill="#93A0B8" font-size="11">analisa e dá a</text>
+        <text x="310" y="138" text-anchor="middle" fill="#93A0B8" font-size="11">anuência da troca</text>
+        <!-- passo 3 -->
+        <circle cx="560" cy="52" r="26" fill="none" stroke="#5b93ff" stroke-width="2.5"/>
+        <text x="560" y="59" text-anchor="middle" fill="#5b93ff" font-size="22" font-weight="800">3</text>
+        <text x="560" y="104" text-anchor="middle" fill="#cfcfd4" font-size="12.5" font-weight="700">Garantia substituída</text>
+        <text x="560" y="122" text-anchor="middle" fill="#93A0B8" font-size="11">a alienação migra p/ o</text>
+        <text x="560" y="138" text-anchor="middle" fill="#93A0B8" font-size="11">bem do captador</text>
+        <!-- passo 4 -->
+        <circle cx="810" cy="52" r="26" fill="none" stroke="#34D399" stroke-width="2.5"/>
+        <text x="810" y="59" text-anchor="middle" fill="#34D399" font-size="22" font-weight="800">4</text>
+        <text x="810" y="104" text-anchor="middle" fill="#cfcfd4" font-size="12.5" font-weight="700">Liberação</text>
+        <text x="810" y="122" text-anchor="middle" fill="#93A0B8" font-size="11">repassante sai da dívida;</text>
+        <text x="810" y="138" text-anchor="middle" fill="#93A0B8" font-size="11">captador recebe o líquido</text>
+      </g>
+    </svg>
+    <div class="cap">A <b>anuência da administradora</b> é a condição central — sem promessa de contemplação ou de prazo. A plataforma <b>não movimenta dinheiro</b>: ela gera a instrução e registra o evento; a custódia fica na <b>Conta Notarial</b> (Prov. CNJ 197/2025). Se a troca for negada, a devolução é integral.</div>
+  </section>
+
+  <!-- Abas -->
+  <div class="tabs">
+    <button class="tab on" data-tab="quitar">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+      Quitação antecipada
+    </button>
+    <button class="tab" data-tab="bem">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>
+      Simule seu bem
+    </button>
+  </div>
+
+  <!-- ==================== PAINEL A — REPASSANTE (Quitação antecipada) ==================== -->
+  <section class="panel on" data-panel="quitar">
+    <div class="sim">
+      <div class="card">
+        <h3>Você quer sair da dívida da cota</h3>
+        <p class="csub">Informe o saldo devedor, a parcela atual e quantas faltam. Mostramos o <b>valor combinado a depositar</b> na Conta Notarial e a economia frente ao saldo — que varia conforme o prazo.</p>
+
+        <div class="fld mono">
+          <label>Saldo devedor assumido <small>(R$)</small></label>
+          <input id="q_saldo" type="text" inputmode="decimal" placeholder="158.729,68" value="158.729,68">
+        </div>
+        <div class="frow">
+          <div class="fld mono">
+            <label>Parcela mensal <small>(R$)</small></label>
+            <input id="q_parcela" type="text" inputmode="decimal" placeholder="1.504,26" value="1.504,26">
+          </div>
+          <div class="fld mono">
+            <label>Parcelas restantes</label>
+            <input id="q_n" type="text" inputmode="numeric" placeholder="105" value="105">
+          </div>
+        </div>
+        <div class="fld">
+          <label>Reajuste anual do fluxo <small>(% a cada 12 meses — degrau)</small></label>
+          <input id="q_g" type="text" inputmode="decimal" placeholder="0" value="0">
+        </div>
+
+        <div class="cetbox">
+          <div class="ch">Custo efetivo-alvo (mensal)</div>
+          <div class="cetrow">
+            <div class="fld mono">
+              <label>CET-alvo <small>(% a.m.)</small></label>
+              <input id="q_cet" type="text" inputmode="decimal" placeholder="2" value="2">
+            </div>
+            <button class="btn-sug" id="q_sug" type="button">Usar 2% (padrão)</button>
+          </div>
+        </div>
+        <div class="hint">O valor combinado é o que fecha esse custo efetivo-alvo pelo prazo informado. Não há percentual fixo de economia — ela depende de quantas parcelas ainda faltam.</div>
+      </div>
+
+      <div class="res" id="q_res">
+        <h3><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Resultado da sua ponta</h3>
+        <div class="big">
+          <div class="bl">Valor combinado a depositar na Conta Notarial</div>
+          <div class="bv" id="q_deposito">—</div>
+          <div class="bm" id="q_dep_meta">—</div>
+        </div>
+        <div class="grid2">
+          <div class="mini ce"><div class="ml">Economia frente ao saldo</div><div class="mv" id="q_economia">—</div></div>
+          <div class="mini"><div class="ml">Saldo devedor de hoje</div><div class="mv" id="q_saldo_out">—</div></div>
+        </div>
+        <ul class="steps">
+          <li><span class="ps">1</span><div>Você deposita o valor combinado na <b>Conta Notarial</b> (Prov. CNJ 197/2025) — a plataforma não recebe o dinheiro.</div></li>
+          <li><span class="ps">2</span><div>Com a <b>anuência da administradora</b>, a garantia é substituída e o seu bem alienado é liberado.</div></li>
+          <li><span class="ps">3</span><div>Se a administradora <b>negar</b> a troca, a devolução do depósito é <b>integral</b>.</div></li>
+        </ul>
+        <a class="reszap" id="q_zap" href="#" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
+          Enviar minha simulação no WhatsApp
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== PAINEL B — CAPTADOR (Simule seu bem) ==================== -->
+  <section class="panel" data-panel="bem">
+    <div class="sim">
+      <div class="card">
+        <h3>Você quer assumir as parcelas</h3>
+        <p class="csub">Informe a parcela, o prazo e o segmento (do extrato). Mostramos o <b>líquido a receber</b>, o <b>custo efetivo</b> mensal e a cobertura da <b>garantia</b> — o bem próprio que você apresenta.</p>
+
+        <div class="frow">
+          <div class="fld mono">
+            <label>Parcela mensal <small>(R$)</small></label>
+            <input id="b_parcela" type="text" inputmode="decimal" placeholder="1.504,26" value="1.504,26">
+          </div>
+          <div class="fld mono">
+            <label>Parcelas restantes</label>
+            <input id="b_n" type="text" inputmode="numeric" placeholder="105" value="105">
+          </div>
+        </div>
+        <div class="fld mono">
+          <label>Saldo devedor assumido <small>(R$)</small></label>
+          <input id="b_saldo" type="text" inputmode="decimal" placeholder="158.729,68" value="158.729,68">
+        </div>
+        <div class="fld">
+          <label>Segmento <small>(vem do campo Produto/Bem do extrato)</small></label>
+          <select id="b_seg">
+            <option value="AUTOMOVEL">Automóvel</option>
+            <option value="IMOVEL">Imóvel</option>
+          </select>
+        </div>
+        <div class="hint" id="b_seg_hint">Automóvel: reajuste anual 0% · comparativo bancário 1,80% a.m. Imóvel: 6% (INCC) · 1,10% a.m. — comandados pelo segmento (editáveis abaixo).</div>
+        <div class="frow">
+          <div class="fld mono">
+            <label>Reajuste anual <small>(% degrau)</small></label>
+            <input id="b_g" type="text" inputmode="decimal" placeholder="0" value="0">
+          </div>
+          <div class="fld mono">
+            <label>Avaliação do bem — laudo <small>(R$)</small></label>
+            <input id="b_aval" type="text" inputmode="decimal" placeholder="170.000,00" value="170.000,00">
+          </div>
+        </div>
+        <div class="fld mono">
+          <label>Exigência de garantia da administradora <small>(% do saldo)</small></label>
+          <input id="b_exig" type="text" inputmode="decimal" placeholder="100" value="100">
+        </div>
+
+        <div class="cetbox">
+          <div class="ch">Custo efetivo-alvo (mensal)</div>
+          <div class="cetrow">
+            <div class="fld mono">
+              <label>CET-alvo <small>(% a.m.)</small></label>
+              <input id="b_cet" type="text" inputmode="decimal" placeholder="2" value="2">
+            </div>
+            <button class="btn-sug" id="b_sug" type="button">Usar valor sugerido</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="res" id="b_res">
+        <h3><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> Resultado da sua ponta</h3>
+
+        <div class="selo" id="b_selo">—</div>
+        <div class="gcover" id="b_gcover">—</div>
+        <div class="bloq" id="b_bloq" style="display:none"></div>
+
+        <div class="big">
+          <div class="bl">Líquido a receber (após a anuência)</div>
+          <div class="bv" id="b_liquido">—</div>
+          <div class="bm">Recebido só depois da <b>anuência da administradora</b> — nunca antes.</div>
+        </div>
+        <div class="grid2">
+          <div class="mini ce"><div class="ml">Custo efetivo</div><div class="mv" id="b_cet_real">—</div></div>
+          <div class="mini"><div class="ml">Comparativo bancário</div><div class="mv" id="b_comp">—</div></div>
+        </div>
+
+        <div class="casc">
+          <div class="cah">Repartição do valor combinado</div>
+          <div class="caline"><span class="cn">Valor combinado</span><span class="cv" id="b_c_comb">—</span></div>
+          <div class="caline neg"><span class="cn">− Bidcon (10%, mín. R$ 2.500)</span><span class="cv" id="b_c_bidcon">—</span></div>
+          <div class="caline neg"><span class="cn">− Parceiro captador (10% do resto)</span><span class="cv" id="b_c_parc">—</span></div>
+          <div class="caline neg"><span class="cn">− Custos notariais (sua parte)</span><span class="cv" id="b_c_notary">—</span></div>
+          <div class="caline tot"><span class="cn">= Líquido do captador</span><span class="cv" id="b_c_liq">—</span></div>
+        </div>
+
+        <a class="reszap" id="b_zap" href="#" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.739-.981z"/></svg>
+          Enviar minha simulação no WhatsApp
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="disc">
+    <b>Como ler estes números.</b> Os valores são estimativas para orientar a conversa e ficam sujeitos à <b>anuência da administradora</b> — que analisa e valida a troca de titularidade e de garantia. Não há promessa de contemplação nem de prazo. O <b>custo efetivo</b> é exibido como taxa mensal factual da operação de assunção de dívida — repartição de um valor combinado entre as partes, não rendimento nem retorno. É exigido <b>extrato da cota com no máximo 7 dias</b>. A cota deste produto já teve o crédito utilizado; por isso o objeto é a dívida e a garantia, não a venda de crédito.
+  </div>
+  <div class="disc">
+    <b>Garantia e custódia.</b> O captador apresenta <b>bem próprio</b> cobrindo, no mínimo, a exigência da administradora sobre o saldo assumido (laudo de avaliação). A liberação depende de <b>anuência</b> mais <b>substituição de garantia registrada</b>: a alienação migra para o bem do captador e o bem do repassante é liberado. O dinheiro fica na <b>Conta Notarial</b> (Prov. CNJ 197/2025) — a plataforma não movimenta valores; ela gera a instrução e registra o evento auditável. Se a administradora negar, a devolução ao repassante é integral.
+  </div>
+
+  <div class="foot">
+    <b>bidcon · Repasse</b> — by Prospere Consórcios<br>
+    Contemplação de consórcio ocorre exclusivamente por <b>sorteio ou lance</b>, sem promessa de data. A bidcon intermedia e organiza a documentação; a viabilidade final é sempre da administradora.<br>
+    Prospere Consórcios · <a href="https://www.prospere.com.br/" target="_blank" rel="noopener">prospere.com.br</a>
+  </div>
+
+</main>
+
+<script>
+/* ============================================================================
+   MOTOR — PORTA 1:1 de platform/lib/reserve/repasse-pricing.ts (FONTE CANÔNICA).
+   ----------------------------------------------------------------------------
+   Qualquer mudança na matemática do servidor (round2, faixas notariais, cascata,
+   VP, CET, cascata reversa) OBRIGA sincronizar este bloco. As primitivas
+   round2 / FAIXAS_TARIFA_NOTARIAL / tarifaNotarial / repartirTarifaNotarial são
+   VERBATIM de platform/lib/reserve/fee-plan.ts. Nada aqui chama rede.
+   Aferição centavo a centavo: BID-0442 e BID-0492 (ver casos no fim do arquivo).
+   ========================================================================== */
+
+/* --- round2: VERBATIM de fee-plan.ts (centavosLit) --- */
+function round2(v){ return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+/* --- FAIXAS_TARIFA_NOTARIAL: 11 faixas VERBATIM de fee-plan.ts (NÃO simplificar) --- */
+var FAIXAS_TARIFA_NOTARIAL = [
+  { ate: 99999.99,   pct: 0,      min: 500  },
+  { ate: 299999.99,  pct: 0.0045, min: 500  },
+  { ate: 499999.99,  pct: 0.0035, min: 1350 },
+  { ate: 699999.99,  pct: 0.0032, min: 1750 },
+  { ate: 999999.99,  pct: 0.0031, min: 2240 },
+  { ate: 1999999.99, pct: 0.0023, min: 3100 },
+  { ate: 2999999.99, pct: 0.0017, min: 4600 },
+  { ate: 3999999.99, pct: 0.0016, min: 5100 },
+  { ate: 4999999.99, pct: 0.0015, min: 6400 },
+  { ate: 5999999.99, pct: 0.0014, min: 7500 },
+  { ate: null,       pct: 0.0013, min: 8400 }
+];
+
+/* --- tarifaNotarial: VERBATIM de fee-plan.ts --- */
+function tarifaNotarial(valorOperacao){
+  if (valorOperacao <= 0) return FAIXAS_TARIFA_NOTARIAL[0].min;
+  for (var k = 0; k < FAIXAS_TARIFA_NOTARIAL.length; k++){
+    var f = FAIXAS_TARIFA_NOTARIAL[k];
+    if (f.ate === null || valorOperacao <= f.ate){
+      return round2(Math.max(valorOperacao * f.pct, f.min));
+    }
+  }
+  return round2(FAIXAS_TARIFA_NOTARIAL[FAIXAS_TARIFA_NOTARIAL.length - 1].min);
+}
+
+/* --- repartirTarifaNotarial: VERBATIM de fee-plan.ts (buyer=repassante, seller=captador) --- */
+function repartirTarifaNotarial(tarifa, alocacao){
+  if (alocacao === "BUYER")  return { buyer: tarifa, seller: 0 };
+  if (alocacao === "SELLER") return { buyer: 0, seller: tarifa };
+  var seller = round2(tarifa / 2);
+  var buyer  = round2(tarifa - seller);
+  return { buyer: buyer, seller: seller };
+}
+
+/* --- Constantes da cascata (VERBATIM de repasse-pricing.ts) --- */
+var BIDCON_PCT = 0.10;
+var BIDCON_MINIMO = 2500;
+var PARTNER_CAPTATION_PCT = 0.10;
+var CET_ALVO_DEFAULT = 0.02;
+var EXIGENCIA_GARANTIA_PCT_DEFAULT = 100;
+
+var PARAMS_SEGMENTO = {
+  AUTOMOVEL: { reajusteAnual: 0.0,  comparativoBancarioMensal: 0.018 },
+  IMOVEL:    { reajusteAnual: 0.06, comparativoBancarioMensal: 0.011 }
+};
+
+/* --- vpFluxo: VERBATIM de repasse-pricing.ts (degrau anual g) --- */
+function vpFluxo(pmt, n, i, g){
+  if (pmt <= 0 || n <= 0) return 0;
+  var m, p;
+  if (i === 0){
+    var soma = 0; p = pmt;
+    for (m = 1; m <= n; m++){
+      if (m > 1 && (m - 1) % 12 === 0) p = round2(p * (1 + g));
+      soma += p;
+    }
+    return soma;
+  }
+  var vp = 0; p = pmt;
+  for (m = 1; m <= n; m++){
+    if (m > 1 && (m - 1) % 12 === 0) p = round2(p * (1 + g));
+    vp += p / Math.pow(1 + i, m);
+  }
+  return vp;
+}
+
+/* --- feeBidcon: VERBATIM de repasse-pricing.ts --- */
+function feeBidcon(combinado){
+  if (combinado <= 0) return 0;
+  return round2(Math.max(combinado * BIDCON_PCT, BIDCON_MINIMO));
+}
+
+/* --- cascata: VERBATIM de repasse-pricing.ts (ordem fixa DELTA-4) --- */
+function cascata(combinado, opts){
+  opts = opts || {};
+  var temParceiro = (opts.temParceiro === undefined) ? true : opts.temParceiro;
+  var alocacaoNotarial = opts.alocacaoNotarial || "SPLIT";
+
+  var c = round2(combinado);
+  var bidcon = feeBidcon(c);
+  var resto = round2(c - bidcon);
+  var parceiroCaptacao = temParceiro ? round2(resto * PARTNER_CAPTATION_PCT) : 0;
+  var posParceiro = round2(resto - parceiroCaptacao);
+
+  var notarialTotal = tarifaNotarial(c);
+  var rateio = repartirTarifaNotarial(notarialTotal, alocacaoNotarial);
+  var notarialRepassante = rateio.buyer;
+  var notarialCaptador = rateio.seller;
+
+  var liquido = round2(posParceiro - notarialCaptador);
+
+  return {
+    combinado: c, bidcon: bidcon, resto: resto,
+    parceiroCaptacao: parceiroCaptacao, posParceiro: posParceiro,
+    notarialTotal: notarialTotal, notarialCaptador: notarialCaptador,
+    notarialRepassante: notarialRepassante, liquido: liquido
+  };
+}
+
+/* --- cetReal: VERBATIM de repasse-pricing.ts (Newton sobre o líquido) --- */
+function cetReal(liquido, pmt, n, g){
+  if (liquido <= 0 || pmt <= 0 || n <= 0) return 0;
+  var i = 0.02;
+  var f = function(x){ return vpFluxo(pmt, n, x, g) - liquido; };
+  for (var k = 0; k < 200; k++){
+    var h = 1e-7;
+    var d = (f(i + h) - f(i - h)) / (2 * h);
+    if (Math.abs(d) < 1e-12) break;
+    var ni = i - f(i) / d;
+    if (ni <= 1e-5) ni = i / 2;
+    if (Math.abs(ni - i) < 1e-12){ i = ni; break; }
+    i = ni;
+  }
+  return i;
+}
+
+/* --- combinadoParaCET: VERBATIM de repasse-pricing.ts (cascata reversa, SEM TETO) --- */
+function combinadoParaCET(pmt, n, cetAlvo, g, opts){
+  opts = opts || {};
+  if (pmt <= 0 || n <= 0) return 0;
+  var liqAlvo = vpFluxo(pmt, n, cetAlvo, g);
+  var v = liqAlvo / 0.81;
+  for (var k = 0; k < 100; k++){
+    var casc = cascata(v, opts);
+    var nv = round2(liqAlvo + casc.bidcon + casc.parceiroCaptacao + casc.notarialCaptador);
+    if (Math.abs(nv - v) < 1e-6){ v = nv; break; }
+    v = nv;
+  }
+  return round2(v);
+}
+
+/* --- avaliarGarantia: VERBATIM de repasse-pricing.ts (DELTA-3) --- */
+function avaliarGarantia(avaliacaoLaudo, saldoDevedor, exigenciaPct){
+  if (exigenciaPct === undefined) exigenciaPct = EXIGENCIA_GARANTIA_PCT_DEFAULT;
+  var coberturaPct = saldoDevedor > 0 ? round2((avaliacaoLaudo / saldoDevedor) * 100) : 0;
+  var selo;
+  if (coberturaPct >= exigenciaPct + 30) selo = "APROVADO_COM_FOLGA";
+  else if (coberturaPct >= exigenciaPct) selo = "APROVADO";
+  else selo = "NAO_COBRE";
+  return { coberturaPct: coberturaPct, exigenciaPct: exigenciaPct, selo: selo, bloqueia: selo === "NAO_COBRE" };
+}
+
+/* --- precificarRepasse: VERBATIM de repasse-pricing.ts (ponta a ponta) --- */
+function precificarRepasse(input){
+  var cetAlvo = (input.cetAlvo === undefined || input.cetAlvo === null) ? CET_ALVO_DEFAULT : input.cetAlvo;
+  var segParams = input.segmento ? PARAMS_SEGMENTO[input.segmento] : null;
+  var g = (input.reajusteAnual === undefined || input.reajusteAnual === null)
+    ? (segParams ? segParams.reajusteAnual : 0)
+    : input.reajusteAnual;
+  var opts = {
+    temParceiro: (input.temParceiro === undefined) ? true : input.temParceiro,
+    alocacaoNotarial: input.alocacaoNotarial || "SPLIT"
+  };
+
+  var combinado = combinadoParaCET(input.parcela, input.parcelasRestantes, cetAlvo, g, opts);
+  var casc = cascata(combinado, opts);
+  var cet = cetReal(casc.liquido, input.parcela, input.parcelasRestantes, g);
+  var repassanteDeposita = round2(casc.combinado + casc.notarialRepassante);
+  var economia = round2(input.saldoDevedor - repassanteDeposita);
+  var economiaPct = input.saldoDevedor > 0 ? round2((economia / input.saldoDevedor) * 100) : 0;
+
+  var garantia = (input.avaliacaoLaudo !== undefined && input.avaliacaoLaudo !== null)
+    ? avaliarGarantia(input.avaliacaoLaudo, input.saldoDevedor,
+        (input.exigenciaGarantiaPct === undefined || input.exigenciaGarantiaPct === null)
+          ? EXIGENCIA_GARANTIA_PCT_DEFAULT : input.exigenciaGarantiaPct)
+    : null;
+
+  return {
+    combinado: combinado, cascata: casc, liquido: casc.liquido,
+    cetReal: cet, cetAlvo: cetAlvo, repassanteDeposita: repassanteDeposita,
+    economia: economia, economiaPct: economiaPct,
+    comparativoBancarioMensal: segParams ? segParams.comparativoBancarioMensal : null,
+    garantia: garantia
+  };
+}
+
+/* ============================================================================
+   UI — parsing, formatação (arredondamento SÓ NA EXIBIÇÃO), tabs, WhatsApp.
+   ========================================================================== */
+var WHATS = "5519997561909";
+
+/* parseBR: aceita "158.729,68" e "158729.68". Cálculo interno = número exato. */
+function parseBR(s){
+  if (s === null || s === undefined) return 0;
+  s = String(s).trim().replace(/[R$\s]/g, "");
+  if (!s) return 0;
+  if (s.indexOf(",") > -1){ s = s.replace(/\./g, "").replace(",", "."); }
+  var v = parseFloat(s);
+  return isFinite(v) ? v : 0;
+}
+/* fmtBRL / fmtNum: formatação de exibição (o valor calculado NÃO é arredondado antes). */
+function fmtBRL(v){
+  return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtPct(taxaMensal){
+  return (taxaMensal * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "% a.m.";
+}
+function $(id){ return document.getElementById(id); }
+
+/* ---- Tabs ---- */
+var tabs = document.querySelectorAll(".tab");
+var panels = document.querySelectorAll(".panel");
+for (var t = 0; t < tabs.length; t++){
+  tabs[t].addEventListener("click", function(){
+    var name = this.getAttribute("data-tab");
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle("on", tabs[i] === this);
+    for (var j = 0; j < panels.length; j++) panels[j].classList.toggle("on", panels[j].getAttribute("data-panel") === name);
+  });
+}
+
+/* ---- PAINEL A — Quitação antecipada (repassante) ---- */
+function updateQuitar(){
+  var saldo   = parseBR($("q_saldo").value);
+  var parcela = parseBR($("q_parcela").value);
+  var n       = Math.round(parseBR($("q_n").value));
+  var g       = parseBR($("q_g").value) / 100;
+  var cet     = parseBR($("q_cet").value) / 100;
+  if (!cet) cet = CET_ALVO_DEFAULT;
+
+  var r = precificarRepasse({
+    saldoDevedor: saldo, parcela: parcela, parcelasRestantes: n,
+    cetAlvo: cet, reajusteAnual: g
+  });
+
+  $("q_deposito").textContent  = parcela > 0 && n > 0 ? fmtBRL(r.repassanteDeposita) : "—";
+  $("q_dep_meta").textContent  = parcela > 0 && n > 0
+    ? "Fecha um custo efetivo-alvo de " + fmtPct(cet) + " pelo prazo de " + n + " parcelas."
+    : "Preencha parcela e prazo para ver o valor combinado.";
+  $("q_economia").textContent  = (parcela > 0 && n > 0 && saldo > 0) ? fmtBRL(r.economia) : "—";
+  $("q_saldo_out").textContent = saldo > 0 ? fmtBRL(saldo) : "—";
+
+  var msg = "Olá! Simulei um repasse na bidcon (quero sair da dívida).%0A" +
+    "Saldo devedor: " + fmtBRL(saldo) + "%0A" +
+    "Parcela: " + fmtBRL(parcela) + " x " + n + "%0A" +
+    "Custo efetivo-alvo: " + fmtPct(cet) + "%0A" +
+    "Valor combinado a depositar: " + fmtBRL(r.repassanteDeposita) + "%0A" +
+    "Economia frente ao saldo: " + fmtBRL(r.economia) + "%0A" +
+    "Podemos conversar sobre a anuência da administradora?";
+  $("q_zap").href = "https://wa.me/" + WHATS + "?text=" + msg;
+}
+
+/* ---- PAINEL B — Simule seu bem (captador) ---- */
+function updateBem(){
+  var parcela = parseBR($("b_parcela").value);
+  var n       = Math.round(parseBR($("b_n").value));
+  var saldo   = parseBR($("b_saldo").value);
+  var seg     = $("b_seg").value;
+  var g       = parseBR($("b_g").value) / 100;
+  var aval    = parseBR($("b_aval").value);
+  var exig    = parseBR($("b_exig").value) || EXIGENCIA_GARANTIA_PCT_DEFAULT;
+  var cet     = parseBR($("b_cet").value) / 100;
+  if (!cet) cet = CET_ALVO_DEFAULT;
+
+  var r = precificarRepasse({
+    saldoDevedor: saldo, parcela: parcela, parcelasRestantes: n,
+    cetAlvo: cet, reajusteAnual: g, segmento: seg,
+    avaliacaoLaudo: aval, exigenciaGarantiaPct: exig
+  });
+
+  var ok = parcela > 0 && n > 0;
+  $("b_liquido").textContent = ok ? fmtBRL(r.liquido) : "—";
+  $("b_cet_real").textContent = ok ? fmtPct(r.cetReal) : "—";
+  $("b_comp").textContent = r.comparativoBancarioMensal != null ? fmtPct(r.comparativoBancarioMensal) : "—";
+
+  $("b_c_comb").textContent   = ok ? fmtBRL(r.cascata.combinado) : "—";
+  $("b_c_bidcon").textContent = ok ? "− " + fmtBRL(r.cascata.bidcon) : "—";
+  $("b_c_parc").textContent   = ok ? "− " + fmtBRL(r.cascata.parceiroCaptacao) : "—";
+  $("b_c_notary").textContent = ok ? "− " + fmtBRL(r.cascata.notarialCaptador) : "—";
+  $("b_c_liq").textContent    = ok ? fmtBRL(r.cascata.liquido) : "—";
+
+  /* Garantia — selo + bloqueio */
+  var selo = $("b_selo"), gcover = $("b_gcover"), bloq = $("b_bloq");
+  if (r.garantia && aval > 0 && saldo > 0){
+    var gr = r.garantia;
+    selo.className = "selo";
+    if (gr.selo === "APROVADO_COM_FOLGA"){ selo.classList.add("folga"); selo.textContent = "✓ Garantia aprovada com folga"; }
+    else if (gr.selo === "APROVADO"){ selo.classList.add("ok"); selo.textContent = "✓ Garantia aprovada"; }
+    else { selo.classList.add("no"); selo.textContent = "✕ Garantia não cobre"; }
+    gcover.innerHTML = "Cobertura do bem: <b>" + gr.coberturaPct.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}) +
+      "%</b> do saldo · exigência da administradora: <b>" + gr.exigenciaPct + "%</b>";
+    if (gr.bloqueia){
+      bloq.style.display = "block";
+      bloq.innerHTML = "<b>A avaliação não cobre a exigência da administradora.</b> Aumente a avaliação do bem (laudo) ou verifique a exigência — a liberação depende de anuência mais substituição de garantia registrada.";
+    } else {
+      bloq.style.display = "none";
+    }
+  } else {
+    selo.className = "selo"; selo.textContent = "—";
+    gcover.textContent = "Informe a avaliação do bem para ver a cobertura da garantia.";
+    bloq.style.display = "none";
+  }
+
+  var msg = "Olá! Simulei um repasse na bidcon (quero assumir as parcelas).%0A" +
+    "Parcela: " + fmtBRL(parcela) + " x " + n + "%0A" +
+    "Segmento: " + (seg === "IMOVEL" ? "Imóvel" : "Automóvel") + "%0A" +
+    "Custo efetivo-alvo: " + fmtPct(cet) + "%0A" +
+    "Líquido a receber: " + fmtBRL(r.liquido) + "%0A" +
+    "Custo efetivo: " + fmtPct(r.cetReal) + "%0A" +
+    "Avaliação do bem (laudo): " + fmtBRL(aval) + "%0A" +
+    "Podemos conversar sobre a garantia e a anuência?";
+  $("b_zap").href = "https://wa.me/" + WHATS + "?text=" + msg;
+}
+
+/* Segmento comanda reajuste (preenche o campo g quando muda o segmento) */
+function onSegChange(){
+  var seg = $("b_seg").value;
+  var p = PARAMS_SEGMENTO[seg];
+  $("b_g").value = (p.reajusteAnual * 100).toLocaleString("pt-BR", {maximumFractionDigits:2});
+  updateBem();
+}
+
+/* Botões "usar valor sugerido" p/ CET-alvo */
+$("q_sug").addEventListener("click", function(){ $("q_cet").value = "2"; updateQuitar(); });
+$("b_sug").addEventListener("click", function(){ $("b_cet").value = "2"; updateBem(); });
+
+/* Listeners */
+["q_saldo","q_parcela","q_n","q_g","q_cet"].forEach(function(id){ $(id).addEventListener("input", updateQuitar); });
+["b_parcela","b_n","b_saldo","b_g","b_aval","b_exig","b_cet"].forEach(function(id){ $(id).addEventListener("input", updateBem); });
+$("b_seg").addEventListener("change", onSegChange);
+
+/* WhatsApp do header (genérico) */
+$("hzap").href = "https://wa.me/" + WHATS + "?text=" + "Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20repasse%20de%20consórcio%20na%20bidcon.";
+
+/* Render inicial */
+updateQuitar();
+updateBem();
+
+/* ============================================================================
+   CASOS DE AFERIÇÃO (paridade centavo a centavo com repasse-pricing.ts):
+   - BID-0442 (Âncora): saldo 158.729,68 · 105 × 1.504,26 · g=0 · CET-alvo 2%
+       → combinado ≈ 81.556 · líquido ≈ 65.810 · CET real ≈ 2,0%.
+   - BID-0492 (Porto):  saldo 203.137,00 · 67 × 3.031,89 · g=0 · CET-alvo 2%
+       → combinado ≈ 137.878 · líquido ≈ 111.370 · repassante deposita ≈ 138.188.
+   Cascata canônica DELTA-4: 70.000 → 7.000 → 63.000 → 6.300 → 56.700.
+   ========================================================================== */
+</script>
+</body>
+</html>
