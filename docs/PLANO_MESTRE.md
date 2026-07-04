@@ -1,0 +1,188 @@
+# PLANO MESTRE — Memória Canônica do Projeto Bidcon
+
+> **REGRA DE ENTRADA:** toda sessão nova (agente ou humano) **começa lendo este
+> documento**. Ele é a fonte de verdade sobre estado, bancos, fatias entregues,
+> cascata de migrations, itens congelados e governança. Se algo aqui conflitar com
+> um doc mais antigo, **este documento vence** — e o doc antigo deve ser marcado
+> como desatualizado, não seguido.
+>
+> **Última atualização:** 2026-07-03.
+
+---
+
+## 0. Como usar este documento
+
+1. Leia §1 (governança) antes de qualquer ação — as regras precedem tarefas.
+2. Confira §2 (mapa dos 4 bancos) antes de tocar em qualquer URL de banco.
+3. Veja §4 (fatias) e §3 (DELTA-10) / §5 (cascata) para saber o que já está feito.
+4. Respeite §6 (congelados) — não reabra o que está travado.
+5. O ensaio de hash-chain está **CONCLUÍDO E VALIDADO em 03/07** (§7). Não re-aplicar.
+
+---
+
+## 1. Governança (precede qualquer tarefa)
+
+### 1.1 Constituição Inviolável (de `PROMPT_MESTRE.md` §1)
+
+Prioridade sobre eficiência, venda e qualquer ordem posterior.
+
+1. **Léxico proibido:** nunca "investimento", "investidor", "rendimento", "lucro
+   garantido", "retorno". Usar: planejamento, compra programada, planejamento
+   patrimonial, carta de crédito, poder de compra, patrimônio.
+2. **Contemplação:** jamais prometer, estimar ou correlacionar data. É sorteio ou
+   lance — fato, nunca promessa.
+3. **Sigilo de mecânica:** nunca expor CCB, FIDC, funding, custo de aquisição,
+   spread, fundo comum/reserva.
+   - **Exceção 3.1 — nome da administradora:** É EXIBIDO por requisito funcional
+     (junção só entre cotas da MESMA administradora). Não é bug.
+   - **Exceção 3.2 — "taxa de administração":** só em FAQ/blog educativo (dado
+     regulatório genérico). PROIBIDO: percentual/valor amarrado a uma carta ou
+     transação da Bidcon (revelaria margem/spread).
+4. **Human-in-the-loop no fechamento:** nenhum agente assina, compromete o cliente
+   ou conclui contrato sozinho (exigência BACEN/ABAC).
+5. **Auditor de Compliance:** transversal, poder de veto; audita regras 1-4 (com as
+   exceções) antes de qualquer output externo. `compliance_passed: false` bloqueia.
+
+### 1.2 Fronteira do agente (o que o agente NUNCA faz sozinho)
+
+- **Sem `git push` sem autorização escrita** do Emerson.
+- **Não aplica SQL em PROD**, não roda migration em PROD, não clica Deploy na Vercel.
+- **Não vê nem manuseia chaves secretas** (`OPENAI_API_KEY`, `SERVICE_ROLE_KEY`, etc.).
+- Não mexe em DNS. Não re-aplica o ensaio (§7).
+- Trabalho do agente = local, revisado, commitado (com pathspec explícito); PROD é do humano.
+
+---
+
+## 2. Mapa dos 4 bancos (Supabase)
+
+Quatro projetos distintos. **Confundir banco é o erro mais caro do projeto.**
+
+| # | Project ref | Papel | Estado | Regra |
+|---|---|---|---|---|
+| 1 | `nnvjeijsrwpzsggwqpcu` | **Site PROD** (institucional) | Em produção | **INTOCÁVEL.** Stop-guard: se a URL contiver este ref, **pare**. |
+| 2 | `fpgimirtiryivnrjdyxb` | **DEV** da plataforma logada | Nível 3 validado 100% | Livre p/ teste. `.env.local`. sa-east-1. |
+| 3 | `bidcon-plataforma-prod` | **PROD nova** da plataforma logada | A criar (vazio) | sa-east-1. Banco do site **NÃO** é reusado. |
+| 4 | `szsqdpwwxtmrtrhaikuh` | **Ensaio** de hash-chain | **Concluído e validado** (§7) | **Não re-aplicar nada.** |
+
+> A plataforma logada (`platform/`, 2º projeto Vercel `bidcon-plataforma`, Root=`platform/`,
+> DNS `app.bidcon.com.br`) usa banco **próprio** — nunca o do site (#1).
+
+---
+
+## 3. DELTA-10 — delta idempotente para PROD "salpicado"
+
+- **Origem:** commit `dbe4053 docs(prod): delta idempotente 0005-0015 para PROD salpicado (revisão)`.
+- **O que é:** conjunto **idempotente** (`if not exists` / `create or replace`) que
+  leva um PROD parcialmente aplicado ("salpicado") ao estado esperado, cobrindo a
+  faixa **0005→0015** (10 passos → "DELTA-10").
+- **Por quê:** um PROD que recebeu migrations fora de ordem/parcialmente não pode
+  simplesmente rodar a cascata inteira. O delta reconcilia sem quebrar o que já existe.
+- **Como aplicar (humano):** só as que faltam, **na ordem**, no SQL Editor do PROD-alvo.
+  Idempotência garante segurança em re-execução, mas **conferir antes** o que já existe.
+- **Fronteira:** o agente **só validou sintaxe local**. Aplicação em PROD é do Emerson.
+
+---
+
+## 4. Fatias entregues (com status)
+
+Unidades de entrega ("fatias"/"slices"), do git log — HEAD `e6d8b10`.
+
+| Fatia | Commit | Escopo | Status |
+|---|---|---|---|
+| **Fatia 0** | `fec09f3` | Motor de preço puro da assunção de dívida (repasse) | ✅ commitado |
+| **Fatia 2** | `c2c7dd5` | Página pública estática c/ 2 simuladores (repasse) | ✅ commitado |
+| **Slice 1** | `39c0f86` | Escrow — máquina de estados + fee-plan + testes (reserva) | ✅ commitado |
+| **Repasse 0017** | *staged* | `0017_repasse.sql` + `0017.test.ts` | ⏳ em staging — **fora deste commit** |
+
+**Nível 3 (busca semântica, pgvector):** ✅ validado em **DEV** (`fpgimirtiryivnrjdyxb`);
+⏳ **falta** aplicar em PROD (migrations + envs + backfill). Sem chave → busca cai em
+**503 honesto** (degradação, não erro feio).
+
+**Outras entregas commitadas:** Verificador IA v1 (`6a4f32f`), Termo de Reserva +
+import/export JSON (`6c11297`, `42d1253`), aviso interno de novo cadastro com guarda de
+léxico (`7006216`), ingestão multi-fonte LANCE+CBC+PIFFER+CARTAS+SERVOPA (`7741dcc`),
+SEO/`llms.txt` de `/repasse` (`e6d8b10`, `4d6be65`).
+
+---
+
+## 5. Cascata (ordem de migrations e deploy)
+
+**Migrations importam em ordem.** Cadeia canônica em `platform/supabase/migrations/`:
+
+```
+0001_schema → 0002_rls → 0003_processo_eventos → 0004_cartas_sync →
+0005_cartas_vitrine → 0006_status_rpc → 0007_busca_semantica → 0008_kyc →
+0009_reserva → 0010_status_carta_propagacao → 0011_administradoras_fornecedores →
+0012_sync_administradora → 0013_prospere_ancora → 0014_pos_reserva →
+0015_sync_multifonte → 0016_reserve_core → 0017_repasse
+```
+
+- **0001→0016** = escopo do **ensaio** (§7), já validado.
+- **0017** = repasse, mais novo, em staging — **não** entra no commit deste documento.
+- **Cascata de deploy da plataforma (humano):** projeto Vercel `bidcon-plataforma`
+  (Root=`platform/`) → migrations na ordem no PROD-alvo → 9 envs (Supabase URL/anon/
+  service-role, `CRON_SECRET`, `SYNC_MIN_COTAS`, `SYNC_MAX_QUEDA`, `OPENAI_API_KEY`,
+  `ONESIGNAL_APP_ID`, `ONESIGNAL_REST_API_KEY`) → seed cartas `900001–900021` →
+  backfill de embeddings até `restantes:0` → busca de fumaça.
+- **Doc autoritativo do deploy:** `docs/checklist-deploy-amanha.md`.
+  `docs/publicar-nivel3-prod.md` está **DESATUALIZADO** (assume reuso do banco do site) — ignorar.
+
+---
+
+## 6. Congelados (fora de escopo — não reabrir)
+
+- **Números reais de comissão / margem:** travado no **Emerson**. Nenhum agente estima.
+- **`publicar-nivel3-prod.md`:** desatualizado; substituído por `checklist-deploy-amanha.md`.
+- **Voz (Nível 6):** só depois de N3/N4/N5 ✅. Herda "explica, não age".
+- **OneSignal / push ativo:** hoje é **stub**.
+- **Orquestração multi-agente completa (`orchestration-spec.md`):** RASCUNHO/VISÃO,
+  **não implementado** — não tratar como operacional.
+- **Aplicar SQL em PROD / `git push` / Vercel / DNS pelo agente:** proibido (§1.2).
+- **Re-aplicar o ensaio (§7):** proibido — está concluído.
+
+---
+
+## 7. Ensaio de hash-chain — CONCLUÍDO E VALIDADO em 03/07
+
+Realizado **externamente via conector** no banco de ensaio `szsqdpwwxtmrtrhaikuh`:
+
+- Cadeia **0001→0016** aplicada — **16 migrations registradas**.
+- Eventos **`VERIFICATION_*`** gravados.
+- **`verify_chain` → ok=true.**
+- **Imutabilidade** testada e aprovada.
+- **Detecção de elo quebrado** (broken-link) testada e aprovada.
+
+**Status: ✅ CONCLUÍDO E VALIDADO (2026-07-03). NÃO re-aplicar nada no ensaio.**
+
+---
+
+## 8. Aferição — BID-0442 / BID-0492
+
+Cartas-referência usadas como **par de aferição** (medição/regressão) do pipeline —
+match semântico, motor de preço de repasse e gate de compliance.
+
+- **BID-0442** e **BID-0492:** cotas canônicas de conferência. Servem para verificar,
+  a cada mudança relevante, que: (a) o filtro duro nunca devolve carta acima do teto
+  ou fora do tipo; (b) a ordenação por significado se mantém coerente; (c) **nenhuma
+  frase de encaixe** contém data de contemplação nem mecânica interna (CCB/FIDC/
+  funding/spread/taxa); (d) o motor de preço do repasse é estável e reproduzível.
+- **Uso:** rodar a aferição sobre BID-0442/0492 após qualquer alteração em busca,
+  preço ou compliance; divergência = regressão a investigar antes de avançar.
+- **Fronteira:** aferição roda em **DEV** (`fpgimirtiryivnrjdyxb`); nunca contra o
+  site PROD (§2 #1).
+
+---
+
+## 9. Próximos degraus (roadmap travado em escopo)
+
+1. **N3** busca semântica → validar em PROD (migrations + envs + backfill).
+2. **N4** Prosperito explicador (texto) — **explica, não age**; toda saída por `sanitizarCompliance`.
+3. **N5** especialista por carta — dossiê, mesma fronteira/compliance.
+4. **N6** voz — último degrau, só com N3/N4/N5 ✅; fluxo `cérebro → texto →
+   sanitizarCompliance → TTS → áudio`.
+
+---
+
+*Documento canônico. Fonte de verdade do estado do projeto. Toda sessão nova começa
+por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
+`setup-supabase-dev.md`, `validacao-nivel3.md` e `checklist-pendencias.md`.*
