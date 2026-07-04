@@ -17,6 +17,29 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// ----- CORS (cross-domain: www.bidcon.com.br → app.bidcon.com.br) -----
+// Origem SEMPRE explícita — nunca "*", pois a requisição é credentialed
+// (o cliente envia credentials: "include" para levar o cookie de sessão).
+// Allow-Credentials: true é obrigatório para o cookie de auth trafegar.
+const CORS_ORIGIN = "https://www.bidcon.com.br";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": CORS_ORIGIN,
+  "Access-Control-Allow-Credentials": "true",
+} as const;
+
+// Preflight: responde ao OPTIONS com os cabeçalhos de CORS e 204.
+export function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "content-type",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
 // ----- limites de entrada -----
 const MAX_ARQUIVOS = 5;
 const MIN_ARQUIVOS = 1;
@@ -74,14 +97,17 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
+    return NextResponse.json(
+      { erro: "Não autenticado." },
+      { status: 401, headers: corsHeaders }
+    );
   }
 
   if (rateLimited(user.id)) {
     logEvento({ userId: user.id, resultado: "rate_limited" });
     return NextResponse.json(
       { erro: "Muitas solicitações. Aguarde um instante e tente de novo." },
-      { status: 429 }
+      { status: 429, headers: corsHeaders }
     );
   }
 
@@ -90,20 +116,23 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as { arquivos?: unknown };
   } catch {
-    return NextResponse.json({ erro: "JSON inválido." }, { status: 400 });
+    return NextResponse.json(
+      { erro: "JSON inválido." },
+      { status: 400, headers: corsHeaders }
+    );
   }
 
   const arquivos = body?.arquivos;
   if (!Array.isArray(arquivos) || arquivos.length < MIN_ARQUIVOS) {
     return NextResponse.json(
       { erro: "Envie de 1 a 5 arquivos (PDF/JPG/PNG)." },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
   if (arquivos.length > MAX_ARQUIVOS) {
     return NextResponse.json(
       { erro: `No máximo ${MAX_ARQUIVOS} arquivos por vez.` },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -113,17 +142,20 @@ export async function POST(req: Request) {
     if (!TIPOS_OK.has(media)) {
       return NextResponse.json(
         { erro: "Tipo não suportado. Use PDF, JPG ou PNG." },
-        { status: 415 }
+        { status: 415, headers: corsHeaders }
       );
     }
     const b64 = limparBase64(item?.data_base64);
     if (!b64) {
-      return NextResponse.json({ erro: "Arquivo em base64 inválido." }, { status: 400 });
+      return NextResponse.json(
+        { erro: "Arquivo em base64 inválido." },
+        { status: 400, headers: corsHeaders }
+      );
     }
     if (bytesBase64(b64) > MAX_BYTES) {
       return NextResponse.json(
         { erro: "Cada arquivo deve ter no máximo 10MB." },
-        { status: 413 }
+        { status: 413, headers: corsHeaders }
       );
     }
     docs.push({ media_type: media as DocEntrada["media_type"], data_base64: b64 });
@@ -134,7 +166,7 @@ export async function POST(req: Request) {
     logEvento({ userId: user.id, resultado: "nao_configurado", qtd: docs.length });
     return NextResponse.json(
       { ok: false, modo: "nao_configurado", erro: "Verificador ainda não configurado." },
-      { status: 503 }
+      { status: 503, headers: corsHeaders }
     );
   }
 
@@ -148,7 +180,7 @@ export async function POST(req: Request) {
       ms: Date.now() - t0,
       alertas: resultado.alertas.length,
     });
-    return NextResponse.json(resultado);
+    return NextResponse.json(resultado, { headers: corsHeaders });
   } catch (e) {
     // Nunca vaza o erro do provedor ao client; loga só a mensagem curta.
     logEvento({
@@ -158,7 +190,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(
       { ok: false, erro: "Não foi possível ler o documento agora. Tente novamente." },
-      { status: 502 }
+      { status: 502, headers: corsHeaders }
     );
   }
 }
