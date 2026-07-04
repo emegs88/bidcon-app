@@ -198,3 +198,4 @@ match semântico, motor de preço de repasse e gate de compliance.
 *Documento canônico. Fonte de verdade do estado do projeto. Toda sessão nova começa
 por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 `setup-supabase-dev.md`, `validacao-nivel3.md` e `checklist-pendencias.md`.*
+0017 PROD 20260704132129 auditada · /conta-notarial v4 selo-medalha (merge+seds f444399) · WhatsApp global 5519997561909 provisório até API · selo na home · navbar global = próxima sessão — 04/07
