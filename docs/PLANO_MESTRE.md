@@ -103,6 +103,18 @@ import/export JSON (`6c11297`, `42d1253`), aviso interno de novo cadastro com gu
 léxico (`7006216`), ingestão multi-fonte LANCE+CBC+PIFFER+CARTAS+SERVOPA (`7741dcc`),
 SEO/`llms.txt` de `/repasse` (`e6d8b10`, `4d6be65`).
 
+**Verificador cross-domain (2026-07-03):** o cliente estático em `www.bidcon.com.br`
+chamava a rota autenticada em `app.bidcon.com.br` sem CORS credenciado — feature
+quebrada (cookie de sessão não trafegava). Correção coerente em 2 arquivos:
+(①) URL absoluta `https://app.bidcon.com.br/api/verificador` no `termo-reserva.html`;
+(②) CORS restrito na rota (`Access-Control-Allow-Origin: https://www.bidcon.com.br`
++ handler `OPTIONS`); (③) `credentials: "include"` no cliente;
+(④) `Access-Control-Allow-Credentials: true` no servidor (OPTIONS **e** todas as
+respostas), origem sempre explícita — nunca `*`; auth e rate-limit intactos.
+**Autorização expandida por decisão do Emerson** após o achado do par
+credentialed-CORS; a opção literal (B) foi oferecida e **recusada** por entregar
+feature quebrada.
+
 ---
 
 ## 5. Cascata (ordem de migrations e deploy)
