@@ -3,6 +3,11 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "outputDirectory": "public",
+  "redirects": [
+    { "source": "/cartas/marketplace", "destination": "/bidcon", "permanent": true },
+    { "source": "/cartas/:path*", "destination": "/bidcon", "permanent": true },
+    { "source": "/cartas", "destination": "/bidcon", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",
