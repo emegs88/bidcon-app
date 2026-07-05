@@ -44,9 +44,10 @@ export default async function CartasPage({
   let query = supabase
     .from("cartas")
     .select(
-      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, administradora:administradora_id ( nome, aceita_assuncao )"
+      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, bidcon_agio_150, bidcon_agio_120, bidcon_custo_am, administradora:administradora_id ( nome, aceita_assuncao )"
     )
     .eq("status", "disponivel")
+    .order("bidcon_agio_150", { ascending: false, nullsFirst: false })
     .order("valor_credito", { ascending: true });
 
   if (tipoFiltro) query = query.eq("tipo", tipoFiltro);
@@ -63,6 +64,9 @@ export default async function CartasPage({
       valor_entrada: c.valor_entrada,
       valor_parcela: c.valor_parcela,
       qtd_parcelas: c.qtd_parcelas,
+      bidcon_agio_150: c.bidcon_agio_150,
+      bidcon_agio_120: c.bidcon_agio_120,
+      bidcon_custo_am: c.bidcon_custo_am,
       administradora: administradora as CartaVitrine["administradora"],
     };
   });

@@ -21,6 +21,10 @@ export type CartaVitrine = {
   valor_entrada: number | null;
   valor_parcela: number | null;
   qtd_parcelas: number | null;
+  // Referências de planejamento Bidcon Price (já calculadas no banco). Só exibir.
+  bidcon_agio_150: number | null;
+  bidcon_agio_120: number | null;
+  bidcon_custo_am: number | null;
   // pode ser null quando a carta ainda não tem administradora vinculada.
   administradora: AdministradoraVitrine | null;
 };
@@ -43,6 +47,20 @@ export function CartaCard({ carta }: { carta: CartaVitrine }) {
         crédito da carta
         {carta.administradora?.nome ? ` · ${carta.administradora.nome}` : ""}
       </div>
+
+      {/* Selos Bidcon Price — referências de planejamento (nunca investimento/rendimento). */}
+      {carta.bidcon_agio_150 != null && carta.bidcon_agio_150 > 0 && (
+        <div className={styles.seloDourado}>
+          <span className={styles.seloDouradoTitulo}>Bidcon Price</span>
+          <span className={styles.seloDouradoVal}>
+            ágio justo até {brl(carta.bidcon_agio_150)}
+          </span>
+        </div>
+      )}
+      {carta.bidcon_agio_120 != null && carta.bidcon_agio_120 > 0 && (
+        <div className={styles.seloVerde}>Custo excelente</div>
+      )}
+      <p className={styles.seloNota}>Referência de planejamento, não é oferta de investimento.</p>
 
       {carta.administradora?.aceita_assuncao && (
         <div className={styles.atributos}>
