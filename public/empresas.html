@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parceiros Bidcon — Plataforma para quem vende consórcio | Cotas contempladas com segurança de cartório</title>
+<meta name="description" content="Exclusivo para vendedores de consórcio, corretores, imobiliárias e administradoras: cadastre cotas contempladas dos seus clientes, ganhe comissão de captação e feche vendas com pagamento custodiado em cartório (Conta Notarial Bidcon).">
+<link rel="canonical" href="https://bidcon.com.br/empresas">
+<style>
+  :root{
+    --navy:#0A0E1A; --navy2:#0F1526; --card:#131B30; --line:#1E2A47;
+    --g1:#8FB7FF; --g2:#36C5F0; --g3:#1E6FE6;
+    --txt:#E8EEFB; --mut:#93A0BE; --gold:#D9B36A; --gold2:#F0D6A0; --ok:#39D98A;
+    --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    --disp:"Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--navy); color:var(--txt); font-family:var(--disp); line-height:1.6; overflow-x:hidden}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 22px}
+  a{color:var(--g2)}
+  .bg{position:fixed; inset:0; z-index:-1; pointer-events:none;
+      background:radial-gradient(900px 520px at 80% -12%, rgba(30,111,230,.20), transparent 60%),
+                 radial-gradient(640px 400px at 6% 6%, rgba(54,197,240,.08), transparent 60%), var(--navy)}
+  .rv{opacity:0; transform:translateY(16px); transition:opacity .65s ease, transform .65s ease}
+  .rv.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion: reduce){ .rv{opacity:1; transform:none; transition:none} }
+  .hr-gold{height:1px; background:linear-gradient(90deg, transparent, rgba(217,179,106,.55), transparent); border:none}
+
+  header.top{border-bottom:1px solid var(--line); padding:18px 0}
+  header.top .wrap{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .brand{font-weight:700; font-size:20px}
+  .brand .grad{background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .brand small{font-size:11px; color:var(--mut); font-weight:400; margin-left:8px}
+  .top-tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--mut)}
+
+  .hero{padding:72px 0 46px}
+  .eyebrow{display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:var(--gold2);
+      border-bottom:1px solid rgba(217,179,106,.45); padding-bottom:8px; margin-bottom:24px}
+  h1{font-size:clamp(32px,5vw,54px); font-weight:700; letter-spacing:-.025em; line-height:1.07; max-width:820px}
+  h1 .q{color:var(--g2)} h1 .au{color:var(--gold2)}
+  .hero p.lead{margin-top:22px; font-size:17px; color:var(--mut); max-width:640px}
+  .hero p.lead strong{color:var(--txt)}
+  .cta-row{margin-top:30px; display:flex; flex-wrap:wrap; gap:12px}
+  .btn{display:inline-block; background:linear-gradient(90deg,var(--g2),var(--g3)); color:#fff; text-decoration:none; font-weight:600; padding:15px 30px; border-radius:12px; font-size:15.5px; box-shadow:0 8px 32px rgba(30,111,230,.35)}
+  .btn.sec{background:transparent; border:1px solid rgba(217,179,106,.55); color:var(--gold2); box-shadow:none; font-family:var(--mono); font-size:13.5px}
+
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); padding:14px 0 52px; border-top:1px solid var(--line); margin-top:46px}
+  .stat{padding:20px 22px 20px 0; border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+  .stat .n{font-family:var(--mono); font-size:24px; font-weight:600; color:var(--g1)}
+  .stat .d{font-size:12.5px; color:var(--mut); margin-top:6px}
+  @media (max-width:760px){ .stat{border-right:none; border-bottom:1px solid var(--line); padding-left:0} }
+
+  section{padding:52px 0; border-top:1px solid var(--line)}
+  .sect-label{font-family:var(--mono); font-size:10.5px; letter-spacing:.26em; text-transform:uppercase; color:var(--mut); margin-bottom:14px}
+  .stitle{font-size:clamp(22px,3.2vw,31px); font-weight:700; letter-spacing:-.015em; margin-bottom:8px}
+  .ssub{color:var(--mut); font-size:15px; max-width:680px; margin-bottom:30px}
+
+  .duo{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:820px){ .duo{grid-template-columns:1fr} }
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px}
+  .panel .k{font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--g2); margin-bottom:12px}
+  .panel.gold .k{color:var(--gold2)}
+  .panel.gold{border-color:rgba(217,179,106,.5); background:linear-gradient(180deg,rgba(217,179,106,.06),var(--card))}
+  .panel h3{font-size:18px; margin-bottom:12px; letter-spacing:-.005em}
+  .panel ul{list-style:none}
+  .panel li{padding:9px 0 9px 22px; border-bottom:1px solid var(--line); font-size:14px; color:var(--mut); position:relative}
+  .panel li:last-child{border-bottom:none}
+  .panel li::before{content:"—"; position:absolute; left:0; color:var(--gold)}
+  .panel li b{color:var(--txt)}
+
+  .cascata{margin-top:26px; background:var(--navy2); border:1px solid var(--line); border-radius:14px; padding:22px 24px}
+  .cascata h3{font-size:15px; margin-bottom:4px}
+  .cascata .s{font-size:12.5px; color:var(--mut); margin-bottom:16px}
+  .flow{display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-family:var(--mono); font-size:13.5px}
+  .flow .box{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px}
+  .flow .box small{display:block; font-size:10px; letter-spacing:.08em; color:var(--mut); text-transform:uppercase; margin-bottom:2px}
+  .flow .box.win{border-color:rgba(217,179,106,.6)} .flow .box.win b{color:var(--gold2)}
+  .flow .arr{color:var(--g2)}
+  .cascata .note{margin-top:12px; font-size:11.5px; color:var(--mut)}
+
+  .pilares{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px}
+  .pilar{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; transition:transform .25s, border-color .25s}
+  .pilar:hover{transform:translateY(-3px); border-color:var(--g3)}
+  .pilar .num{font-family:var(--mono); font-size:11px; letter-spacing:.14em; color:var(--g2); margin-bottom:8px}
+  .pilar h3{font-size:15px; margin-bottom:6px}
+  .pilar p{font-size:13px; color:var(--mut)}
+  .pilar p b{color:var(--txt)}
+
+  .notarial{border:1px solid rgba(217,179,106,.5); border-radius:18px; padding:28px; background:linear-gradient(135deg, rgba(217,179,106,.09), rgba(15,21,38,.92) 46%)}
+  .notarial .k{font-family:var(--mono); font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--gold2); margin-bottom:12px}
+  .notarial h2{font-size:clamp(20px,2.8vw,26px); font-weight:700; margin-bottom:10px}
+  .notarial p{font-size:14.5px; color:var(--mut); max-width:700px}
+  .notarial p b{color:var(--txt)}
+  .notarial .link{display:inline-block; margin-top:16px; font-family:var(--mono); font-size:13px; color:var(--gold2)}
+
+  .passos{counter-reset:p}
+  .passo{display:grid; grid-template-columns:76px 1fr; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); align-items:start}
+  .passo:last-of-type{border-bottom:none}
+  .pn{font-family:var(--mono); font-size:38px; font-weight:600; line-height:1;
+      background:linear-gradient(180deg,var(--g1),var(--g3)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .passo h3{font-size:16.5px; margin-bottom:4px}
+  .passo p{font-size:14px; color:var(--mut)}
+  .passo p b{color:var(--txt)}
+  @media (max-width:560px){ .passo{grid-template-columns:52px 1fr} .pn{font-size:28px} }
+
+  .cta-final{text-align:center; padding:66px 0}
+  .cta-final h2{font-size:clamp(24px,4vw,38px); font-weight:700; letter-spacing:-.02em}
+  .cta-final h2 .grad{background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .cta-final p{color:var(--mut); margin:14px 0 26px}
+  .btns{display:flex; flex-wrap:wrap; gap:12px; justify-content:center}
+  .xlinks{margin-top:26px; font-size:12.5px; color:var(--mut)}
+  .xlinks a{margin:0 8px}
+
+  footer{border-top:1px solid var(--line); padding:26px 0 46px; font-size:11.5px; color:var(--mut); line-height:1.75}
+  footer .ass{margin-top:12px; color:var(--txt)}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="top"><div class="wrap"><nav class="gnav" aria-label="Navegação principal">
+<div class="gnav-in">
+<a href="/" data-nav="inicio">Início</a>
+<a href="/bidcon" data-nav="cotas">Cotas</a>
+<a href="/vender-consorcio-contemplado" data-nav="vender">Vender</a>
+<a href="/repasse" data-nav="repasse">Repasse</a>
+<a href="/conta-notarial" data-nav="conta">Conta Notarial</a>
+<a href="/bidcon-imobiliaria" data-nav="imob">Imobiliária</a>
+<a href="/bidcon-lojista" data-nav="lojista">Lojista</a>
+<a href="/blog" data-nav="blog">Blog</a>
+<a class="on" href="/empresas" data-nav="parceiros">Parceiros</a>
+<a href="https://app.bidcon.com.br" class="gnav-cta" data-nav="entrar">Entrar</a>
+</div>
+</nav>
+<style>
+.gnav{background:#1E2A47;border-bottom:1px solid #1E2A47}
+.gnav-in{max-width:1120px;margin:0 auto;display:flex;gap:2px;align-items:center;padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.gnav-in::-webkit-scrollbar{display:none}
+.gnav-in a{color:#E8ECF5;text-decoration:none;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:14px 12px;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
+.gnav-in a:hover{color:#D9B36A;border-bottom-color:#D9B36A}
+.gnav-in a.on{color:#D9B36A;border-bottom-color:#D9B36A}
+.gnav-in a.gnav-cta{margin-left:auto;color:#1E2A47;background:#D9B36A;border-radius:8px;padding:9px 16px;border-bottom:none}
+.gnav-in a.gnav-cta:hover{color:#1E2A47;background:#E4C583;border-bottom:none}
+@media (max-width:640px){.gnav-in a.gnav-cta{margin-left:8px}}
+</style>
+
+  <div class="brand"><span class="grad">bidcon</span><small>by Prospere Consórcios</small></div>
+  <span class="top-tag">Parceiros · Empresas</span>
+</div></header>
+
+<div class="wrap"><div class="hero rv">
+  <span class="eyebrow">Exclusivo para quem vive de consórcio</span>
+  <h1>Ganhe em <span class="q">cada operação</span>.<br>Monte sua <span class="au">equipe</span>.<br>Opere com <span class="q">inteligência</span>.</h1>
+  <p class="lead">A plataforma profissional de cotas contempladas para <strong>vendedores de consórcio, corretores, imobiliárias, lojistas e administradoras</strong>: ganhe na venda, na compra, no repasse e no crédito com ágio — cadastre-se, construa seu time e opere tudo num <strong>dashboard completo com inteligência artificial</strong>.</p>
+  <div class="cta-row">
+    <a class="btn" href="https://wa.me/5519997561909?text=Ol%C3%A1%2C%20quero%20me%20cadastrar%20como%20parceiro%20Bidcon%20e%20montar%20minha%20equipe">Cadastre-se e monte sua equipe</a>
+    <a class="btn sec" href="#ganhos">Ver como se ganha</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">4 frentes</div><div class="d">de ganho: venda, compra, repasse e crédito com ágio</div></div>
+    <div class="stat"><div class="n">Sua equipe</div><div class="d">cadastre, gerencie e acompanhe seu time num painel só</div></div>
+    <div class="stat"><div class="n">Dashboard IA</div><div class="d">inteligência artificial ajudando em cada operação</div></div>
+    <div class="stat"><div class="n">Cartório</div><div class="d">pagamento custodiado em conta notarial (Banco Safra)</div></div>
+  </div>
+</div></div>
+
+<!-- ============ VENDA E COMPRA ============ -->
+<section id="ganhos"><div class="wrap rv">
+  <div class="sect-label">Quatro frentes de ganho</div>
+  <h2 class="stitle">Você ganha em cada tipo de operação</h2>
+  <p class="ssub">Não é uma comissão só. É um leque de operações — e em todas você entra remunerado, conforme o contrato de parceria.</p>
+  <div class="pilares">
+    <div class="pilar"><div class="num">GANHO 01</div><h3>Comissão de venda</h3><p>Ajudou a vender a carta contemplada do cliente? <b>Você é remunerado pela venda.</b> Cadastre, anuncie e feche pela plataforma.</p></div>
+    <div class="pilar"><div class="num">GANHO 02</div><h3>Comissão de compra</h3><p>Atendeu um comprador e fechou uma carta do estoque? <b>Você ganha pela compra intermediada</b> — o outro lado da mesma operação.</p></div>
+    <div class="pilar"><div class="num">GANHO 03</div><h3>Comissão de repasse</h3><p>Estruturou um repasse ou assunção de cota? <b>Você é remunerado pela operação de repasse</b>, com garantia e substituição de devedor.</p></div>
+    <div class="pilar destaque"><div class="num">GANHO 04</div><h3>Crédito e ágio</h3><p>Operações de crédito contemplado com <b>ágio</b> — quando o crédito vale mais que o saldo — geram margem adicional para o parceiro que traz a operação.</p></div>
+  </div>
+  <p class="ssub" style="margin-top:22px">Todas as formas de remuneração são definidas no <b>contrato de parceria</b>, com regras claras por tipo de operação — sem letra miúda.</p>
+</div></section>
+
+<!-- ============ EQUIPE ============ -->
+<section><div class="wrap rv">
+  <div class="sect-label">Multiplique</div>
+  <h2 class="stitle">Cadastre-se e monte a sua equipe</h2>
+  <p class="ssub">Você não precisa operar sozinho. Construa seu time de vendedores dentro da Bidcon e acompanhe todo mundo num painel só.</p>
+  <div class="duo">
+    <div class="panel gold">
+      <div class="k">Líder de equipe</div>
+      <h3>Cresça pelo seu time.</h3>
+      <ul>
+        <li><b>Cadastre seus vendedores</b> e organize a operação sob a sua liderança</li>
+        <li><b>Acompanhe cada membro:</b> cartas cadastradas, propostas e operações fechadas</li>
+        <li><b>Metas e ranking</b> do time no painel — visão de gestor, não de planilha solta</li>
+        <li><b>Escale sem virar burocracia:</b> a plataforma organiza o fluxo por você</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="k">Vendedor da equipe</div>
+      <h3>Foco no que importa: vender.</h3>
+      <ul>
+        <li><b>Estoque pronto</b> para ofertar aos seus clientes, já verificado</li>
+        <li><b>Scripts e materiais</b> na palma da mão — copies, fichas, argumentos</li>
+        <li><b>Pagamento seguro</b> pela Conta Notarial fecha a venda que travava na desconfiança</li>
+        <li><b>Seu histórico</b> registrado e rastreável, do primeiro contato ao fechamento</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ DASHBOARD IA ============ -->
+<section><div class="wrap rv">
+  <div class="notarial">
+    <div class="k">Dashboard completo · Inteligência Artificial</div>
+    <h2>Um painel que trabalha com você — e uma IA que trabalha por você.</h2>
+    <p>Todas as suas operações, sua equipe e seus clientes num <b>dashboard único</b>. E uma <b>inteligência artificial</b> integrada que acelera o dia a dia: sugere a carta certa para cada perfil de cliente, monta o argumento de venda, calcula os números da operação, responde dúvidas técnicas e organiza o seu funil. <b>Menos tempo em planilha, mais tempo fechando.</b></p>
+    <div class="pilares" style="margin-top:24px">
+      <div class="pilar"><div class="num">IA · MATCH</div><h3>Carta certa, cliente certo</h3><p>A IA cruza o perfil do cliente com o estoque e sugere as melhores cartas.</p></div>
+      <div class="pilar"><div class="num">IA · ARGUMENTO</div><h3>Copy e resposta na hora</h3><p>Gera o texto de abordagem, responde objeções e monta a ficha da carta.</p></div>
+      <div class="pilar"><div class="num">IA · NÚMEROS</div><h3>Conta pronta, sem erro</h3><p>Calcula entrada, saldo, parcelas e condições — você só apresenta.</p></div>
+      <div class="pilar"><div class="num">PAINEL</div><h3>Funil e equipe num lugar</h3><p>Propostas, status, repasses e desempenho do time em tempo real.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ CONTA NOTARIAL ============ -->
+<section><div class="wrap rv">
+  <div class="notarial">
+    <div class="k">A objeção que matava sua venda — resolvida</div>
+    <h2>"E se eu pagar e não receber?" Agora a resposta é: o cartório garante.</h2>
+    <p>Toda operação Bidcon pode ser liquidada pela <b>Conta Notarial</b>: o comprador deposita numa conta vinculada do <b>5º Tabelionato de Notas de Campinas</b>, mantida no <b>Banco Safra</b>, e o valor só é liberado quando a administradora aprova a transferência. Se negar, <b>100% volta ao comprador</b>. Para você, parceiro, isso significa uma coisa: <b>a venda que travava na desconfiança, agora fecha</b> — com fé pública no lugar de promessa.</p>
+    <a class="link" href="/conta-notarial">Conheça a Conta Notarial Bidcon →</a>
+  </div>
+</div></section>
+
+<!-- ============ PILARES ============ -->
+<section><div class="wrap rv">
+  <div class="sect-label">Estrutura</div>
+  <h2 class="stitle">Segurança, organização e confiança — de ponta a ponta</h2>
+  <p class="ssub">A Bidcon nasceu para profissionalizar o mercado de cotas contempladas. Cada pilar existe para proteger o parceiro, o cliente e a operação.</p>
+  <div class="pilares">
+    <div class="pilar"><div class="num">PILAR 01</div><h3>Parceiros verificados</h3><p>Validação de <b>todos</b> os participantes antes de operar — ecossistema confiável para quem anuncia e para quem compra.</p></div>
+    <div class="pilar"><div class="num">PILAR 02</div><h3>Verificação de cartas</h3><p>Extrato atualizado (≤ 7 dias) e dados conferidos pelo <b>Verificador Bidcon</b> antes da vitrine.</p></div>
+    <div class="pilar"><div class="num">PILAR 03</div><h3>Conta Notarial</h3><p>Pagamento custodiado em cartório, no Banco Safra — <b>Provimento CNJ nº 197/2025</b>.</p></div>
+    <div class="pilar"><div class="num">PILAR 04</div><h3>Trilha imutável</h3><p>Cada passo vira registro <b>encadeado por hash</b> — histórico completo, inalterável até por nós.</p></div>
+    <div class="pilar"><div class="num">PILAR 05</div><h3>Organização documental</h3><p>Termo de Reserva padronizado, dossiê único, informações estruturadas do início ao fim.</p></div>
+    <div class="pilar"><div class="num">PILAR 06</div><h3>Compliance</h3><p>Transferências sempre sujeitas à <b>análise e anuência da administradora</b> — segurança jurídica em cada etapa.</p></div>
+  </div>
+</div></section>
+
+<!-- ============ ADMINISTRADORAS ============ -->
+<section><div class="wrap rv">
+  <div class="sect-label">Institucional</div>
+  <h2 class="stitle">Bidcon para administradoras</h2>
+  <p class="ssub">Estrutura tecnológica para organizar o mercado secundário de cotas: mais liquidez, menos fricção na revenda, e um canal rastreável de relacionamento com o mercado.</p>
+  <div class="duo">
+    <div class="panel">
+      <div class="k">O que a administradora ganha</div>
+      <ul>
+        <li><b>Visibilidade estruturada</b> do movimento de cotas contempladas</li>
+        <li><b>Aumento de liquidez</b> e giro de créditos no secundário</li>
+        <li><b>Redução de fricção</b> nos processos de cessão e transferência</li>
+        <li><b>Possibilidade de integrações</b> tecnológicas e novos canais de distribuição</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="k">Como funciona a conversa</div>
+      <ul>
+        <li>Apresentação institucional da plataforma e do fluxo de operações</li>
+        <li>Alinhamento das regras de análise e anuência da administradora</li>
+        <li>Definição de canal dedicado para protocolos e dossiês</li>
+        <li>Evolução para integração conforme o volume de operações</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ COMO VIRAR PARCEIRO ============ -->
+<section><div class="wrap rv">
+  <div class="sect-label">O caminho</div>
+  <h2 class="stitle">Como se tornar um parceiro verificado</h2>
+  <div class="passos">
+    <div class="passo"><div class="pn">01</div><div><h3>Cadastro</h3><p>Você se apresenta pelo WhatsApp ou e-mail: quem é, como atua (vendedor de consórcio, corretor, imobiliária, lojista) e em qual região.</p></div></div>
+    <div class="passo"><div class="pn">02</div><div><h3>Verificação</h3><p>Validamos seus dados e formalizamos o <b>contrato de parceria</b> — com as regras de comissão, conduta e compliance pretas no branco.</p></div></div>
+    <div class="passo"><div class="pn">03</div><div><h3>Operação</h3><p>Você cadastra as cartas dos seus clientes, acompanha propostas no painel e recebe a <b>comissão de captação</b> a cada operação concluída.</p></div></div>
+  </div>
+</div></section>
+
+<!-- ============ CTA FINAL ============ -->
+<section class="cta-final"><div class="wrap rv">
+  <h2>O mercado de cotas se profissionalizou.<br><span class="grad">Opere do lado certo.</span></h2>
+  <p>Parceria verificada, comissão transparente e a única plataforma com pagamento custodiado em cartório.</p>
+  <div class="btns">
+    <a class="btn" href="https://wa.me/5519997561909?text=Ol%C3%A1%2C%20vendo%20cons%C3%B3rcio%20e%20quero%20ser%20parceiro%20Bidcon">Quero ser parceiro</a>
+    <a class="btn sec" href="mailto:contato@bidcon.com.br">contato@bidcon.com.br</a>
+  </div>
+  <div class="xlinks">
+    <a href="/conta-notarial">Conta Notarial</a> · <a href="/bidcon">Marketplace</a> · <a href="/vender-consorcio-contemplado">Vender uma carta</a> · <a href="/bidcon-imobiliaria">Imobiliárias</a> · <a href="/bidcon-lojista">Lojistas</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  A Bidcon é um marketplace para compra e venda de cotas contempladas e não é administradora de consórcios · toda cessão, repasse ou transferência está sujeita à análise e anuência da administradora do consórcio · a contemplação ocorre exclusivamente por sorteio ou lance · valores confirmados por extrato atualizado (≤ 7 dias) · comissões de captação conforme contrato de parceria · pagamentos via conta vinculada de cartório (Provimento CNJ nº 197/2025, Lei 8.935/94 art. 7º-A) quando contratada a Conta Notarial · a Bidcon não é instituição financeira e não custodia recursos.
+  <div class="ass">bidcon by Prospere Consórcios · Grupo Prospere I Consórcios I Imóveis I Seguros · bidcon.com.br</div>
+</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  var els = document.querySelectorAll(".rv");
+  if ("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, {threshold:.12});
+    els.forEach(function(el){ io.observe(el); });
+  } else { els.forEach(function(el){ el.classList.add("in"); }); }
+})();
+</script>
+</body>
+</html>
