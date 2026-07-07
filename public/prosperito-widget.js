@@ -321,4 +321,103 @@ addMsg = function (tipo, texto) {
     body.scrollTop = body.scrollHeight;
   }
 };
+
+var css3 = ''
+  + ".pw-carta{background:#121A2E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px;margin:10px 0;font-family:'IBM Plex Mono',monospace;max-width:100%}"
+  + ".pw-carta-eyebrow{font-size:11px;letter-spacing:.08em;color:#8891A5;text-transform:uppercase;margin-bottom:6px}"
+  + ".pw-carta-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;color:#F2F4F8;margin-bottom:12px}"
+  + ".pw-carta-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-top:1px solid rgba(255,255,255,.07)}"
+  + ".pw-carta-row:first-child{border-top:0}"
+  + ".pw-carta-row span{font-family:'Space Grotesk',sans-serif;font-size:13.5px;color:#8891A5}"
+  + ".pw-carta-row b{font-weight:600;font-size:14.5px;color:#F2F4F8}"
+  + ".pw-green{color:#34D399!important}"
+  + ".pw-carta-price{border:1px solid rgba(217,180,92,.35);background:rgba(217,180,92,.07);border-radius:10px;padding:11px 13px;margin:12px 0}"
+  + ".pw-carta-price-k{font-size:10px;letter-spacing:.07em;color:#D9B45C;text-transform:uppercase;margin-bottom:4px}"
+  + ".pw-carta-price-v{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:21px;color:#D9B45C}"
+  + ".pw-carta-selo{display:inline-flex;align-items:center;gap:6px;background:rgba(52,211,153,.12);color:#34D399;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12.5px;padding:6px 12px;border-radius:999px}"
+  + ".pw-dot{width:6px;height:6px;border-radius:50%;background:#34D399;display:inline-block;flex:0 0 auto}"
+  + ".pw-carta-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:11px}"
+  + ".pw-carta-title2{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#F2F4F8}"
+  + ".pw-carta-cred{text-align:right}"
+  + ".pw-carta-cred b{font-weight:700;font-size:16px;color:#F2F4F8;white-space:nowrap;display:block}"
+  + ".pw-carta-cred i{font-style:normal;font-size:9.5px;letter-spacing:.08em;color:#5D6579}"
+  + ".pw-carta-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:11px}"
+  + ".pw-cell{background:#0B1122;border-radius:8px;padding:8px;min-width:0}"
+  + ".pw-cell i{display:block;font-style:normal;font-size:9px;letter-spacing:.07em;color:#5D6579;text-transform:uppercase;margin-bottom:4px}"
+  + ".pw-cell b{font-weight:600;font-size:12px;color:#F2F4F8;word-break:break-word}"
+  + ".pw-carta-foot{display:flex;justify-content:space-between;align-items:center;gap:8px}"
+  + ".pw-carta-info{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-family:'Space Grotesk',sans-serif;font-size:12px;color:#34D399;min-width:0}"
+  + ".pw-carta-info em{font-style:normal;color:#5D6579}"
+  + ".pw-carta-info u{text-decoration:none;color:#D9B45C;font-weight:600}"
+  + ".pw-carta-cta{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12.5px;color:#fff;background:linear-gradient(180deg,#E2483F,#C93A32);border:0;border-radius:999px;padding:10px 15px;white-space:nowrap;cursor:pointer;flex:0 0 auto}";
+var style3 = document.createElement('style');
+style3.textContent = css3;
+document.head.appendChild(style3);
+
+/* ===== PW CARTAS — render de [[CARTA]] ===== */
+var PW_CARTA_RE = /\[\[CARTA\]\]([\s\S]*?)\[\[\/CARTA\]\]/g;
+function pwEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function pwBRL(n){var v=parseInt(String(n).replace(/\D/g,''),10);return isNaN(v)?pwEsc(n):'R$ '+v.toLocaleString('pt-BR');}
+function pwParseCarta(body){var c={};body.split('|').forEach(function(p){var i=p.indexOf('=');if(i>0)c[p.slice(0,i).trim().toLowerCase()]=p.slice(i+1).trim();});return c;}
+function pwRenderCarta(c){
+  var ref=pwEsc(c.ref||''),tipo=pwEsc((c.tipo||'').toUpperCase()),custo=pwEsc(c.custo||'');
+  if((c.modo||'').toLowerCase()==='destaque'){
+    var selo=c.selo?'<span class="pw-carta-selo"><span class="pw-dot"></span>'+pwEsc(c.selo)+'</span>':'';
+    return '<div class="pw-carta pw-carta-feat">'
+      +'<div class="pw-carta-eyebrow">REF. '+ref+' &middot; '+tipo+'</div>'
+      +'<div class="pw-carta-title">Carta de cr\u00e9dito contemplada</div>'
+      +'<div class="pw-carta-rows">'
+      +'<div class="pw-carta-row"><span>Cr\u00e9dito</span><b>'+pwBRL(c.credito)+'</b></div>'
+      +'<div class="pw-carta-row"><span>Entrada</span><b>'+pwBRL(c.entrada)+'</b></div>'
+      +'<div class="pw-carta-row"><span>Parcelas</span><b>'+pwEsc(c.nparcelas)+'\u00d7 '+pwBRL(c.parcela)+'</b></div>'
+      +'<div class="pw-carta-row"><span>Custo Bidcon</span><b class="pw-green">'+custo+'% a.m.</b></div>'
+      +'</div>'
+      +'<div class="pw-carta-price"><div class="pw-carta-price-k">BIDCON PRICE &middot; \u00c1GIO JUSTO AT\u00c9</div><div class="pw-carta-price-v">'+pwBRL(c.agio)+'</div></div>'
+      +selo+'</div>';
+  }
+  var info='';
+  if(c.selo)info+='<span class="pw-dot"></span>'+pwEsc(c.selo);
+  if(c.agio)info+=(info?' <em>&middot;</em> ':'')+'\u00e1gio justo at\u00e9 <u>'+pwBRL(c.agio)+'</u>';
+  return '<div class="pw-carta pw-carta-mini">'
+    +'<div class="pw-carta-top"><div><div class="pw-carta-eyebrow">REF. '+ref+' &middot; '+tipo+'</div><div class="pw-carta-title2">Carta contemplada</div></div>'
+    +'<div class="pw-carta-cred"><b>'+pwBRL(c.credito)+'</b><i>CR\u00c9DITO</i></div></div>'
+    +'<div class="pw-carta-g3">'
+    +'<div class="pw-cell"><i>ENTRADA</i><b>'+pwBRL(c.entrada)+'</b></div>'
+    +'<div class="pw-cell"><i>PARCELA</i><b>'+pwEsc(c.nparcelas)+'\u00d7 '+pwBRL(c.parcela)+'</b></div>'
+    +'<div class="pw-cell"><i>CUSTO</i><b class="pw-green">'+custo+'% a.m.</b></div>'
+    +'</div>'
+    +'<div class="pw-carta-foot">'
+    +'<div class="pw-carta-info">'+info+'</div>'
+    +'<button type="button" class="pw-carta-cta" data-ref="'+ref+'">Quero esta</button>'
+    +'</div></div>';
+}
+
+/* ===== PW CARTAS — patch addMsg pra [[CARTA]] ===== */
+var __addMsgComOpcoes = addMsg;
+addMsg = function (tipo, texto) {
+  var cartas = [], m;
+  var limpo = String(texto == null ? '' : texto);
+  PW_CARTA_RE.lastIndex = 0;
+  while ((m = PW_CARTA_RE.exec(limpo))) { cartas.push(pwParseCarta(m[1])); }
+  PW_CARTA_RE.lastIndex = 0;
+  limpo = limpo.replace(PW_CARTA_RE, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (limpo || !cartas.length) __addMsgComOpcoes(tipo, limpo);
+  if (cartas.length) {
+    var wrap = el('div', 'pw-cartas');
+    var html = '';
+    for (var i = 0; i < cartas.length; i++) html += pwRenderCarta(cartas[i]);
+    wrap.innerHTML = html;
+    var ancora = (body.lastElementChild && body.lastElementChild.classList &&
+      body.lastElementChild.classList.contains('pw-opcoes')) ? body.lastElementChild : null;
+    body.insertBefore(wrap, ancora);
+    body.scrollTop = body.scrollHeight;
+  }
+};
+body.addEventListener('click', function (ev) {
+  var btn = ev.target && ev.target.closest ? ev.target.closest('.pw-carta-cta') : null;
+  if (!btn) return;
+  txt.value = 'Quero esta carta \u2014 REF. ' + (btn.getAttribute('data-ref') || '');
+  sendBtn.click();
+});
+
 })();
