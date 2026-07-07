@@ -40,6 +40,7 @@
   + '.pw-panel{position:fixed;right:20px;bottom:92px;z-index:99999;width:378px;max-width:calc(100vw - 24px);height:600px;max-height:calc(100vh - 120px);background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.3);display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}'
   + '.pw-panel.aberto{display:flex}'
   + '@media(max-width:480px){.pw-panel{right:0;bottom:0;width:100vw;max-width:100vw;height:100vh;max-height:100vh;border-radius:0}}'
+  + '@media(max-width:480px){.pw-head{padding:18px 18px 16px}.pw-head .pw-badge{width:42px;height:42px;font-size:19px}.pw-head h3{font-size:17px}.pw-head p{font-size:13px}.pw-close{font-size:26px;padding:6px 8px}.pw-body{padding:20px 18px;gap:14px}.pw-entrada{gap:16px}.pw-entrada h4{font-size:21px}.pw-entrada .pw-sub{font-size:15px;line-height:1.6}.pw-entrada label{font-size:13px;margin-bottom:6px}.pw-entrada input{padding:15px 16px;font-size:16.5px;border-radius:13px}.pw-btn{padding:16px;font-size:16.5px;border-radius:13px}.pw-nota{font-size:12px;line-height:1.6}.pw-msg{font-size:15.5px;padding:11px 15px;max-width:88%}.pw-input{padding:14px}.pw-input textarea{padding:13px 16px;font-size:15.5px;border-radius:22px}.pw-send{width:48px;height:48px}.pw-send svg{width:21px;height:21px}.pw-foot{font-size:10.5px;padding:9px}}'
   + '.pw-head{background:#0F0F10;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:11px;flex:none}'
   + '.pw-head .pw-badge{width:38px;height:38px;border-radius:11px;background:#E10600;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff}'
   + '.pw-head h3{margin:0;font-size:15px;font-weight:700;line-height:1.1}'
@@ -238,4 +239,86 @@
   }
   launcher.addEventListener('click', function () { toggle(true); });
   closeBtn.addEventListener('click', function () { toggle(false); });
+
+var pendingCtx = null;
+var pendingTimer = null;
+
+function tentarEnviarContexto() {
+  if (!pendingCtx) return;
+  if (state.interesseId && barra.style.display !== 'none') {
+    var texto = pendingCtx;
+    pendingCtx = null;
+    if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null; }
+    setTimeout(function () { txt.value = texto; sendBtn.click(); }, 900);
+  }
+}
+
+window.abrirProsperito = function (ctx) {
+  if (ctx && ctx.texto) {
+    pendingCtx = ctx.texto;
+    if (pendingTimer) clearInterval(pendingTimer);
+    pendingTimer = setInterval(tentarEnviarContexto, 200);
+    setTimeout(function () { if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null; } }, 30000);
+  }
+  toggle(true);
+  tentarEnviarContexto();
+};
+
+document.addEventListener('click', function (e) {
+  var a = e.target && e.target.closest ? e.target.closest('.js-prosperito') : null;
+  if (!a) return;
+  e.preventDefault();
+  var ref = a.getAttribute('data-ref');
+  var tipo = a.getAttribute('data-tipo');
+  var valor = a.getAttribute('data-valor');
+  var ctx = null;
+  if (ref) {
+    var partes = ['Tenho interesse na carta ' + ref];
+    if (tipo) partes.push('(' + tipo + ')');
+    if (valor) partes.push('- cr\u00e9dito ' + valor);
+    ctx = { texto: partes.join(' ') };
+  }
+  window.abrirProsperito(ctx);
+});
+
+/* ---- opcoes em botao (quick reply) ---- */
+var css2 = ''
+  + '.pw-opcoes{display:flex;flex-wrap:wrap;gap:8px;margin:-2px 0 6px;padding:0 2px}'
+  + '.pw-opcao{background:#fff;border:1.5px solid #E10600;color:#E10600;font-family:inherit;font-weight:700;font-size:13px;padding:9px 14px;border-radius:999px;cursor:pointer;transition:background .15s,color .15s}'
+  + '.pw-opcao:hover:not(:disabled){background:#E10600;color:#fff}'
+  + '.pw-opcao:disabled{opacity:.4;cursor:default}';
+var style2 = document.createElement('style');
+style2.textContent = css2;
+document.head.appendChild(style2);
+
+var __addMsgOriginal = addMsg;
+addMsg = function (tipo, texto) {
+  var A = '[[OPCOES]]', F = '[[/OPCOES]]';
+  var iA = texto.indexOf(A), iF = texto.indexOf(F);
+  var opcoes = null, textoLimpo = texto;
+  if (iA !== -1 && iF !== -1 && iF > iA) {
+    var bloco = texto.substring(iA + A.length, iF);
+    textoLimpo = (texto.substring(0, iA) + texto.substring(iF + F.length)).trim();
+    opcoes = bloco.split('|').map(function (par) {
+      var idx = par.indexOf(':');
+      if (idx === -1) return null;
+      return { valor: par.substring(0, idx).trim(), rotulo: par.substring(idx + 1).trim() };
+    }).filter(Boolean);
+  }
+  __addMsgOriginal(tipo, textoLimpo);
+  if (opcoes && opcoes.length) {
+    var wrap = el('div', 'pw-opcoes');
+    opcoes.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pw-opcao'; b.textContent = o.rotulo;
+      b.addEventListener('click', function () {
+        wrap.querySelectorAll('.pw-opcao').forEach(function (x) { x.disabled = true; });
+        txt.value = o.valor; sendBtn.click();
+      });
+      wrap.appendChild(b);
+    });
+    body.appendChild(wrap);
+    body.scrollTop = body.scrollHeight;
+  }
+};
 })();
