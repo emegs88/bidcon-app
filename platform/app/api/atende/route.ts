@@ -14,9 +14,20 @@
 // LEAD ANÔNIMO: não há sessão de usuário. As tabelas interesses/conversas/
 // mensagens vivem no projeto Supabase "xtv" — usamos createXtvClient()
 // (service_role, server-only) porque o lead não tem sessão/cookie para RLS.
+//
+// CORS: o widget roda em bidcon.com.br (vitrine) e chama app.bidcon.com.br
+// (este endpoint) — cross-origin. Auth (allowlist de origem + rate-limit) e os
+// headers CORS vivem em @/lib/api-guard, compartilhados com /api/interesse.
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { sanitizarCompliance } from "@/lib/ia";
+import {
+  origemPermitida,
+  rateLimitExcedido,
+  ipDe,
+  corsHeaders,
+  handlePreflight,
+} from "@/lib/api-guard";
 import {
   montarSystem,
   MARCADOR_BASTAO,
@@ -33,64 +44,9 @@ const UUID_RE =
 const CANAIS = ["site", "whatsapp"] as const;
 type Canal = (typeof CANAIS)[number];
 
-// --- AUTH camada 1: allowlist de origem -------------------------------------
-// Só aceitamos chamadas vindas do próprio site/app Bidcon. Fora disso -> 403.
-// Conferimos Origin; na ausência dele, caímos para o host do Referer.
-const ORIGENS_PERMITIDAS = new Set<string>([
-  "https://bidcon.com.br",
-  "https://www.bidcon.com.br",
-  "https://app.bidcon.com.br",
-]);
-
-function hostDe(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
-// Retorna true se a requisição tem origem confiável.
-function origemPermitida(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (origin) return ORIGENS_PERMITIDAS.has(origin);
-  // Sem Origin (ex.: navegação same-origin em alguns browsers): usa o Referer.
-  const refOrigin = hostDe(req.headers.get("referer"));
-  if (refOrigin) return ORIGENS_PERMITIDAS.has(refOrigin);
-  // Sem Origin nem Referer confiável -> nega.
-  return false;
-}
-
-// --- AUTH camada 2: rate-limit por IP ---------------------------------------
-// Teto de 20 req/min por IP, janela fixa de 60s. Store em memória por instância
-// (aceitável no MVP; some ao reiniciar/escalar horizontalmente).
-// TODO(escala): trocar por Upstash/Redis para um contador compartilhado entre
-// instâncias e persistente entre deploys.
-const RATE_LIMITE = 20;
-const RATE_JANELA_MS = 60_000;
-const rateStore = new Map<string, { count: number; reset: number }>();
-
-// Extrai o IP do cliente: primeiro item de x-forwarded-for, com fallback.
-function ipDe(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const primeiro = xff.split(",")[0]?.trim();
-    if (primeiro) return primeiro;
-  }
-  return req.headers.get("x-real-ip")?.trim() || "desconhecido";
-}
-
-// Retorna true se o IP ESTOUROU o teto (deve ser bloqueado com 429).
-function rateLimitExcedido(ip: string): boolean {
-  const agora = Date.now();
-  const reg = rateStore.get(ip);
-  if (!reg || agora >= reg.reset) {
-    rateStore.set(ip, { count: 1, reset: agora + RATE_JANELA_MS });
-    return false;
-  }
-  reg.count += 1;
-  return reg.count > RATE_LIMITE;
+// Preflight CORS (bidcon.com.br chamando app.bidcon.com.br).
+export async function OPTIONS(req: Request) {
+  return handlePreflight(req);
 }
 
 // Fallback neutro exigido por sanitizarCompliance quando a saída do modelo
@@ -158,14 +114,17 @@ function montarMensagens(
 export async function POST(req: Request) {
   // AUTH camada 1: só origem confiável (bidcon.com.br / app.bidcon.com.br).
   if (!origemPermitida(req)) {
-    return NextResponse.json({ erro: "Origem não autorizada." }, { status: 403 });
+    return NextResponse.json(
+      { erro: "Origem não autorizada." },
+      { status: 403, headers: corsHeaders(req) }
+    );
   }
 
   // AUTH camada 2: rate-limit por IP (20 req/min). Estouro -> 429.
   if (rateLimitExcedido(ipDe(req))) {
     return NextResponse.json(
       { erro: "Muitas requisições. Tente novamente em instantes." },
-      { status: 429 }
+      { status: 429, headers: corsHeaders(req) }
     );
   }
 
@@ -180,7 +139,10 @@ export async function POST(req: Request) {
   const texto = String(body.texto ?? "").trim().slice(0, 4000);
 
   if (!CANAIS.includes(canal)) {
-    return NextResponse.json({ erro: "Canal inválido." }, { status: 422 });
+    return NextResponse.json(
+      { erro: "Canal inválido." },
+      { status: 422, headers: corsHeaders(req) }
+    );
   }
   // Contrato "já contatável": interesse_id ausente/malformado -> 400 (não 422),
   // com a mensagem que orienta a capturar nome+WhatsApp no front.
@@ -190,18 +152,21 @@ export async function POST(req: Request) {
         erro:
           "interesse_id obrigatório e deve existir; capture nome+WhatsApp no front antes de abrir o chat",
       },
-      { status: 400 }
+      { status: 400, headers: corsHeaders(req) }
     );
   }
   if (!texto) {
-    return NextResponse.json({ erro: "Mensagem vazia." }, { status: 422 });
+    return NextResponse.json(
+      { erro: "Mensagem vazia." },
+      { status: 422, headers: corsHeaders(req) }
+    );
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { erro: "Provedor de IA não configurado." },
-      { status: 503 }
+      { status: 503, headers: corsHeaders(req) }
     );
   }
 
@@ -220,7 +185,7 @@ export async function POST(req: Request) {
       console.error("[atende] erro ao verificar interesse:", error);
       return NextResponse.json(
         { erro: "Erro ao verificar interesse." },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
     if (!interesse) {
@@ -229,7 +194,7 @@ export async function POST(req: Request) {
           erro:
             "interesse_id obrigatório e deve existir; capture nome+WhatsApp no front antes de abrir o chat",
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(req) }
       );
     }
   }
@@ -259,7 +224,7 @@ export async function POST(req: Request) {
     if (error || !data) {
       return NextResponse.json(
         { erro: "Não foi possível abrir a conversa." },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
     conversa = data;
@@ -277,7 +242,7 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json(
         { erro: "Não foi possível registrar a mensagem." },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
   }
@@ -318,14 +283,14 @@ export async function POST(req: Request) {
     if (!resp.ok) {
       return NextResponse.json(
         { erro: "Falha ao consultar o provedor de IA." },
-        { status: 502 }
+        { status: 502, headers: corsHeaders(req) }
       );
     }
     data = await resp.json();
   } catch {
     return NextResponse.json(
       { erro: "Provedor de IA indisponível." },
-      { status: 502 }
+      { status: 502, headers: corsHeaders(req) }
     );
   }
 
@@ -351,7 +316,7 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json(
         { erro: "Não foi possível registrar a resposta." },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
   }
@@ -368,5 +333,5 @@ export async function POST(req: Request) {
   }
 
   // 11) Devolve só o texto limpo ao cliente.
-  return NextResponse.json({ resposta: limpo });
+  return NextResponse.json({ resposta: limpo }, { headers: corsHeaders(req) });
 }
