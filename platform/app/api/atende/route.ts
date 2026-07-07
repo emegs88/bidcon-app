@@ -11,10 +11,11 @@
 // persistida ou devolvida. Nunca investimento/rendimento/retorno; nunca promessa
 // de data de contemplação; "Bidcon Price" é referência, não oferta.
 //
-// LEAD ANÔNIMO: não há sessão de usuário. Por isso usamos o cliente SERVICE_ROLE
-// (createAdminClient) — o cliente anon+cookies+RLS não atende um lead sem login.
+// LEAD ANÔNIMO: não há sessão de usuário. As tabelas interesses/conversas/
+// mensagens vivem no projeto Supabase "xtv" — usamos createXtvClient()
+// (service_role, server-only) porque o lead não tem sessão/cookie para RLS.
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
+import { createXtvClient } from "@/lib/supabase-xtv";
 import { sanitizarCompliance } from "@/lib/ia";
 import {
   montarSystem,
@@ -204,16 +205,24 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = createAdminClient();
+  const supabase = createXtvClient();
 
   // Contrato "já contatável": o interesse PRECISA existir. Nunca criamos aqui.
-  // Se não existir no banco -> 400 com a mesma orientação de captura no front.
+  // Erro de banco -> 500 (com log); registro inexistente -> 400 com a mesma
+  // orientação de captura no front.
   {
-    const { data: interesse } = await supabase
+    const { data: interesse, error } = await supabase
       .from("interesses")
       .select("id")
       .eq("id", interesseId)
       .maybeSingle();
+    if (error) {
+      console.error("[atende] erro ao verificar interesse:", error);
+      return NextResponse.json(
+        { erro: "Erro ao verificar interesse." },
+        { status: 500 }
+      );
+    }
     if (!interesse) {
       return NextResponse.json(
         {
