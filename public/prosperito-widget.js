@@ -1,0 +1,241 @@
+/* ============================================================================
+ *  prosperito-widget.js — Bolha flutuante do Time Prosperito (Bidcon)
+ *  Grupo Prospere I Consórcios I Imóveis I Seguros
+ * ----------------------------------------------------------------------------
+ *  COMO USAR: salvar em public/prosperito-widget.js do site da vitrine e
+ *  incluir no layout:  <script src="/prosperito-widget.js" defer></script>
+ *  O widget injeta tudo sozinho (CSS + DOM). Sem dependência externa.
+ *
+ *  Endpoints usados (no app):  POST {API_BASE}/api/interesse
+ *                              POST {API_BASE}/api/atende
+ * ========================================================================== */
+(function () {
+  'use strict';
+  if (window.__prosperitoWidget) return; // não injeta duas vezes
+  window.__prosperitoWidget = true;
+
+  /* ---------------- CONFIG ---------------- */
+  var API_BASE = 'https://app.bidcon.com.br'; // mesmo domínio? deixe '' 
+  var CANAL = 'site';
+  var LS_KEY = 'bidcon_prosperito_v1';        // lembra a conversa do visitante
+
+  /* ---------------- ESTADO ---------------- */
+  var state = { aberto: false, interesseId: null, nome: '', enviando: false };
+  try {
+    var salvo = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (salvo && salvo.interesseId) { state.interesseId = salvo.interesseId; state.nome = salvo.nome || ''; }
+  } catch (e) {}
+
+  function persistir() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ interesseId: state.interesseId, nome: state.nome })); } catch (e) {}
+  }
+
+  /* ---------------- CSS ---------------- */
+  var css = ''
+  + '.pw-launcher{position:fixed;right:20px;bottom:20px;z-index:99998;display:flex;align-items:center;gap:10px;cursor:pointer;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}'
+  + '.pw-launcher .pw-tag{background:#0F0F10;color:#fff;font-size:13px;font-weight:600;padding:9px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}'
+  + '.pw-launcher .pw-bola{width:58px;height:58px;border-radius:50%;background:#E10600;display:grid;place-items:center;box-shadow:0 10px 28px rgba(225,6,0,.45);transition:transform .15s}'
+  + '.pw-launcher:hover .pw-bola{transform:scale(1.06)}'
+  + '.pw-bola svg{width:28px;height:28px;fill:#fff}'
+  + '.pw-panel{position:fixed;right:20px;bottom:92px;z-index:99999;width:378px;max-width:calc(100vw - 24px);height:600px;max-height:calc(100vh - 120px);background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.3);display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}'
+  + '.pw-panel.aberto{display:flex}'
+  + '@media(max-width:480px){.pw-panel{right:0;bottom:0;width:100vw;max-width:100vw;height:100vh;max-height:100vh;border-radius:0}}'
+  + '.pw-head{background:#0F0F10;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:11px;flex:none}'
+  + '.pw-head .pw-badge{width:38px;height:38px;border-radius:11px;background:#E10600;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff}'
+  + '.pw-head h3{margin:0;font-size:15px;font-weight:700;line-height:1.1}'
+  + '.pw-head p{margin:2px 0 0;font-size:11.5px;color:#B9B9C0}'
+  + '.pw-close{margin-left:auto;background:none;border:none;color:#B9B9C0;font-size:22px;cursor:pointer;line-height:1;padding:4px}'
+  + '.pw-body{flex:1;overflow-y:auto;padding:16px;background:#FAFAFB;display:flex;flex-direction:column;gap:10px}'
+  + '.pw-entrada{margin:auto 0;display:flex;flex-direction:column;gap:12px}'
+  + '.pw-entrada h4{margin:0;font-size:18px;font-weight:800;color:#0F0F10}'
+  + '.pw-entrada .pw-sub{margin:0;font-size:13.5px;color:#6B6B72;line-height:1.5}'
+  + '.pw-entrada label{font-size:11.5px;font-weight:600;color:#3A3A40;margin-bottom:4px;display:block}'
+  + '.pw-entrada input{width:100%;box-sizing:border-box;padding:12px 13px;border:1.5px solid #E6E6EA;border-radius:11px;font-size:14.5px;font-family:inherit}'
+  + '.pw-entrada input:focus{outline:none;border-color:#0F0F10}'
+  + '.pw-entrada input.pw-erro{border-color:#E10600}'
+  + '.pw-btn{background:#E10600;color:#fff;border:none;padding:13px;border-radius:11px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit}'
+  + '.pw-btn:hover{background:#B60500}.pw-btn:disabled{opacity:.55;cursor:not-allowed}'
+  + '.pw-nota{font-size:10.5px;color:#9A9AA2;line-height:1.45;text-align:center;margin:0}'
+  + '.pw-msg{max-width:84%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}'
+  + '.pw-msg.ag{background:#F1F1F3;color:#17171A;align-self:flex-start;border-bottom-left-radius:4px}'
+  + '.pw-msg.cl{background:#0F0F10;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}'
+  + '.pw-msg.sis{align-self:center;background:transparent;color:#9A9AA2;font-size:12px;text-align:center;max-width:100%}'
+  + '.pw-typing{align-self:flex-start;background:#F1F1F3;padding:12px 15px;border-radius:14px;border-bottom-left-radius:4px;display:flex;gap:4px}'
+  + '.pw-typing i{width:6px;height:6px;border-radius:50%;background:#B0B0B8;animation:pwB 1.2s infinite}'
+  + '.pw-typing i:nth-child(2){animation-delay:.2s}.pw-typing i:nth-child(3){animation-delay:.4s}'
+  + '@keyframes pwB{0%,60%,100%{opacity:.3}30%{opacity:1}}'
+  + '.pw-input{flex:none;display:flex;gap:8px;padding:10px;border-top:1px solid #E6E6EA;background:#fff}'
+  + '.pw-input textarea{flex:1;resize:none;border:1.5px solid #E6E6EA;border-radius:20px;padding:10px 14px;font-size:14px;font-family:inherit;max-height:100px;line-height:1.4}'
+  + '.pw-input textarea:focus{outline:none;border-color:#0F0F10}'
+  + '.pw-send{width:42px;height:42px;border-radius:50%;background:#E10600;border:none;cursor:pointer;display:grid;place-items:center;flex:none}'
+  + '.pw-send:disabled{opacity:.5}.pw-send svg{width:19px;height:19px;fill:#fff}'
+  + '.pw-foot{flex:none;text-align:center;font-size:9.5px;letter-spacing:.3px;color:#9A9AA2;padding:7px;background:#fff;border-top:1px solid #E6E6EA}';
+
+  var style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  /* ---------------- DOM ---------------- */
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  var launcher = el('div', 'pw-launcher');
+  launcher.appendChild(el('div', 'pw-tag', 'Fale com o Time Prosperito'));
+  var bola = el('div', 'pw-bola', '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.02 2 11c0 2.63 1.24 5 3.24 6.65-.14.98-.55 2.35-1.6 3.35 0 0 2.68-.16 4.74-1.7.86.23 1.74.35 2.62.35 5.52 0 10-4.02 10-8.65S17.52 2 12 2z"/></svg>');
+  launcher.appendChild(bola);
+
+  var panel = el('div', 'pw-panel');
+  var head = el('div', 'pw-head');
+  head.appendChild(el('div', 'pw-badge', 'P'));
+  var headTxt = el('div', '', '<h3>Time Prosperito</h3><p>Bidcon · cartas contempladas</p>');
+  head.appendChild(headTxt);
+  var closeBtn = el('button', 'pw-close', '&times;');
+  head.appendChild(closeBtn);
+  panel.appendChild(head);
+
+  var body = el('div', 'pw-body');
+  panel.appendChild(body);
+
+  var barra = el('div', 'pw-input');
+  var txt = document.createElement('textarea');
+  txt.rows = 1; txt.placeholder = 'Escreva sua mensagem...';
+  var sendBtn = el('button', 'pw-send', '<svg viewBox="0 0 24 24"><path d="M3 20.5v-17L22 12 3 20.5zm2-3.05L16.85 12 5 6.55v3.9L11 12l-6 1.55v3.9z"/></svg>');
+  barra.appendChild(txt); barra.appendChild(sendBtn);
+  barra.style.display = 'none';
+  panel.appendChild(barra);
+
+  panel.appendChild(el('div', 'pw-foot', 'Grupo Prospere &nbsp;I&nbsp; Cons&oacute;rcios &nbsp;I&nbsp; Im&oacute;veis &nbsp;I&nbsp; Seguros'));
+
+  document.body.appendChild(launcher);
+  document.body.appendChild(panel);
+
+  /* ---------------- TELAS ---------------- */
+  function telaEntrada() {
+    body.innerHTML = '';
+    var box = el('div', 'pw-entrada');
+    box.appendChild(el('h4', '', 'Bora conversar?'));
+    box.appendChild(el('p', 'pw-sub', 'Deixa seu nome e WhatsApp pra falar com a gente sobre as cartas, planejamento e poder de compra. Sem compromisso.'));
+    var f1 = el('div'); f1.innerHTML = '<label>Seu nome</label>';
+    var inNome = document.createElement('input'); inNome.type = 'text'; inNome.placeholder = 'Como podemos te chamar?';
+    f1.appendChild(inNome); box.appendChild(f1);
+    var f2 = el('div'); f2.innerHTML = '<label>Seu WhatsApp</label>';
+    var inFone = document.createElement('input'); inFone.type = 'tel'; inFone.placeholder = '(19) 91234-5678';
+    f2.appendChild(inFone); box.appendChild(f2);
+    var btn = el('button', 'pw-btn', 'Come&ccedil;ar conversa');
+    box.appendChild(btn);
+    box.appendChild(el('p', 'pw-nota', 'Voc&ecirc; conversa com nosso time sobre planejamento, carta de cr&eacute;dito e patrim&ocirc;nio. N&atilde;o prometemos data de contempla&ccedil;&atilde;o &mdash; ela ocorre por sorteio ou lance.'));
+    body.appendChild(box);
+
+    inFone.addEventListener('input', function () {
+      var d = inFone.value.replace(/\D/g, '').slice(0, 11), o = d;
+      if (d.length > 2) o = '(' + d.slice(0, 2) + ') ' + d.slice(2);
+      if (d.length > 7) o = '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+      inFone.value = o;
+    });
+
+    btn.addEventListener('click', function () {
+      var nome = inNome.value.trim();
+      var fone = inFone.value.replace(/\D/g, '');
+      var erro = false;
+      inNome.classList.toggle('pw-erro', nome.length < 2); if (nome.length < 2) erro = true;
+      inFone.classList.toggle('pw-erro', fone.length < 10); if (fone.length < 10) erro = true;
+      if (erro) return;
+      btn.disabled = true; btn.textContent = 'Abrindo...';
+      fetch(API_BASE + '/api/interesse', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ nome: nome, telefone: fone, origem: 'chat' })
+      }).then(function (r) { if (!r.ok) throw new Error('interesse ' + r.status); return r.json(); })
+        .then(function (data) {
+          state.interesseId = data.interesse_id || data.id;
+          state.nome = nome.split(' ')[0];
+          if (!state.interesseId) throw new Error('sem id');
+          persistir();
+          telaChat(true);
+        })
+        .catch(function (e) {
+          console.error('[prosperito]', e);
+          btn.disabled = false; btn.innerHTML = 'Come&ccedil;ar conversa';
+          alert('N\u00e3o consegui abrir a conversa agora. Tenta de novo em instantes.');
+        });
+    });
+  }
+
+  function telaChat(novo) {
+    body.innerHTML = '';
+    barra.style.display = 'flex';
+    if (novo) {
+      addMsg('ag', 'Oi, ' + state.nome + '! Aqui \u00e9 o Prosperito \ud83d\udc4b Que bom te ver na Bidcon. Me conta: viu alguma carta na vitrine que te interessou, ou prefere que eu te ajude a achar o caminho pro que voc\u00ea quer conquistar?');
+    } else {
+      addMsg('sis', 'Bem-vindo de volta' + (state.nome ? ', ' + state.nome : '') + '! Pode continuar de onde parou.');
+    }
+    txt.focus();
+  }
+
+  function addMsg(tipo, texto) {
+    var m = el('div', 'pw-msg ' + tipo);
+    m.textContent = texto;
+    body.appendChild(m);
+    body.scrollTop = body.scrollHeight;
+  }
+  function typingOn() {
+    var t = el('div', 'pw-typing'); t.id = 'pwTyping';
+    t.innerHTML = '<i></i><i></i><i></i>';
+    body.appendChild(t); body.scrollTop = body.scrollHeight;
+  }
+  function typingOff() { var t = document.getElementById('pwTyping'); if (t) t.remove(); }
+
+  function enviar() {
+    var texto = txt.value.trim();
+    if (!texto || state.enviando || !state.interesseId) return;
+    state.enviando = true; sendBtn.disabled = true;
+    addMsg('cl', texto);
+    txt.value = ''; txt.style.height = 'auto';
+    typingOn();
+    fetch(API_BASE + '/api/atende', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ canal: CANAL, interesse_id: state.interesseId, texto: texto })
+    }).then(function (r) {
+      typingOff();
+      if (r.status === 400) { // interesse sumiu (ex.: limpeza) -> recomeça
+        try { localStorage.removeItem(LS_KEY); } catch (e) {}
+        state.interesseId = null;
+        addMsg('sis', 'Sua sess\u00e3o expirou. Vamos recome\u00e7ar rapidinho?');
+        barra.style.display = 'none';
+        telaEntrada();
+        throw new Error('sessao expirada');
+      }
+      if (!r.ok) throw new Error('atende ' + r.status);
+      return r.json();
+    }).then(function (data) {
+      addMsg('ag', data.resposta || 'Recebi sua mensagem! J\u00e1 te respondo.');
+    }).catch(function (e) {
+      typingOff();
+      if (String(e.message).indexOf('sessao') < 0) {
+        console.error('[prosperito]', e);
+        addMsg('sis', 'Tive um probleminha aqui agora. Pode mandar de novo?');
+      }
+    }).finally ? null : null;
+    // finally manual (compat):
+    setTimeout(function () { state.enviando = false; sendBtn.disabled = false; txt.focus(); }, 400);
+  }
+
+  txt.addEventListener('input', function () { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 100) + 'px'; });
+  txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } });
+  sendBtn.addEventListener('click', enviar);
+
+  /* ---------------- ABRIR/FECHAR ---------------- */
+  function toggle(abrir) {
+    state.aberto = abrir == null ? !state.aberto : abrir;
+    panel.classList.toggle('aberto', state.aberto);
+    if (state.aberto) {
+      if (state.interesseId) { barra.style.display = 'flex'; if (!body.children.length) telaChat(false); }
+      else { barra.style.display = 'none'; telaEntrada(); }
+    }
+  }
+  launcher.addEventListener('click', function () { toggle(true); });
+  closeBtn.addEventListener('click', function () { toggle(false); });
+})();
