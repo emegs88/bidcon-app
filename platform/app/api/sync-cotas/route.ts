@@ -97,6 +97,7 @@ export async function GET(req: Request) {
         valor_parcela: c.valorParcela,
         qtd_parcelas: c.qtdParcelas,
         entrada_parceiro: c.entradaParceiro, // null p/ LANCE
+        administradora: c.administradora,
       }));
 
       const { data, error } = await db.rpc("sync_aplicar_cotas", {

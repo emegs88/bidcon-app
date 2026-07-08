@@ -19,8 +19,9 @@
 // COMPLIANCE (§1.3): a entrada EXIBIDA (`e`) já vem pronta da fonte (com os 7%
 //   nas externas; crua==correta na Lance) — a plataforma NÃO recalcula comissão.
 //   `entrada_parceiro` (valor CRU do parceiro) só vem em ?admin=1 e é gravado em
-//   entrada_parceiro_raw (admin-only), NUNCA exposto ao cliente. Nome de
-//   administradora/mecânica de margem não são lidos aqui.
+//   entrada_parceiro_raw (admin-only), NUNCA exposto ao cliente. `adm` (nome da
+//   administradora) passa a ser lido a partir da fatia 0023; mecânica de
+//   margem segue não lida aqui.
 //
 // As 5 GUARDAS (por fonte; qualquer falha => aquela fonte é PULADA, sem escrever):
 //   1) HTTP != 200            -> aborta a fonte
@@ -46,6 +47,8 @@ export type CotaFonte = {
   // valor CRU do parceiro (Opção B), só nas fontes externas em ?admin=1.
   // null para LANCE (não há valor cru separado) e quando a fonte não trouxe.
   entradaParceiro: number | null;
+  // nome da administradora, lido a partir da fatia 0023 (`adm` no envelope).
+  administradora: string | null;
 };
 
 export type LeituraOk = { ok: true; origem: FonteMarca; cotas: CotaFonte[] };
@@ -101,8 +104,9 @@ function tipoDe(bruto: unknown): "imovel" | "veiculo" | null {
  * numero_externo — a chave de upsert (administradora_origem, numero_externo)
  * cuida da colisão de id entre fontes distintas.
  *
- * COMPLIANCE: só campos públicos do bem + entrada_parceiro (admin). `adm`, `ac`,
- *   `custoEfetivo`, `idParceiro`, metadados de dedup: NÃO são lidos aqui.
+ * COMPLIANCE: campos públicos do bem + entrada_parceiro (admin) + `adm` (nome
+ *   da administradora, lido a partir da fatia 0023). `ac`, `custoEfetivo`,
+ *   `idParceiro`, metadados de dedup: seguem NÃO lidos aqui.
  */
 function parsearEnvelope(texto: string, origem: FonteMarca): CotaFonte[] | null {
   let env: unknown;
@@ -152,6 +156,10 @@ function parsearEnvelope(texto: string, origem: FonteMarca): CotaFonte[] | null 
     // valor cru do parceiro: só existe em ?admin=1 nas externas; nunca na Lance.
     const entradaParceiro = ehLance ? null : inteiro(r.entrada_parceiro);
 
+    // nome da administradora, lido a partir da fatia 0023 (`adm` no envelope).
+    const administradora =
+      typeof r.adm === "string" && r.adm.trim() !== "" ? r.adm.trim() : null;
+
     vistos.add(numero);
     cotas.push({
       numero,
@@ -161,7 +169,8 @@ function parsearEnvelope(texto: string, origem: FonteMarca): CotaFonte[] | null 
       valorParcela,
       qtdParcelas,
       entradaParceiro,
-      // adm / ac / custoEfetivo / idParceiro / dedup: DESCARTADOS (compliance).
+      administradora,
+      // ac / custoEfetivo / idParceiro / dedup: DESCARTADOS (compliance).
     });
   }
 
