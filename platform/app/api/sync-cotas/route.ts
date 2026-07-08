@@ -1,24 +1,31 @@
 // ============================================================================
 // Cron de sync de cotas — roda 1x/hora (Vercel Cron). Server-only.
 // ----------------------------------------------------------------------------
-// Agora MULTI-FONTE: consome LANCE + CBC + PIFFER + CARTAS + SERVOPA do feed do
-// prospere-360 (lib/cotas-source), cada fonte lida e aplicada SEPARADAMENTE.
+// MULTI-FONTE em LOTES: consome LANCE + CBC + PIFFER + CARTAS + SERVOPA do
+// feed do prospere-360 (lib/cotas-source), cada fonte lida e aplicada
+// SEPARADAMENTE, e cada fonte aplicada em LOTES de 100 cotas (fatia 0027):
+// chamadas curtas na RPC nunca estouram o teto HTTP do gateway (~60s).
 //
 // Fluxo, POR FONTE (decisão B — isolamento total entre fontes):
 //   1) autoriza (CRON_SECRET) — uma vez, ninguém dispara isto de fora;
 //   2) p/ cada fonte: lê a contagem boa anterior (cartas DAQUELA fonte ainda
 //      disponíveis, via administradora_origem);
 //   3) lerCotasFonte(fonte, anterior) roda as 5 GUARDAS só daquela fonte;
-//      se abortar, REGISTRA o motivo e PULA a fonte — NÃO toca o estoque de
-//      NENHUMA fonte (nem a própria: sem lista íntegra, não marca ausências);
-//   4) chama a RPC ATÔMICA sync_aplicar_cotas(p_origem, p_cotas) só com as
-//      cotas daquela fonte — upsert + marca ausentes DENTRO da fonte, numa
-//      transação no Postgres (rollback automático em erro);
-//   5) carta nova nasce com evento push_pendente=true (gatilho do OneSignal,
-//      hoje stub — ver lib/notificar.ts).
+//      se abortar, registra evento 'sync_pulado' e PULA a fonte — NÃO toca o
+//      estoque de NENHUMA fonte;
+//   4) aplica em LOTES: sync_aplicar_cotas(p_origem, p_lote, p_varrer=false)
+//      por lote de 100. Falha num lote => 'sync_abortado' com o índice do
+//      lote e SEM varredura (lotes já aplicados ficam; a próxima hora cura);
+//   5) todos os lotes ok => UMA chamada sync_varrer_ausentes(p_origem,
+//      p_numeros) com TODOS os números lidos marca as ausentes da fonte;
+//   6) carta nova nasce com evento push_pendente=true (gatilho do OneSignal,
+//      hoje stub — ver lib/notificar.ts);
+//   7) ao final da execução, evento 'sync_fim' com duração e placar — se um
+//      'sync_fim' não aparecer no eventos_sync, a função foi morta pelo teto
+//      de duração (maxDuration) antes de terminar.
 //
-// Uma fonte que falha (HTTP/timeout/parse/volume/RPC) NUNCA derruba as outras:
-// o loop segue, e o resultado por fonte é reportado individualmente.
+// Uma fonte que falha NUNCA derruba as outras: o loop segue, e o resultado
+// por fonte é reportado individualmente.
 //
 // service_role: usada só aqui (lib/supabase-xtv), via env var protegida.
 // ============================================================================
@@ -28,6 +35,11 @@ import { lerCotasFonte, FONTES, type FonteMarca } from "@/lib/cotas-source";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// Fatia 0027: teto explícito de duração. Sem isto, a Vercel matava a função
+// no meio da fila de fontes (SERVOPA morria muda às 17h e 19h de 08/07).
+export const maxDuration = 800;
+
+const TAMANHO_LOTE = 100;
 
 function autorizado(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -42,6 +54,7 @@ type ResultadoFonte = {
   ok: boolean;
   motivo?: string;         // preenchido quando ok=false
   lidas?: number;
+  lotes?: number;
   contagemAnterior?: number;
   novas?: number;
   atualizadas?: number;
@@ -53,6 +66,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, erro: "nao_autorizado" }, { status: 401 });
   }
 
+  const inicio = Date.now();
   const db = createXtvClient();
   const resultados: ResultadoFonte[] = [];
 
@@ -84,19 +98,24 @@ export async function GET(req: Request) {
       }
       const contagemAnterior = anterior ?? 0;
 
-      // (3) as 5 guardas, só desta fonte
+      // (3) as 5 guardas, só desta fonte. Guarda que barra => 'sync_pulado'
+      // (fatia 0027: tipo dedicado e filtrável; 'sync_abortado' fica reservado
+      // pra falha de contagem/RPC/lote/exceção).
       const leitura = await lerCotasFonte(origem, contagemAnterior);
       if (!leitura.ok) {
-        // aborta SÓ esta fonte, SEM escrever; registra o motivo p/ auditoria
-        await db.from("eventos_sync").insert({
-          tipo: "sync_abortado",
-          detalhe: origem + ": " + leitura.motivo,
-        });
+        try {
+          await db.from("eventos_sync").insert({
+            tipo: "sync_pulado",
+            detalhe: origem + ": " + leitura.motivo,
+          });
+        } catch {
+          // silencioso de propósito
+        }
         resultados.push({ origem, ok: false, motivo: leitura.motivo, contagemAnterior });
         continue;
       }
 
-      // (4) transação atômica no Postgres, só com as cotas desta fonte.
+      // (4) aplica em LOTES de 100, sem varredura (p_varrer=false).
       // entrada_parceiro (cru) vai como entrada_parceiro; null vira null no jsonb.
       const payload = leitura.cotas.map((c) => ({
         numero: c.numero,
@@ -109,28 +128,80 @@ export async function GET(req: Request) {
         administradora: c.administradora,
       }));
 
-      const { data, error } = await db.rpc("sync_aplicar_cotas", {
-        p_origem: origem,
-        p_cotas: payload,
-      });
-      if (error) {
-        await db.from("eventos_sync").insert({
-          tipo: "sync_abortado",
-          detalhe: origem + " rpc_falhou: " + error.message,
+      let novas = 0;
+      let atualizadas = 0;
+      let falhouLote = false;
+
+      for (let i = 0; i < payload.length; i += TAMANHO_LOTE) {
+        const lote = payload.slice(i, i + TAMANHO_LOTE);
+        const indice = Math.floor(i / TAMANHO_LOTE) + 1;
+        const { data, error } = await db.rpc("sync_aplicar_cotas", {
+          p_origem: origem,
+          p_cotas: lote,
+          p_varrer: false,
         });
-        resultados.push({ origem, ok: false, motivo: "rpc: " + error.message, contagemAnterior });
+        if (error) {
+          try {
+            await db.from("eventos_sync").insert({
+              tipo: "sync_abortado",
+              detalhe: origem + " rpc_falhou lote " + indice + ": " + error.message,
+            });
+          } catch {
+            // silencioso de propósito
+          }
+          resultados.push({
+            origem,
+            ok: false,
+            motivo: "rpc lote " + indice + ": " + error.message,
+            contagemAnterior,
+            lidas: payload.length,
+          });
+          falhouLote = true;
+          break;
+        }
+        const r = Array.isArray(data) ? data[0] : data;
+        novas += r?.novas ?? 0;
+        atualizadas += r?.atualizadas ?? 0;
+      }
+      if (falhouLote) continue; // lotes aplicados ficam; SEM varredura desta fonte
+
+      // (5) todos os lotes aplicaram => varredura única com a lista COMPLETA.
+      // A RPC tem trava própria: lista vazia jamais varre.
+      const numeros = payload.map((c) => c.numero);
+      const { data: varridas, error: errVarrer } = await db.rpc("sync_varrer_ausentes", {
+        p_origem: origem,
+        p_numeros: numeros,
+      });
+      if (errVarrer) {
+        try {
+          await db.from("eventos_sync").insert({
+            tipo: "sync_abortado",
+            detalhe: origem + " varredura_falhou: " + errVarrer.message,
+          });
+        } catch {
+          // silencioso de propósito
+        }
+        resultados.push({
+          origem,
+          ok: false,
+          motivo: "varredura: " + errVarrer.message,
+          contagemAnterior,
+          lidas: payload.length,
+          novas,
+          atualizadas,
+        });
         continue;
       }
 
-      const r = Array.isArray(data) ? data[0] : data;
       resultados.push({
         origem,
         ok: true,
-        lidas: leitura.cotas.length,
+        lidas: payload.length,
+        lotes: Math.ceil(payload.length / TAMANHO_LOTE),
         contagemAnterior,
-        novas: r?.novas ?? 0,
-        atualizadas: r?.atualizadas ?? 0,
-        indisponibilizadas: r?.indisponibilizadas ?? 0,
+        novas,
+        atualizadas,
+        indisponibilizadas: typeof varridas === "number" ? varridas : 0,
       });
     } catch (e) {
       // rede de segurança: erro inesperado numa fonte não derruba as outras
@@ -159,6 +230,20 @@ export async function GET(req: Request) {
     },
     { novas: 0, atualizadas: 0, indisponibilizadas: 0 }
   );
+
+  // (7) telemetria de fim (fatia 0027): se este evento não existir numa
+  // execução, a função foi morta pelo maxDuration antes de completar a fila.
+  try {
+    await db.from("eventos_sync").insert({
+      tipo: "sync_fim",
+      detalhe:
+        "total_ms=" + (Date.now() - inicio) +
+        " fontes_ok=" + resultados.filter((r) => r.ok).length +
+        " fontes_falha=" + resultados.filter((r) => !r.ok).length,
+    });
+  } catch {
+    // silencioso de propósito
+  }
 
   return NextResponse.json(
     {
