@@ -20,10 +20,10 @@
 // Uma fonte que falha (HTTP/timeout/parse/volume/RPC) NUNCA derruba as outras:
 // o loop segue, e o resultado por fonte é reportado individualmente.
 //
-// service_role: usada só aqui (lib/supabase-admin), via env var protegida.
+// service_role: usada só aqui (lib/supabase-xtv), via env var protegida.
 // ============================================================================
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
+import { createXtvClient } from "@/lib/supabase-xtv";
 import { lerCotasFonte, FONTES, type FonteMarca } from "@/lib/cotas-source";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, erro: "nao_autorizado" }, { status: 401 });
   }
 
-  const db = createAdminClient();
+  const db = createXtvClient();
   const resultados: ResultadoFonte[] = [];
 
   // itera fonte a fonte — isolamento total (B): o try/catch por fonte garante
@@ -70,6 +70,15 @@ export async function GET(req: Request) {
         .eq("status", "disponivel");
 
       if (errCount) {
+        // Blindagem A: best-effort — falha ao logar nunca derruba o loop das outras fontes.
+        try {
+          await db.from("eventos_sync").insert({
+            tipo: "sync_abortado",
+            detalhe: origem + " contagem: " + errCount.message,
+          });
+        } catch {
+          // silencioso de propósito: logging é best-effort, não pode quebrar o sync
+        }
         resultados.push({ origem, ok: false, motivo: "contagem: " + errCount.message });
         continue;
       }
@@ -125,6 +134,15 @@ export async function GET(req: Request) {
       });
     } catch (e) {
       // rede de segurança: erro inesperado numa fonte não derruba as outras
+      // Blindagem A: best-effort — falha ao logar nunca derruba o loop das outras fontes.
+      try {
+        await db.from("eventos_sync").insert({
+          tipo: "sync_abortado",
+          detalhe: origem + " excecao: " + (e as Error).message,
+        });
+      } catch {
+        // silencioso de propósito: logging é best-effort, não pode quebrar o sync
+      }
       resultados.push({ origem, ok: false, motivo: "excecao: " + (e as Error).message });
     }
   }
@@ -142,10 +160,15 @@ export async function GET(req: Request) {
     { novas: 0, atualizadas: 0, indisponibilizadas: 0 }
   );
 
-  return NextResponse.json({
-    ok: algumaOk,
-    fontes: resultados,
-    totais,
-    // lembrete: push das novas fica PENDENTE (push_pendente=true) até o OneSignal.
-  });
+  return NextResponse.json(
+    {
+      ok: algumaOk,
+      fontes: resultados,
+      totais,
+      // lembrete: push das novas fica PENDENTE (push_pendente=true) até o OneSignal.
+    },
+    // Blindagem B: nenhuma fonte aplicou => 500, pro painel de cron do Vercel
+    // acusar falha de verdade em vez de um 200 verde mentiroso.
+    { status: algumaOk ? 200 : 500 }
+  );
 }
