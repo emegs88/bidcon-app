@@ -106,6 +106,39 @@ function montarMensagens(
   return msgs;
 }
 
+// cache simples em módulo (best-effort por instância serverless)
+let _cartasCache: { txt: string; em: number } | null = null;
+
+async function blocoCartas(supabase: ReturnType<typeof createXtvClient>): Promise<string> {
+  if (_cartasCache && Date.now() - _cartasCache.em < 60_000) return _cartasCache.txt;
+  const { data, error } = await supabase
+    .from('cartas')
+    .select('numero_externo,tipo,valor_credito,valor_entrada,valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150')
+    .eq('status', 'disponivel')
+    .not('bidcon_custo_am', 'is', null)
+    .order('bidcon_agio_150', { ascending: false })
+    .order('bidcon_custo_am', { ascending: true })   // desempate: veículos têm agio=0
+    .limit(40);
+  if (error || !data?.length) return '';
+
+  const linha = (c: any) => {
+    const fmt = (n: any) => String(Math.round(Number(n)));
+    const custo = Number(c.bidcon_custo_am).toFixed(2).replace('.', ',');
+    const agio = Number(c.bidcon_agio_150) > 0 ? `|agio=${fmt(c.bidcon_agio_150)}` : '';
+    const selo = Number(c.bidcon_agio_120) > 0 ? '|selo=Custo excelente' : '';
+    return `ref=${c.numero_externo}|tipo=${String(c.tipo) === 'imovel' ? 'IMÓVEL' : 'VEÍCULO'}|credito=${fmt(c.valor_credito)}|entrada=${fmt(c.valor_entrada)}|nparcelas=${c.qtd_parcelas}|parcela=${fmt(c.valor_parcela)}|custo=${custo}${agio}${selo}`;
+  };
+  const imoveis  = data.filter(c => String(c.tipo) === 'imovel').slice(0, 8);
+  const veiculos = data.filter(c => String(c.tipo) === 'veiculo').slice(0, 6);
+  const txt = [
+    'CARTAS DISPONÍVEIS AGORA (dados reais do banco — ao emitir [[CARTA]], use SOMENTE estas linhas, copiando os valores exatamente):',
+    ...imoveis.map(linha),
+    ...veiculos.map(linha),
+  ].join('\n');
+  _cartasCache = { txt, em: Date.now() };
+  return txt;
+}
+
 // CONTRATO ESPERADO (opção "já contatável"):
 // O front captura nome + WhatsApp, cria o interesse (nome, telefone,
 // origem='chat') e passa o interesse_id retornado para este endpoint.
