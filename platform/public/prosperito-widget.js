@@ -21,6 +21,7 @@
 
   /* ---------------- ESTADO ---------------- */
   var state = { aberto: false, interesseId: null, nome: '', enviando: false };
+  var cartaFocoAtual = null; // fatia carta-chat: carta clicada na vitrine, vai em toda POST /api/atende
   try {
     var salvo = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
     if (salvo && salvo.interesseId) { state.interesseId = salvo.interesseId; state.nome = salvo.nome || ''; }
@@ -198,7 +199,9 @@
     typingOn();
     fetch(API_BASE + '/api/atende', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ canal: CANAL, interesse_id: state.interesseId, texto: texto })
+      body: JSON.stringify(cartaFocoAtual
+        ? { canal: CANAL, interesse_id: state.interesseId, texto: texto, carta_foco: cartaFocoAtual }
+        : { canal: CANAL, interesse_id: state.interesseId, texto: texto })
     }).then(function (r) {
       typingOff();
       if (r.status === 400) { // interesse sumiu (ex.: limpeza) -> recomeça
@@ -260,6 +263,39 @@ window.abrirProsperito = function (ctx) {
     pendingTimer = setInterval(tentarEnviarContexto, 200);
     setTimeout(function () { if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null; } }, 30000);
   }
+  toggle(true);
+  tentarEnviarContexto();
+};
+
+/* fatia carta-chat: abre o widget já focado numa carta específica da vitrine.
+ * Se o gate (nome/WhatsApp) ainda não foi passado, telaEntrada() aparece
+ * normalmente e a mensagem some de contexto (pendingCtx) só dispara depois,
+ * quando o interesseId existir — reaproveita o mecanismo de tentarEnviarContexto. */
+window.abrirProsperitoComCarta = function (carta) {
+  if (!carta) { toggle(true); return; }
+  var ref = carta.ref != null ? String(carta.ref).slice(0, 40) : '';
+  var tipo = carta.tipo != null ? String(carta.tipo).slice(0, 20) : '';
+  var adm = carta.adm != null ? String(carta.adm).slice(0, 60) : '';
+  var credito = Number(carta.credito);
+  var entrada = Number(carta.entrada);
+  var parcela = Number(carta.parcela);
+  var nparcelas = Number(carta.nparcelas);
+  cartaFocoAtual = {
+    ref: ref, tipo: tipo, adm: adm,
+    credito: isNaN(credito) ? 0 : credito,
+    entrada: isNaN(entrada) ? 0 : entrada,
+    parcela: isNaN(parcela) ? 0 : parcela,
+    nparcelas: isNaN(nparcelas) ? 0 : nparcelas
+  };
+  var tipoLbl = tipo.toLowerCase() === 'imovel' ? 'Im\u00f3vel' : 'Ve\u00edculo';
+  var texto = 'Quero saber mais sobre esta carta de ' + tipoLbl + ': cr\u00e9dito ' +
+    pwBRL(cartaFocoAtual.credito) + ', entrada ' + pwBRL(cartaFocoAtual.entrada) +
+    ', parcela ' + pwBRL(cartaFocoAtual.parcela) +
+    (cartaFocoAtual.nparcelas > 0 ? '\u00d7' + cartaFocoAtual.nparcelas : '') + '.';
+  pendingCtx = texto;
+  if (pendingTimer) clearInterval(pendingTimer);
+  pendingTimer = setInterval(tentarEnviarContexto, 200);
+  setTimeout(function () { if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null; } }, 30000);
   toggle(true);
   tentarEnviarContexto();
 };

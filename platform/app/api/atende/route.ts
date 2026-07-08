@@ -111,15 +111,43 @@ let _cartasCache: { txt: string; em: number } | null = null;
 
 async function blocoCartas(supabase: ReturnType<typeof createXtvClient>): Promise<string> {
   if (_cartasCache && Date.now() - _cartasCache.em < 60_000) return _cartasCache.txt;
-  const { data, error } = await supabase
-    .from('cartas')
-    .select('numero_externo,tipo,valor_credito,valor_entrada,valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150')
-    .eq('status', 'disponivel')
-    .not('bidcon_custo_am', 'is', null)
-    .order('bidcon_agio_150', { ascending: false })
-    .order('bidcon_custo_am', { ascending: true })   // desempate: veículos têm agio=0
-    .limit(40);
-  if (error || !data?.length) return '';
+
+  const campos =
+    'numero_externo,tipo,valor_credito,valor_entrada,valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150';
+  // fábrica de query: mesmo filtro/ordenação de sempre, só falta o .eq('tipo', ...)
+  // e o .limit(...) de cada chamada abaixo.
+  const base = () =>
+    supabase
+      .from('cartas')
+      .select(campos)
+      .eq('status', 'disponivel')
+      .not('bidcon_custo_am', 'is', null)
+      .order('bidcon_agio_150', { ascending: false })
+      .order('bidcon_custo_am', { ascending: true }); // desempate: veículos têm agio=0
+
+  // Mudança E (adendo Valentina): antes era UMA query (limit 40) sem filtro de
+  // tipo, seguida de filtro em memória — como veículo quase sempre tem agio=0,
+  // os 40 primeiros por ágio eram quase sempre só imóveis, e a Valentina ficava
+  // sem veículo pra mostrar. Agora são DUAS queries, uma por tipo, pra garantir
+  // os dois tipos na mão sempre que houver estoque de ambos.
+  const [rImoveis, rVeiculos] = await Promise.all([
+    base().eq('tipo', 'imovel').limit(20),
+    base().eq('tipo', 'veiculo').limit(20),
+  ]);
+  if ((rImoveis.error || !rImoveis.data) && (rVeiculos.error || !rVeiculos.data)) return '';
+
+  let dImoveis = rImoveis.data ?? [];
+  let dVeiculos = rVeiculos.data ?? [];
+  if (!dImoveis.length && !dVeiculos.length) return '';
+
+  // um dos tipos zerou no estoque -> o outro preenche o espaço vago (até ~40).
+  if (!dImoveis.length && dVeiculos.length) {
+    const extra = await base().eq('tipo', 'veiculo').limit(40);
+    dVeiculos = extra.data ?? dVeiculos;
+  } else if (!dVeiculos.length && dImoveis.length) {
+    const extra = await base().eq('tipo', 'imovel').limit(40);
+    dImoveis = extra.data ?? dImoveis;
+  }
 
   const linha = (c: any) => {
     const fmt = (n: any) => String(Math.round(Number(n)));
@@ -128,15 +156,58 @@ async function blocoCartas(supabase: ReturnType<typeof createXtvClient>): Promis
     const selo = Number(c.bidcon_agio_120) > 0 ? '|selo=Custo excelente' : '';
     return `ref=${c.numero_externo}|tipo=${String(c.tipo) === 'imovel' ? 'IMÓVEL' : 'VEÍCULO'}|credito=${fmt(c.valor_credito)}|entrada=${fmt(c.valor_entrada)}|nparcelas=${c.qtd_parcelas}|parcela=${fmt(c.valor_parcela)}|custo=${custo}${agio}${selo}`;
   };
-  const imoveis  = data.filter(c => String(c.tipo) === 'imovel').slice(0, 8);
-  const veiculos = data.filter(c => String(c.tipo) === 'veiculo').slice(0, 6);
   const txt = [
     'CARTAS DISPONÍVEIS AGORA (dados reais do banco — ao emitir [[CARTA]], use SOMENTE estas linhas, copiando os valores exatamente):',
-    ...imoveis.map(linha),
-    ...veiculos.map(linha),
+    ...dImoveis.map(linha),
+    ...dVeiculos.map(linha),
   ].join('\n');
   _cartasCache = { txt, em: Date.now() };
   return txt;
+}
+
+// Fatia carta-chat (Mudança A): sanitiza o carta_foco opcional vindo do front
+// (clique numa carta da vitrine). Números viram Number(); strings são
+// truncadas; qualquer campo essencial ausente/inválido descarta o bloco
+// inteiro (a conversa segue normal, sem CARTA EM FOCO).
+type CartaFoco = {
+  ref: string;
+  tipo: string;
+  credito: number;
+  entrada: number;
+  parcela: number;
+  nparcelas: number;
+  adm: string;
+};
+
+function lerCartaFoco(raw: unknown): CartaFoco | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const ref = String(o.ref ?? '').trim().slice(0, 40);
+  const tipo = String(o.tipo ?? '').trim().slice(0, 20);
+  const adm = String(o.adm ?? '').trim().slice(0, 60);
+  const credito = Number(o.credito);
+  const entrada = Number(o.entrada);
+  const parcela = Number(o.parcela);
+  const nparcelas = Number(o.nparcelas);
+  if (!ref || !tipo) return null;
+  if (![credito, entrada, parcela, nparcelas].every((n) => Number.isFinite(n) && n >= 0)) {
+    return null;
+  }
+  return { ref, tipo, credito, entrada, parcela, nparcelas, adm };
+}
+
+// Monta o bloco CARTA EM FOCO no mesmo formato de linha do blocoCartas.
+function blocoCartaFoco(c: CartaFoco): string {
+  const fmt = (n: number) => String(Math.round(n));
+  const tipoTxt =
+    c.tipo.toLowerCase() === 'imovel' ? 'IMÓVEL' : c.tipo.toLowerCase() === 'veiculo' ? 'VEÍCULO' : c.tipo.toUpperCase();
+  const admParte = c.adm ? `|administradora=${c.adm}` : '';
+  const linha = `ref=${c.ref}|tipo=${tipoTxt}|credito=${fmt(c.credito)}|entrada=${fmt(c.entrada)}|nparcelas=${c.nparcelas}|parcela=${fmt(c.parcela)}${admParte}`;
+  return [
+    'CARTA EM FOCO (o cliente clicou nesta carta na vitrine):',
+    linha,
+    'Instrução: conduza a conversa sobre ESTA carta usando exatamente estes números; não invente dados além deles; se o cliente pedir algo que não está aqui, ofereça verificar com a equipe.',
+  ].join('\n');
 }
 
 // CONTRATO ESPERADO (opção "já contatável"):
@@ -165,6 +236,7 @@ export async function POST(req: Request) {
     canal?: unknown;
     interesse_id?: unknown;
     texto?: unknown;
+    carta_foco?: unknown;
   };
 
   const canal = String(body.canal ?? "").trim() as Canal;
@@ -294,7 +366,22 @@ export async function POST(req: Request) {
   }
 
   // 4) System da persona atual.
-  const system = montarSystem(agenteAtual);
+  // Achado do Passo 0 (fatia carta-chat): blocoCartas() existia mas nunca era
+  // chamado — a persona falava em "CARTAS DISPONÍVEIS AGORA" sem nenhum dado
+  // real do banco por trás. O adendo (Mudança D exige [[CARTA]] com dados reais;
+  // Mudança E melhora a query dele) só faz sentido se o bloco estiver de fato
+  // no system — por isso ele passa a ser buscado e concatenado aqui.
+  let system = montarSystem(agenteAtual);
+  const cartas = await blocoCartas(supabase);
+  if (cartas) {
+    system += "\n\n" + cartas;
+  }
+  // Fatia carta-chat (Mudança A): clique numa carta da vitrine -> injeta um
+  // bloco CARTA EM FOCO depois do bloco geral, pra ancorar a conversa nela.
+  const cartaFoco = lerCartaFoco(body.carta_foco);
+  if (cartaFoco) {
+    system += "\n\n" + blocoCartaFoco(cartaFoco);
+  }
 
   // 5) Anthropic Messages API (fetch cru).
   let data: unknown;
