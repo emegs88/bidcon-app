@@ -1,7 +1,12 @@
 // POST /api/admin/processo/[id]/contrato — admin gera um contrato (serviço/cota)
-// do processo. O snapshot factual (nome/CPF mascarado + valores; sem
-// administradora/comissão) é montado por lib/contratos. A RPC gerar_contrato
-// (0014, security definer) aplica o gate: contrato 'cota' exige sinal 'pago'.
+// do processo. O snapshot factual (qualificação completa do CONTRATANTE —
+// nome/CPF/e-mail de `profiles` — + valores; sem administradora/comissão) é
+// montado por lib/contratos. A RPC gerar_contrato (0014, security definer)
+// aplica o gate: contrato 'cota' exige sinal 'pago'.
+//
+// Observação: este endpoint (admin) não bloqueia a geração por qualificação
+// incompleta — quem exige nome/CPF válidos antes do ACEITE é o cliente, na
+// rota /api/processo/contrato (v4/FINAL). Aqui a RPC grava o que houver.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
@@ -61,15 +66,12 @@ export async function POST(
         .eq("id", proc.carta_id)
         .maybeSingle()
     : { data: null };
+  // qualificação do CONTRATANTE (nome + CPF + e-mail), fonte única em
+  // `profiles` — mesma fonte usada pela rota do cliente (v4/FINAL).
   const { data: profile } = await admin
     .from("profiles")
-    .select("nome")
+    .select("nome, cpf, email")
     .eq("id", proc.cliente_id)
-    .maybeSingle();
-  const { data: kyc } = await admin
-    .from("kyc_perfis")
-    .select("cpf")
-    .eq("user_id", proc.cliente_id)
     .maybeSingle();
 
   const c = carta as {
@@ -82,19 +84,21 @@ export async function POST(
     valor_entrada: c?.valor_entrada ?? proc.valor_entrada ?? null,
   });
   const clienteNome = (profile as { nome: string | null } | null)?.nome ?? "";
-  const clienteCpf = (kyc as { cpf: string | null } | null)?.cpf ?? null;
+  const clienteCpf = (profile as { cpf: string | null } | null)?.cpf ?? null;
+  const clienteEmail = (profile as { email: string | null } | null)?.email ?? "";
 
   const dados =
     tipo === "cota" && c
       ? dadosContratoCota({
           clienteNome,
           clienteCpf,
+          clienteEmail,
           bemTipo: c.tipo,
           valorCredito: c.valor_credito,
           valorEntrada: c.valor_entrada,
           valorSinal: sinal,
         })
-      : dadosContratoServico({ clienteNome, clienteCpf, valorSinal: sinal });
+      : dadosContratoServico({ clienteNome, clienteCpf, clienteEmail, valorSinal: sinal });
 
   // RLS-client chama a RPC; ela revalida o papel (admin OU cliente dono) e o gate.
   const { error } = await supabase.rpc("gerar_contrato", {

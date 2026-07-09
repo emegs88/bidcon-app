@@ -7,7 +7,14 @@
 // com provedor, o POST inicia a assinatura eletrônica.
 //
 // COMPLIANCE: o texto do contrato NÃO cita administradora/taxa/comissão e cada
-// parágrafo já passou por `violaCompliance` no servidor. CPF vem MASCARADO.
+// parágrafo já passou por `violaCompliance` no servidor. CPF vem por extenso
+// (sem máscara) — o cliente só vê o próprio CPF nesta tela (ver lib/format.ts:
+// formatarCpf), qualificação civil completa exigida para validade jurídica.
+//
+// QUALIFICAÇÃO COMPLETA (v4/FINAL): enquanto nome/CPF do profile não
+// estiverem preenchidos e válidos, o botão "Li e aceito" é substituído pelo
+// <QualificacaoGate>. O gate real (que não confia no client) é server-side em
+// /api/processo/contrato.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +24,7 @@ import {
   TONE_STATUS_CONTRATO,
   type StatusContrato,
 } from "@/lib/status";
+import { QualificacaoGate } from "./QualificacaoGate";
 import styles from "./fluxo.module.css";
 
 export type CorpoContratoView = { titulo: string; paragrafos: string[] };
@@ -25,11 +33,18 @@ export function ContratoServico({
   processoId,
   corpo,
   status,
+  precisaQualificacao,
+  nomeAtual,
+  cpfAtual,
 }: {
   processoId: string;
   corpo: CorpoContratoView;
   // null => ainda não gerado; caso contrário, o status atual do contrato.
   status: StatusContrato | null;
+  // true => nome/CPF do profile ainda não estão completos/válidos.
+  precisaQualificacao: boolean;
+  nomeAtual: string;
+  cpfAtual: string;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState(false);
@@ -81,7 +96,11 @@ export function ContratoServico({
         venda da cota. Nada aqui promete contemplação, prazo ou rendimento.
       </p>
 
-      {!assinado && (
+      {!assinado && precisaQualificacao && (
+        <QualificacaoGate nomeAtual={nomeAtual} cpfAtual={cpfAtual} />
+      )}
+
+      {!assinado && !precisaQualificacao && (
         <Button size="sm" onClick={aceitar} disabled={enviando}>
           {enviando ? "Registrando…" : "Li e aceito"}
         </Button>

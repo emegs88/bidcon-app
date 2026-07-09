@@ -3,8 +3,8 @@
 // ----------------------------------------------------------------------------
 // Dois contratos, na ordem jurídica confirmada (SERVIÇO → PIX → COTA):
 //   1) 'servico'  — prestação de serviço de intermediação. Modelo FIXO + dados
-//                   do cliente (nome/CPF do KYC + valor do sinal). NÃO cita
-//                   administradora, taxa, fundo nem comissão.
+//                   do cliente (nome/CPF/e-mail do profile + valor do sinal).
+//                   NÃO cita administradora, taxa, fundo nem comissão.
 //   2) 'cota'     — compra e venda da cota, gerado só APÓS o sinal pago. Descreve
 //                   o bem de forma factual (tipo, crédito, entrada). Também NÃO
 //                   cita administradora/taxa/comissão ao cliente.
@@ -15,8 +15,14 @@
 //   aviso neutro. administradora/taxa/fundo/comissão NUNCA entram no snapshot do
 //   cliente nem no texto.
 //
-// LGPD: o CPF exibido no texto vem MASCARADO (mascararCpf). O CPF cru continua
-//   só no banco (KYC) e nunca é escrito aqui.
+// QUALIFICAÇÃO COMPLETA (v4/FINAL): o CONTRATANTE precisa estar identificado
+//   por inteiro (nome + CPF POR EXTENSO + e-mail) para o contrato ter validade
+//   jurídica — quem vê esse texto é o próprio cliente, então exibir o próprio
+//   CPF não é problema de privacidade. `mascararCpf` (lib/format.ts) segue
+//   intocada e em uso nas telas administrativas (admin/perfis).
+//   O CPF só é gravado em `profiles.cpf` depois de validado por dígito
+//   verificador (`cpfValido`, lib/kyc.ts) — ver /api/perfil/qualificacao e o
+//   gate em /api/processo/contrato.
 //
 // Este módulo é texto/dado puro (sem I/O, sem env): pode ser importado por
 // rotas de servidor. A geração da linha em `contratos` é feita pela RPC
@@ -26,15 +32,29 @@
 import { violaCompliance } from "./ia";
 import { brl } from "./status";
 import { LABEL_TIPO_BEM } from "./status";
-import { mascararCpf } from "./format";
+import { formatarCpf } from "./format";
 
-// Parte CONTRATADA (dado factual público da empresa). Nome jurídico confirmado.
+// Parte CONTRATADA (dado factual público da empresa). Qualificação completa
+// conforme cartão CNPJ (Receita Federal).
 export const CONTRATADA = {
-  razaoSocial: "PROSPERITY PARTICIPACOES HOLDING LTDA",
-  nomeFantasia: "Prospere Consórcios",
+  razaoSocial: "EGS CAPITAL PARTICIPACOES LTDA",
+  cnpj: "67.709.975/0001-64",
+  endereco:
+    "Av. Brigadeiro Faria Lima, nº 1.572, Sala 1022, Jardim Paulistano, São Paulo/SP, CEP 01.451-917",
+  representante: "Emerson Gomes dos Santos",
   marca: "Bidcon",
-  cidade: "Hortolândia/SP",
 } as const;
+
+// Linha de qualificação da CONTRATADA, reusada nos dois modelos de contrato
+// (serviço e cota) — mesma redação, mesma fonte de verdade (CONTRATADA acima).
+function linhaContratada(): string {
+  return (
+    `CONTRATADA: ${CONTRATADA.razaoSocial}, inscrita no CNPJ ${CONTRATADA.cnpj}, ` +
+    `com sede em ${CONTRATADA.endereco}, neste ato representada por seu ` +
+    `administrador, ${CONTRATADA.representante}, na forma de seu contrato ` +
+    `social, operadora da plataforma ${CONTRATADA.marca}.`
+  );
+}
 
 export type TipoContrato = "servico" | "cota";
 
@@ -43,7 +63,8 @@ export type TipoContrato = "servico" | "cota";
 export type DadosContratoServico = {
   tipo: "servico";
   cliente_nome: string;
-  cliente_cpf_mascarado: string;
+  cliente_cpf: string;
+  cliente_email: string;
   valor_sinal: number | null;
   contratada_razao_social: string;
   gerado_em: string; // ISO
@@ -52,7 +73,8 @@ export type DadosContratoServico = {
 export type DadosContratoCota = {
   tipo: "cota";
   cliente_nome: string;
-  cliente_cpf_mascarado: string;
+  cliente_cpf: string;
+  cliente_email: string;
   bem_tipo: string; // "imovel" | "veiculo" (rótulo aplicado na exibição)
   valor_credito: number | null;
   valor_entrada: number | null;
@@ -77,12 +99,14 @@ function linhaSegura(texto: string): string {
 export function dadosContratoServico(input: {
   clienteNome: string;
   clienteCpf: string | null | undefined;
+  clienteEmail: string | null | undefined;
   valorSinal: number | null;
 }): DadosContratoServico {
   return {
     tipo: "servico",
     cliente_nome: input.clienteNome,
-    cliente_cpf_mascarado: mascararCpf(input.clienteCpf),
+    cliente_cpf: formatarCpf(input.clienteCpf),
+    cliente_email: input.clienteEmail ?? "",
     valor_sinal: input.valorSinal,
     contratada_razao_social: CONTRATADA.razaoSocial,
     gerado_em: new Date().toISOString(),
@@ -92,6 +116,7 @@ export function dadosContratoServico(input: {
 export function dadosContratoCota(input: {
   clienteNome: string;
   clienteCpf: string | null | undefined;
+  clienteEmail: string | null | undefined;
   bemTipo: string;
   valorCredito: number | null;
   valorEntrada: number | null;
@@ -100,7 +125,8 @@ export function dadosContratoCota(input: {
   return {
     tipo: "cota",
     cliente_nome: input.clienteNome,
-    cliente_cpf_mascarado: mascararCpf(input.clienteCpf),
+    cliente_cpf: formatarCpf(input.clienteCpf),
+    cliente_email: input.clienteEmail ?? "",
     bem_tipo: input.bemTipo,
     valor_credito: input.valorCredito,
     valor_entrada: input.valorEntrada,
@@ -119,9 +145,8 @@ export type CorpoContrato = { titulo: string; paragrafos: string[] };
 export function corpoContratoServico(d: DadosContratoServico): CorpoContrato {
   const sinal = d.valor_sinal != null ? brl(d.valor_sinal) : "a definir";
   const paragrafos = [
-    `CONTRATANTE: ${d.cliente_nome}, CPF ${d.cliente_cpf_mascarado}.`,
-    `CONTRATADA: ${d.contratada_razao_social} (${CONTRATADA.nomeFantasia}), ` +
-      `operadora da plataforma ${CONTRATADA.marca}, com sede em ${CONTRATADA.cidade}.`,
+    `CONTRATANTE: ${d.cliente_nome}, CPF ${d.cliente_cpf}, e-mail ${d.cliente_email}.`,
+    linhaContratada(),
     `OBJETO: a CONTRATADA prestará serviço de intermediação para a aquisição de ` +
       `uma cota de consórcio já contemplada, organizando a documentação e a ` +
       `transferência de titularidade junto à administradora responsável.`,
@@ -131,6 +156,12 @@ export function corpoContratoServico(d: DadosContratoServico): CorpoContrato {
     `SINAL DA RESERVA: para reservar a cota, o CONTRATANTE pagará, via PIX, o ` +
       `valor de ${sinal}, que segura a cota pelo prazo informado na plataforma. O ` +
       `valor pago a título de sinal é abatido da entrada da cota.`,
+    `ENTRADA E FECHAMENTO PROTEGIDO: o valor principal da entrada é depositado ` +
+      `em conta vinculada aberta EM NOME DO CONTRATANTE em instituição financeira ` +
+      `conveniada ao 5º Tabelionato de Notas de Campinas (Conta Notarial), e sua ` +
+      `liberação é comandada pelo tabelião somente após a formalização da ` +
+      `transferência junto à administradora. O sinal da reserva é pago via PIX e ` +
+      `abatido da entrada.`,
     `Os valores exibidos na plataforma (crédito, entrada, parcela, prazo) são ` +
       `estimativas e ficam sujeitos à análise e à transferência pela administradora ` +
       `do consórcio.`,
@@ -149,9 +180,8 @@ export function corpoContratoCota(d: DadosContratoCota): CorpoContrato {
   const sinal = d.valor_sinal != null ? brl(d.valor_sinal) : "—";
 
   const paragrafos = [
-    `COMPRADOR: ${d.cliente_nome}, CPF ${d.cliente_cpf_mascarado}.`,
-    `INTERMEDIADORA: ${d.contratada_razao_social} (${CONTRATADA.nomeFantasia}), ` +
-      `plataforma ${CONTRATADA.marca}.`,
+    `COMPRADOR: ${d.cliente_nome}, CPF ${d.cliente_cpf}, e-mail ${d.cliente_email}.`,
+    linhaContratada(),
     `OBJETO: aquisição de uma cota de consórcio já contemplada, destinada a ${bem}, ` +
       `com crédito de ${credito}.`,
     `ENTRADA: ${entrada}. Do valor da entrada é abatido o sinal já pago (${sinal}); ` +

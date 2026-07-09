@@ -197,3 +197,34 @@
   color: #a4f3b8;
   font-size: 13px;
 }
+
+/* gate de qualificação (nome + CPF) antes do aceite do contrato de serviço */
+.qualif {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda, #2c2f36);
+  border-radius: 10px;
+  background: var(--cor-fundo-2, #1a1d21);
+}
+.qualifAviso {
+  margin: 0;
+  color: var(--text-soft, #b7bcc4);
+  font-size: 13px;
+}
+.qualifCampo {
+  display: grid;
+  gap: 4px;
+}
+.qualifLabel {
+  font-size: 12px;
+  color: var(--text-muted, #9aa0aa);
+}
+.qualifInput {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text, #e8eaed);
+  background: var(--cor-fundo-3, #23262c);
+  border: 1px solid var(--cor-borda, #2c2f36);
+  border-radius: 8px;
+}

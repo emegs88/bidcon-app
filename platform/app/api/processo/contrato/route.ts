@@ -9,12 +9,19 @@
 // eletrônica é iniciado por /api/processo/esign (rota à parte).
 //
 // COMPLIANCE: o snapshot `dados` (jsonb) é montado por lib/contratos, que NÃO
-// inclui administradora/taxa/comissão e MASCARA o CPF. A geração via RPC
-// gerar_contrato já aplica o gate do sinal para a cota.
+// inclui administradora/taxa/comissão. A geração via RPC gerar_contrato já
+// aplica o gate do sinal para a cota.
+//
+// QUALIFICAÇÃO COMPLETA (v4/FINAL): nome/CPF/e-mail vêm de `profiles` (não
+// mais de kyc_perfis — o KYC de documento/selfie é verificação à parte e não
+// é pré-requisito do contrato). Toda 'aceitar' exige nome preenchido e CPF
+// válido (dígito verificador) — gate server-side; a UI (ContratoServico +
+// QualificacaoGate) já bloqueia antes, mas o servidor é a barreira real.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { resumoSinal } from "@/lib/sinal";
+import { cpfValido } from "@/lib/kyc";
 import {
   dadosContratoServico,
   dadosContratoCota,
@@ -66,10 +73,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "Processo não encontrado." }, { status: 404 });
   }
 
+  const admin = createAdminClient();
+
+  // ----- qualificação do CONTRATANTE (nome + CPF + e-mail), fonte única em
+  // `profiles`. Toda ação 'aceitar' exige nome preenchido e CPF válido. -----
+  const { data: profileRow } = await admin
+    .from("profiles")
+    .select("nome, cpf, email")
+    .eq("id", user.id)
+    .maybeSingle();
+  const clienteNome = (profileRow as { nome: string | null } | null)?.nome?.trim() ?? "";
+  const clienteCpf = (profileRow as { cpf: string | null } | null)?.cpf ?? null;
+  const clienteEmail = (profileRow as { email: string | null } | null)?.email ?? "";
+
+  if (acao === "aceitar" && (!clienteNome || !cpfValido(clienteCpf))) {
+    return NextResponse.json(
+      { erro: "Preencha nome completo e CPF antes de aceitar." },
+      { status: 422 }
+    );
+  }
+
   // ----- COTA + gerar: delega o gate (sinal pago) à RPC gerar_contrato -----
   if (tipo === "cota" && acao === "gerar") {
-    const admin = createAdminClient();
-    // snapshot factual da cota (CPF mascarado dentro de lib/contratos).
+    // snapshot factual da cota (qualificação completa do CONTRATANTE).
     const { data: carta } = processo.carta_id
       ? await admin
           .from("cartas")
@@ -80,16 +106,6 @@ export async function POST(req: Request) {
     if (!carta) {
       return NextResponse.json({ erro: "Carta não vinculada." }, { status: 422 });
     }
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("nome")
-      .eq("id", user.id)
-      .maybeSingle();
-    const { data: kyc } = await admin
-      .from("kyc_perfis")
-      .select("cpf")
-      .eq("user_id", user.id)
-      .maybeSingle();
 
     const c = carta as {
       tipo: string;
@@ -101,8 +117,9 @@ export async function POST(req: Request) {
       valor_entrada: c.valor_entrada ?? processo.valor_entrada ?? null,
     });
     const dados = dadosContratoCota({
-      clienteNome: (profile as { nome: string | null } | null)?.nome ?? "",
-      clienteCpf: (kyc as { cpf: string | null } | null)?.cpf ?? null,
+      clienteNome,
+      clienteCpf,
+      clienteEmail,
       bemTipo: c.tipo,
       valorCredito: c.valor_credito,
       valorEntrada: c.valor_entrada,
@@ -127,8 +144,6 @@ export async function POST(req: Request) {
   }
 
   // ----- SERVIÇO + aceitar: gera (se preciso) e registra o aceite -----
-  const admin = createAdminClient();
-
   if (tipo === "servico" && acao === "aceitar") {
     // já existe um contrato de serviço? (idempotência do aceite)
     const { data: existente } = await admin
@@ -143,7 +158,7 @@ export async function POST(req: Request) {
     let contratoId = (existente as { id: string } | null)?.id ?? null;
 
     if (!contratoId) {
-      // snapshot do serviço (nome/CPF + valor do sinal 2% do crédito).
+      // snapshot do serviço (qualificação completa + valor do sinal 2% do crédito).
       const { data: carta } = processo.carta_id
         ? await admin
             .from("cartas")
@@ -151,16 +166,6 @@ export async function POST(req: Request) {
             .eq("id", processo.carta_id)
             .maybeSingle()
         : { data: null };
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("nome")
-        .eq("id", user.id)
-        .maybeSingle();
-      const { data: kyc } = await admin
-        .from("kyc_perfis")
-        .select("cpf")
-        .eq("user_id", user.id)
-        .maybeSingle();
 
       const cc = carta as {
         valor_credito: number;
@@ -171,8 +176,9 @@ export async function POST(req: Request) {
         valor_entrada: cc?.valor_entrada ?? processo.valor_entrada ?? null,
       });
       const dados = dadosContratoServico({
-        clienteNome: (profile as { nome: string | null } | null)?.nome ?? "",
-        clienteCpf: (kyc as { cpf: string | null } | null)?.cpf ?? null,
+        clienteNome,
+        clienteCpf,
+        clienteEmail,
         valorSinal: sinal,
       });
 

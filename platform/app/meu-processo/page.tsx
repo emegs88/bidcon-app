@@ -23,6 +23,7 @@ import {
 } from "@/lib/status";
 import { brl, dataBR } from "@/lib/format";
 import { resumoSinal } from "@/lib/sinal";
+import { cpfValido } from "@/lib/kyc";
 import {
   dadosContratoServico,
   corpoContratoServico,
@@ -49,10 +50,12 @@ export default async function MeuProcesso() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // identificação do usuário para a casca
+  // identificação do usuário para a casca + qualificação do CONTRATANTE
+  // (nome + CPF + e-mail vêm de `profiles` — fonte única, independente do
+  // KYC de documento/selfie, que segue à parte em kyc_perfis).
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nome, tipo")
+    .select("nome, tipo, cpf, email")
     .eq("id", user.id)
     .single();
   const nome = profile?.nome ?? user.email ?? null;
@@ -153,15 +156,14 @@ export default async function MeuProcesso() {
   const sinalPago = sinalStatus === "pago";
   const qrPayload = (sinalRow as { qr_payload: string | null } | null)?.qr_payload ?? null;
 
-  // dados do cliente para o snapshot do contrato. O nome vem do profile; o CPF,
-  // do KYC (kyc_perfis). O CPF é MASCARADO por lib/contratos antes de gravar.
-  const { data: kyc } = await supabase
-    .from("kyc_perfis")
-    .select("cpf")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const clienteNome = nome ?? "";
-  const clienteCpf = (kyc as { cpf: string | null } | null)?.cpf ?? null;
+  // qualificação completa do CONTRATANTE (nome + CPF + e-mail), fonte única
+  // em `profiles`. Enquanto nome/CPF não estiverem preenchidos e válidos, o
+  // aceite do contrato de serviço fica bloqueado (QualificacaoGate na UI;
+  // gate real é server-side em /api/processo/contrato).
+  const clienteNome = profile?.nome?.trim() ?? "";
+  const clienteCpf = (profile as { cpf: string | null } | null)?.cpf ?? null;
+  const clienteEmail = profile?.email ?? user.email ?? "";
+  const precisaQualificacao = !clienteNome || !cpfValido(clienteCpf);
 
   // valores factuais do sinal/entrada (2% do crédito; residual da entrada).
   const { sinal: valorSinal, residualEntrada } = resumoSinal({
@@ -171,7 +173,7 @@ export default async function MeuProcesso() {
 
   // corpo do contrato de SERVIÇO (modelo fixo + dados do cliente; sanitizado).
   const corpoServico = corpoContratoServico(
-    dadosContratoServico({ clienteNome, clienteCpf, valorSinal })
+    dadosContratoServico({ clienteNome, clienteCpf, clienteEmail, valorSinal })
   );
 
   // corpo do contrato da COTA — só montado quando o sinal está pago (gate real
@@ -182,6 +184,7 @@ export default async function MeuProcesso() {
           dadosContratoCota({
             clienteNome,
             clienteCpf,
+            clienteEmail,
             bemTipo: carta.tipo,
             valorCredito: carta.valor_credito,
             valorEntrada: carta.valor_entrada,
@@ -238,6 +241,9 @@ export default async function MeuProcesso() {
                 processoId={processo.id}
                 corpo={corpoServico}
                 status={contratoServicoStatus}
+                precisaQualificacao={precisaQualificacao}
+                nomeAtual={clienteNome}
+                cpfAtual={clienteCpf ?? ""}
               />
 
               {/* 3) Sinal via PIX (2% do crédito) */}

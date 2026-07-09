@@ -30,3 +30,16 @@ export function mascararCnpj(cnpj: string | null | undefined): string {
   if (d.length !== 14) return cnpj ? "•••" : "—";
   return `**.***.***/****-${d.slice(12)}`;
 }
+
+// ---------------------------------------------------------------------------
+// CPF por extenso (SEM redigir) — uso restrito a documentos que exigem
+// qualificação civil completa das partes (ex.: corpo do contrato assinado
+// pelo próprio cliente, lib/contratos.ts). O cliente só vê o próprio CPF
+// nessas telas; para listas/telas administrativas continue usando
+// `mascararCpf` acima (LGPD por design nesses contextos).
+// ---------------------------------------------------------------------------
+export function formatarCpf(cpf: string | null | undefined): string {
+  const d = (cpf ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
