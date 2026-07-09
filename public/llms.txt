@@ -11,6 +11,8 @@
 - [Carta contemplada de veículo](https://www.bidcon.com.br/carta-contemplada-veiculo): Página dedicada a cartas de consórcio contempladas para compra de veículo, com estimativas de crédito, entrada e parcela.
 - [Vender consórcio contemplado](https://www.bidcon.com.br/vender-consorcio-contemplado): Para quem quer vender uma cota de consórcio já contemplada; a bidcon organiza a documentação e a transferência junto à administradora.
 - [Repasse de consórcio (assunção de dívida)](https://www.bidcon.com.br/repasse): Assunção de dívida de cotas de consórcio já com o crédito utilizado. Quem sai da dívida deposita o valor combinado em Conta Notarial; quem assume as parcelas apresenta bem próprio em garantia e recebe o líquido após a anuência da administradora. Não é venda de crédito; sujeito à anuência, sem promessa de contemplação.
+- [Conta Notarial Bidcon](https://www.bidcon.com.br/conta-notarial): Custódia notarial de ponta a ponta via 5º Tabelionato de Notas de Campinas e conta vinculada Banco Safra — o pagamento só é liberado quando a administradora aprova a transferência.
+- [Parceiros Bidcon](https://www.bidcon.com.br/empresas): Para vendedores de consórcio, corretores e imobiliárias cadastrarem cotas contempladas de clientes e ganharem comissão de captação.
 
 ## Diferenciais
 

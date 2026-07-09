@@ -6,11 +6,6 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://www.bidcon.com.br/bidcon</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
     <loc>https://www.bidcon.com.br/bidcon-lojista</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -57,6 +52,11 @@
   </url>
   <url>
     <loc>https://www.bidcon.com.br/empresas</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.bidcon.com.br/repasse</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
