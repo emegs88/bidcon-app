@@ -1,0 +1,153 @@
+/* ============================================================================
+   bidcon-brand.css — kit de marca autônomo (FENOMENO-01-B / reaproveitável na
+   FENOMENO-02). Prefixo bc- em todas as classes — nunca redefine seletor
+   genérico já existente no index.html ou nas outras páginas do site.
+   Fonte Space Grotesk é carregada via <link> no <head> do HTML (não @import
+   aqui, pra não bloquear o render). IBM Plex Mono já é local (/fonts/fonts.css)
+   mas .bc-mono declara a pilha completa pra funcionar em páginas que não
+   tenham a var(--f-mono) definida no :root.
+   ============================================================================ */
+
+:root {
+  --bc-navy: #0A0E1A;
+  --bc-grad: linear-gradient(100deg, #8FB7FF, #36C5F0 45%, #1E6FE6);
+  --bc-grad-mid: #36C5F0;
+}
+
+.bc-mono {
+  font-family: 'IBM Plex Mono', var(--f-mono, monospace);
+}
+
+.bc-credito-grad {
+  background: var(--bc-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* --- botões --- */
+.bc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bc-grad);
+  color: var(--bc-navy);
+  font-weight: 700;
+  font-family: 'Space Grotesk', var(--f-display, system-ui, sans-serif);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.bc-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(54, 197, 240, .35);
+}
+
+.bc-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 19px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 183, 255, .4);
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  font-family: 'Space Grotesk', var(--f-display, system-ui, sans-serif);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease;
+}
+.bc-btn-ghost:hover {
+  border-color: var(--bc-grad-mid);
+  background: rgba(54, 197, 240, .08);
+}
+
+/* --- chips (filtro de administradora) --- */
+.bc-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 183, 255, .3);
+  background: rgba(143, 183, 255, .06);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+  white-space: nowrap;
+}
+.bc-chip:hover {
+  border-color: var(--bc-grad-mid);
+}
+.bc-chip.on {
+  background: var(--bc-grad);
+  border-color: transparent;
+  color: var(--bc-navy);
+}
+
+/* --- selos do card --- */
+.bc-selo-ouro,
+.bc-selo-verde {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', var(--f-mono, monospace);
+  letter-spacing: .01em;
+}
+.bc-selo-ouro {
+  background: linear-gradient(100deg, #F4D77A, #D9A441);
+  color: #2B1D02;
+  margin-right: 6px;
+}
+.bc-selo-verde {
+  background: rgba(58, 209, 126, .16);
+  color: #3ad17e;
+  border: 1px solid rgba(58, 209, 126, .4);
+}
+
+/* --- card: hover com anel de gradiente (NÃO usa border-image, que ignora
+   border-radius) --- */
+.bc-card {
+  position: relative;
+  transition: transform .18s ease, box-shadow .18s ease;
+  animation: bc-fade-in .4s ease both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.bc-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 1px var(--bc-grad-mid), 0 12px 28px rgba(10, 14, 26, .28);
+}
+
+@keyframes bc-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- skeleton (loading) --- */
+.bc-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(143, 183, 255, .08);
+  border-radius: 16px;
+}
+.bc-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .12), transparent);
+  animation: bc-shimmer 1.4s infinite;
+}
+@keyframes bc-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
