@@ -6,7 +6,9 @@
   "redirects": [
     { "source": "/cartas/marketplace", "destination": "/bidcon", "permanent": true },
     { "source": "/cartas/:path*", "destination": "/bidcon", "permanent": true },
-    { "source": "/cartas", "destination": "/bidcon", "permanent": true }
+    { "source": "/cartas", "destination": "/bidcon", "permanent": true },
+    { "source": "/bidcon", "destination": "/", "permanent": true },
+    { "source": "/bidcon.html", "destination": "/", "permanent": true }
   ],
   "headers": [
     {
