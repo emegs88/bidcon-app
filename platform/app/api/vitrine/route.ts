@@ -85,30 +85,57 @@ export async function GET(req: Request) {
       "valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150," +
       "administradora:administradora_id(nome)";
 
-    const [{ data: cartas, error: erroCartas }, { count: novasHoje, error: erroNovas }] =
-      await Promise.all([
-        supabase
+    // O gateway do Supabase corta em 1000 linhas por resposta mesmo com
+    // .limit() maior — pagina via .range() até esgotar ou bater o teto de
+    // segurança (5 páginas = 5000 linhas). .order(bidcon_agio_150,
+    // bidcon_custo_am) não é única, então soma-se .order("id") como
+    // tiebreaker estável — sem ele, o .range() pode pular ou duplicar
+    // linhas empatadas entre páginas.
+    const POR_PAGINA = 1000;
+    const MAX_PAGINAS = 5;
+
+    async function buscaCartasPaginado() {
+      const todas: LinhaCarta[] = [];
+      let pagina = 0;
+      while (pagina < MAX_PAGINAS) {
+        const { data, error } = await supabase
           .from("cartas")
           .select(campos)
           .eq("status", "disponivel")
           .order("bidcon_agio_150", { ascending: false })
           .order("bidcon_custo_am", { ascending: true })
-          .limit(2000),
+          .order("id", { ascending: true })
+          .range(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA - 1);
+        if (error) throw error;
+        todas.push(...((data ?? []) as unknown as LinhaCarta[]));
+        if (!data || data.length < POR_PAGINA) break;
+        pagina++;
+      }
+      return todas;
+    }
+
+    let linhas: LinhaCarta[];
+    let novasHoje: number | null;
+    let erroNovas: unknown;
+    try {
+      const [cartasPaginadas, resultadoNovas] = await Promise.all([
+        buscaCartasPaginado(),
         supabase
           .from("eventos_sync")
           .select("id", { count: "exact", head: true })
           .eq("tipo", "carta_nova")
           .gte("em", new Date().toISOString().slice(0, 10)),
       ]);
-
-    if (erroCartas) {
+      linhas = cartasPaginadas;
+      novasHoje = resultadoNovas.count;
+      erroNovas = resultadoNovas.error;
+    } catch {
       return NextResponse.json(
         { ok: false, erro: "falha ao ler cartas" },
         { status: 500, headers: corsHeaders(req) }
       );
     }
 
-    const linhas = (cartas ?? []) as unknown as LinhaCarta[];
     const cotas = linhas.map((c) => ({
       n: c.numero_externo,
       fonte: c.administradora_origem,
