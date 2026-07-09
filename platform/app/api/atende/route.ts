@@ -31,6 +31,7 @@ import {
 import {
   montarSystem,
   MARCADOR_BASTAO,
+  MARCADOR_RESERVAR,
   AGENTE_INICIAL,
   AGENTES,
   type AgenteId,
@@ -54,6 +55,22 @@ export async function OPTIONS(req: Request) {
 const FALLBACK =
   "Posso te ajudar a entender como funciona o processo e os próximos passos. " +
   "Se preferir, um especialista da equipe continua com você. Como posso ajudar?";
+
+// RESERVA-01 — frases FIXAS no backend (nunca geradas pelo modelo). A
+// promessa de reserva é garantia de sistema, não prosa de IA: qualquer
+// resultado do gatilho [[RESERVAR]] substitui INTEIRAMENTE o texto do
+// modelo nesta volta por uma destas frases.
+const FRASE_RESERVA_SUCESSO =
+  "Pronto — reservei esta carta pra você por 48 horas: ela saiu da vitrine e fica travada " +
+  "no sistema nesse prazo. 🔒 Nossa equipe te chama no WhatsApp pra seguir com a documentação.";
+const FRASE_RESERVA_INDISPONIVEL =
+  "Essa carta não está mais disponível — deixa eu te mostrar opções parecidas.";
+const FRASE_RESERVA_OUTRO =
+  "Essa carta acabou de ser reservada por outro cliente — deixa eu te mostrar opções parecidas.";
+const FRASE_RESERVA_MISMATCH =
+  "Antes de travar, confirma rapidinho pra mim: qual REF você quer reservar?";
+const FRASE_RESERVA_ESCALONAR =
+  "Vou acionar nossa equipe agora pra confirmar a disponibilidade e formalizar com você.";
 
 // Garante que agente_atual é um AgenteId conhecido; senão, volta ao inicial.
 function agenteValido(id: string | null | undefined): AgenteId {
@@ -217,6 +234,161 @@ function blocoCartaFoco(c: CartaFoco): string {
     linha,
     'Instrução: conduza a conversa sobre ESTA carta usando exatamente estes números; não invente dados além deles; se o cliente pedir algo que não está aqui, ofereça verificar com a equipe.',
   ].join('\n');
+}
+
+// administradora vem como objeto (FK 1:1) na maioria dos clients, mas o
+// supabase-js tipa join-a-um como array — mesmo normalizador de vitrine/route.ts.
+function nomeAdministradora(
+  a: { nome: string | null } | { nome: string | null }[] | null | undefined
+): string | null {
+  if (!a) return null;
+  if (Array.isArray(a)) return a[0]?.nome ?? null;
+  return a.nome ?? null;
+}
+
+// RESERVA-01 — trava real de carta via chat (TTL 48h), acionada só pelo
+// marcador [[RESERVAR]] emitido pela Serena (ver _prompt.ts) após confirmação
+// explícita do cliente.
+//
+// GARANTIA DE SEGURANÇA (correção crítica pós-plano): o `refGatilho` extraído
+// do texto do modelo NUNCA é usado para calcular fingerprint nem para
+// identificar a carta — ele serve só de cross-check contra `cartaFoco.ref`
+// (já sanitizado e enviado pelo WIDGET, não pelo texto do modelo). A
+// identidade real e os valores usados no fingerprint vêm SEMPRE de uma leitura
+// fresca de `cartas` no momento da confirmação — nunca de `cartaFoco` nem do
+// texto do modelo, que podem estar desatualizados (sync roda em paralelo) ou
+// serem uma carta "extra"/virtual sem linha na tabela (ref<=0).
+//
+// Retorna sempre uma das frases FIXAS acima — nunca texto do modelo, nunca
+// finge sucesso em caso de erro de banco (loga e escalona pra humano).
+async function processarReservaCarta(
+  supabase: ReturnType<typeof createXtvClient>,
+  refGatilho: number,
+  cartaFoco: CartaFoco | null,
+  interesseId: string
+): Promise<string> {
+  // 1) sem carta_foco no POST não há como confirmar identidade com segurança.
+  if (!cartaFoco) return FRASE_RESERVA_ESCALONAR;
+
+  // 2) cross-check: o ref que o modelo confirmou tem que bater com o ref do
+  // carta_foco que o widget mandou (dado do cliente, mas não do texto do modelo).
+  const refFoco = Number(cartaFoco.ref);
+  if (!Number.isFinite(refFoco) || refFoco !== refGatilho) {
+    return FRASE_RESERVA_MISMATCH;
+  }
+
+  // 3) ref<=0 é carta "extra"/virtual (gerada no front via normExtra), sem
+  // linha em `cartas` — nunca reservável por este caminho.
+  if (refFoco <= 0) return FRASE_RESERVA_ESCALONAR;
+
+  try {
+    // 4) busca a carta DE VERDADE no banco, no momento atual — nunca usa os
+    // números de carta_foco/texto do modelo daqui pra frente.
+    const { data: cartaDb, error: erroCarta } = await supabase
+      .from("cartas")
+      .select(
+        "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, administradora_raw, administradora:administradora_id(nome)"
+      )
+      .eq("numero_externo", refFoco)
+      .eq("status", "disponivel")
+      .gt("valor_credito", 0)
+      .maybeSingle();
+    if (erroCarta) {
+      console.error("[atende] reserva: erro ao buscar carta:", erroCarta);
+      return FRASE_RESERVA_ESCALONAR;
+    }
+    if (!cartaDb) return FRASE_RESERVA_INDISPONIVEL;
+
+    const adm =
+      nomeAdministradora(
+        cartaDb.administradora as { nome: string | null } | { nome: string | null }[] | null
+      ) ??
+      cartaDb.administradora_raw ??
+      "";
+
+    // 5) fingerprint SEMPRE calculado no banco, com os valores QUE ESTÃO NO
+    // BANCO agora (RPC — nunca recalculado em JS, nunca com dado do cliente).
+    const { data: fp, error: erroFp } = await supabase.rpc("carta_fingerprint", {
+      p_tipo: cartaDb.tipo,
+      p_credito: cartaDb.valor_credito,
+      p_entrada: cartaDb.valor_entrada,
+      p_parcela: cartaDb.valor_parcela,
+      p_parcelas: cartaDb.qtd_parcelas,
+      p_adm: adm,
+    });
+    if (erroFp || !fp) {
+      console.error("[atende] reserva: erro ao calcular fingerprint:", erroFp);
+      return FRASE_RESERVA_ESCALONAR;
+    }
+
+    // 6) já existe reserva ativa (não expirada) com este fingerprint?
+    const { data: reservaAtiva, error: erroReserva } = await supabase
+      .from("reservas")
+      .select("id, interesse_id")
+      .eq("fingerprint", fp)
+      .eq("status", "ativa")
+      .gt("expira_em", new Date().toISOString())
+      .maybeSingle();
+    if (erroReserva) {
+      console.error("[atende] reserva: erro ao checar reserva ativa:", erroReserva);
+      return FRASE_RESERVA_ESCALONAR;
+    }
+    if (reservaAtiva) {
+      // idempotência: mesma conversa confirmando de novo -> sucesso, sem duplicar.
+      if (reservaAtiva.interesse_id === interesseId) return FRASE_RESERVA_SUCESSO;
+      return FRASE_RESERVA_OUTRO;
+    }
+
+    // 7) nome/telefone do interesse, pra deixar rastro na reserva.
+    const { data: interesse, error: erroInteresse } = await supabase
+      .from("interesses")
+      .select("id, nome, telefone")
+      .eq("id", interesseId)
+      .maybeSingle();
+    if (erroInteresse || !interesse) {
+      console.error("[atende] reserva: erro ao buscar interesse:", erroInteresse);
+      return FRASE_RESERVA_ESCALONAR;
+    }
+
+    // 8) grava a reserva (expira_em fica no default do banco: now()+48h).
+    const { error: erroInsert } = await supabase.from("reservas").insert({
+      carta_id: cartaDb.id,
+      interesse_id: interesseId,
+      fingerprint: fp,
+      nome: interesse.nome,
+      telefone: interesse.telefone,
+      origem: "chat",
+    });
+    if (erroInsert) {
+      console.error("[atende] reserva: erro ao inserir reserva:", erroInsert);
+      return FRASE_RESERVA_ESCALONAR;
+    }
+
+    // 9) amarra o interesse à carta reservada. Falha aqui não desfaz a
+    // reserva nem finge erro ao cliente — a reserva em si é a fonte de
+    // verdade (a vitrine já esconde a carta); só loga pra investigar depois.
+    const snapshot = {
+      ref: refFoco,
+      tipo: cartaDb.tipo,
+      credito: cartaDb.valor_credito,
+      entrada: cartaDb.valor_entrada,
+      parcela: cartaDb.valor_parcela,
+      parcelas: cartaDb.qtd_parcelas,
+      adm,
+    };
+    const { error: erroUpdate } = await supabase
+      .from("interesses")
+      .update({ carta_id: cartaDb.id, snapshot, intencao: "reserva_pretendida" })
+      .eq("id", interesseId);
+    if (erroUpdate) {
+      console.error("[atende] reserva: erro ao atualizar interesse pós-reserva:", erroUpdate);
+    }
+
+    return FRASE_RESERVA_SUCESSO;
+  } catch (e) {
+    console.error("[atende] reserva: falha inesperada:", e);
+    return FRASE_RESERVA_ESCALONAR;
+  }
 }
 
 // CONTRATO ESPERADO (opção "já contatável"):
@@ -430,6 +602,17 @@ export async function POST(req: Request) {
   const m = bruto.match(MARCADOR_BASTAO);
   const proximoBruto = m ? m[1] : null;
   let limpo = bruto.replace(MARCADOR_BASTAO, "").trimEnd();
+
+  // 7.5) RESERVA-01: captura [[RESERVAR]]ref=NNN[[/RESERVAR]] — SEMPRE remove
+  // do texto exibido (sucesso ou não; o cliente nunca vê o marcador cru). Se
+  // veio, o resultado do processamento SUBSTITUI inteiramente o texto do
+  // modelo por uma frase fixa (ver processarReservaCarta).
+  const marcadorReserva = limpo.match(MARCADOR_RESERVAR);
+  limpo = limpo.replace(MARCADOR_RESERVAR, "").trimEnd();
+  if (marcadorReserva) {
+    const refGatilho = Number(marcadorReserva[1]);
+    limpo = await processarReservaCarta(supabase, refGatilho, cartaFoco, interesseId);
+  }
 
   // 8) Barreira de compliance (com fallback neutro obrigatório).
   limpo = sanitizarCompliance(limpo, FALLBACK);

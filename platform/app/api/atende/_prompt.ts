@@ -26,6 +26,20 @@
  *
  *  MECÂNICA: a persona SÓ passa o bastão quando a intenção muda de estágio.
  *  Se ainda está no assunto dela, NÃO emite marcador — continua respondendo.
+ *
+ *  RESERVA DE CARTA (RESERVA-01)
+ *  Só a Serena emite, no máximo uma vez por resposta, o marcador:
+ *
+ *      [[RESERVAR]]ref=86[[/RESERVAR]]
+ *
+ *  SÓ depois de o cliente confirmar de forma explícita e inequívoca que quer
+ *  travar uma REF concreta já apresentada na conversa. O marcador é só um
+ *  GATILHO — a edge `atende` NUNCA confia no `ref` do texto do modelo pra
+ *  identificar a carta: a identidade real vem do `carta_foco` que o widget
+ *  já manda em todo POST, cruzado contra a linha atual em `cartas` e o
+ *  fingerprint calculado no banco (ver route.ts). O cliente nunca vê o
+ *  marcador; a frase de confirmação de reserva é FIXA no backend, nunca
+ *  gerada pelo modelo.
  * ========================================================================== */
 
 export type AgenteId =
@@ -217,6 +231,19 @@ O QUE VOCÊ EXPLICA E CONDUZ
 - Conduza o cliente pelos passos do fechamento com calma e clareza, um de cada vez.
 - Tranquilize: cada etapa tem quem cuida. Você garante que ele se sinta seguro.
 
+RESERVA DA CARTA ([[RESERVAR]])
+- Quando o cliente confirmar de forma EXPLÍCITA e INEQUÍVOCA que quer travar uma
+  REF concreta já apresentada na conversa (ex.: "quero reservar a 86", "pode travar
+  essa pra mim", "sim, fecho com essa"), emita — depois do seu texto normal, na
+  penúltima linha (antes do ##AGENTE:xxx## se houver troca na mesma resposta) —
+  o marcador exato:
+      [[RESERVAR]]ref=NNN[[/RESERVAR]]
+  onde NNN é o número da REF que o cliente confirmou. Emita no MÁXIMO um marcador
+  desses por resposta, e SÓ quando a confirmação for inequívoca — na dúvida,
+  pergunte de novo antes de emitir. NÃO prometa a reserva você mesma: quem confirma
+  ao cliente que a trava foi feita é o sistema, não o seu texto. NÃO explique o
+  marcador nem fale dele — ele é removido antes do cliente ver.
+
 REGRAS
 - Não trate a transferência como automática — ela depende da aprovação da administradora.
 - Quando a parte jurídica/documental entra (cessão, anuência, gravames) -> Dr. Tobias:
@@ -306,6 +333,19 @@ export function montarSystem(ativo: AgenteId): string {
  *   const limpo = texto.replace(MARCADOR_BASTAO, '').trimEnd();  // manda `limpo` ao cliente
  */
 export const MARCADOR_BASTAO = /##AGENTE:(prosperito|valentina|caetano|serena|tobias|aurora|bento)##\s*$/;
+
+/* Regex pra a edge extrair o gatilho de reserva (RESERVA-01), emitido só pela
+ * Serena após confirmação explícita do cliente. `ref` aqui é só o GATILHO —
+ * a edge NUNCA usa esse número pra calcular fingerprint nem identificar a
+ * carta; a identidade real vem do carta_foco enviado pelo widget, cruzado
+ * contra a linha atual em `cartas` (ver route.ts, passo de reserva).
+ * Aceita ref negativo na captura (cartas "extra"/virtuais existem no front),
+ * mas o handler trata ref<=0 como não-reservável.
+ *   const m = texto.match(MARCADOR_RESERVAR);
+ *   const refGatilho = m ? Number(m[1]) : null;
+ *   const semMarcador = texto.replace(MARCADOR_RESERVAR, '').trimEnd();
+ */
+export const MARCADOR_RESERVAR = /\[\[RESERVAR\]\]ref=(-?\d{1,10})\[\[\/RESERVAR\]\]/;
 
 /* Agente com quem toda conversa nova começa. */
 export const AGENTE_INICIAL: AgenteId = 'prosperito';

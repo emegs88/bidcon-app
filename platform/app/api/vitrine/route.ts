@@ -6,6 +6,13 @@
 // PRIMÁRIA — os feeds do 360prospere seguem como fallback lá no front, se
 // esta chamada falhar. NÃO grava nada; NÃO chama RPC; só leitura.
 //
+// RESERVA-01: a fonte deixou de ser a tabela `cartas` direto e passou a ser a
+// VIEW `vw_vitrine_viva` — ela já embute `status='disponivel' AND
+// valor_credito>0 AND NOT EXISTS(reserva ativa com mesmo fingerprint)`, ou
+// seja, uma carta reservada via chat (ver app/api/atende/route.ts) some
+// daqui automaticamente, sem esta rota precisar saber nada de `reservas`.
+// `cartas.status` NUNCA muda quando uma reserva é criada — só a view filtra.
+//
 // Mesmo client/filtro do blocoCartas() (app/api/atende/route.ts): a policy
 // de select da vitrine só libera `authenticated`, então anon-key não
 // devolveria linha nenhuma — createXtvClient() (service_role) é obrigatório
@@ -32,29 +39,21 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type LinhaCarta = {
-  numero_externo: number | null;
+  ref: number | null;
   tipo: string | null;
-  valor_credito: number | null;
-  valor_entrada: number | null;
-  valor_parcela: number | null;
-  qtd_parcelas: number | null;
-  bidcon_custo_am: number | null;
-  bidcon_agio_120: number | null;
-  bidcon_agio_150: number | null;
-  administradora: { nome: string | null } | { nome: string | null }[] | null;
+  credito: number | null;
+  entrada: number | null;
+  parcela: number | null;
+  parcelas: number | null;
+  custo_am: number | null;
+  agio_120: number | null;
+  agio_150: number | null;
+  administradora: string | null;
 };
 
 // Preflight CORS (bidcon.com.br chamando app.bidcon.com.br).
 export async function OPTIONS(req: Request) {
   return handlePreflight(req);
-}
-
-// administradora vem como objeto (FK 1:1) na maioria dos clients, mas o
-// supabase-js tipa join-a-um como array — normaliza os dois formatos.
-function nomeAdministradora(a: LinhaCarta["administradora"]): string | null {
-  if (!a) return null;
-  if (Array.isArray(a)) return a[0]?.nome ?? null;
-  return a.nome ?? null;
 }
 
 function num(v: number | null): number {
@@ -80,16 +79,13 @@ export async function GET(req: Request) {
     const supabase = createXtvClient();
 
     const campos =
-      "numero_externo,tipo,valor_credito,valor_entrada," +
-      "valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150," +
-      "administradora:administradora_id(nome)";
+      "ref,tipo,credito,entrada,parcela,parcelas,custo_am,agio_120,agio_150,administradora";
 
     // O gateway do Supabase corta em 1000 linhas por resposta mesmo com
     // .limit() maior — pagina via .range() até esgotar ou bater o teto de
-    // segurança (5 páginas = 5000 linhas). .order(bidcon_agio_150,
-    // bidcon_custo_am) não é única, então soma-se .order("id") como
-    // tiebreaker estável — sem ele, o .range() pode pular ou duplicar
-    // linhas empatadas entre páginas.
+    // segurança (5 páginas = 5000 linhas). .order(agio_150, custo_am) não é
+    // única, então soma-se .order("id") como tiebreaker estável — sem ele,
+    // o .range() pode pular ou duplicar linhas empatadas entre páginas.
     const POR_PAGINA = 1000;
     const MAX_PAGINAS = 5;
 
@@ -98,11 +94,10 @@ export async function GET(req: Request) {
       let pagina = 0;
       while (pagina < MAX_PAGINAS) {
         const { data, error } = await supabase
-          .from("cartas")
+          .from("vw_vitrine_viva")
           .select(campos)
-          .eq("status", "disponivel")
-          .order("bidcon_agio_150", { ascending: false })
-          .order("bidcon_custo_am", { ascending: true })
+          .order("agio_150", { ascending: false })
+          .order("custo_am", { ascending: true })
           .order("id", { ascending: true })
           .range(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA - 1);
         if (error) throw error;
@@ -136,16 +131,16 @@ export async function GET(req: Request) {
     }
 
     const cotas = linhas.map((c) => ({
-      n: c.numero_externo,
+      n: c.ref,
       t: c.tipo,
-      c: num(c.valor_credito),
-      e: num(c.valor_entrada),
-      p: num(c.valor_parcela),
-      x: num(c.qtd_parcelas),
-      adm: nomeAdministradora(c.administradora),
-      custo: c.bidcon_custo_am,
-      agio150: c.bidcon_agio_150,
-      agio120: c.bidcon_agio_120,
+      c: num(c.credito),
+      e: num(c.entrada),
+      p: num(c.parcela),
+      x: num(c.parcelas),
+      adm: c.administradora,
+      custo: c.custo_am,
+      agio150: c.agio_150,
+      agio120: c.agio_120,
     }));
 
     return NextResponse.json(

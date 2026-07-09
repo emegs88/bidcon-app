@@ -179,7 +179,7 @@
 
   function addMsg(tipo, texto) {
     var m = el('div', 'pw-msg ' + tipo);
-    m.textContent = texto;
+    m.innerHTML = pwBoldEsc(texto);
     body.appendChild(m);
     body.scrollTop = body.scrollHeight;
   }
@@ -397,6 +397,9 @@ document.head.appendChild(style3);
 /* ===== PW CARTAS — render de [[CARTA]] ===== */
 var PW_CARTA_RE = /\[\[CARTA\]\]([\s\S]*?)\[\[\/CARTA\]\]/g;
 function pwEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+/* negrito simples **texto** -> <b>texto</b>, sempre sobre texto já escapado
+ * (pwEsc primeiro) pra nunca abrir brecha de HTML injection via resposta do modelo. */
+function pwBoldEsc(s){return pwEsc(s).replace(/\*\*([^\*]+?)\*\*/g,'<b>$1</b>');}
 function pwBRL(n){var v=parseInt(String(n).replace(/\D/g,''),10);return isNaN(v)?pwEsc(n):'R$ '+v.toLocaleString('pt-BR');}
 function pwParseCarta(body){var c={};body.split('|').forEach(function(p){var i=p.indexOf('=');if(i>0)c[p.slice(0,i).trim().toLowerCase()]=p.slice(i+1).trim();});return c;}
 function pwRenderCarta(c){
@@ -428,7 +431,7 @@ function pwRenderCarta(c){
     +'</div>'
     +'<div class="pw-carta-foot">'
     +'<div class="pw-carta-info">'+info+'</div>'
-    +'<button type="button" class="pw-carta-cta" data-ref="'+ref+'">Quero esta</button>'
+    +'<button type="button" class="pw-carta-cta" data-ref="'+ref+'" data-tipo="'+pwEsc(c.tipo||'')+'" data-credito="'+pwEsc(c.credito||'')+'" data-entrada="'+pwEsc(c.entrada||'')+'" data-parcela="'+pwEsc(c.parcela||'')+'" data-nparcelas="'+pwEsc(c.nparcelas||'')+'" data-custo="'+pwEsc(c.custo||'')+'">Quero esta</button>'
     +'</div></div>';
 }
 
@@ -453,10 +456,33 @@ addMsg = function (tipo, texto) {
     body.scrollTop = body.scrollHeight;
   }
 };
+/* fatia RESERVA-01: o card [[CARTA]] renderizado DENTRO do chat (diferente do
+ * clique num card da vitrine, fora do chat) não passava por
+ * abrirProsperitoComCarta() e por isso nunca populava cartaFocoAtual — a
+ * reserva via chat depende de carta_foco ir em todo POST /api/atende, então
+ * sem isso a maioria das conversas reais (cliente vê a carta dentro do
+ * próprio chat) chegaria na Serena sem carta_foco. Popula aqui a partir dos
+ * data-* já presentes no botão (mesmos dados que o próprio card mostrou,
+ * vindos do bloco CARTAS DISPONÍVEIS AGORA montado server-side). */
 body.addEventListener('click', function (ev) {
   var btn = ev.target && ev.target.closest ? ev.target.closest('.pw-carta-cta') : null;
   if (!btn) return;
-  txt.value = 'Quero esta carta \u2014 REF. ' + (btn.getAttribute('data-ref') || '');
+  var ref = btn.getAttribute('data-ref') || '';
+  var tipo = (btn.getAttribute('data-tipo') || '').slice(0, 20);
+  var credito = Number(btn.getAttribute('data-credito'));
+  var entrada = Number(btn.getAttribute('data-entrada'));
+  var parcela = Number(btn.getAttribute('data-parcela'));
+  var nparcelas = Number(btn.getAttribute('data-nparcelas'));
+  var custo = Number(String(btn.getAttribute('data-custo') || '').replace(',', '.'));
+  cartaFocoAtual = {
+    ref: ref.slice(0, 40), tipo: tipo, adm: '',
+    credito: isNaN(credito) ? 0 : credito,
+    entrada: isNaN(entrada) ? 0 : entrada,
+    parcela: isNaN(parcela) ? 0 : parcela,
+    nparcelas: isNaN(nparcelas) ? 0 : nparcelas,
+    custo: (!isNaN(custo) && custo > 0) ? custo : null
+  };
+  txt.value = 'Quero esta carta \u2014 REF. ' + ref;
   sendBtn.click();
 });
 
