@@ -177,6 +177,7 @@ type CartaFoco = {
   parcela: number;
   nparcelas: number;
   adm: string;
+  custo?: number;
 };
 
 function lerCartaFoco(raw: unknown): CartaFoco | null {
@@ -193,7 +194,14 @@ function lerCartaFoco(raw: unknown): CartaFoco | null {
   if (![credito, entrada, parcela, nparcelas].every((n) => Number.isFinite(n) && n >= 0)) {
     return null;
   }
-  return { ref, tipo, credito, entrada, parcela, nparcelas, adm };
+  // custo é aditivo (não invalida o carta_foco se ausente/fora de faixa) —
+  // mesma faixa de sanidade do bidcon_custo_am (>0, ≤100), 2 casas.
+  const custoRaw = Number(o.custo);
+  const custo =
+    Number.isFinite(custoRaw) && custoRaw > 0 && custoRaw <= 100
+      ? Math.round(custoRaw * 100) / 100
+      : undefined;
+  return { ref, tipo, credito, entrada, parcela, nparcelas, adm, custo };
 }
 
 // Monta o bloco CARTA EM FOCO no mesmo formato de linha do blocoCartas.
@@ -202,7 +210,8 @@ function blocoCartaFoco(c: CartaFoco): string {
   const tipoTxt =
     c.tipo.toLowerCase() === 'imovel' ? 'IMÓVEL' : c.tipo.toLowerCase() === 'veiculo' ? 'VEÍCULO' : c.tipo.toUpperCase();
   const admParte = c.adm ? `|administradora=${c.adm}` : '';
-  const linha = `ref=${c.ref}|tipo=${tipoTxt}|credito=${fmt(c.credito)}|entrada=${fmt(c.entrada)}|nparcelas=${c.nparcelas}|parcela=${fmt(c.parcela)}${admParte}`;
+  const custoParte = c.custo != null ? `|custo=${c.custo.toFixed(2).replace('.', ',')}` : '';
+  const linha = `ref=${c.ref}|tipo=${tipoTxt}|credito=${fmt(c.credito)}|entrada=${fmt(c.entrada)}|nparcelas=${c.nparcelas}|parcela=${fmt(c.parcela)}${admParte}${custoParte}`;
   return [
     'CARTA EM FOCO (o cliente clicou nesta carta na vitrine):',
     linha,

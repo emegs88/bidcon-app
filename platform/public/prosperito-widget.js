@@ -280,18 +280,22 @@ window.abrirProsperitoComCarta = function (carta) {
   var entrada = Number(carta.entrada);
   var parcela = Number(carta.parcela);
   var nparcelas = Number(carta.nparcelas);
+  var custo = Number(carta.custo);
   cartaFocoAtual = {
     ref: ref, tipo: tipo, adm: adm,
     credito: isNaN(credito) ? 0 : credito,
     entrada: isNaN(entrada) ? 0 : entrada,
     parcela: isNaN(parcela) ? 0 : parcela,
-    nparcelas: isNaN(nparcelas) ? 0 : nparcelas
+    nparcelas: isNaN(nparcelas) ? 0 : nparcelas,
+    custo: (!isNaN(custo) && custo > 0) ? custo : null
   };
   var tipoLbl = tipo.toLowerCase() === 'imovel' ? 'Im\u00f3vel' : 'Ve\u00edculo';
+  var custoSufixo = cartaFocoAtual.custo != null ? (', custo efetivo ~' + cartaFocoAtual.custo + '% a.m') : '';
   var texto = 'Quero saber mais sobre esta carta de ' + tipoLbl + ': cr\u00e9dito ' +
     pwBRL(cartaFocoAtual.credito) + ', entrada ' + pwBRL(cartaFocoAtual.entrada) +
     ', parcela ' + pwBRL(cartaFocoAtual.parcela) +
-    (cartaFocoAtual.nparcelas > 0 ? '\u00d7' + cartaFocoAtual.nparcelas : '') + '.';
+    (cartaFocoAtual.nparcelas > 0 ? '\u00d7' + cartaFocoAtual.nparcelas : '') +
+    custoSufixo + '.';
   pendingCtx = texto;
   if (pendingTimer) clearInterval(pendingTimer);
   pendingTimer = setInterval(tentarEnviarContexto, 200);
@@ -406,21 +410,21 @@ function pwRenderCarta(c){
       +'<div class="pw-carta-row"><span>Cr\u00e9dito</span><b>'+pwBRL(c.credito)+'</b></div>'
       +'<div class="pw-carta-row"><span>Entrada</span><b>'+pwBRL(c.entrada)+'</b></div>'
       +'<div class="pw-carta-row"><span>Parcelas</span><b>'+pwEsc(c.nparcelas)+'\u00d7 '+pwBRL(c.parcela)+'</b></div>'
-      +'<div class="pw-carta-row"><span>Custo Bidcon</span><b class="pw-green">'+custo+'% a.m.</b></div>'
+      +(custo?'<div class="pw-carta-row"><span>Custo Bidcon</span><b class="pw-green">'+custo+'% a.m.</b></div>':'')
       +'</div>'
-      +'<div class="pw-carta-price"><div class="pw-carta-price-k">BIDCON PRICE &middot; \u00c1GIO JUSTO AT\u00c9</div><div class="pw-carta-price-v">'+pwBRL(c.agio)+'</div></div>'
+      +'<div class="pw-carta-price"><div class="pw-carta-price-k">BIDCON PRICE &middot; ABAIXO DO TETO</div><div class="pw-carta-price-v">'+pwBRL(c.agio)+'</div></div>'
       +selo+'</div>';
   }
   var info='';
   if(c.selo)info+='<span class="pw-dot"></span>'+pwEsc(c.selo);
-  if(c.agio)info+=(info?' <em>&middot;</em> ':'')+'\u00e1gio justo at\u00e9 <u>'+pwBRL(c.agio)+'</u>';
+  if(c.agio)info+=(info?' <em>&middot;</em> ':'')+'<u>'+pwBRL(c.agio)+'</u> abaixo do teto';
   return '<div class="pw-carta pw-carta-mini">'
     +'<div class="pw-carta-top"><div><div class="pw-carta-eyebrow">REF. '+ref+' &middot; '+tipo+'</div><div class="pw-carta-title2">Carta contemplada</div></div>'
     +'<div class="pw-carta-cred"><b>'+pwBRL(c.credito)+'</b><i>CR\u00c9DITO</i></div></div>'
     +'<div class="pw-carta-g3">'
     +'<div class="pw-cell"><i>ENTRADA</i><b>'+pwBRL(c.entrada)+'</b></div>'
     +'<div class="pw-cell"><i>PARCELA</i><b>'+pwEsc(c.nparcelas)+'\u00d7 '+pwBRL(c.parcela)+'</b></div>'
-    +'<div class="pw-cell"><i>CUSTO</i><b class="pw-green">'+custo+'% a.m.</b></div>'
+    +(custo?'<div class="pw-cell"><i>CUSTO</i><b class="pw-green">'+custo+'% a.m.</b></div>':'')
     +'</div>'
     +'<div class="pw-carta-foot">'
     +'<div class="pw-carta-info">'+info+'</div>'
