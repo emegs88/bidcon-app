@@ -93,7 +93,7 @@ export async function GET(req: Request) {
           .eq("status", "disponivel")
           .order("bidcon_agio_150", { ascending: false })
           .order("bidcon_custo_am", { ascending: true })
-          .limit(300),
+          .limit(2000),
         supabase
           .from("eventos_sync")
           .select("id", { count: "exact", head: true })
