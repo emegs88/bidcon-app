@@ -56,9 +56,12 @@
 <a href="/empresas" data-nav="parceiros">Parceiros</a>
 <a href="https://app.bidcon.com.br" class="gnav-cta" data-nav="entrar">Entrar</a>
 </div>
+<span class="gnav-fade" aria-hidden="true">›</span>
 </nav>
 <style>
-.gnav{background:#1E2A47;border-bottom:1px solid #1E2A47}
+.gnav{background:#1E2A47;border-bottom:1px solid #1E2A47;position:relative}
+.gnav-fade{position:absolute;top:0;right:0;bottom:0;width:30px;background:linear-gradient(90deg,transparent,#1E2A47 75%);pointer-events:none;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;color:#D9B36A;font-size:15px;font-weight:800}
+@media (min-width:901px){.gnav-fade{display:none}}
 .gnav-in{max-width:1120px;margin:0 auto;display:flex;gap:2px;align-items:center;padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .gnav-in::-webkit-scrollbar{display:none}
 .gnav-in a{color:#E8ECF5;text-decoration:none;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:14px 12px;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
