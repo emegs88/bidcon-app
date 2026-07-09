@@ -33,7 +33,6 @@ export const runtime = "nodejs";
 
 type LinhaCarta = {
   numero_externo: number | null;
-  administradora_origem: string | null;
   tipo: string | null;
   valor_credito: number | null;
   valor_entrada: number | null;
@@ -81,7 +80,7 @@ export async function GET(req: Request) {
     const supabase = createXtvClient();
 
     const campos =
-      "numero_externo,administradora_origem,tipo,valor_credito,valor_entrada," +
+      "numero_externo,tipo,valor_credito,valor_entrada," +
       "valor_parcela,qtd_parcelas,bidcon_custo_am,bidcon_agio_120,bidcon_agio_150," +
       "administradora:administradora_id(nome)";
 
@@ -138,7 +137,6 @@ export async function GET(req: Request) {
 
     const cotas = linhas.map((c) => ({
       n: c.numero_externo,
-      fonte: c.administradora_origem,
       t: c.tipo,
       c: num(c.valor_credito),
       e: num(c.valor_entrada),
