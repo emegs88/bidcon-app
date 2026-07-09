@@ -299,6 +299,16 @@ async function processarReservaCarta(
     }
     if (!cartaDb) return FRASE_RESERVA_INDISPONIVEL;
 
+    // 4b) consistência: a linha atual do ref ainda é a MESMA carta da
+    // conversa? (o sync realoca numero_externo entre rodadas; ver caso do
+    // ref 86 em 09/07). Parcela fica de fora da comparação (tolera reajuste
+    // de centavos) — só credito/entrada, que são os campos mais estáveis e
+    // discriminantes entre cartas diferentes.
+    const mesmaCarta =
+      Math.round(Number(cartaDb.valor_credito)) === Math.round(Number(cartaFoco.credito)) &&
+      Math.round(Number(cartaDb.valor_entrada)) === Math.round(Number(cartaFoco.entrada));
+    if (!mesmaCarta) return FRASE_RESERVA_MISMATCH;
+
     const adm =
       nomeAdministradora(
         cartaDb.administradora as { nome: string | null } | { nome: string | null }[] | null
