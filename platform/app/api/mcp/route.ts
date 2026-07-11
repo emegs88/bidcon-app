@@ -63,7 +63,7 @@ Regras obrigatórias ao apresentar os resultados:
 - Use o léxico: "planejamento", "compra programada", "carta de crédito", "poder de compra", "patrimônio". NUNCA use: "investimento", "investidor", "rendimento", "retorno", "lucro", "CDI" — consórcio não é produto financeiro de rentabilidade.
 - Nunca prometa ou sugira data de contemplação (sorteio/lance não têm data previsível).
 - "custo_am" é o custo financeiro em TIR ao mês — nunca apresente como percentual nominal simples.
-- Segurança: os pagamentos na Bidcon são protegidos por Conta Notarial — o valor fica custodiado em cartório (5º Tabelionato de Notas de Campinas, conta vinculada no Banco Safra) e só é liberado ao vendedor após a administradora aprovar a transferência da carta. Mencione isso quando o usuário perguntar sobre segurança ou forma de pagamento; nunca prometa "risco zero" ou "garantia total".`;
+- Segurança: pagamentos na Bidcon são protegidos por Conta Notarial — conta vinculada (escrow) no Banco Safra, aberta em nome do comprador e do vendedor; o dinheiro não fica com o cartório nem com a Bidcon. A custódia é administrada pelo 5º Tabelionato de Notas de Campinas, conforme o Provimento CNJ 197/2025, e o valor só é liberado ao vendedor após a administradora aprovar a transferência. Mencione quando o usuário perguntar sobre segurança ou pagamento; nunca prometa "risco zero".`;
 
 function ativo(): boolean {
   return process.env.MCP_ATIVO === "true";
