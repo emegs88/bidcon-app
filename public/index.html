@@ -38,6 +38,9 @@
 {"@type":"Question","name":"O que é uma cota de consórcio contemplada?","acceptedAnswer":{"@type":"Answer","text":"É uma cota de consórcio que já foi contemplada, por sorteio ou lance, e teve o crédito liberado. Ao assumir a cota, você paga a entrada combinada e passa a usar o crédito para comprar o bem, quitando o saldo nas parcelas mensais conforme as regras da administradora."}},
 {"@type":"Question","name":"Consórcio contemplado é investimento?","acceptedAnswer":{"@type":"Answer","text":"Não. Consórcio é uma forma de compra programada de um bem, não um investimento. A bidcon exibe estimativas de crédito, entrada, parcela e custo mensal para comparação, mas não promete contemplação, rendimento nem aprovação de crédito — a análise final é sempre da administradora."}},
 {"@type":"Question","name":"Posso comprar cota para imóvel e para veículo?","acceptedAnswer":{"@type":"Answer","text":"Sim. A bidcon reúne cartas de consórcio contempladas de imóvel, residencial e comercial, e de veículo. Com o crédito liberado, o pagamento ao vendedor é feito à vista, dentro do valor do crédito, respeitando as regras de finalidade da administradora."}}]}</script>
+<!-- BC:SSR-LD-INICIO -->
+<script type="application/ld+json" id="ldCotas"></script>
+<!-- BC:SSR-LD-FIM -->
 <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/poppins-800-latin.woff2">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -263,7 +266,7 @@
     <div class="ccount" id="cotasCount"></div>
   </div>
 
-  <div class="cgrid" id="cotasGrid"></div>
+  <div class="cgrid" id="cotasGrid"><!-- BC:SSR-COTAS-INICIO --><!-- BC:SSR-COTAS-FIM --></div>
   <button class="cmore hide" id="cotasMore" style="display:none">Ver mais cotas</button>
 
   <section class="como">
