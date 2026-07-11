@@ -1,0 +1,40 @@
+name: atualizar-vitrine
+
+on:
+  schedule:
+    - cron: "0 12,16,21 * * *"   # ~09h/13h/18h BRT
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-vitrine
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Gerar vitrine estática
+        env:
+          BIDCON_PUBLISHABLE_KEY: ${{ secrets.BIDCON_PUBLISHABLE_KEY }}
+        run: node scripts/gerar-vitrine.mjs
+
+      - name: Commit se houver diff
+        run: |
+          if git diff --quiet -- public/index.html; then
+            echo "Sem mudanças na vitrine — nada a commitar."
+            exit 0
+          fi
+          git config user.name "bidcon-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/index.html
+          git commit -m "chore(vitrine): snapshot automático do estoque"
+          git push
