@@ -199,3 +199,4 @@ match semântico, motor de preço de repasse e gate de compliance.
 por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 `setup-supabase-dev.md`, `validacao-nivel3.md` e `checklist-pendencias.md`.*
 0017 PROD 20260704132129 auditada · /conta-notarial v4 selo-medalha (merge+seds f444399) · WhatsApp global 5519997561909 provisório até API · selo na home · navbar global = próxima sessão — 04/07
+2026-07-11 · WhatsApp oficial migrado de 5519997561909 para 5511973202967 (site + plataforma, todas as superfícies)
