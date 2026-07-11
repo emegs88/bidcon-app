@@ -36,18 +36,35 @@ const ADMIN: Link[] = [
 // fora da equipe não. A RLS da migration 0013 reforça o sigilo no banco.
 const EQUIPE: Link[] = [{ href: "/prospere-ancora", label: "byAncora" }];
 
-function linksPara(tipo?: Tipo, equipe?: boolean): Link[] {
+// Console admin (FATIA F1 — importador + fila de revisão), gate por allowlist
+// de e-mail (BIDCON_ADMIN_EMAILS, lib/admin-console.ts). Independente de
+// `tipo`/`equipe`: é um allowlist próprio, sem sistema de papéis (F3 futura).
+const ADMIN_CONSOLE: Link[] = [
+  { href: "/admin/importar", label: "Importar" },
+  { href: "/admin/revisao", label: "Revisão" },
+];
+
+function linksPara(tipo?: Tipo, equipe?: boolean, equipeAdminConsole?: boolean): Link[] {
   let links: Link[];
   if (tipo === "admin") links = [...BASE, ...ADMIN];
   else if (tipo === "parceiro") links = [...BASE, ...PARCEIRO];
   else links = [...BASE];
   if (equipe) links = [...links, ...EQUIPE];
+  if (equipeAdminConsole) links = [...links, ...ADMIN_CONSOLE];
   return links;
 }
 
-export function ShellNav({ tipo, equipe }: { tipo?: Tipo; equipe?: boolean }) {
+export function ShellNav({
+  tipo,
+  equipe,
+  equipeAdminConsole,
+}: {
+  tipo?: Tipo;
+  equipe?: boolean;
+  equipeAdminConsole?: boolean;
+}) {
   const path = usePathname();
-  const links = linksPara(tipo, equipe);
+  const links = linksPara(tipo, equipe, equipeAdminConsole);
   return (
     <nav className={styles.nav}>
       {links.map((l) => {

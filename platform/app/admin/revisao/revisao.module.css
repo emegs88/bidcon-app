@@ -1,0 +1,68 @@
+/* Fila de revisão (FATIA F1) — só CSS Modules + tokens globais. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.linha1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.credito {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.acoesWrap {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.botoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formCorrigir {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.grid4 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .grid4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.erro {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #f3a4a4;
+}

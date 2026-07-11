@@ -1,0 +1,192 @@
+/* Console de importação (FATIA F1) — só CSS Modules + tokens globais. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.linhaFornecedor {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.linhaFornecedor > *:first-child {
+  flex: 1 1 auto;
+}
+
+.novoFornecedor {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.novoFornecedor > *:first-child {
+  flex: 1 1 auto;
+}
+
+.modoTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.modoTab {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.modoTab:hover {
+  color: var(--text-soft);
+  border-color: var(--border-strong);
+}
+.modoTabAtivo {
+  color: var(--text);
+  background: rgba(54, 197, 240, 0.12);
+  border-color: rgba(54, 197, 240, 0.4);
+}
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.uploadLabel {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.campo > span {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 200px;
+}
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.erro {
+  margin-top: 10px;
+  font-size: 0.88rem;
+  color: #f3a4a4;
+}
+
+.resumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.avisos {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.tabelaWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.tabela th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface-2);
+}
+.tabela td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+.linhaProblema {
+  background: rgba(243, 195, 74, 0.04);
+}
+
+.numero {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: right;
+}
+.obs {
+  white-space: normal;
+  min-width: 180px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.avisoTir {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  color: var(--accent-amber);
+}
+
+.ok {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ok strong {
+  color: var(--text);
+}
+.ok span {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+.voltar {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--brand);
+  text-decoration: none;
+}
+.voltar:hover {
+  text-decoration: underline;
+}

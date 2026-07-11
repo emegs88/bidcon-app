@@ -10,11 +10,13 @@ export function AppShell({
   nome,
   tipo,
   equipe,
+  equipeAdminConsole,
   children,
 }: {
   nome?: string | null;
   tipo?: "cliente" | "parceiro" | "admin";
   equipe?: boolean;
+  equipeAdminConsole?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -24,7 +26,7 @@ export function AppShell({
           <a className={styles.brand} href="/">
             bid<span className={styles.brandAccent}>con</span>
           </a>
-          <ShellNav tipo={tipo} equipe={equipe} />
+          <ShellNav tipo={tipo} equipe={equipe} equipeAdminConsole={equipeAdminConsole} />
           <div className={styles.user}>
             <ThemeControls />
             {nome && <span className={styles.hello}>{nome}</span>}
