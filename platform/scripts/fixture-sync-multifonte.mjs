@@ -187,8 +187,11 @@ r = await lerCotasFonte("CARTAS", 0);
 assert.equal(r.ok, false); assert.match(r.motivo, /parse_vazio_ou_formato_novo/);
 ok("guardas por fonte: HTTP!=200 e envelope vazio abortam s\u00f3 a fonte, com origem");
 
-assert.deepEqual(FONTES, ["LANCE", "CBC", "PIFFER", "CARTAS", "SERVOPA"]);
-ok("FONTES = [LANCE, CBC, PIFFER, CARTAS, SERVOPA]");
+// SERVOPA aposentada da rotação automática (SYNC-SERVOPA-01, 2026-07): fica
+// fora de FONTES, mas lerCotasFonte("SERVOPA", ...) continua testado acima
+// (linhas 167-179) — parsing dormente, não deletado.
+assert.deepEqual(FONTES, ["LANCE", "CBC", "PIFFER", "CARTAS"]);
+ok("FONTES = [LANCE, CBC, PIFFER, CARTAS] (SERVOPA aposentada da rota\u00e7\u00e3o)");
 
 // ==========================================================================
 // PARTE B — rota real (sync-cotas) com db stub
@@ -226,7 +229,7 @@ function criarDbStub(contagens) {
   return db;
 }
 
-const dbRef = { current: criarDbStub({ LANCE: 10, CBC: 8, PIFFER: 12, CARTAS: 6, SERVOPA: 9 }) };
+const dbRef = { current: criarDbStub({ LANCE: 10, CBC: 8, PIFFER: 12, CARTAS: 6 }) };
 globalThis.__DB_STUB__ = dbRef;
 process.env.CRON_SECRET = "segredo-teste";
 
@@ -253,13 +256,8 @@ global.fetch = async (url) => {
     { n: 5, t: "imovel", c: 140000, e: 42000, p: 1099, x: 180 },
     { n: 6, t: "imovel", c: 150000, e: 45000, p: 1199, x: 180 },
   ]); } };
-  if (url === U.SERVOPA) return { status: 200, async text() { return envServopa([
-    { id: 1, t: "veiculo", c: 80000, e: 25600, p: 800, x: 120, entrada_parceiro: 20000 },
-    { id: 2, t: "imovel", c: 300000, e: 96000, p: 2000, x: 220, entrada_parceiro: 75000 },
-    { id: 3, t: "imovel", c: 310000, e: 97000, p: 2050, x: 220, entrada_parceiro: 76000 },
-    { id: 4, t: "imovel", c: 320000, e: 98000, p: 2075, x: 220, entrada_parceiro: 77000 },
-    { id: 5, t: "imovel", c: 330000, e: 99000, p: 2099, x: 220, entrada_parceiro: 78000 },
-  ]); } };
+  // SERVOPA aposentada de FONTES: a rota real não chama mais U.SERVOPA
+  // (nenhuma rota de fetch stub aqui — se chamar, é regressão do escopo).
   if (url === U.EXTRA) { const n = filaExtra.shift(); return { status: n.status, async text() { return n.body; } }; }
   throw new Error("fetch stub sem rota p/ " + url);
 };
@@ -269,23 +267,21 @@ const out2 = (await GET(req))._json;
 const db = dbRef.current;
 
 const origensRpc = db._rpcs.map((x) => x.p_origem).sort();
-assert.deepEqual(origensRpc, ["CBC", "LANCE", "SERVOPA"]);
-assert.ok(!origensRpc.includes("PIFFER") && !origensRpc.includes("CARTAS"));
-ok("falha parcial: s\u00f3 fontes s\u00e3s upsertam; fonte que aborta n\u00e3o emite RPC");
+assert.deepEqual(origensRpc, ["CBC", "LANCE"]);
+assert.ok(!origensRpc.includes("PIFFER") && !origensRpc.includes("CARTAS") && !origensRpc.includes("SERVOPA"));
+ok("falha parcial: s\u00f3 fontes s\u00e3s upsertam; fonte que aborta n\u00e3o emite RPC (SERVOPA fora de FONTES)");
 
 const abort = db._eventos.filter((e) => e.tipo === "sync_abortado").map((e) => e.detalhe);
 assert.ok(abort.some((d) => /^PIFFER/.test(d)) && abort.some((d) => /^CARTAS/.test(d)));
 ok("aborts de PIFFER e CARTAS auditados em eventos_sync, sem afetar as demais");
 
 assert.equal(out2.ok, true);
-assert.deepEqual(out2.fontes.filter((f) => f.ok).map((f) => f.origem).sort(), ["CBC", "LANCE", "SERVOPA"]);
+assert.deepEqual(out2.fontes.filter((f) => f.ok).map((f) => f.origem).sort(), ["CBC", "LANCE"]);
 assert.deepEqual(out2.fontes.filter((f) => !f.ok).map((f) => f.origem).sort(), ["CARTAS", "PIFFER"]);
-ok("resultado por-fonte reportado individualmente (3 ok, 2 abortadas)");
+ok("resultado por-fonte reportado individualmente (2 ok, 2 abortadas)");
 
 const rpcCbc = db._rpcs.find((x) => x.p_origem === "CBC");
-const rpcServ = db._rpcs.find((x) => x.p_origem === "SERVOPA");
 assert.equal(rpcCbc.qtd, 5);
-assert.equal(rpcServ.qtd, 5);
-ok("RPC por-fonte com p_origem distinto: CBC #1 e SERVOPA #1 nunca colidem no upsert");
+ok("RPC por-fonte com p_origem distinto: CBC segue upsertando normalmente sem SERVOPA na rota\u00e7\u00e3o");
 
 console.log(`\nOK \u2014 ${passed} asser\u00e7\u00f5es passaram.`);

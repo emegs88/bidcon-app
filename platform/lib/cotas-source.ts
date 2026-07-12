@@ -247,4 +247,15 @@ export async function lerCotasFonte(
 
 // Ordem de ingestão. LANCE inclusa: passa a ser tratada uniforme (config de
 // carimbo por administradora_origem existe pra todas — ver migration 0015).
-export const FONTES: FonteMarca[] = ["LANCE", "CBC", "PIFFER", "CARTAS", "SERVOPA"];
+//
+// SERVOPA aposentada da rotação automática em 2026-07 (SYNC-SERVOPA-01):
+// autópsia (ver PLANO_MESTRE §4) mostrou que a fonte não é bloqueada por
+// anti-bot — o fetch upstream sempre teve sucesso — mas o RPC
+// sync_aplicar_cotas estourava o timeout do gateway porque o lote 1 nunca
+// commitou uma vez sequer (sempre 100% INSERT novo + trigger de preço por
+// linha). Decisão de negócio: a parceria Servopa é comercial, sem
+// integração técnica; o canal oficial passa a ser o importador do /admin,
+// não o sync automático. FonteMarca, ENDPOINTS.SERVOPA e o parsing em
+// parsearEnvelope() ficam intactos/dormentes — reversível com uma linha se
+// a parceria voltar a ser técnica.
+export const FONTES: FonteMarca[] = ["LANCE", "CBC", "PIFFER", "CARTAS"];

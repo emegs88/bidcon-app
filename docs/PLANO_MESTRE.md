@@ -115,6 +115,40 @@ respostas), origem sempre explícita — nunca `*`; auth e rate-limit intactos.
 credentialed-CORS; a opção literal (B) foi oferecida e **recusada** por entregar
 feature quebrada.
 
+**SYNC-SERVOPA-01 — autópsia + aposentadoria (2026-07-11):** a fonte SERVOPA
+abortava 100% dos ciclos de sync desde a estreia (77/77 horas), sempre com
+`"SERVOPA rpc_falhou lote 1: upstream request timeout"`, nunca entregando
+uma carta via sync automático. Autópsia com evidência coletada (não
+suposição): (①) `prospere-360/app/api/cotas-servopa/route.js` chama
+`GET cartascontempladasservopa.com.br/api/cartas.php` — API JSON real,
+paginada (14 páginas, 319 cotas), confirmada por teste ao vivo (200,
+~0.03–1s por página; um timeout isolado de 30s numa rajada sequencial, não
+reproduzido em retentativas imediatas) — **não é bloqueio anti-bot**, a
+suspeita original não se confirma pelos dados; (②) a string de erro só é
+logada no `catch` do `db.rpc("sync_aplicar_cotas", ...)` em
+`platform/app/api/sync-cotas/route.ts` — ou seja, o fetch upstream **já
+tinha sucesso**; a falha é na aplicação em lote no banco, não no upstream
+Servopa; (③) `sync_aplicar_cotas` é 100% PL/pgSQL sem rede (`pg_net`/`http`
+nem instaladas no projeto xtv) — "upstream request timeout" não existe em
+nenhum `RAISE EXCEPTION` do projeto nem em nenhum dos dois repositórios
+(grep vazio); é a mensagem padrão do gateway (Kong/PostgREST) da Supabase
+quando o Postgres não responde a tempo ao RPC; (④) hipótese mais provável
+(registrada como teoria): como o lote 1 nunca commitou uma vez sequer, todo
+ciclo tenta o caminho mais pesado possível — 100% INSERT novo, nunca
+UPDATE, com o trigger `trg_bidcon_price` rodando um solver Newton-Raphson
+por linha — loop auto-reforçado que nunca "esfria". **Decisão de negócio do
+Emerson:** a parceria Servopa é comercial, sem integração técnica do lado
+deles; o canal oficial passa a ser o importador do `/admin`, não o sync
+automático. **Aposentadoria:** `"SERVOPA"` removida do array `FONTES` em
+`platform/lib/cotas-source.ts` (única linha que controla a rotação do
+cron) — `FonteMarca`, `ENDPOINTS.SERVOPA` e o parsing em
+`parsearEnvelope()` ficam **intactos/dormentes**, reversível com uma linha
+se a parceria voltar a ser técnica. `sync_fonte_config` (mapeamento
+fonte↔administradora, usado pelo importador) e o histórico de
+`eventos_sync` foram **preservados**, nenhuma migration aplicada. Nenhuma
+mudança no repo `prospere-360` (rota tecnicamente correta, só deixa de ser
+chamada pelo cron).
+
 ---
 
 ## 5. Cascata (ordem de migrations e deploy)
@@ -200,3 +234,4 @@ por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 `setup-supabase-dev.md`, `validacao-nivel3.md` e `checklist-pendencias.md`.*
 0017 PROD 20260704132129 auditada · /conta-notarial v4 selo-medalha (merge+seds f444399) · WhatsApp global 5519997561909 provisório até API · selo na home · navbar global = próxima sessão — 04/07
 2026-07-11 · WhatsApp oficial migrado de 5519997561909 para 5511973202967 (site + plataforma, todas as superfícies)
+2026-07-11 · SERVOPA aposentada da rotação automática de sync (SYNC-SERVOPA-01) — autópsia em §4, sync_fonte_config/eventos_sync preservados, importador /admin vira canal oficial
