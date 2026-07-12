@@ -9,7 +9,8 @@
     { "source": "/cartas", "destination": "/bidcon", "permanent": true },
     { "source": "/bidcon", "destination": "/", "permanent": true },
     { "source": "/bidcon.html", "destination": "/", "permanent": true },
-    { "source": "/score-da-carta", "destination": "/carta-contemplada-veiculo", "permanent": false }
+    { "source": "/score-da-carta", "destination": "/carta-contemplada-veiculo", "permanent": false },
+    { "source": "/gpt", "destination": "https://chatgpt.com/g/g-6a52c1782c788191aa2a36b15aee763d-bidcon-cartas-contempladas", "permanent": false }
   ],
   "headers": [
     {
