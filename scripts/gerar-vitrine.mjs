@@ -142,7 +142,7 @@ function ic(nome) {
 // Campos expostos: tipo, crédito, entrada, parcela×n, custo a.m.,
 // administradora — sempre exposta (regra de negócio canônica, CLAUDE.md).
 // ---------------------------------------------------------------------------
-function cardHtml(c) {
+function cardHtml(c, i) {
   const tipoImovel = c.tipo === "imovel";
   const custoLinha =
     typeof c.custo_am === "number" && c.custo_am > 0
@@ -161,7 +161,7 @@ function cardHtml(c) {
   const parcelasMes = c.parcelas
     ? '<span style="font-size:11px;color:var(--cinza)">/mês</span>'
     : "";
-  return `<div class="ccard bc-card ${tipoImovel ? "imovel" : "veiculo"}">
+  return `<div class="ccard bc-card ${tipoImovel ? "imovel" : "veiculo"}" id="item-${i + 1}">
       <div class="ctop">
         <span class="ccat"><span class="emo">${ic(
           tipoImovel ? "casa" : "carro"
@@ -189,18 +189,36 @@ function cardHtml(c) {
 // <script id="ldCotas"> ficar equivalente nos dois lados (o que o SSR grava
 // e o que o JS regrava por cima assim que carrega).
 // ---------------------------------------------------------------------------
+// REGRA INEGOCIÁVEL DOS 7%: `price` é a entrada exatamente como vem de
+// vw_cartas_publicas (c.entrada) — o valor gravado JÁ inclui a
+// intermediação de 7% (entradas = pedido redondo do vendedor + 0,07×
+// crédito). Proibido somar comissão de novo ou "descontar" aqui.
+// price sai como STRING (.toFixed(2)), não Number: JSON.stringify de um
+// Number não preserva zeros decimais (27000.00 vira "27000" no texto do
+// JSON) — string é o formato que o Google Merchant aceita pra manter as
+// 2 casas.
 function itemListJsonLd(cartas) {
   const itens = cartas.map((c, i) => {
     const tipoLabel = c.tipo === "imovel" ? "Imóvel" : "Veículo";
+    const url = `https://www.bidcon.com.br/#item-${i + 1}`;
     const produto = {
       "@type": "Product",
       name: `Carta de crédito contemplada — ${tipoLabel} ${BRL(c.credito)}`,
       category: tipoLabel,
+      image: "https://www.bidcon.com.br/img/bidcon-og-banner.png",
+      url,
       offers: {
         "@type": "Offer",
         priceCurrency: "BRL",
-        price: Math.round(c.entrada),
+        price: Number(c.entrada).toFixed(2),
         availability: "https://schema.org/InStock",
+        itemCondition: "https://schema.org/UsedCondition",
+        url,
+        seller: {
+          "@type": "Organization",
+          name: "Bidcon — Prospere Consórcios",
+          url: "https://www.bidcon.com.br",
+        },
         itemOffered: {
           "@type": "Service",
           name: "Assunção de cota de consórcio já contemplada",
@@ -253,7 +271,7 @@ function blocoCotas(totalCartas, cartasParaCard) {
     minute: "2-digit",
   }).format(agora);
   const statsLinha = `<div class="csrc" style="grid-column:1/-1">${totalCartas} cartas disponíveis · atualizado ${dataHora}</div>`;
-  const cards = cartasParaCard.map(cardHtml).join("\n      ");
+  const cards = cartasParaCard.map((c, i) => cardHtml(c, i)).join("\n      ");
   return `${statsLinha}\n      ${cards}`;
 }
 
