@@ -212,6 +212,7 @@ posterior; registrar a decisão no PLANO_MESTRE).
 - **F2 · Eco:** recebe texto → responde texto fixo. Valida encanamento inteiro
   (assinatura, dedup, ack, envio).
 - **F3 · Cérebro:** Claude + tools + interativas. Roteiro de teste (seção 8).
+  Spec detalhada (orquestrador, guardrail, escalada) em §10.
 - **F4 · Blindagem:** handoff completo, rate limit por telefone (ex.: 20 msgs/10min
   → cooldown gentil), logs, kill-switch testado.
 - **F5 · Piloto interno:** equipe conversa com o sandbox por alguns dias; ajuste
@@ -243,3 +244,171 @@ posterior; registrar a decisão no PLANO_MESTRE).
   opcional) e revisar após o piloto.
 - Compliance transversal: os 8 invioláveis do prompt valem em TODO texto que o
   sistema emitir, inclusive mensagens estáticas e alertas.
+
+---
+
+## 10. F3 — Time Prosperito Conversando no WhatsApp (spec detalhada)
+
+**Status:** SPEC — entra na fila ATRÁS do F2. Não iniciar antes de F2 aceito.
+**Depende de:** F1 (✅ webhook + `wa_conversas`/`wa_mensagens` no ar), F2
+(⬜ envio ativo via Cloud API — spec entregue em §5/§6 acima), F0 (⬜ Meta:
+verificação EGS Capital CNPJ 67.709.975/0001-64 + número dedicado).
+**Prova de conceito:** 12/07/2026 — fluxo executado manualmente com lead real
+(Victor, REF. 57/924/936): entrada qualificada, objeção respondida, oferta
+com condição de pagamento, CTA de reserva. Funcionou. Esta fatia automatiza
+exatamente aquilo.
+
+### 10.1 Objetivo
+
+Quando um lead manda mensagem no WhatsApp da Bidcon, o agente certo do Time
+Prosperito responde em segundos, 24/7, com acesso ao inventário real — e
+escala pro operador nos momentos de fechamento. O operador para de ser o
+gargalo de resposta e vira o closer.
+
+### 10.2 Arquitetura
+
+```
+Mensagem entra → webhook F1 grava em wa_mensagens (direcao='entrada')
+      ↓
+Orquestrador (nova rota interna, chamada pelo webhook via waitUntil)
+      ↓
+1. Identifica/cria wa_conversa pelo número (E.164)
+2. Carrega histórico (últimas N=30 mensagens da conversa)
+3. Determina agente ativo (campo wa_conversas.agente_ativo)
+4. Monta contexto: prompt do agente + histórico + ferramentas
+      ↓
+Chama Anthropic API (tool use):
+  - buscar_cartas (mesma lógica do chat do site: filtros tipo/faixa/entrada,
+    ordenação bidcon_custo_am ASC NULLS LAST, valores FINAIS do banco)
+  - transferir_agente (prosperito→valentina→serena, mesma máquina do site)
+  - escalar_humano (dispara alerta F2 pro operador e marca conversa)
+      ↓
+Resposta → passa pelo guardrail de saída → enviar.ts (F2) → lead
+      ↓
+Tudo logado em wa_mensagens (direcao='saida', agente, tokens, custo)
+```
+
+### 10.3 Componentes
+
+**10.3.1 Orquestrador — `platform/app/api/whatsapp/responder/route.ts`**
+
+- Chamado pelo webhook F1 após gravar a entrada (fire-and-forget, `waitUntil`).
+- Debounce de 8s: lead que manda 3 mensagens seguidas recebe UMA resposta
+  consolidada (comportamento humano; evita metralhadora).
+- Lock por conversa (coluna `respondendo_desde` em `wa_conversas`): nunca duas
+  respostas simultâneas pra mesma pessoa.
+- Timeout total 25s; falha → mensagem de contorno ("já te respondo!") + alerta
+  F2 pro operador.
+
+**10.3.2 Prompts dos agentes — `platform/lib/prosperito/prompts/`**
+
+- Reutilizar os prompts do chat do site (mesmo cérebro, canal diferente), com
+  camada de adaptação WhatsApp: sem `[[OPCOES]]`/`[[CARTA]]` renderizados —
+  cartas viram texto formatado (REF, crédito, entrada, parcelas, custo a.m.,
+  administradora SEMPRE citada).
+- Agentes no canal: Prosperito (recepção), Valentina (vendas), Serena
+  (fechamento/Conta Notarial). Dr. Tobias, Caetano, Aurora, Bento ficam pra F4.
+- Modelo: `claude-sonnet-4-6` (custo/latência); env `WHATSAPP_LLM_MODEL` pra
+  trocar sem deploy.
+
+**10.3.3 Guardrail de saída — `platform/lib/prosperito/guardrail.ts`**
+
+Toda resposta passa por verificação ANTES do envio (regex + lista):
+
+- Léxico proibido (mesmo do §4): resposta bloqueada, regenerada 1x; se
+  persistir, escala humano.
+- Promessa de contemplação/data: padrões tipo "contempla em X meses",
+  "garantido que sai" → mesmo tratamento.
+- Valores: resposta só pode citar números vindos do tool result de
+  `buscar_cartas` (nunca inventados pelo modelo) — o orquestrador injeta os
+  dados e o guardrail confere que toda REF citada existe no resultado.
+- Risco zero: proibido; Conta Notarial descrita como "o valor só é liberado
+  após aprovação da administradora".
+- Log de todo bloqueio em `wa_guardrail_log`.
+
+**10.3.4 Escalada pro humano (o momento-Victor)**
+
+`escalar_humano` dispara automaticamente quando:
+
+1. Lead escolhe REF específica e pede reserva.
+2. Lead pergunta condição de pagamento fora do padrão (parcelamento de
+   entrada, permuta).
+3. Lead pede falar com pessoa / demonstra irritação.
+4. Guardrail bloqueia 2x seguidas.
+5. Qualquer menção a problema jurídico, reclamação ou cancelamento.
+
+Ao escalar: alerta F2 pro operador com resumo da conversa +
+`wa_conversas.modo='humano'` → agente PARA de responder até operador devolver
+(`modo='auto'`). Regra de ouro: IA qualifica e conduz; reserva, preço fora de
+tabela e fechamento são humanos nesta fase.
+
+**10.3.5 Migration `0048_whatsapp_f3.sql`** (⚠️ ainda não redigida — entra na
+fila de migrations do repo; AUTORIZO 0048 só depois de escrita e revisada)
+
+- `wa_conversas`: `agente_ativo text default 'prosperito'`,
+  `modo text default 'auto' check (modo in ('auto','humano'))`,
+  `respondendo_desde timestamptz`,
+  `interesse_id uuid references interesses` (ponte com o funil do site —
+  mesmo telefone = mesma pessoa).
+- `wa_mensagens`: `agente text`, `tokens_in int`, `tokens_out int`.
+- Nova `wa_guardrail_log` (service-only, RLS no padrão do F1).
+
+**10.3.6 LGPD / opt-out**
+
+- Palavras "parar/sair/cancelar/descadastrar" → confirma, marca
+  `wa_conversas.opt_out=true`, nunca mais envia proativo (F2 respeita a flag).
+- Primeira resposta do Prosperito inclui, uma única vez: "você pode pedir pra
+  parar quando quiser".
+- Dados pessoais no WhatsApp seguem a mesma política de privacidade do site.
+
+### 10.4 Custos (estimativa pra aprovação, não compromisso)
+
+- LLM: ~R$0,05–0,15 por troca de mensagens no sonnet → conversa completa tipo
+  a do Victor: < R$2.
+- Meta: conversa de serviço (lead iniciou) ≈ grátis na janela de 24h.
+- Pequeno perto do valor de uma carta de crédito nessa faixa.
+
+### 10.5 Fora de escopo (F4+)
+
+Áudio (transcrição), imagens/comprovantes (Caetano), agentes restantes,
+campanhas proativas em massa, multi-número, painel de conversas na
+plataforma.
+
+### 10.6 Plano de teste (antes de lead real)
+
+1. Modo sombra (1ª semana): agente gera resposta mas NÃO envia — grava em
+   `wa_mensagens` com `status_envio='sombra'`; operador compara com o que ele
+   teria respondido.
+2. Teste E2E com número do operador simulando lead: jornada
+   Prosperito→Valentina→Serena completa.
+3. Ataque de léxico: tentar fazer o agente usar termos do léxico proibido ou
+   prometer contemplação — guardrail tem que segurar 100%.
+4. Teste de escalada: pedir reserva → alerta chega no operador em <60s e
+   agente silencia.
+5. Só depois: `WHATSAPP_F3_ATIVO=true` em produção.
+
+### 10.7 Critérios de aceite
+
+1. `AUTORIZO 0048` → migration aplicada e verificada por consulta
+   independente.
+2. Resposta E2E (mensagem→resposta no WhatsApp) em < 20s no p90.
+3. Guardrail: zero vazamento de léxico proibido no teste de ataque (10.6.3).
+4. Toda REF citada em resposta existe no tool result correspondente
+   (auditável por log).
+5. Escalada funciona nos 5 gatilhos; `modo='humano'` silencia o agente.
+6. Debounce e lock: rajada de 3 mensagens → 1 resposta; sem respostas
+   duplicadas.
+7. Opt-out respeitado ponta a ponta (inclusive proativos do F2).
+8. Modo sombra rodou ≥ 1 semana OU ≥ 20 conversas com aprovação do operador.
+9. `tsc --noEmit` limpo; credenciais só em env; varredura de léxico no diff:
+   zero.
+10. `PUBLICA WHATSAPP-01-F3` — gate exclusivo do operador.
+
+### 10.8 Governança
+
+- 1 fatia = 1 sessão na Code (estimativa: 2 sessões — orquestrador+guardrail
+  / testes+sombra).
+- Escrita em produção só com AUTORIZO nominal; push só com PUBLICA.
+- ACERVO-360 intocável — KYC segue fora deste fluxo.
+- Ativação em produção (`WHATSAPP_F3_ATIVO=true`) é decisão do operador,
+  nunca default.
