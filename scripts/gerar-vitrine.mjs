@@ -70,7 +70,12 @@ async function buscarCartas() {
   const campos =
     "ref,tipo,credito,entrada,parcela,parcelas,custo_am,administradora";
   for (;;) {
-    const url = `${XTV_URL}/rest/v1/vw_cartas_publicas?select=${campos}&order=credito.desc,entrada.asc`;
+    // order: espelha EXATAMENTE o "order by custo_am asc nulls last,
+    // credito asc" da RPC buscar_cartas (migration 0043) — mesmo desempate
+    // (credito.asc, não .desc), com .nullslast explícito por segurança
+    // mesmo sem custo_am nulo hoje. Único order= na URL (PostgREST ignora
+    // um segundo order= duplicado — testado e confirmado ao vivo).
+    const url = `${XTV_URL}/rest/v1/vw_cartas_publicas?select=${campos}&order=custo_am.asc.nullslast,credito.asc`;
     const resp = await fetch(url, {
       headers: {
         apikey: PUBLISHABLE_KEY,
@@ -279,9 +284,11 @@ async function main() {
     );
   }
 
-  const paraCards = [...todas]
-    .sort((a, b) => Number(b.credito) - Number(a.credito))
-    .slice(0, LIMITE_SSR);
+  // Sem re-sort local: `todas` já vem ordenada pelo fetch (custo_am.asc,
+  // credito.asc, espelhando a RPC). Um resort JS aqui foi a causa raiz de
+  // uma divergência real entre a ordem pedida na query e o que saía no
+  // snapshot — fonte única de ordenação é a API/banco, não duas.
+  const paraCards = todas.slice(0, LIMITE_SSR);
 
   const original = await readFile(ARQUIVO_INDEX, "utf8");
 
