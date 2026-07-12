@@ -32,8 +32,18 @@ Meta WhatsApp Cloud API ──webhook──▶ Vercel: platform/app/api/whatsapp
                                         ▼
                         Graph API send → resposta interativa ao cliente
                                         │
-                              nnv: wa_conversas / wa_mensagens (histórico)
+                              xtv: wa_conversas / wa_mensagens (histórico)
 ```
+
+> **Correção (2026-07-12, planejamento F1):** este diagrama originalmente
+> apontava `wa_conversas`/`wa_mensagens` pro projeto "nnv". Investigação
+> read-only (`list_tables` via MCP Supabase) mostrou que nnv é uma cópia
+> vazia do schema (cartas=1, eventos_sync=0, sem interesses/conversas/
+> mensagens) — não é onde a plataforma vive de fato. O banco real, usado
+> por todas as rotas ativas via `createXtvClient()`, é o xtv (cartas=1.878,
+> eventos_sync=11.927). Corrigido pra manter consistência com
+> `interesses`/`conversas`/`mensagens` (mesmo projeto). Ver
+> `docs/PLANO_MESTRE.md` §4 e a migration `0046_whatsapp_fundacao.sql`.
 
 Regras de ouro herdadas da casa: leitura do estoque **só** pela publishable key
 (zero service_role no caminho do agente); escrita em prod com AUTORIZO;

@@ -166,6 +166,31 @@ nesta coluna, coerente com a aposentadoria de SYNC-SERVOPA-01 acima.
 array hardcoded; poderia um dia ler `ativo` desta tabela em vez de
 duplicar a lista.
 
+**WHATSAPP-01 · F1 — Fundação (2026-07-12, migration 0046):** primeira
+fatia de código do atendimento via WhatsApp com cérebro Claude (spec em
+`docs/WHATSAPP-01-SPEC.md`). F1 entrega só o encanamento: tabelas
+`wa_conversas`/`wa_mensagens` (RLS service-only, zero policies — mesmo
+padrão de `fornecedores`/`importacoes` da 0037) + rota
+`platform/app/api/whatsapp/route.ts` com handshake GET da Meta e um POST
+que valida assinatura (HMAC-SHA256 timing-safe sobre `X-Hub-Signature-256`,
+segredo `WHATSAPP_APP_SECRET`), deduplica por `wa_message_id` e grava a
+mensagem recebida — sem chamar Claude, sem enviar resposta via Graph API
+(isso é F2/F3). **Correção de arquitetura descoberta nesta fatia:** a spec
+original apontava as tabelas novas pro projeto Supabase "nnv"
+(`nnvjeijsrwpzsggwqpcu`), mas isso conflitava com o mapa de bancos deste
+documento (nnv = "Site PROD, INTOCÁVEL") e com `CLAUDE.md` (nnv = "PROD
+app logado"). Investigação read-only (`list_tables` via MCP) resolveu:
+`nnv` tem o mesmo schema mas está praticamente vazio (`cartas`=1,
+`eventos_sync`=0, sem `interesses`/`conversas`/`mensagens`) — não é o banco
+que a plataforma usa de fato. O banco real, usado por **todas** as rotas
+ativas (`/api/atende`, `/api/mcp`, `/api/sync-cotas`, `/api/admin/*`) via
+`createXtvClient()`, é o **xtv** (`cartas`=1.878, `eventos_sync`=11.927,
+`interesses`/`conversas`/`mensagens` com uso real). `wa_conversas`/
+`wa_mensagens` foram corrigidas pra viver no xtv, junto de
+`interesses`/`conversas`/`mensagens` — mesmo padrão, sem banco novo.
+Migration 0046 aguarda **AUTORIZO** antes de aplicar em produção; push
+aguarda **PUBLICA WHATSAPP-01-F1**.
+
 ---
 
 ## 5. Cascata (ordem de migrations e deploy)
@@ -253,3 +278,4 @@ por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 2026-07-11 · WhatsApp oficial migrado de 5519997561909 para 5511973202967 (site + plataforma, todas as superfícies)
 2026-07-11 · SERVOPA aposentada da rotação automática de sync (SYNC-SERVOPA-01) — autópsia em §4, sync_fonte_config/eventos_sync preservados, importador /admin vira canal oficial
 2026-07-12 · sync_fonte_config.ativo (migration 0045, aplicada via MCP) — corrige falso-positivo da Torre sobre fonte Itaú (importação manual), fonte única da verdade de elegibilidade a sync automático — ver §4
+2026-07-12 · WHATSAPP-01 F1 (migration 0046, aguarda AUTORIZO) — wa_conversas/wa_mensagens (RLS service-only, xtv) + webhook /api/whatsapp (handshake + assinatura HMAC + dedup, sem Claude/Graph API ainda), corrige rótulo nnv→xtv na spec (nnv vazio, xtv é o banco real) — ver §4
