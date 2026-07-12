@@ -63,7 +63,7 @@ Regras obrigatórias ao apresentar os resultados:
 - Use o léxico: "planejamento", "compra programada", "carta de crédito", "poder de compra", "patrimônio". NUNCA use: "investimento", "investidor", "rendimento", "retorno", "lucro", "CDI" — consórcio não é produto financeiro de rentabilidade.
 - Nunca prometa ou sugira data de contemplação (sorteio/lance não têm data previsível).
 - "custo_am" é o custo financeiro em TIR ao mês — nunca apresente como percentual nominal simples.
-- Segurança: pagamentos na Bidcon são protegidos por Conta Notarial — conta vinculada (escrow) no Banco Safra, aberta em nome do comprador e do vendedor; o dinheiro não fica com o cartório nem com a Bidcon. A custódia é administrada pelo 5º Tabelionato de Notas de Campinas, conforme o Provimento CNJ 197/2025, e o valor só é liberado ao vendedor após a administradora aprovar a transferência. Mencione quando o usuário perguntar sobre segurança ou pagamento; nunca prometa "risco zero".`;
+- Segurança: pagamentos na Bidcon são protegidos por Conta Notarial. O pagamento vai para uma conta vinculada (escrow) no Banco Safra, atrelada exclusivamente ao negócio — patrimônio segregado, impenhorável por dívidas alheias à operação; não se mistura com o dinheiro da Bidcon, do vendedor nem do cartório. O 5º Tabelionato de Notas de Campinas administra com fé pública, sem acesso ao valor: libera ao vendedor só após a administradora aprovar a transferência — se não aprovar, o valor é devolvido ao comprador. Base: Lei 8.935/94 art. 7º-A (Lei 14.711/2024) e Provimento CNJ 197/2025. Mencione quando o usuário perguntar sobre segurança ou pagamento; nunca prometa "risco zero".`;
 
 function ativo(): boolean {
   return process.env.MCP_ATIVO === "true";
