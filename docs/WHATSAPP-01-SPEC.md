@@ -258,6 +258,20 @@ verificação EGS Capital CNPJ 67.709.975/0001-64 + número dedicado).
 com condição de pagamento, CTA de reserva. Funcionou. Esta fatia automatiza
 exatamente aquilo.
 
+> **Atualização de estado (2026-07-12, janela banco):** migrations
+> `0047_whatsapp_envio` (F2) e `0048_whatsapp_f3` (esta fase) **já foram
+> aplicadas em produção (xtv)** — confirmado por `list_migrations` +
+> `list_tables` (schema real, não estimativa). O esquema aplicado é mais
+> rico que o esboço original do §10.3.5 abaixo (já corrigido): a fila que
+> falta agora pra F2/F3 é **só código** — orquestrador, guardrail e envio
+> ainda não foram escritos. Diferenças do esquema real vs. o esboço
+> original: (1) **sem coluna `direcao`** — o enum `wa_papel`
+> (cliente/prosperito/humano/sistema) já distingue direção da mensagem;
+> (2) **sem coluna `wamid`** separada — dedup já existe via
+> `wa_message_id` (herdado do F1); (3) **sem coluna `modo`** —
+> escalada humana usa o enum `wa_status` (ativo/humano/encerrado) que já
+> existia em `wa_conversas.status` desde o F1, em vez de uma flag nova.
+
 ### 10.1 Objetivo
 
 Quando um lead manda mensagem no WhatsApp da Bidcon, o agente certo do Time
@@ -268,7 +282,7 @@ gargalo de resposta e vira o closer.
 ### 10.2 Arquitetura
 
 ```
-Mensagem entra → webhook F1 grava em wa_mensagens (direcao='entrada')
+Mensagem entra → webhook F1 grava em wa_mensagens (papel='cliente')
       ↓
 Orquestrador (nova rota interna, chamada pelo webhook via waitUntil)
       ↓
@@ -281,11 +295,13 @@ Chama Anthropic API (tool use):
   - buscar_cartas (mesma lógica do chat do site: filtros tipo/faixa/entrada,
     ordenação bidcon_custo_am ASC NULLS LAST, valores FINAIS do banco)
   - transferir_agente (prosperito→valentina→serena, mesma máquina do site)
-  - escalar_humano (dispara alerta F2 pro operador e marca conversa)
+  - escalar_humano (marca wa_conversas.status='humano' + dispara alerta
+    via envio F2 pro operador)
       ↓
 Resposta → passa pelo guardrail de saída → enviar.ts (F2) → lead
       ↓
-Tudo logado em wa_mensagens (direcao='saida', agente, tokens, custo)
+Tudo logado em wa_mensagens (papel='prosperito', agente=<persona real,
+ex. 'valentina'>, tokens_in/out, status_envio)
 ```
 
 ### 10.3 Componentes
@@ -338,20 +354,44 @@ Toda resposta passa por verificação ANTES do envio (regex + lista):
 5. Qualquer menção a problema jurídico, reclamação ou cancelamento.
 
 Ao escalar: alerta F2 pro operador com resumo da conversa +
-`wa_conversas.modo='humano'` → agente PARA de responder até operador devolver
-(`modo='auto'`). Regra de ouro: IA qualifica e conduz; reserva, preço fora de
-tabela e fechamento são humanos nesta fase.
+`wa_conversas.status='humano'` (enum `wa_status` já existente desde o F1,
+reaproveitado em vez de uma flag `modo` nova) → agente PARA de responder até
+operador devolver a conversa pra `status='ativo'`. Regra de ouro: IA
+qualifica e conduz; reserva, preço fora de tabela e fechamento são humanos
+nesta fase.
 
-**10.3.5 Migration `0048_whatsapp_f3.sql`** (⚠️ ainda não redigida — entra na
-fila de migrations do repo; AUTORIZO 0048 só depois de escrita e revisada)
+**10.3.5 Esquema aplicado (migrations `0047_whatsapp_envio` e
+`0048_whatsapp_f3`, já em produção no xtv em 2026-07-12 — ver nota de estado
+no topo desta seção)**
 
-- `wa_conversas`: `agente_ativo text default 'prosperito'`,
-  `modo text default 'auto' check (modo in ('auto','humano'))`,
-  `respondendo_desde timestamptz`,
-  `interesse_id uuid references interesses` (ponte com o funil do site —
-  mesmo telefone = mesma pessoa).
-- `wa_mensagens`: `agente text`, `tokens_in int`, `tokens_out int`.
-- Nova `wa_guardrail_log` (service-only, RLS no padrão do F1).
+`wa_conversas` (colunas novas sobre o F1):
+- `agente_ativo text default 'prosperito'` — prosperito | valentina | serena.
+- `respondendo_desde timestamptz` (nullable) — lock, impede resposta dupla.
+- `opt_out boolean default false` — LGPD, nunca mais envia proativo.
+- `interesse_id uuid references interesses` (nullable) — ponte com o funil
+  do site (mesmo telefone = mesma pessoa).
+- (escalada usa a coluna `status` já existente — enum `wa_status`, sem
+  coluna nova; ver 10.3.4)
+
+`wa_mensagens` (colunas novas sobre o F1):
+- `template text` (nullable) — nome do template Meta usado no envio; null =
+  texto livre dentro da janela de 24h.
+- `status_envio text` (nullable) — `enviado | falha | sombra` (o valor
+  `sombra` é o modo de teste do §10.6).
+- `erro text` (nullable).
+- `agente text` (nullable) — persona real que gerou a mensagem (ex.
+  `valentina`), independente do `papel` (que fica em `prosperito`).
+- `tokens_in int4`, `tokens_out int4` (nullable).
+- (dedup segue via `wa_message_id`, já existente desde o F1 — sem coluna
+  `wamid` nova).
+
+`wa_guardrail_log` (tabela nova, service-only, RLS no padrão do F1):
+- `id bigint identity primary key`
+- `conversa_id uuid references wa_conversas` (nullable)
+- `motivo text` — não-nulo, o que disparou o bloqueio.
+- `conteudo_bloqueado text` (nullable) — o texto que o guardrail impediu de
+  sair.
+- `criado_em timestamptz default now()`
 
 **10.3.6 LGPD / opt-out**
 
@@ -389,8 +429,9 @@ plataforma.
 
 ### 10.7 Critérios de aceite
 
-1. `AUTORIZO 0048` → migration aplicada e verificada por consulta
-   independente.
+1. ~~`AUTORIZO 0048` → migration aplicada~~ — feito em 2026-07-12, verificado
+   por consulta independente (`list_migrations` + `list_tables`). Falta só
+   o código do orquestrador/guardrail/envio.
 2. Resposta E2E (mensagem→resposta no WhatsApp) em < 20s no p90.
 3. Guardrail: zero vazamento de léxico proibido no teste de ataque (10.6.3).
 4. Toda REF citada em resposta existe no tool result correspondente
