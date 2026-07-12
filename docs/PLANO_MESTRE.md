@@ -149,6 +149,23 @@ fonte↔administradora, usado pelo importador) e o histórico de
 mudança no repo `prospere-360` (rota tecnicamente correta, só deixa de ser
 chamada pelo cron).
 
+**`sync_fonte_config.ativo` (2026-07-12, migration 0045):** fonte única da
+verdade de elegibilidade a sync automático. Nasceu de um falso-positivo
+real: o agente Torre (fora deste repo, console de Managed Agents da
+Anthropic) reportava "fonte Itaú nunca sincronizou" — na verdade 13
+cartas de importação manual (lote `contempla_bens`, migration 0044)
+sendo confundidas com fonte de sync automático, já que nenhuma
+administradora alimentada só por importação manual jamais gera linha em
+`eventos_sync`. Corrigido ao vivo no prompt da Torre (fora deste repo).
+A coluna `ativo` existe pra ser a referência que qualquer sistema — Torre,
+e futuros parceiros do KIT-PARCEIROS (Servopa/Play, também manuais, mesmo
+risco) — pode consultar antes de alertar "nunca sincronizou", sem
+duplicar a lista `FONTES` em um terceiro lugar. SERVOPA já nasce `false`
+nesta coluna, coerente com a aposentadoria de SYNC-SERVOPA-01 acima.
+**Refactor futuro (não urgente):** `FONTES` em `cotas-source.ts` hoje é
+array hardcoded; poderia um dia ler `ativo` desta tabela em vez de
+duplicar a lista.
+
 ---
 
 ## 5. Cascata (ordem de migrations e deploy)
@@ -235,3 +252,4 @@ por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 0017 PROD 20260704132129 auditada · /conta-notarial v4 selo-medalha (merge+seds f444399) · WhatsApp global 5519997561909 provisório até API · selo na home · navbar global = próxima sessão — 04/07
 2026-07-11 · WhatsApp oficial migrado de 5519997561909 para 5511973202967 (site + plataforma, todas as superfícies)
 2026-07-11 · SERVOPA aposentada da rotação automática de sync (SYNC-SERVOPA-01) — autópsia em §4, sync_fonte_config/eventos_sync preservados, importador /admin vira canal oficial
+2026-07-12 · sync_fonte_config.ativo (migration 0045, aplicada via MCP) — corrige falso-positivo da Torre sobre fonte Itaú (importação manual), fonte única da verdade de elegibilidade a sync automático — ver §4
