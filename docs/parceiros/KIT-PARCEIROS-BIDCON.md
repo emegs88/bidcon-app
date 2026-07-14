@@ -34,7 +34,7 @@ export direto do seu sistema — sem formatação especial.
 
 ### Como enviar e atualizar
 
-- **E-mail:** contato@bidcon.com.br · **WhatsApp:** (11) 97320-2967
+- **E-mail:** contato@bidcon.com.br · **WhatsApp:** (19) 99756-1909
 - **Atualizou o estoque? Reenvie a planilha inteira.** Nosso sistema
   identifica sozinho o que é novo, o que mudou e o que já existe — nada
   duplica.

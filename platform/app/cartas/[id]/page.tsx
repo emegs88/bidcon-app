@@ -14,7 +14,7 @@ import { LABEL_TIPO_BEM } from "@/lib/status";
 import { brl, linkWhatsApp } from "@/lib/format";
 import styles from "./detalhe.module.css";
 
-const WA = "5511973202967";
+const WA = "5519997561909";
 
 type CartaDetalhe = {
   id: string;
