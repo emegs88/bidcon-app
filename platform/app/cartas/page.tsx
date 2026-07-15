@@ -12,7 +12,7 @@ import { type CartaVitrine } from "@/components/CartaCard";
 import { CartasExplorer } from "@/components/CartasExplorer";
 import styles from "./cartas.module.css";
 
-const WA = "5511973202967";
+const WA = "5519997561909";
 const TIPOS = ["imovel", "veiculo"] as const;
 
 export default async function CartasPage({

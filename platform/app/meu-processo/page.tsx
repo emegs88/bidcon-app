@@ -39,7 +39,7 @@ import styles from "./processo.module.css";
 import fluxo from "./fluxo.module.css";
 
 // contatos oficiais do cliente (públicos). Instagram @bidcon.br.
-const WA = "5511973202967";
+const WA = "5519997561909";
 const EMAIL = "contato@prospere.com.br";
 const INSTAGRAM = "bidcon.br";
 

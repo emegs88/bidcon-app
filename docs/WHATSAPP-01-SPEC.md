@@ -3,7 +3,7 @@
 **Objetivo:** o Time Prosperito atendendo clientes no WhatsApp, com cérebro Claude
 (API Anthropic), estoque vivo vindo da `buscar_cartas()` (a mesma API 0039 que
 alimenta o ChatGPT) e mensagens interativas nativas (listas e botões).
-**Piloto no número de teste da Meta (sandbox). O número real +55 11 97320-2967
+**Piloto no número de teste da Meta (sandbox). O número real +55 19 99756-1909
 só entra na última fase, com palavra explícita do Emerson.**
 
 Fora de escopo v1: pagamentos, mídia rica além de texto/interativas, painel de

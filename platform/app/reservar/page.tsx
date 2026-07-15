@@ -21,7 +21,7 @@ import { LABEL_STATUS_KYC, TONE_STATUS_KYC, type StatusKYC } from "@/lib/status"
 import { ReservarWizard, type CartaReserva } from "./ReservarWizard";
 import styles from "./reservar.module.css";
 
-const WA = "5511973202967";
+const WA = "5519997561909";
 
 export const dynamic = "force-dynamic";
 
