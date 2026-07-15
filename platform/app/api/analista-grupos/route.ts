@@ -165,44 +165,60 @@ function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre"
   };
 }
 
-// multi-junção diversificada: ordena grupos por score = tempo esperado + TIR
-// (menor melhor — TIR é invariante ao valor do crédito p/ um grupo fixo, então
-// uma amostra em cred_max já representa o score do grupo), aloca em rodízio
-// (round-robin) até o alvo, respeitando cap por grupo = min(vencedores_ultimo
-// ?? 2, 3) e estoque (cotas_venda) — evita concentrar tudo num único grupo.
+// multi-junção diversificada, em camadas de prioridade:
+// 1) exclui grupos degenerados: restantes < 10 (parcela diluída explode perto
+//    do fim do grupo) e candidatos cuja amostra (simulação em cred_max) dê
+//    TIR nula ou <= 0 (grupo não fecha conta — não é opção real de venda).
+// 2) camadas por veredito: vence_agora > janela_3m > fila. Só avança pra
+//    próxima camada quando a atual não tem mais o que oferecer (estoque/cap
+//    esgotados) ou o alvo já foi atingido.
+// 3) dentro de cada camada, ordena por TIR crescente (menor custo primeiro)
+//    e aloca em rodízio (round-robin) entre os grupos, respeitando cap por
+//    grupo = min(vencedores_ultimo ?? 2, 3) e estoque (cotas_venda) — evita
+//    concentrar tudo num único grupo.
 function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance: "livre" | "embutido", segmento?: string) {
+  const CAMADAS: Opcao["veredito"][] = ["vence_agora", "janela_3m", "fila"];
+
   const eleg = grupos
-    .filter(g => (!segmento || g.segmento === segmento) && g.cred_max && g.restantes > 0)
+    .filter(g => (!segmento || g.segmento === segmento) && g.cred_max && g.restantes >= 10)
     .map(g => {
       const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance);
-      const score = amostra ? amostra.tempoEsperadoMeses + (amostra.tirMes ?? 999) : Infinity;
       const capGrupo = Math.max(1, Math.min(Number(g.vencedores_ultimo ?? 2), 3));
       const estoque = g.cotas_venda != null ? Number(g.cotas_venda) : 1;
       const limiteGrupo = Math.min(capGrupo, estoque);
-      return { g, score, limiteGrupo };
+      return { g, amostra, limiteGrupo };
     })
-    .filter(e => e.limiteGrupo > 0 && Number.isFinite(e.score))
-    .sort((a, b) => a.score - b.score);
+    .filter(
+      (e): e is { g: Grupo; amostra: Opcao; limiteGrupo: number } =>
+        e.limiteGrupo > 0 && e.amostra != null && e.amostra.tirMes != null && e.amostra.tirMes > 0
+    );
+
+  const porCamada = CAMADAS.map(v =>
+    eleg.filter(e => e.amostra.veredito === v).sort((a, b) => a.amostra.tirMes! - b.amostra.tirMes!)
+  );
 
   const cartas: Opcao[] = [];
   const usoPorGrupo = new Map<string, number>();
   let acumulado = 0;
 
-  let progrediu = true;
-  while (acumulado < alvo && cartas.length < 80 && progrediu) {
-    progrediu = false;
-    for (const { g, limiteGrupo } of eleg) {
-      if (acumulado >= alvo || cartas.length >= 80) break;
-      const usadas = usoPorGrupo.get(g.codigo) ?? 0;
-      if (usadas >= limiteGrupo) continue;
-      const falta = alvo - acumulado;
-      const credito = Math.min(Number(g.cred_max), Math.max(Number(g.cred_min ?? 0), falta));
-      const op = simular(g, credito, lancePct, tipoLance);
-      if (!op) continue;
-      cartas.push(op);
-      acumulado += credito;
-      usoPorGrupo.set(g.codigo, usadas + 1);
-      progrediu = true;
+  for (const camada of porCamada) {
+    if (acumulado >= alvo || cartas.length >= 80) break;
+    let progrediu = true;
+    while (acumulado < alvo && cartas.length < 80 && progrediu) {
+      progrediu = false;
+      for (const { g, limiteGrupo } of camada) {
+        if (acumulado >= alvo || cartas.length >= 80) break;
+        const usadas = usoPorGrupo.get(g.codigo) ?? 0;
+        if (usadas >= limiteGrupo) continue;
+        const falta = alvo - acumulado;
+        const credito = Math.min(Number(g.cred_max), Math.max(Number(g.cred_min ?? 0), falta));
+        const op = simular(g, credito, lancePct, tipoLance);
+        if (!op || op.tirMes == null || op.tirMes <= 0) continue;
+        cartas.push(op);
+        acumulado += credito;
+        usoPorGrupo.set(g.codigo, usadas + 1);
+        progrediu = true;
+      }
     }
   }
 
