@@ -165,47 +165,62 @@ function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre"
   };
 }
 
-// multi-junção greedy: soma cartas até atingir o crédito alvo,
-// priorizando grupos onde o lance vence agora, respeitando estoque (cotas_venda)
+// multi-junção diversificada: ordena grupos por score = tempo esperado + TIR
+// (menor melhor — TIR é invariante ao valor do crédito p/ um grupo fixo, então
+// uma amostra em cred_max já representa o score do grupo), aloca em rodízio
+// (round-robin) até o alvo, respeitando cap por grupo = min(vencedores_ultimo
+// ?? 2, 3) e estoque (cotas_venda) — evita concentrar tudo num único grupo.
 function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance: "livre" | "embutido", segmento?: string) {
   const eleg = grupos
     .filter(g => (!segmento || g.segmento === segmento) && g.cred_max && g.restantes > 0)
-    .map(g => ({ g, corte: corteRef(g) }))
-    .sort((a, b) => {
-      const av = a.corte != null && lancePct >= a.corte ? 0 : 1;
-      const bv = b.corte != null && lancePct >= b.corte ? 0 : 1;
-      if (av !== bv) return av - bv;
-      return Number(b.g.cred_max) - Number(a.g.cred_max);
-    });
+    .map(g => {
+      const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance);
+      const score = amostra ? amostra.tempoEsperadoMeses + (amostra.tirMes ?? 999) : Infinity;
+      const capGrupo = Math.max(1, Math.min(Number(g.vencedores_ultimo ?? 2), 3));
+      const estoque = g.cotas_venda != null ? Number(g.cotas_venda) : 1;
+      const limiteGrupo = Math.min(capGrupo, estoque);
+      return { g, score, limiteGrupo };
+    })
+    .filter(e => e.limiteGrupo > 0 && Number.isFinite(e.score))
+    .sort((a, b) => a.score - b.score);
 
   const cartas: Opcao[] = [];
   const usoPorGrupo = new Map<string, number>();
   let acumulado = 0;
-  for (const { g } of eleg) {
-    if (acumulado >= alvo) break;
-    const estoque = g.cotas_venda != null ? Number(g.cotas_venda) : 1;
-    let usadas = usoPorGrupo.get(g.codigo) ?? 0;
-    while (acumulado < alvo && usadas < estoque) {
+
+  let progrediu = true;
+  while (acumulado < alvo && cartas.length < 80 && progrediu) {
+    progrediu = false;
+    for (const { g, limiteGrupo } of eleg) {
+      if (acumulado >= alvo || cartas.length >= 80) break;
+      const usadas = usoPorGrupo.get(g.codigo) ?? 0;
+      if (usadas >= limiteGrupo) continue;
       const falta = alvo - acumulado;
       const credito = Math.min(Number(g.cred_max), Math.max(Number(g.cred_min ?? 0), falta));
       const op = simular(g, credito, lancePct, tipoLance);
-      if (!op) break;
+      if (!op) continue;
       cartas.push(op);
       acumulado += credito;
-      usadas++;
+      usoPorGrupo.set(g.codigo, usadas + 1);
+      progrediu = true;
     }
-    usoPorGrupo.set(g.codigo, usadas);
-    if (cartas.length >= 80) break; // trava de sanidade
   }
 
   const tempoTotal = Math.max(...cartas.map(c => c.tempoEsperadoMeses), 0);
   const resumo = {
     creditoTotal: acumulado,
     cartas: cartas.length,
+    gruposDistintos: usoPorGrupo.size,
     parcelaTotal: cartas.reduce((s, c) => s + c.parcela, 0),
     desembolsoTotal: cartas.reduce((s, c) => s + c.desembolsoContemplacao, 0),
     saldoDevedorTotal: cartas.reduce((s, c) => s + c.saldoDevedorPos, 0),
     tempoEsperadoMeses: tempoTotal,
+    tirMedia:
+      cartas.length > 0
+        ? Math.round(
+            (cartas.reduce((s, c) => s + (c.tirMes ?? 0), 0) / cartas.length) * 100
+          ) / 100
+        : null,
   };
   return { resumo, cartas };
 }

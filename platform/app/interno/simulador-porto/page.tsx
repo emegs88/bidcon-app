@@ -4,7 +4,7 @@
 // Space Grotesk (títulos), IBM Plex Mono (números).
 // Requer as rotas /api/analista-grupos e /api/analista-ia deste pacote.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const fmt = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -19,6 +19,9 @@ type Opcao = {
   tendencia: string | null; mesesHistorico: number; veredito: string;
 };
 
+type Indice = { acumulado12m: number | null; atualizadoEm: string };
+type Indices = { incc: Indice; ipca: Indice; igpm: Indice };
+
 export default function SimuladorPorto() {
   const [aba, setAba] = useState<"ranking" | "juncao">("ranking");
   const [segmento, setSegmento] = useState<"auto" | "imovel">("auto");
@@ -31,6 +34,23 @@ export default function SimuladorPorto() {
   const [resumo, setResumo] = useState<any>(null);
   const [ia, setIa] = useState("");
   const [erro, setErro] = useState("");
+  const [indices, setIndices] = useState<Indices | null>(null);
+
+  useEffect(() => {
+    fetch("/api/indices")
+      .then((r) => r.json())
+      .then((d) => { if (d?.indices) setIndices(d.indices); })
+      .catch(() => {});
+  }, []);
+
+  // reajuste anual: imóvel acompanha INCC 12m acumulado; auto mantém a parcela
+  // (o valor do bem é quem se ajusta, não a parcela do consórcio).
+  function parcelaPosReajuste(o: Opcao): { valor: number; projetado: boolean } {
+    if (o.segmento === "imovel" && indices?.incc?.acumulado12m != null) {
+      return { valor: o.parcela * (1 + indices.incc.acumulado12m / 100), projetado: true };
+    }
+    return { valor: o.parcela, projetado: false };
+  }
 
   async function rodar() {
     setCarregando(true); setErro(""); setIa(""); setResumo(null); setOpcoes([]);
@@ -75,6 +95,22 @@ export default function SimuladorPorto() {
           Tempos são estimativas estatísticas — nunca prometemos data de contemplação. Custo financeiro medido por TIR ao mês.
         </p>
 
+        {indices && (
+          <div style={{ marginTop: 12, display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center",
+                        background: "#0F1526", border: "1px solid #16213A", borderRadius: 10, padding: "8px 14px" }}>
+            <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 700 }}>Índices oficiais (BCB) · 12m acum.</span>
+            <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", opacity: 0.85 }}>
+              INCC-DI: {indices.incc.acumulado12m != null ? `${indices.incc.acumulado12m}%` : "—"}
+            </span>
+            <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", opacity: 0.85 }}>
+              IPCA: {indices.ipca.acumulado12m != null ? `${indices.ipca.acumulado12m}%` : "—"}
+            </span>
+            <span style={{ fontSize: 12, fontFamily: "'IBM Plex Mono',monospace", opacity: 0.85 }}>
+              IGP-M: {indices.igpm.acumulado12m != null ? `${indices.igpm.acumulado12m}%` : "—"}
+            </span>
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 8, margin: "20px 0" }}>
           {(["ranking", "juncao"] as const).map(a => (
             <button key={a} onClick={() => setAba(a)}
@@ -118,8 +154,12 @@ export default function SimuladorPorto() {
         {resumo && (
           <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
             {[["Crédito total", fmt(resumo.creditoTotal)], ["Cartas", resumo.cartas],
-              ["Parcela total/mês", fmt(resumo.parcelaTotal)], ["Desembolso na contemplação", fmt(resumo.desembolsoTotal)],
-              ["Saldo devedor pós", fmt(resumo.saldoDevedorTotal)], ["Tempo esperado", `${resumo.tempoEsperadoMeses} ass.`]]
+              ["Grupos distintos", resumo.gruposDistintos ?? "—"],
+              ["Parcela total/mês", fmt(resumo.parcelaTotal)],
+              ["Parcela total pós-reajuste (12m)", fmt(opcoes.reduce((s, o) => s + parcelaPosReajuste(o).valor, 0))],
+              ["Desembolso na contemplação", fmt(resumo.desembolsoTotal)],
+              ["Saldo devedor pós", fmt(resumo.saldoDevedorTotal)], ["Tempo esperado", `${resumo.tempoEsperadoMeses} ass.`],
+              ["TIR média", resumo.tirMedia != null ? `${resumo.tirMedia}%` : "—"]]
               .map(([k, v]) => (
                 <div key={String(k)} style={{ background: "#0F1526", borderRadius: 12, padding: 12, border: "1px solid #16213A" }}>
                   <div style={{ fontSize: 11, opacity: 0.6 }}>{k}</div>
@@ -132,15 +172,23 @@ export default function SimuladorPorto() {
           <div style={{ marginTop: 20, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "'IBM Plex Mono',monospace" }}>
               <thead><tr style={{ color: "#8FB7FF", textAlign: "left" }}>
-                {["Grupo", "Adm", "Crédito", "Parcela", "Tempo", "Corte ref.", "Hist.", "Desembolso", "TIR/mês", "Veredito"].map(h =>
+                {["Grupo", "Adm", "Crédito", "Parcela", "Pós-reajuste (12m)", "Tempo", "Corte ref.", "Hist.", "Desembolso", "TIR/mês", "Veredito"].map(h =>
                   <th key={h} style={{ padding: "8px 10px", borderBottom: "1px solid #16213A" }}>{h}</th>)}
               </tr></thead>
-              <tbody>{opcoes.map((o, i) => (
+              <tbody>{opcoes.map((o, i) => {
+                const pos = parcelaPosReajuste(o);
+                return (
                 <tr key={i} style={{ borderBottom: "1px solid #10182B" }}>
                   <td style={{ padding: "8px 10px", fontWeight: 700 }}>{o.codigo}</td>
                   <td style={{ padding: "8px 10px", opacity: .7 }}>{o.administradora}</td>
                   <td style={{ padding: "8px 10px" }}>{fmt(o.credito)}</td>
                   <td style={{ padding: "8px 10px" }}>{fmt(o.parcela)}</td>
+                  <td style={{ padding: "8px 10px" }}>
+                    {fmt(pos.valor)}
+                    {!pos.projetado && (
+                      <div style={{ fontSize: 10, opacity: 0.5 }}>reajuste acompanha o valor do bem</div>
+                    )}
+                  </td>
                   <td style={{ padding: "8px 10px" }}>{o.tempoEsperadoMeses} ass.</td>
                   <td style={{ padding: "8px 10px" }}>{o.corteReferencia != null ? `${o.corteReferencia}%` : "—"}</td>
                   <td style={{ padding: "8px 10px", opacity: .7 }}>{o.mesesHistorico}m {o.tendencia && o.tendencia !== "base_1_mes" ? `· ${o.tendencia}` : ""}</td>
@@ -152,7 +200,9 @@ export default function SimuladorPorto() {
                       color: o.veredito === "vence_agora" ? "#4ade80" : o.veredito === "janela_3m" ? "#8FB7FF" : "#a1a1aa" }}>
                       {o.veredito === "vence_agora" ? "vence agora" : o.veredito === "janela_3m" ? "janela ~3 ass." : "fila"}
                     </span></td>
-                </tr>))}
+                </tr>
+                );
+              })}
               </tbody>
             </table>
             <button onClick={analisarIA} style={{ marginTop: 14, padding: "10px 20px", borderRadius: 10, border: "1px solid #1E6FE6", background: "transparent", color: "#8FB7FF", cursor: "pointer", fontWeight: 700 }}>
@@ -164,6 +214,8 @@ export default function SimuladorPorto() {
 
         <p style={{ marginTop: 32, fontSize: 11, opacity: 0.45, borderTop: "1px solid #16213A", paddingTop: 12 }}>
           Bidcon · Prospere Consórcios. Simulação de planejamento e compra programada de carta de crédito. Estimativas baseadas em histórico de assembleias; resultados passados não garantem resultados futuros. Nenhuma data de contemplação é prometida.
+          <br />
+          Reajuste anual no aniversário do grupo; índices BCB/FGV.
         </p>
       </div>
     </main>
