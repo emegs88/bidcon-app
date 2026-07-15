@@ -244,13 +244,18 @@ export async function POST(req: NextRequest) {
 
     const db = createXtvClient();
 
-    let q = db.schema("consorcios").from("vw_grupos_calibrados").select("*");
-    if (administradora) q = q.eq("administradora", administradora);
-    if (segmento) q = q.eq("segmento", segmento);
-    if (modo === "grupo" && codigo) q = q.ilike("codigo", codigo);
-    const { data, error } = await q;
+    // RPC (security definer, sem args) — evita expor o schema `consorcios`
+    // via .schema().from() e cobre o caso do schema não estar em "Exposed
+    // schemas" da API. Filtros aplicados aqui, em memória.
+    const { data, error } = await db.rpc("consorcios_grupos_calibrados");
     if (error) throw error;
-    const grupos = (data ?? []) as unknown as Grupo[];
+    let grupos = (data ?? []) as unknown as Grupo[];
+    if (administradora) grupos = grupos.filter((g) => g.administradora === administradora);
+    if (segmento) grupos = grupos.filter((g) => g.segmento === segmento);
+    if (modo === "grupo" && codigo) {
+      const alvo = String(codigo).toLowerCase();
+      grupos = grupos.filter((g) => g.codigo?.toLowerCase() === alvo);
+    }
 
     if (modo === "grupo") {
       const g = grupos[0];
