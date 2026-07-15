@@ -4,10 +4,15 @@
 // parcela por diluição, tempo esperado de contemplação, custo financeiro/mês (TIR)
 // e multi-junção de cartas (greedy) para créditos altos.
 // Espelha o motor validado nos simuladores Bidcon (jul/2026).
+//
+// Dados: schema `consorcios` vive no projeto Supabase "xtv" (mesmo projeto de
+// administradoras/fornecedores/vitrine — ver lib/supabase-xtv.ts), não no
+// projeto principal "nnv" (auth + profiles). Por isso usamos createXtvClient()
+// aqui, igual a /api/whatsapp e /api/atende — NUNCA a chave nnv p/ este schema.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createClient as createClientRLS } from "@/lib/supabase-server";
+import { createClient } from "@/lib/supabase-server";
+import { createXtvClient } from "@/lib/supabase-xtv";
 
 export const dynamic = "force-dynamic";
 
@@ -208,14 +213,14 @@ function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance:
 // ---------- handler ----------
 export async function POST(req: NextRequest) {
   try {
-    const supabaseRLS = createClientRLS();
+    const supabase = createClient();
     const {
       data: { user },
-    } = await supabaseRLS.auth.getUser();
+    } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
     }
-    const { data: perfil } = await supabaseRLS
+    const { data: perfil } = await supabase
       .from("profiles")
       .select("tipo")
       .eq("id", user.id)
@@ -237,13 +242,9 @@ export async function POST(req: NextRequest) {
       limite = 10,
     } = body ?? {};
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
+    const db = createXtvClient();
 
-    let q = supabase.schema("consorcios").from("vw_grupos_calibrados").select("*");
+    let q = db.schema("consorcios").from("vw_grupos_calibrados").select("*");
     if (administradora) q = q.eq("administradora", administradora);
     if (segmento) q = q.eq("segmento", segmento);
     if (modo === "grupo" && codigo) q = q.ilike("codigo", codigo);
