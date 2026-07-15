@@ -4,6 +4,7 @@
 // Compliance Bidcon travado no system prompt.
 
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,22 @@ REGRAS INEGOCIÁVEIS:
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
+    }
+    const { data: perfil } = await supabase
+      .from("profiles")
+      .select("tipo")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (perfil?.tipo !== "admin") {
+      return NextResponse.json({ erro: "Sem permissão." }, { status: 403 });
+    }
+
     const { pergunta, contexto } = await req.json();
     if (!pergunta) return NextResponse.json({ erro: "pergunta ausente" }, { status: 400 });
 

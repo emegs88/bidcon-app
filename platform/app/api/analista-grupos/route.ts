@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createClientRLS } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -207,6 +208,22 @@ function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance:
 // ---------- handler ----------
 export async function POST(req: NextRequest) {
   try {
+    const supabaseRLS = createClientRLS();
+    const {
+      data: { user },
+    } = await supabaseRLS.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ erro: "Não autenticado." }, { status: 401 });
+    }
+    const { data: perfil } = await supabaseRLS
+      .from("profiles")
+      .select("tipo")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (perfil?.tipo !== "admin") {
+      return NextResponse.json({ erro: "Sem permissão." }, { status: 403 });
+    }
+
     const body = await req.json();
     const {
       modo = "grupo",            // "grupo" | "juncao" | "ranking"
