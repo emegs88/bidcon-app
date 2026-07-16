@@ -1,12 +1,20 @@
 // ============================================================================
-// Webhook do WhatsApp (Meta Cloud API) — WHATSAPP-01 · F1 (Fundação).
+// Webhook do WhatsApp (Meta Cloud API) — WHATSAPP-01 · F1+F2+F3.
 // ----------------------------------------------------------------------------
-// F1 só cuida do encanamento: handshake GET + POST que valida assinatura,
+// F1 cuida do encanamento: handshake GET + POST que valida assinatura,
 // deduplica por wa_message_id e grava a mensagem recebida em wa_conversas/
 // wa_mensagens (projeto xtv — ver migration 0046 e a nota de correção de
-// arquitetura nnv→xtv nela). NENHUMA lógica de Claude, NENHUM envio de
-// resposta via Graph API ainda — isso é F2 (Eco) e F3 (Cérebro), ver
-// docs/WHATSAPP-01-SPEC.md.
+// arquitetura nnv→xtv nela).
+//
+// F2+F3 (esta fatia): depois de gravar a mensagem do cliente, se
+// WHATSAPP_AGENT_ATIVO==="true" (kill-switch, default desligado) e a
+// conversa não estiver opt-out nem escalada pra humano, chama o cérebro do
+// Time Prosperito (lib/whatsapp/cerebro.ts — reaproveita persona/compliance
+// do /api/atende) e responde via Graph API (lib/whatsapp/graph.ts). Falha
+// do agente é capturada em try/catch e NUNCA derruba o ack 200 do webhook —
+// só loga. Escopo desta fatia é mais enxuto que o §10.3 completo da spec
+// (sem orquestrador em rota separada, sem debounce/lock, sem tools de
+// busca via RPC, sem guardrail module dedicado — ver relatório da sessão).
 //
 // GET: handshake exigido pela Meta ao configurar o webhook (hub.mode=
 //   subscribe + hub.verify_token == WHATSAPP_VERIFY_TOKEN → devolve
@@ -21,10 +29,25 @@
 //   receber" (normalizado) => wa_conversas.opt_out=true — detecta nas três
 //   formas em que pode chegar: quick reply de TEMPLATE (button.text),
 //   quick reply de interativa comum (interactive.button_reply.title) ou
-//   texto digitado livremente (text.body);
-//   6) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
+//   texto digitado livremente (text.body); 6) Fatia F2+F3: se ativo e a
+//   conversa está livre (sem opt-out, status!=='humano'), gera e envia a
+//   resposta do Time Prosperito (await dentro do try/catch — ver nota
+//   abaixo sobre a escolha de não usar fire-and-forget literal);
+//   7) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
 //   Meta reenviar por erro de aplicação, mesmo padrão de
 //   /api/hooks/novo-cadastro.
+//
+// Nota de desenho (F2+F3): o pedido original falava em "fire-and-forget".
+// Em runtime serverless (Vercel/Node), uma promise não aguardada corre risco
+// real de ser encerrada junto com a função antes de terminar — não é
+// fire-and-forget seguro, é só "talvez rode". Por isso o processamento do
+// agente é AGUARDADO (await) dentro do try/catch: a falha nunca derruba o
+// 200 (mesmo efeito pedido), mas o trabalho tem garantia de rodar até o
+// fim antes da função retornar. Efeito colateral: o ack pode demorar um
+// pouco mais quando o agente está ativo (1 chamada Anthropic + 1 chamada
+// Graph API, tipicamente poucos segundos) — aceitável nesta fatia; um
+// mecanismo de fila/waitUntil fica para uma fatia de blindagem (F4) se a
+// latência dessa ack virar problema real em produção.
 //
 // service_role (createXtvClient): usado aqui porque não há sessão de
 // usuário (mensagem chega de fora, sem cookie) — mesmo motivo de
@@ -33,6 +56,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { gerarRespostaWhatsApp, agenteValido } from "@/lib/whatsapp/cerebro";
+import { sendText } from "@/lib/whatsapp/graph";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -182,7 +207,7 @@ export async function POST(req: Request) {
     const { data: conversa, error: errConversa } = await db
       .from("wa_conversas")
       .upsert({ telefone }, { onConflict: "telefone", ignoreDuplicates: false })
-      .select("id")
+      .select("id, status, agente_ativo, opt_out")
       .single();
     if (errConversa || !conversa) continue;
 
@@ -197,11 +222,62 @@ export async function POST(req: Request) {
     // detectado em qualquer uma das 3 formas (ver ehOptOut); F2/F3 devem
     // sempre respeitar essa flag antes de qualquer envio proativo. Ver
     // docs/WHATSAPP-01-SPEC.md §10.3.6.
-    if (ehOptOut(m)) {
+    const acabaDeOptarSair = ehOptOut(m);
+    if (acabaDeOptarSair) {
       await db
         .from("wa_conversas")
         .update({ opt_out: true })
         .eq("id", conversa.id);
+    }
+
+    // Fatia F2+F3 — Time Prosperito responde, se ligado (kill-switch) e a
+    // conversa está livre (sem opt-out — nem o histórico nem esta mesma
+    // mensagem — e não escalada pra humano). Nunca responde à própria
+    // mensagem de opt-out.
+    const podeResponder =
+      process.env.WHATSAPP_AGENT_ATIVO === "true" &&
+      !acabaDeOptarSair &&
+      conversa.opt_out !== true &&
+      conversa.status !== "humano";
+
+    if (podeResponder) {
+      try {
+        const resultado = await gerarRespostaWhatsApp(
+          db,
+          conversa.id,
+          agenteValido(conversa.agente_ativo)
+        );
+        if (resultado) {
+          await sendText({
+            conversaId: conversa.id,
+            telefone,
+            texto: resultado.texto,
+            agente: resultado.agenteQueRespondeu,
+            tokensIn: resultado.tokensIn,
+            tokensOut: resultado.tokensOut,
+          });
+
+          const updates: Record<string, unknown> = {};
+          if (
+            resultado.proximoAgente &&
+            resultado.proximoAgente !== resultado.agenteQueRespondeu
+          ) {
+            updates.agente_ativo = resultado.proximoAgente;
+          }
+          if (resultado.escalarHumano) {
+            updates.status = "humano";
+          }
+          if (Object.keys(updates).length > 0) {
+            await db.from("wa_conversas").update(updates).eq("id", conversa.id);
+          }
+        }
+      } catch (e) {
+        // Falha do agente NUNCA derruba o ack 200 do webhook — só loga.
+        console.error(
+          "[whatsapp] falha ao gerar/enviar resposta do agente:",
+          e instanceof Error ? e.message : e
+        );
+      }
     }
   }
 
