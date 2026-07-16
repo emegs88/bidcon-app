@@ -1,10 +1,14 @@
 // /cartas/[id] — detalhe de uma carta contemplada disponível.
-// Server Component. Leitura via Supabase (RLS): depende da policy da migration
-// 0005 (cartas_vitrine_select) para o cliente enxergar estoque (parceiro_id null).
+// Server Component. PÚBLICA (FATIA SYNC-ID, migration 0048): a query já filtra
+// status='disponivel', e a policy cartas_vitrine_select_anon (RLS) libera esse
+// mesmo recorte pro role anon — não há redirect de login aqui. Isso resolve o
+// destino do botão "Ver carta" do carrossel de marketing do WhatsApp e o gap
+// chat→cadastro (auditoria 2026-07). A ação de RESERVAR continua exigindo
+// login: o botão abaixo leva a /reservar, que mantém seu próprio redirect.
 // CTA "Tenho interesse" abre o WhatsApp do atendimento com texto neutro citando a
 // carta. Sem linguagem de promessa/contemplação garantida.
 import { createClient } from "@/lib/supabase-server";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -38,14 +42,18 @@ export default async function CartaDetalhePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("nome")
-    .eq("id", user.id)
-    .single();
-  const nome = profile?.nome ?? user.email ?? null;
+  // sem login: visitante público (carrossel WhatsApp, chat sem cadastro etc.).
+  // AppShell recebe nome=null e omite o botão "Sair" nesse caso.
+  let nome: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", user.id)
+      .single();
+    nome = profile?.nome ?? user.email ?? null;
+  }
 
   // Join SÓ com administradoras (marca pública). NUNCA selecionar fornecedor.
   const { data: carta } = await supabase

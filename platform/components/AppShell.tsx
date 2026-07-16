@@ -1,6 +1,9 @@
 // Casca visual da área logada: topo com marca + navegação + identificação do
 // usuário + sair. Server Component (recebe nome/email já lidos via RLS na página).
 // O <form action="/auth/signout"> mantém o mesmo endpoint POST já existente.
+// FATIA SYNC-ID: /cartas/[id] agora é pública (visitante sem sessão) e reusa
+// este shell passando nome=null — nesse caso o botão "Sair" não faz sentido
+// (não há sessão pra encerrar), então ele só renderiza quando nome existe.
 import type { ReactNode } from "react";
 import { ShellNav } from "./ShellNav";
 import { ThemeControls } from "./ThemeControls";
@@ -30,11 +33,13 @@ export function AppShell({
           <div className={styles.user}>
             <ThemeControls />
             {nome && <span className={styles.hello}>{nome}</span>}
-            <form action="/auth/signout" method="post">
-              <button type="submit" className={styles.signout}>
-                Sair
-              </button>
-            </form>
+            {nome && (
+              <form action="/auth/signout" method="post">
+                <button type="submit" className={styles.signout}>
+                  Sair
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </header>
