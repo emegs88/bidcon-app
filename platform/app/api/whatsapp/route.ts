@@ -17,8 +17,11 @@
 //   motivo, sem vazar segredo/corpo), nada é processado; 2) ignora eventos
 //   que não sejam `messages` (statuses, echoes — fora de escopo F1);
 //   3) dedup por wa_message_id; 4) upsert da conversa por telefone + insert
-//   da mensagem (papel='cliente'); 5) Fatia 4: quick reply "Não quero
-//   receber" (botão do carrossel de marketing) => wa_conversas.opt_out=true;
+//   da mensagem (papel='cliente'); 5) Fatia 4-B: opt-out "Não quero
+//   receber" (normalizado) => wa_conversas.opt_out=true — detecta nas três
+//   formas em que pode chegar: quick reply de TEMPLATE (button.text),
+//   quick reply de interativa comum (interactive.button_reply.title) ou
+//   texto digitado livremente (text.body);
 //   6) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
 //   Meta reenviar por erro de aplicação, mesmo padrão de
 //   /api/hooks/novo-cadastro.
@@ -96,8 +99,9 @@ function assinaturaValida(
   return { valida: ok, motivo: ok ? undefined : "hmac_nao_bate" };
 }
 
-// Shape mínimo do envelope da Meta que nos interessa em F1 (texto e
-// interativas); campos não usados aqui ficam como unknown de propósito.
+// Shape mínimo do envelope da Meta que nos interessa em F1 (texto,
+// interativas e quick reply de TEMPLATE de marketing); campos não usados
+// aqui ficam como unknown de propósito.
 type MensagemMeta = {
   id?: string;
   from?: string;
@@ -106,6 +110,11 @@ type MensagemMeta = {
     button_reply?: { title?: string };
     list_reply?: { title?: string };
   };
+  // Quick reply de botão de TEMPLATE (carrossel de marketing) chega como
+  // messages[].type="button", com o texto em button.text (não em
+  // interactive.button_reply.title — esse é só pra botões de mensagem
+  // interativa comum, formato diferente).
+  button?: { text?: string; payload?: string };
 };
 
 // --- POST: recebe eventos; F1 só grava (sem Claude, sem resposta) ----------
@@ -165,6 +174,7 @@ export async function POST(req: Request) {
 
     const conteudo =
       m.text?.body ??
+      m.button?.text ??
       m.interactive?.button_reply?.title ??
       m.interactive?.list_reply?.title ??
       "";
@@ -183,9 +193,9 @@ export async function POST(req: Request) {
       wa_message_id: waMessageId,
     });
 
-    // Fatia 4 (LGPD/opt-out) — quick reply "Não quero receber" (botão do
-    // carrossel de marketing) marca opt_out=true; F2/F3 devem sempre
-    // respeitar essa flag antes de qualquer envio proativo. Ver
+    // Fatia 4 (LGPD/opt-out) — "não quero receber" marca opt_out=true,
+    // detectado em qualquer uma das 3 formas (ver ehOptOut); F2/F3 devem
+    // sempre respeitar essa flag antes de qualquer envio proativo. Ver
     // docs/WHATSAPP-01-SPEC.md §10.3.6.
     if (ehOptOut(m)) {
       await db
@@ -200,15 +210,35 @@ export async function POST(req: Request) {
 
 // Texto do quick reply de opt-out usado no template de marketing (carrossel
 // da vitrine). Ver docs/WHATSAPP-01-SPEC.md — botão precisa ter esse título
-// exato em todos os cards (a Meta exige botões idênticos entre cards).
+// exato em todos os cards (a Meta exige botões idênticos entre cards). Já
+// normalizado (minúsculo, sem pontuação nas pontas) — comparar sempre via
+// normalizarTexto().
 const TEXTO_BOTAO_OPT_OUT = "não quero receber";
 
-/** true se a mensagem for o quick reply de opt-out (por título, já que o
- *  template ainda não tem `id` de botão fixo definido/aprovado). */
+/** trim + lowercase + remove aspas/pontuação nas pontas (ex.: `"Não quero
+ *  receber."` → `não quero receber`), pra comparação tolerante a variações
+ *  de digitação/formatação que a Meta ou o cliente podem introduzir. */
+function normalizarTexto(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/^[\s"'“”‘’.!?,;:]+|[\s"'“”‘’.!?,;:]+$/g, "");
+}
+
+/** true se a mensagem for o opt-out — cobre as três formas como ele pode
+ *  chegar: quick reply de TEMPLATE de marketing (messages[].type="button",
+ *  texto em button.text), quick reply de mensagem interativa comum
+ *  (interactive.button_reply.title) e texto digitado livremente
+ *  (text.body), já que o cliente pode simplesmente escrever a frase. */
 function ehOptOut(m: MensagemMeta): boolean {
-  const titulo = m.interactive?.button_reply?.title;
-  if (!titulo) return false;
-  return titulo.trim().toLowerCase() === TEXTO_BOTAO_OPT_OUT;
+  const candidatos = [
+    m.button?.text,
+    m.interactive?.button_reply?.title,
+    m.text?.body,
+  ];
+  return candidatos.some(
+    (c) => !!c && normalizarTexto(c) === TEXTO_BOTAO_OPT_OUT
+  );
 }
 
 /** Extrai o array de `messages` do envelope `entry[].changes[].value.messages`
