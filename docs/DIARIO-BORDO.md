@@ -112,6 +112,45 @@ estranhar ao ler os logs depois.
 a tela de reenvio/expiração — com o Emerson. Depois, limpeza de dados de
 teste (`counts=0`) fecha a fatia PORTAL-01.
 
+## 2026-07 — PORTAL-01 ENCERRADO
+
+**QA completo, testemunhado por humano (Emerson) contra o deploy do fix**:
+
+- (a) magic link gerado pelo admin real → **ok** (evidência de log GoTrue,
+  ver seção de diagnóstico acima).
+- (b)/(c) RLS de cartas/processo → **ok** (evidência SQL, fatia original).
+- (d) reuso do link já consumido → **ok, aprovado com ressalva de UX
+  não-bloqueante**: reabrir o link usado leva a `callback` 200 → sem sessão
+  criada → cai em `/login` limpo, sem erro cru exposto. Existe caminho de
+  recuperação na própria tela ("Entrar com link por e-mail"), então não há
+  dead-end — só falta a mensagem ser específica. **Backlog `UX-01`** (fatia
+  futura, não iniciada): callback com token inválido/expirado deveria
+  redirecionar pra algo como `/entrar?erro=link-expirado` com mensagem
+  própria ("seu link expirou, digite seu e-mail para receber um novo") em
+  vez do `/login` genérico atual.
+
+**Limpeza de dados de teste — executada com AUTORIZO digitado nesta sessão**:
+
+```sql
+DELETE FROM processos WHERE id = '99999999-aaaa-9999-9999-999999999999';
+DELETE FROM profiles WHERE id = '99999999-9999-9999-9999-999999999999';
+DELETE FROM auth.users WHERE id = '99999999-9999-9999-9999-999999999999';
+```
+
+Confirmado por SELECT pós-delete: `processos_teste=0, profiles_teste=0,
+users_teste=0`; pré-cadastro real da Rafaela (`ffee12ed...`) e o processo
+semente (`33333333...`) conferidos intactos (count=1 cada) — nenhum dado
+real foi tocado.
+
+**Status final**: fatia **PORTAL-01 encerrada**. Acesso automático via
+magic link ao `/meu-processo` está em produção, QA a/b/c/d completo,
+telemetria de servidor confirmando cada etapa, ambiente de teste limpo.
+Pendências abertas ficam só como dívida técnica registrada (não bloqueiam
+nada): bot de snapshot publicando sem gate humano (seção acima), backlog
+`UX-01` (mensagem de link expirado), `PONTE-01` (promoção xtv→nnv) e
+`HIGIENE-01` (destino de `bidcon.html`) — nenhuma delas faz parte desta
+fatia, todas propostas pra entrarem em fatias próprias no futuro.
+
 ## 2026-07 — Incidente: `vercel env rm` apagou `SUPABASE_SERVICE_ROLE_KEY` inteira (fatia PORTAL-01)
 
 **O que aconteceu**: pedido de reverter só o escopo Preview da
