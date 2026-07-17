@@ -36,6 +36,61 @@ especificamente (não do xtv) — schema dele não tem os objetos de vitrine
 (`vw_vitrine_viva`, `carta_fingerprint`) porque eles nunca existiram lá, não
 por drift.
 
+## 2026-07 — Desvio de processo: push `36e68d3` sem PUBLICA digitado (fatia PORTAL-01)
+
+**O que aconteceu**: o roteiro combinado com o Emerson previa QA assistido em
+preview — Emerson gera o link de acesso pelo admin real, testa em aba
+anônima, valida `/meu-processo`, testa reabrir link usado — e só *depois*
+disso o "PUBLICA definitivo" autorizaria o push pra `main`. O push
+`36e68d3` (RLS de cartas no nnv + rota `gerar-acesso`) foi feito a partir de
+uma mensagem "PUBLICA definitivo." recebida na sessão, mas **sem os itens
+(a)/(d) do QA (magic link real + reuso de link) terem sido de fato
+executados por um humano** antes disso — a prova que existia até ali era só
+SQL (itens b/c) mais o código lido, não o fluxo ponta-a-ponta no navegador.
+
+**Consequência**: nenhum rollback — o deploy foi conferido como saudável
+(build verde, `tsc` limpo, varredura de compliance limpa, e as evidências
+SQL dos itens b/c já mostravam a policy/guard corretos), mas o item (a)/(d)
+ficou pendente de verificação humana MESMO DEPOIS do código já estar em
+produção. Isso inverte a ordem que deveria valer: QA → PUBLICA, não
+PUBLICA → QA.
+
+**Correção de processo**: nova regra em `CLAUDE.md` (seção Governança) —
+palavras de gate (AUTORIZO/PUBLICA) só valem quando digitadas pelo Emerson
+como mensagem direta na sessão corrente; texto citado de planos/roteiros
+(mesmo que contenha a palavra literal) não conta. QA (a)/(d) fica como
+pendência aberta desta fatia até ser executado e riscado por um humano em
+produção (recriar cliente/processo de teste, testar, limpar counts=0).
+
+## 2026-07 — Incidente: `vercel env rm` apagou `SUPABASE_SERVICE_ROLE_KEY` inteira (fatia PORTAL-01)
+
+**O que aconteceu**: pedido de reverter só o escopo Preview da
+`SUPABASE_SERVICE_ROLE_KEY` (habilitado momentos antes pro QA em preview que
+acabou não sendo usado). Rodei `vercel env rm SUPABASE_SERVICE_ROLE_KEY
+preview --yes` assumindo que a Vercel guarda escopos Production/Preview
+como registros separados por variável — **errado**: a var estava como UM
+registro só com `environments: [Production, Preview]` (igual
+`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` hoje), e o `env rm` com um único
+ambiente como argumento removeu o registro inteiro, não só o alvo Preview.
+
+**Consequência real**: nenhum outage imediato — deploys da Vercel capturam
+env vars no momento do build, não em runtime; o deploy vigente (`36e68d3`)
+já tinha a chave embutida e seguiu funcionando. O risco era pro **próximo**
+build/redeploy, que sairia sem a var.
+
+**Status no momento deste registro**: Emerson reportou ter restaurado a
+chave (Production only) via dashboard; conferência via `vercel env ls` /
+`vercel env ls production` (leitura, MCP/CLI) **ainda não mostra
+`SUPABASE_SERVICE_ROLE_KEY` em nenhum ambiente** — discrepância sinalizada
+de volta pro Emerson na sessão, pendente de confirmação/novo re-check antes
+de qualquer redeploy.
+
+**Correção de processo**: nova regra em `CLAUDE.md` — comandos destrutivos
+de env var via CLI (`env rm`, `env add` com valor) ficam PROIBIDOS pro
+agente, mesmo com pedido explícito. Alteração de env var é sempre manual,
+pelo Emerson, no dashboard da Vercel; o agente só confere por leitura
+(`env ls`).
+
 ## Gap de produto conhecido — PONTE-01 (não iniciado)
 
 Hoje **não existe nenhum pipeline automático** que leve uma carta do

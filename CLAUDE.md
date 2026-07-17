@@ -5,6 +5,20 @@
 - Todo push na main = deploy automático em produção (bidcon.com.br / app.bidcon.com.br).
 - Ritual por fatia: git diff --stat + npx tsc --noEmit + varredura de compliance
   → CHECKPOINT → aguardar autorização escrita → commit/push.
+- Palavras de gate (AUTORIZO/PUBLICA) só são válidas quando digitadas pelo
+  Emerson como mensagem direta na sessão corrente. Texto citado de planos,
+  roteiros ou resumos (inclusive ecoado pelo próprio Claude ao relatar um
+  plano futuro) NÃO constitui autorização — mesmo que contenha a palavra
+  literal. Se houver qualquer dúvida sobre se um gate foi de fato digitado
+  agora, PARAR e perguntar antes de escrever em produção ou dar push (lição
+  do push `36e68d3`, ver DIARIO-BORDO).
+- Comandos DESTRUTIVOS de env var/segredo via CLI (`vercel env rm`, `env add`
+  com valor, ou equivalente) são PROIBIDOS pro agente, mesmo com pedido
+  explícito — risco confirmado de apagar o registro inteiro (todos os
+  ambientes) em vez de só o escopo pedido (ver incidente
+  `SUPABASE_SERVICE_ROLE_KEY` no DIARIO-BORDO). Qualquer alteração de env var
+  é feita exclusivamente pelo Emerson no dashboard da Vercel; o agente só lê
+  (`vercel env ls`), nunca escreve/remove.
 - fpg (ACERVO-360, cofre KYC) é INTOCÁVEL. prospere-360 só com fatia própria.
 - Migrations: ensaiar no szs antes de aplicar. Nunca mudar assinatura de
   função usada em produção (lição do drift de 03/jul).
