@@ -35,7 +35,13 @@
 //   5) (transação/rollback fica na RPC/rota do cron, não aqui)
 // ============================================================================
 
-export type FonteMarca = "LANCE" | "CBC" | "PIFFER" | "CARTAS" | "SERVOPA";
+export type FonteMarca =
+  | "LANCE"
+  | "CBC"
+  | "PIFFER"
+  | "CARTAS"
+  | "SERVOPA"
+  | "PLAYCONTEMPLADAS";
 
 export type CotaFonte = {
   numero: number;        // id nativo da fonte (`n` na Lance, `id` nas demais) => numero_externo
@@ -71,7 +77,10 @@ const MAX_QUEDA = Number(process.env.SYNC_MAX_QUEDA ?? "0.6"); // 60%
 
 // Mapa fonte-marca -> endpoint. A Lance tem shape ligeiramente diferente (id em
 // `n`, sem entrada_parceiro); as demais compartilham o shape de cotas-extra/servopa.
-const ENDPOINTS: Record<FonteMarca, string> = {
+// Partial (não Record<FonteMarca,...>): PLAYCONTEMPLADAS não tem endpoint JSON
+// aqui (lida via HTML em lib/playcontempladas-source.ts, nunca por esta função) —
+// ver guarda defensiva em lerCotasFonte() logo abaixo.
+const ENDPOINTS: Partial<Record<FonteMarca, string>> = {
   LANCE:   "/api/cotas?admin=1",
   CBC:     "/api/cotas-extra?admin=1",
   PIFFER:  "/api/cotas-extra?admin=1",
@@ -86,8 +95,10 @@ function inteiro(bruto: unknown): number | null {
   return Math.round(n);
 }
 
-/** Normaliza o tipo do bem vindo da fonte ('imovel'|'veiculo'). */
-function tipoDe(bruto: unknown): "imovel" | "veiculo" | null {
+/** Normaliza o tipo do bem vindo da fonte ('imovel'|'veiculo'). Exportada
+ *  pra reuso em lib/playcontempladas-source.ts (mesma regra de mapeamento,
+ *  aplicada agora a texto de coluna HTML em vez de campo `t` do JSON). */
+export function tipoDe(bruto: unknown): "imovel" | "veiculo" | null {
   if (typeof bruto !== "string") return null;
   const c = bruto.trim().toLowerCase();
   if (c === "veiculo" || c === "veículo") return "veiculo";
@@ -189,7 +200,14 @@ export async function lerCotasFonte(
   origem: FonteMarca,
   contagemAnterior: number
 ): Promise<Leitura> {
-  const url = BASE + ENDPOINTS[origem];
+  const endpoint = ENDPOINTS[origem];
+  if (!endpoint) {
+    // defensivo: nunca deve acontecer em uso normal (route.ts desvia
+    // PLAYCONTEMPLADAS pro leitor de HTML antes de chegar aqui) — mas se
+    // chegar, falha como fonte inválida em vez de montar uma URL quebrada.
+    return { ok: false, origem, motivo: "sem_endpoint_json_configurado" };
+  }
+  const url = BASE + endpoint;
 
   let resp: Response;
   const ctrl = new AbortController();
@@ -258,4 +276,18 @@ export async function lerCotasFonte(
 // não o sync automático. FonteMarca, ENDPOINTS.SERVOPA e o parsing em
 // parsearEnvelope() ficam intactos/dormentes — reversível com uma linha se
 // a parceria voltar a ser técnica.
-export const FONTES: FonteMarca[] = ["LANCE", "CBC", "PIFFER", "CARTAS"];
+//
+// PLAYCONTEMPLADAS entra DIRETO na rotação (PLAYCONTEMPLADAS-01, 2026-07):
+// diferente da SERVOPA, o problema que a aposentou (timeout de lote único)
+// já foi resolvido antes desta fonte existir — app/api/sync-cotas/route.ts
+// aplica em lotes de 100 (fatia 0027) desde então. Fonte lida via HTML
+// (lib/playcontempladas-source.ts), não pelo lerCotasFonte/ENDPOINTS
+// genérico daqui (que é JSON-only) — ver escolha de leitor por origem no
+// próprio route.ts.
+export const FONTES: FonteMarca[] = [
+  "LANCE",
+  "CBC",
+  "PIFFER",
+  "CARTAS",
+  "PLAYCONTEMPLADAS",
+];

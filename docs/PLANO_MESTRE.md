@@ -191,6 +191,48 @@ ativas (`/api/atende`, `/api/mcp`, `/api/sync-cotas`, `/api/admin/*`) via
 Migration 0046 aguarda **AUTORIZO** antes de aplicar em produção; push
 aguarda **PUBLICA WHATSAPP-01-F1**.
 
+**PLAYCONTEMPLADAS-01 — nova fonte de cotas via HTML (migration 0053):**
+`playcontempladas.com.br` entra como mais uma fonte de sync automático
+(parceria/contato confirmado pelo Emerson), seguindo "mesma regra dos
+outros" pedido. Diferente das fontes existentes (LANCE/CBC/PIFFER/CARTAS/
+SERVOPA), que leem um envelope JSON já normalizado do `prospere-360`, o
+site do parceiro não tem API/JSON — é server-renderizado, com a tabela
+inteira de cotas (imóveis + veículos) embutida em duas
+`<table style="display:none;">` no HTML da home. Leitor dedicado
+`platform/lib/playcontempladas-source.ts` (fetch + regex parse, sem
+dependência nova de scraping) implementa as mesmas 5 guardas de
+`lib/cotas-source.ts` adaptadas pra HTML: HTTP≠200, timeout, parse vazio/
+formato mudou, e sanidade de volume com piso **próprio**
+(`PLAYCONTEMPLADAS_MIN_COTAS`, default 200 — o `SYNC_MIN_COTAS=5` genérico
+é fraco demais pra uma fonte que tem ~980 itens normalmente). Achados da
+investigação: cada linha aparece **2x no HTML** (artefato do template,
+confirmado por comparação byte-a-byte) → dedupe por `numero`; **981 cotas
+distintas** (563 imóveis + 418 veículos), sem colisão de `Cód. Cota` entre
+os dois tipos; **29 administradoras distintas num único feed** — a
+resolução por linha via `resolver_administradora()`/`aliases[]` (já usada
+por **todas** as fontes de sync, não só pelo importador do `/admin`) dá
+conta sem nenhuma mudança nela, só 6 aliases novos pras que não batiam
+direto (migration 0053: BB Consórcios→Banco do Brasil, "Caixa"+"CNP
+Consórcio"→CNP (Caixa) [fusão confirmada — mesma administradora,
+denominação informal no site], Itaú Motos→Itaú, Porto VP→Porto Seguro,
+Racon Consórcios→Racon, Unicoob (Sicoob)→Unicoob). **Único ajuste
+estrutural no banco:** as RPCs `sync_aplicar_cotas`/`sync_varrer_ausentes`
+travavam a origem numa lista fixa (`'LANCE','CBC','PIFFER','CARTAS',
+'SERVOPA'`) — migration 0053 amplia as duas pra incluir
+`'PLAYCONTEMPLADAS'` (corpo idêntico ao existente hoje, só o IN-list
+muda). **Compliance §1.3 aplicado aqui dentro** (diferente das outras
+fontes, onde o cálculo já vem pronto do `prospere-360`): entrada exibida
+ao cliente = entrada crua do parceiro + 7% do valor de crédito
+(`entrada_parceiro_raw` guarda o valor cru, admin-only, nunca exposto).
+**Decisão de negócio do Emerson (cadência):** diferente da SERVOPA — cujo
+timeout de lote único foi a causa raiz da aposentadoria (SYNC-SERVOPA-01
+acima) — PLAYCONTEMPLADAS entra **direto na rotação automática horária**
+(`FONTES` em `cotas-source.ts`) desde o início, porque o problema que
+aposentou a SERVOPA já estava resolvido antes desta fonte existir: o lote
+de 100 (`TAMANHO_LOTE`, fatia 0027) em `app/api/sync-cotas/route.ts` cobre
+o volume de ~980 itens sem estourar o teto do gateway. Migration 0053
+aguarda **AUTORIZO**; push aguarda **PUBLICA PLAYCONTEMPLADAS-01**.
+
 ---
 
 ## 5. Cascata (ordem de migrations e deploy)
@@ -283,3 +325,4 @@ por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 2026-07-12 · WhatsApp oficial de volta a 5511973202967 (bloqueio resolvido, número aprovado pelo WhatsApp Business) — reversão nos mesmos 16 arquivos; linhas de log anteriores (07-11 e a de hoje acima) mantidas como registro histórico, não alteradas
 2026-07-12 · Novo bloqueio no 5511973202967 — WhatsApp oficial trocado de volta pra 5519997561909, mesmos 16 arquivos (site + plataforma); linhas de log anteriores mantidas como registro histórico, não alteradas
 2026-07-12 · WHATSAPP-01 fix: 401 na validação de X-Hub-Signature-256 — comparação HMAC refeita byte-a-byte (hex sem prefixo sha256=) + log temporário do motivo da rejeição (sem segredo/corpo) pra diagnosticar em produção; Fatia 4 (LGPD) junto: quick reply "Não quero receber" do carrossel marca wa_conversas.opt_out=true — ver platform/app/api/whatsapp/route.ts. PUBLICA condicionado a confirmação do Emerson
+2026-07-17 · PLAYCONTEMPLADAS-01 (migration 0053, aguarda AUTORIZO) — novo fornecedor/vitrine playcontempladas.com.br entra na rotação automática de sync: leitor dedicado lib/playcontempladas-source.ts (HTML, sem JSON do parceiro), 981 cotas / 29 administradoras (27 batem direto, 6 aliases novos), RPCs sync_aplicar_cotas/sync_varrer_ausentes ampliadas pra aceitar a origem, entrada = cru do parceiro + 7% do crédito (compliance §1.3, calculado aqui dentro por não haver camada intermediária) — ver §4

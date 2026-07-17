@@ -1,10 +1,13 @@
 // ============================================================================
 // Cron de sync de cotas — roda 1x/hora (Vercel Cron). Server-only.
 // ----------------------------------------------------------------------------
-// MULTI-FONTE em LOTES: consome LANCE + CBC + PIFFER + CARTAS + SERVOPA do
-// feed do prospere-360 (lib/cotas-source), cada fonte lida e aplicada
-// SEPARADAMENTE, e cada fonte aplicada em LOTES de 100 cotas (fatia 0027):
-// chamadas curtas na RPC nunca estouram o teto HTTP do gateway (~60s).
+// MULTI-FONTE em LOTES: consome LANCE + CBC + PIFFER + CARTAS do feed do
+// prospere-360 (lib/cotas-source) + PLAYCONTEMPLADAS direto do HTML do
+// parceiro (lib/playcontempladas-source, PLAYCONTEMPLADAS-01) — cada fonte
+// lida e aplicada SEPARADAMENTE, e cada fonte aplicada em LOTES de 100
+// cotas (fatia 0027): chamadas curtas na RPC nunca estouram o teto HTTP do
+// gateway (~60s). SERVOPA fica fora da rotação (ver nota em FONTES, no
+// próprio lib/cotas-source.ts).
 //
 // Fluxo, POR FONTE (decisão B — isolamento total entre fontes):
 //   1) autoriza (CRON_SECRET) — uma vez, ninguém dispara isto de fora;
@@ -32,6 +35,7 @@
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { lerCotasFonte, FONTES, type FonteMarca } from "@/lib/cotas-source";
+import { lerCotasPlaycontempladas } from "@/lib/playcontempladas-source";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -101,7 +105,13 @@ export async function GET(req: Request) {
       // (3) as 5 guardas, só desta fonte. Guarda que barra => 'sync_pulado'
       // (fatia 0027: tipo dedicado e filtrável; 'sync_abortado' fica reservado
       // pra falha de contagem/RPC/lote/exceção).
-      const leitura = await lerCotasFonte(origem, contagemAnterior);
+      // PLAYCONTEMPLADAS-01: fonte lida via HTML (site do parceiro não tem
+      // JSON), leitor dedicado — resto do fluxo (lote/varredura/eventos)
+      // idêntico às demais.
+      const leitura =
+        origem === "PLAYCONTEMPLADAS"
+          ? await lerCotasPlaycontempladas(contagemAnterior)
+          : await lerCotasFonte(origem, contagemAnterior);
       if (!leitura.ok) {
         try {
           await db.from("eventos_sync").insert({
