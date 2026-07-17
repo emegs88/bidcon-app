@@ -62,6 +62,20 @@ como mensagem direta na sessão corrente; texto citado de planos/roteiros
 pendência aberta desta fatia até ser executado e riscado por um humano em
 produção (recriar cliente/processo de teste, testar, limpar counts=0).
 
+**Atualização — item (a) falhou no primeiro teste real**: Emerson gerou o
+link pelo admin e recebeu "Cliente sem e-mail cadastrado", apesar do dado
+estar correto no banco (confirmado via SQL). Investigação encontrou a causa
+raiz: a rota tratava qualquer falha de `auth.admin.getUserById()` com a
+mesma mensagem genérica de "sem e-mail", sem logar nada — impossível saber
+se era API fora do ar, chave inválida ou e-mail mesmo ausente. Reteste
+confirmou o comportamento **determinístico** (mesma mensagem, mesmo deploy
+sem o fix ainda aplicado) — descarta a hipótese de instabilidade transitória
+do incidente da service_role key; é bug de tratamento de erro na rota, não
+efeito colateral do incidente anterior. Fix (fallback pra `profiles.email` +
+log estruturado do erro cru + mensagens distintas por causa) commitado em
+`1796e50`, publicado nesta sessão. Item (a)/(d) segue pendente de reteste
+humano contra o deploy com o fix.
+
 ## 2026-07 — Incidente: `vercel env rm` apagou `SUPABASE_SERVICE_ROLE_KEY` inteira (fatia PORTAL-01)
 
 **O que aconteceu**: pedido de reverter só o escopo Preview da
