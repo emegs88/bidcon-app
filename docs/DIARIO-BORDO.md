@@ -161,3 +161,70 @@ volume atual, mas não escala.
 uma carta específica do catálogo xtv pro operacional nnv quando um cliente
 fecha negócio nela (ou automatiza via RPC cross-project, se viável). Não
 iniciado; fora do escopo do PORTAL-01.
+
+## 2026-07 — VITRINE-EXCLUSIVA-01: plano fechado (implementação aguarda PORTAL-01 encerrado)
+
+**Pré-requisito explícito da fatia**: só implementa depois de PORTAL-01
+encerrado (deploy do fix + QA a/d + limpeza). Esta seção registra o plano
+aprovado — nenhum código desta fatia foi tocado ainda.
+
+**Achado de arquitetura**: a "vitrine pública" real (a que aparece pro
+lead anônimo, com banner "Carta em destaque hoje" e filtro por
+administradora) é `public/index.html` — um site estático vanilla-JS,
+deploy separado do app Next.js (`vercel.json` da raiz, `outputDirectory:
+"public"`, domínio `bidcon.com.br`). Não é a mesma coisa que
+`platform/app/cartas` (portal do cliente logado, Next.js, domínio
+`app.bidcon.com.br`). A fatia mexe nos dois lados: backend
+(`platform/app/api/vitrine/route.ts`) e o front estático
+(`public/index.html`).
+
+**Decisões de implementação (aprovadas)**:
+1. Backend: `route.ts` passa a expor `fonte`/`exclusiva` no payload de
+   `cotas` (já existem em `vw_vitrine_viva`, só não eram repassados) +
+   `.order("exclusiva", {ascending:false})` como primeira chave.
+2. Pin de verdade: como `renderMarket()` em `index.html` refaz o `sort()`
+   no cliente toda vez que o dropdown de ordenação muda (sobrescrevendo
+   qualquer ordem vinda da API), o comparator do JS também precisa tratar
+   `exclusiva` como 1ª chave — não basta mudar só o backend.
+3. Filtro > pin já sai de graça: `filtrar()` roda antes do sort em
+   `renderMarket()`, então filtro de administradora/tipo/faixa já exclui a
+   exclusiva do resultado antes do pin valer.
+4. Banner "Carta em destaque hoje" (`bcAtualizaDestaque()`): candidatas
+   exclusivas = **todo `exclusiva===true` disponível, sem exigir
+   `agio150>0`** (o funil de ágio+seed diário só vale no caminho sem
+   exclusiva). Texto de ágio no banner vira condicional
+   (`a.agio150>0 ? "... abaixo do teto Bidcon Price" : ""`) pra não
+   quebrar com "R$ undefined" numa exclusiva sem ágio calculado ainda.
+   Verificado no dado real: a carta de referência `83f8af16-...` hoje TEM
+   ágio preenchido (agio_120=14.700, agio_150=20.800) — não é o caso atual,
+   mas a regra fica defensiva pra exclusivas futuras cadastradas manualmente
+   antes do cálculo de teto rodar. Nome da administradora entra no template
+   do banner (ADENDO) — campo já existe em `a.adm`, sem mudança de backend.
+5. Fallbacks (Edge Function nível 2 + `/api/cotas-extra`): **não dá** pra
+   propagar `exclusiva` neles — `lib/cotas-source.ts` não tem esse conceito
+   (só concorrentes externos) e `/api/cotas-extra` nem existe neste repo
+   (é o app externo `360prospere.vercel.app`). Decisão: front tolerante
+   (`a.exclusiva` undefined tratado como `false`) — pin e badge somem
+   silenciosamente só quando o fallback dispara (isto é, quando
+   `/api/vitrine` falhou). Limitação conhecida e aceita, não bug.
+6. CSS: `--bc-grad` em `bidcon-brand.css` já é exatamente
+   `#8FB7FF→#36C5F0→#1E6FE6` (cores do spec), e `.bc-card:hover` já usa
+   `var(--bc-grad-mid)` num box-shadow de anel — vira a base do anel
+   permanente da exclusiva (hoje só existe no hover).
+
+**Fora de escopo — decisão explícita**: `public/bidcon.html` (página
+duplicada, canonical `bidcon.com.br/bidcon`) fica **fora** da
+VITRINE-EXCLUSIVA-01. Motivo: é uma cópia mais antiga com `renderMarket()`
+próprio, busca dados de `/api/cotas` + `/api/cotas-extra` (não de
+`/api/vitrine`/`vw_vitrine_viva`) e nem tem a função do banner de destaque
+— não teria como saber o que é exclusiva sem reescrever o pipeline de dados
+dela inteiro. Pin/badge/banner da VITRINE-EXCLUSIVA-01 valem só pra
+`index.html` (vitrine principal).
+
+**Dívida registrada — proposta `HIGIENE-01` (futura, não iniciada)**:
+`public/bidcon.html` é essencialmente uma duplicata desatualizada de
+`public/index.html`, com pipeline de dados divergente. Antes de decidir o
+destino dela (redirect 301 `/bidcon` → `/`, ou aposentar de vez), checar no
+Search Console se há tráfego orgânico ou backlinks relevantes apontando
+pra essa URL — não mexer sem esse dado. Não faz parte de nenhuma fatia em
+andamento.
