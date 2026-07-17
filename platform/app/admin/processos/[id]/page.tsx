@@ -88,8 +88,15 @@ export default async function AdminProcessoDetalhe({
     { data: contratosRows },
   ] = await Promise.all([
     ids.length
-      ? supabase.from("profiles").select("id, nome, email").in("id", ids)
-      : Promise.resolve({ data: [] as { id: string; nome: string | null; email: string | null }[] }),
+      ? supabase.from("profiles").select("id, nome, email, telefone").in("id", ids)
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            nome: string | null;
+            email: string | null;
+            telefone: string | null;
+          }[],
+        }),
     processo.carta_id
       ? supabase
           .from("cartas")
@@ -384,6 +391,7 @@ export default async function AdminProcessoDetalhe({
             sinalPago={sinalPago}
             temContratoServico={Boolean(contratoServico)}
             temContratoCota={Boolean(contratoCota)}
+            clienteTelefone={cliente?.telefone ?? null}
           />
         </Card>
 

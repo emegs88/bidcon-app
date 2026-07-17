@@ -6,14 +6,35 @@
 - Ritual por fatia: git diff --stat + npx tsc --noEmit + varredura de compliance
   → CHECKPOINT → aguardar autorização escrita → commit/push.
 - fpg (ACERVO-360, cofre KYC) é INTOCÁVEL. prospere-360 só com fatia própria.
-- Migrations: ensaiar no szs antes do xtv. Nunca mudar assinatura de função
-  usada em produção (lição do drift de 03/jul).
+- Migrations: ensaiar no szs antes de aplicar. Nunca mudar assinatura de
+  função usada em produção (lição do drift de 03/jul).
+- Dois bancos de produção com histórico de migration SEPARADO (ver mapa
+  abaixo) — migration do xtv vai em `platform/supabase/migrations/`,
+  migration do nnv vai em `platform/supabase/migrations-nnv/`. Nunca
+  presumir que os dois estão sincronizados; conferir schema real
+  (information_schema) antes de portar SQL de um pro outro.
 
-## Ambientes Supabase
-- xtv xtvjpnyadcdeadhmzyff = PROD vitrine (cartas, sync, Bidcon Price)
-- nnv nnvjeijsrwpzsggwqpcu = PROD app logado (auth)
-- szs szsqdpwwxtmrtrhaikuh = ensaio
-- fpg = ACERVO-360: read-only, NUNCA tocar
+## Ambientes Supabase (mapa canônico — 4 projetos)
+- **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
+  do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
+  atendimento via WhatsApp). Alimenta `/api/vitrine` e `/api/atende` via
+  `createXtvClient()` (service_role). Migrations em
+  `platform/supabase/migrations/` (numeração própria, hoje até 0054).
+- **nnv** `nnvjeijsrwpzsggwqpcu` = PROD **app logado / auth real**
+  (auth.users, profiles, processos, `cartas` operacional — tabela menor e
+  curada, não o catálogo full do xtv —, reservas, contratos,
+  pagamentos_sinal, checklist, KYC). Usado por `createClient()`
+  (`lib/supabase-server.ts`, RLS/cookie) em `/meu-processo`, `/cartas`,
+  `/admin/processos`, `/auth/*`. Migrations em
+  `platform/supabase/migrations-nnv/` (numeração própria, hoje até 0019).
+  **Gap de produto conhecido**: não existe pipeline automático que leve
+  uma carta do catálogo xtv pro `nnv.cartas` — hoje é inserção manual (ver
+  DIARIO-BORDO, fatia futura PONTE-01).
+- **szs** `szsqdpwwxtmrtrhaikuh` = staging **do nnv** (schema espelha nnv,
+  não xtv — não tem `vw_vitrine_viva`/`carta_fingerprint`, que são só do
+  xtv). Ensaiar aqui migrations destinadas ao nnv.
+- **prospere-360-dev** `fpgimirtiryivnrjdyxb` (ACERVO-360, cofre KYC) =
+  **INTOCÁVEL**, read-only. prospere-360 só com fatia própria.
 
 ## Regras de negócio canônicas
 - Comissão 7% do crédito somada à entrada (exceto LANCE: já embutida na origem).

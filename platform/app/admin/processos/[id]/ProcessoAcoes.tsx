@@ -6,6 +6,7 @@
 //   - confirmar sinal (fallback manual)    → /api/admin/processo/[id]/sinal
 //   - gerar contrato (serviço/cota)        → /api/admin/processo/[id]/contrato
 //   - avançar sub-etapa (fluxo Lance)      → /api/admin/processo/[id]/subetapa
+//   - gerar magic link de acesso           → /api/admin/processos/[id]/gerar-acesso
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +19,7 @@ import {
   type SubetapaProcesso,
   type StatusDocumento,
 } from "@/lib/status";
+import { linkWhatsApp } from "@/lib/format";
 import styles from "./acoes.module.css";
 
 type DocResumo = {
@@ -35,6 +37,7 @@ export function ProcessoAcoes({
   sinalPago,
   temContratoServico,
   temContratoCota,
+  clienteTelefone,
 }: {
   processoId: string;
   atual: StatusProcesso;
@@ -44,10 +47,13 @@ export function ProcessoAcoes({
   sinalPago: boolean;
   temContratoServico: boolean;
   temContratoCota: boolean;
+  clienteTelefone?: string | null;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const terminal = atual === "concluido" || atual === "cancelado";
   const idx = ORDEM_STATUS.indexOf(atual);
@@ -88,18 +94,107 @@ export function ProcessoAcoes({
     }
   }
 
-  if (terminal) {
-    return (
-      <p className={styles.terminal}>
-        Este processo está em estado final e não pode mais ser alterado.
-      </p>
-    );
+  // Gera o magic link — handler à parte de `acao()` porque precisa capturar
+  // o link retornado (não só refresh). Fica disponível mesmo com o processo
+  // em estado final: reenviar acesso ao cliente não deve depender do status.
+  async function gerarAcesso() {
+    if (enviando) return;
+    setEnviando("acesso");
+    setErro(null);
+    setLink(null);
+    setCopiado(false);
+    try {
+      const res = await fetch(
+        `/api/admin/processos/${processoId}/gerar-acesso`,
+        { method: "POST" },
+      );
+      const j = (await res.json().catch(() => ({}))) as {
+        link?: string;
+        erro?: string;
+      };
+      if (!res.ok || !j.link) {
+        throw new Error(j.erro ?? "Falha ao gerar link.");
+      }
+      setLink(j.link);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao gerar link.");
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  async function copiarLink() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // clipboard indisponível (ex.: contexto não seguro) — o campo readOnly
+      // abaixo já permite selecionar e copiar manualmente.
+    }
   }
 
   const ocupado = enviando !== null;
 
+  const acesso = (
+    <div className={styles.grupo}>
+      <span className={styles.grupoLbl}>Acesso do cliente</span>
+      <div className={styles.botoes} role="group" aria-label="Gerar acesso do cliente">
+        <Button size="sm" variant="ghost" disabled={ocupado} onClick={gerarAcesso}>
+          {enviando === "acesso" ? "Gerando…" : "Gerar link de acesso"}
+        </Button>
+      </div>
+      {link && (
+        <div className={styles.linkBox}>
+          <input
+            className={styles.linkInput}
+            readOnly
+            value={link}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div className={styles.botoes}>
+            <Button size="sm" variant="ghost" onClick={copiarLink}>
+              {copiado ? "Copiado!" : "Copiar link"}
+            </Button>
+            {clienteTelefone && (
+              <Button
+                size="sm"
+                variant="ghost"
+                href={linkWhatsApp(
+                  clienteTelefone.replace(/\D/g, ""),
+                  `Olá! Aqui está seu link de acesso ao portal Bidcon: ${link}`,
+                )}
+              >
+                Enviar por WhatsApp
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (terminal) {
+    return (
+      <div className={styles.wrap}>
+        {acesso}
+        <p className={styles.terminal}>
+          Este processo está em estado final e não pode mais ser alterado.
+        </p>
+        {erro && (
+          <p className={styles.erro} role="alert">
+            {erro}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrap}>
+      {acesso}
+
       {/* 1) Status de topo (régua dos 5 estados) */}
       <div className={styles.botoes} role="group" aria-label="Avançar status">
         {proximo && (

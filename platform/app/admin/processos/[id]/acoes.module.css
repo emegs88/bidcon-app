@@ -42,3 +42,20 @@
   color: var(--text);
   font-size: 14px;
 }
+
+/* Caixa do link de acesso gerado (magic link) */
+.linkBox {
+  display: grid;
+  gap: 8px;
+}
+.linkInput {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
