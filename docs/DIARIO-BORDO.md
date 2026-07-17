@@ -76,6 +76,42 @@ log estruturado do erro cru + mensagens distintas por causa) commitado em
 `1796e50`, publicado nesta sessão. Item (a)/(d) segue pendente de reteste
 humano contra o deploy com o fix.
 
+**Diagnóstico fechado — causa raiz confirmada por teste A/B + logs de servidor**:
+o usuário de teste (`99999999-...`) foi criado via SQL direto em vez do fluxo
+normal de signup, e nasceu com `confirmation_token`, `recovery_token`,
+`email_change`, `email_change_token_new` em **NULL** — GoTrue quebra ao
+tentar tratar esses campos como string quando estão NULL (bug conhecido:
+"converting NULL to string is unsupported"), fazendo `auth.admin
+.getUserById()` falhar mesmo com o e-mail correto no banco, e a rota (antes
+do fix) reportava isso como "Cliente sem e-mail cadastrado" — mensagem
+genérica errada pra causa real.
+
+Teste A/B: `UPDATE auth.users SET confirmation_token='', recovery_token='',
+email_change='', email_change_token_new='' WHERE id='99999999-...'` (mesmo
+registro, nada mais mudou) — reteste do Emerson no mesmo deploy do fix
+confirmou via logs do GoTrue (nnv, service `auth`):
+
+- `17:04` e `17:12` UTC — `GET /admin/users/99999999-...` → `200` e
+  `POST /admin/generate_link` → `200`. Link gerado com sucesso.
+- `17:17:49` UTC — `GET /verify` → `303` seguido de login
+  (`login_method=implicit`, referer `/auth/callback?next=/meu-processo`) em
+  perfil de navegador sem sessão admin (cookie jar separado — equivalente
+  funcional de aba anônima). Sessão criada, item (item 2 do roteiro,
+  "sessão anônima") **passou**.
+
+Confirma a hipótese: o fallback de `profiles.email` (fix `1796e50`) é
+proteção extra útil pra clientes legados com Auth incompleto, mas a causa
+raiz deste incidente específico era os tokens NULL, não a ausência de
+e-mail em si. Nota de operação: `generate_link` loga no GoTrue como evento
+`user_recovery_requested` — é o nome interno do GoTrue pra esse tipo de
+link administrativo (magic link via admin API), não indica fluxo de
+recuperação de senha; comportamento normal, registrado aqui pra ninguém
+estranhar ao ler os logs depois.
+
+**Falta só**: item (d) do roteiro — reabrir o mesmo link já usado e conferir
+a tela de reenvio/expiração — com o Emerson. Depois, limpeza de dados de
+teste (`counts=0`) fecha a fatia PORTAL-01.
+
 ## 2026-07 — Incidente: `vercel env rm` apagou `SUPABASE_SERVICE_ROLE_KEY` inteira (fatia PORTAL-01)
 
 **O que aconteceu**: pedido de reverter só o escopo Preview da
