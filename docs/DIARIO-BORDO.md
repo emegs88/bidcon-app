@@ -303,3 +303,60 @@ destino dela (redirect 301 `/bidcon` → `/`, ou aposentar de vez), checar no
 Search Console se há tráfego orgânico ou backlinks relevantes apontando
 pra essa URL — não mexer sem esse dado. Não faz parte de nenhuma fatia em
 andamento.
+
+## 2026-07 — VITRINE-EXCLUSIVA-01 ENTREGUE
+
+Implementação liberada após "PORTAL-01 encerrado". Visual (descrição do
+card exclusiva + banner) aprovado pelo usuário antes do commit. Regra de
+desempate confirmada no código antes do commit: entre múltiplas
+exclusivas, `bcAtualizaDestaque()` escolhe a de **menor `custo_am`**
+(`exclusivas.sort((a,b)=>(a.custo??Infinity)-(b.custo??Infinity))[0]`) —
+hoje só existe uma exclusiva, mas a regra já nasce certa pra quando a
+segunda carta `cliente_direto` entrar.
+
+**Commit**: `2c45ef9` "feat(vitrine-exclusiva-01): pin, badge e banner pra
+cartas cliente_direto" — `platform/app/api/vitrine/route.ts`,
+`public/index.html`, `public/bidcon-brand.css`.
+
+**Desvio de rota durante o PUBLICA**: o push inicial (commit local
+`f8e59ee`) foi rejeitado — o `bidcon-bot` publicou
+`7eb54aa "chore(vitrine): snapshot automático do estoque"` direto no
+`main` às 17:08 UTC, durante a janela entre o commit local e o pedido de
+PUBLICA. Esse é exatamente o risco de auto-deploy do bot já registrado
+como dívida em sessão anterior (`fix(portal-01)`, commit `1796e50`) —
+aconteceu na prática pela primeira vez aqui. Verificação antes de
+resolver: `git show --stat 7eb54aa` mostrou que o commit do bot só toca
+o bloco SSR estático de `index.html` (linhas ~39–370, snapshot de dados
+pra SEO/schema.org), sem nenhuma sobreposição com o `<script>` onde
+ficam `bcAtualizaDestaque()`/`renderMarket()` (linha 1306+). Rebase
+(`git pull --rebase origin main`) aplicado sem conflitos, `tsc --noEmit`
+revalidado limpo depois do rebase, push então liberado como
+`7eb54aa..2c45ef9 main -> main`. Nenhum dado de estoque foi perdido —
+o snapshot do bot ficou como base, meu commit foi reaplicado por cima.
+Continua valendo a recomendação de uma fatia de higiene futura pra dar
+ao bot uma janela de exclusão mútua com deploys manuais (ex.: lock file,
+ou rodar só fora do horário de trabalho) — não bloqueou a entrega desta
+vez porque a mudança dele não colidiu por sorte de área de código, mas
+o próximo push pode não ter essa sorte.
+
+**Verificação pós-deploy** (dados reais, ao vivo, contra a carta
+`83f8af16-9fbf-41e3-81be-ff0a8dd45692` — única `exclusiva=true` hoje,
+`adm="CNP (Caixa)"`, `credito=136.069,72`, `agio150=20.800`):
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Maior crédito em 1º (mesmo não sendo o maior crédito bruto do dataset — R$1.861.100 é o 1º orgânico) | PASSA |
+| 2 | Filtro administradora "CNP (Caixa)" mostra a carta | PASSA |
+| 3 | Filtro administradora "Porto Seguro" oculta a carta | PASSA |
+| 4 | Banner exibe a carta com nome da administradora | PASSA |
+
+Confirmado também: `/api/vitrine` expõe `fonte`/`exclusiva` no ar; HTML e
+CSS estáticos publicados (`www.bidcon.com.br`) contêm `bc-exclusiva` /
+`bc-selo-exclusiva` / `mask-composite`.
+
+**Status**: VITRINE-EXCLUSIVA-01 fechada e entregue. Dívidas que
+continuam em aberto, nenhuma bloqueante: risco de auto-deploy do bot
+(agora com um incidente real registrado, reforça a prioridade de uma
+fatia de higiene futura), `UX-01` (mensagem de link expirado),
+`PONTE-01` (promoção xtv→nnv), `HIGIENE-01` (redirect de
+`public/bidcon.html`, pendente checagem de Search Console).
