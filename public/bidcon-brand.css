@@ -128,6 +128,41 @@
   box-shadow: 0 0 0 1px var(--bc-grad-mid), 0 12px 28px rgba(10, 14, 26, .28);
 }
 
+/* --- VITRINE-EXCLUSIVA-01: anel de gradiente PERMANENTE (não só hover) pra
+   cartas cliente_direto. Técnica de máscara (não border-image, mesmo motivo
+   do comentário acima) — desenha só o anel de 2px, sem cobrir o fundo do
+   card nem precisar saber a cor dele. Soma ao hover normal, não substitui. */
+.bc-card.bc-exclusiva::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--bc-grad);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* --- selo "✓ Exclusiva Bidcon" — mesma família visual dos selos de
+   crédito/ágio, mas com o gradiente de marca (mesmo idioma do .bc-chip.on).
+   Sempre soma ao Bidcon Price/Custo excelente, nunca substitui. */
+.bc-selo-exclusiva {
+  display: inline-block;
+  margin-top: 6px;
+  margin-right: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', var(--f-mono, monospace);
+  letter-spacing: .01em;
+  background: var(--bc-grad);
+  color: var(--bc-navy);
+}
+
 @keyframes bc-fade-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

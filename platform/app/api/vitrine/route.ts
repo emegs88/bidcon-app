@@ -24,6 +24,13 @@
 //
 // COMPLIANCE (CLAUDE.md): nunca data de contemplação; custo/TIR é o custo do
 // crédito para o comprador (referência), não retorno/rendimento.
+//
+// VITRINE-EXCLUSIVA-01: expõe `fonte`/`exclusiva` (já calculados na view,
+// `exclusiva = fonte = 'cliente_direto'`) e ordena por `exclusiva` como
+// primeira chave. Isso só decide a ordem ANTES do primeiro re-sort no
+// cliente — o pin de verdade (que sobrevive a qualquer ordenação escolhida
+// pelo usuário) é aplicado no comparator do `renderMarket()` em
+// public/index.html, não aqui. Ver DIARIO-BORDO.
 // ============================================================================
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
@@ -49,6 +56,8 @@ type LinhaCarta = {
   agio_120: number | null;
   agio_150: number | null;
   administradora: string | null;
+  fonte: string | null;
+  exclusiva: boolean | null;
 };
 
 // Preflight CORS (bidcon.com.br chamando app.bidcon.com.br).
@@ -79,13 +88,16 @@ export async function GET(req: Request) {
     const supabase = createXtvClient();
 
     const campos =
-      "ref,tipo,credito,entrada,parcela,parcelas,custo_am,agio_120,agio_150,administradora";
+      "ref,tipo,credito,entrada,parcela,parcelas,custo_am,agio_120,agio_150,administradora,fonte,exclusiva";
 
     // O gateway do Supabase corta em 1000 linhas por resposta mesmo com
     // .limit() maior — pagina via .range() até esgotar ou bater o teto de
     // segurança (5 páginas = 5000 linhas). .order(agio_150, custo_am) não é
     // única, então soma-se .order("id") como tiebreaker estável — sem ele,
     // o .range() pode pular ou duplicar linhas empatadas entre páginas.
+    // .order("exclusiva") entra como 1ª chave (VITRINE-EXCLUSIVA-01) — só
+    // define a ordem inicial do payload; o pin que sobrevive a qualquer
+    // ordenação escolhida pelo usuário é feito no cliente (renderMarket()).
     const POR_PAGINA = 1000;
     const MAX_PAGINAS = 5;
 
@@ -96,6 +108,7 @@ export async function GET(req: Request) {
         const { data, error } = await supabase
           .from("vw_vitrine_viva")
           .select(campos)
+          .order("exclusiva", { ascending: false })
           .order("agio_150", { ascending: false })
           .order("custo_am", { ascending: true })
           .order("id", { ascending: true })
@@ -141,6 +154,8 @@ export async function GET(req: Request) {
       custo: c.custo_am,
       agio150: c.agio_150,
       agio120: c.agio_120,
+      fonte: c.fonte,
+      exclusiva: !!c.exclusiva,
     }));
 
     return NextResponse.json(
