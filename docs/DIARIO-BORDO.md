@@ -360,3 +360,112 @@ continuam em aberto, nenhuma bloqueante: risco de auto-deploy do bot
 fatia de higiene futura), `UX-01` (mensagem de link expirado),
 `PONTE-01` (promoção xtv→nnv), `HIGIENE-01` (redirect de
 `public/bidcon.html`, pendente checagem de Search Console).
+
+## 2026-07-17 — INCIDENTE SYNC-CHURN-01: investigação fechada, fix adiado pra amanhã
+
+Disparado por observação direta do usuário: 6.558 cartas criadas hoje no
+xtv (total 9.112; estoque real ~5,6k), com PLAYCONTEMPLADAS criando 3.511
+com estoque real de só 1.429 — sinal de que o feed inteiro estava sendo
+recriado a cada rodada de sync em vez de atualizado. Investigação
+somente leitura (nenhum DDL/DML aplicado), projeto `xtvjpnyadcdeadhmzyff`.
+
+**1. Risco pra carta da Rafaela (`83f8af16-9fbf-41e3-81be-ff0a8dd45692`) —
+SEM RISCO.** Confirmado com SELECT direto: `fonte='cliente_direto'`,
+`administradora_origem='BIDCON_DIRETO'`, `numero_externo=NULL`,
+`status='disponivel'`, `sincronizada_em=NULL` (nunca tocada por sync).
+`sync_varrer_ausentes`/`sync_aplicar_cotas` têm 3 barreiras
+independentes: `WHERE fonte='360prospere'` (a carta é `cliente_direto`),
+`WHERE numero_externo IS NOT NULL` (a carta tem `NULL`), e
+`p_origem NOT IN (...)` levanta exceção pra qualquer origem fora das 6
+fontes de sync (`BIDCON_DIRETO` nem é aceito como parâmetro). Não existe
+`pg_cron` dentro do Postgres (extensão não instalada) — o "cron" é
+Vercel Cron externo (`platform/vercel.json`, `/api/sync-cotas` de hora em
+hora), que só chama essas funções com as 6 origens de sync válidas.
+Nenhuma guarda adicional necessária pra essa carta.
+
+**2. Causa raiz — autocorreção de hipótese registrada aqui de propósito**
+(pra não repetir o mesmo caminho errado numa investigação futura):
+a hipótese inicial óbvia — "scraper manda `numero_externo` vazio" — foi
+**descartada por evidência de código**: `playcontempladas-source.ts` (em
+produção desde as 08:19 de hoje) sempre exige número de cota válido antes
+de aceitar a linha, nunca manda `null`. A causa real: `sync_aplicar_cotas`
+tem uma "guarda de identidade" (migration `0047_sync_identidade_estavel`,
+16/07 19:18 UTC — véspera do incidente) que, quando a posição
+`(fonte, numero_externo)` já existe mas `tipo`/`administradora_id`/
+`crédito (Δ>50%)` mudaram, assume "número reciclado por outro bem" e
+**orfaniza a linha antiga** (`numero_externo=NULL`, `status=indisponivel`)
++ insere linha nova. Rastreado via `eventos_sync`: 2.530 orfanamentos
+hoje só no PLAYCONTEMPLADAS = exatamente o total de `numero_externo NULL`
+— match perfeito, não é bug de escrita nula.
+
+Testei se `resolver_administradora()` era não-determinística (mesma
+entrada → UUID diferente entre chamadas) — **não é**: 100% determinística,
+10 chamadas seguidas pra 4 administradoras, sempre mesmo UUID, zero
+duplicata/alias sobreposto na tabela `administradoras`. O problema está
+uma camada antes: o **texto cru da administradora que chega a cada rodada,
+pra um mesmo `numero_externo`, é literalmente diferente** (89,6% dos 5.938
+casos hoje, nas 4 fontes que têm essa guarda — PLAYCONTEMPLADAS, CBC,
+CARTAS, PIFFER). Exemplo real: número 545 era "Itaú" às 19:06 e virou
+"Santander" às 20:05. Cada `numero_externo` divergiu em média 3,4x hoje,
+cobrindo quase toda a faixa numérica do PLAYCONTEMPLADAS (2–945, 884
+valores distintos).
+
+**Hipótese fundamentada, não confirmada por leitura direta do HTML ao
+vivo do parceiro** (fica como item 1 do escopo de amanhã): o "número da
+cota" nessas fontes provavelmente não é um ID persistente do bem, e sim
+posição/ordem de exibição numa tabela reordenada a cada carregamento —
+"linha 545" é uma posição, não uma cota específica. Consistente com **4
+fontes independentes tendo saltado no mesmo dia** (PLAYCONTEMPLADAS
+0→2.716 eventos de divergência, CBC 15→1.519 ~101x, CARTAS 127→810
+~6,4x, PIFFER 118→707 ~6x) — não é um scraper individual quebrado, é a
+guarda nova (deployada ontem à noite) reagindo a uma instabilidade que
+provavelmente já existia nesses feeds antes, só que a lógica antiga
+(pré-migration) parecia sobrescrever silenciosamente em vez de
+orfanizar+duplicar. A guarda tornou visível — e amplificou em volume de
+linhas — um problema que talvez já existisse de forma invisível.
+Efeito colateral menor (~13% ponderado, concentrado em PIFFER 55/707 e
+CBC 9/1519): texto de administradora sem `nome`/`alias` cadastrado vira
+`NULL`, também "divergente" — path secundário.
+
+**3. Estrago dimensionado:**
+
+| origem | criadas hoje | já mortas | % mortas | vida mediana |
+|---|---|---|---|---|
+| PLAYCONTEMPLADAS | 3.511 | 2.672 | 76,1% | ~2h |
+| CBC | 1.518 | 972 | 64,0% | ~2h |
+| CARTAS | 807 | 639 | 79,2% | ~1h |
+| PIFFER | 721 | 579 | 80,3% | ~1h |
+
+Total de cartas "mortas" hoje: **4.862** (nasceram e já foram marcadas
+indisponíveis no mesmo dia). Total geral bate com o relatado: `360prospere`
+9.098 (6.557 hoje) + `cliente_direto` 1 + `contempla_bens` 13 = 9.112.
+**Reservas/interesses órfãos: 0** (checado em `reservas` e
+`interesses`/`leads_inativos` — zero FK apontando pra carta morta criada
+hoje; contexto: volume de uso ainda baixo, 1 e 18 linhas no total
+respectivamente).
+
+**4. Decisão do usuário — não pausar o cron.** "Dado atualizado pro
+comprador vale mais que inchaço interno por mais um dia." Cron de sync
+(`/api/sync-cotas`, hora em hora via Vercel Cron) continua rodando como
+está. Fix vira `SYNC-CHURN-02`, primeira fatia de amanhã, prioridade
+sobre o resto da fila. Escopo pré-aprovado pelo usuário (a formalizar
+amanhã antes de codar):
+1. Confirmar por leitura do HTML vivo dos parceiros (1 fetch por fonte)
+   se `numero_externo`/"número da cota" é de fato posição de tabela.
+2. Estratégia de identidade pra fontes sem ID estável: chave por
+   fingerprint de campos ESTÁVEIS (tipo+administradora+crédito+parcelas),
+   número vira só display, não identidade.
+3. Limpeza das ~4.862 órfãs de hoje só DEPOIS do fix validado (limpar
+   antes faria a próxima rodada recriar o mesmo problema).
+4. Avaliar reduzir cadência do cron (1h → 3h) como mitigação barata,
+   dentro da mesma fatia.
+5. **Atenção de escopo extra registrada pelo usuário**: com IDs de carta
+   girando a cada ~2h, links diretos e referências de atendimento
+   (ex.: Valentina citando "carta nº X" pro cliente) quebram rápido —
+   considerar isso no desenho da identidade estável, não só resolver o
+   churn de linhas.
+
+**Status**: SYNC-CHURN-01 fechado como diagnóstico (causa raiz + estrago
+dimensionados, zero fix aplicado, zero dado perdido/corrompido, carta da
+Rafaela confirmada segura). `SYNC-CHURN-02` (fix) aberto como próxima
+fatia prioritária.
