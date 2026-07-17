@@ -58,14 +58,47 @@ export async function POST(
     );
   }
 
+  // E-mail de fallback do profile do cliente — resolvido via RLS normal do
+  // próprio admin (policy profiles_admin_all), não precisa de service_role
+  // pra isso. Usado só se o Auth não devolver e-mail (ver comentário abaixo).
+  const { data: perfilCliente } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", processo.cliente_id)
+    .maybeSingle();
+
   const admin = createAdminClient();
 
   const { data: clienteAuth, error: erroCliente } =
     await admin.auth.admin.getUserById(processo.cliente_id);
-  const email = clienteAuth?.user?.email;
-  if (erroCliente || !email) {
+
+  if (erroCliente) {
+    // Loga o erro cru do Auth pra diagnosticar rápido da próxima vez — antes
+    // disso a falha de API ficava indistinguível de "cliente sem e-mail" (ver
+    // incidente SUPABASE_SERVICE_ROLE_KEY no DIARIO-BORDO). Não expõe segredo
+    // nenhum, só o erro que o SDK devolveu.
+    console.error(
+      "[gerar-acesso] auth.admin.getUserById falhou:",
+      processo.cliente_id,
+      erroCliente
+    );
+  }
+
+  // Fallback: se o Auth não devolveu e-mail (usuário legado com Auth
+  // incompleto, por exemplo), usa profiles.email — o admin já enxerga via
+  // RLS própria (profiles_admin_all). Isso NÃO cobre o caso de a API do Auth
+  // estar fora do ar / com chave inválida: nesse cenário o generateLink logo
+  // abaixo falha do mesmo jeito, e o ganho aqui é o erro claro + log, não o
+  // fallback em si.
+  const email = clienteAuth?.user?.email || perfilCliente?.email;
+
+  if (!email) {
     return NextResponse.json(
-      { erro: "Cliente sem e-mail cadastrado." },
+      {
+        erro: erroCliente
+          ? "Falha ao consultar o Auth do cliente. Veja os logs do servidor."
+          : "Cliente sem e-mail cadastrado.",
+      },
       { status: 422 }
     );
   }
@@ -78,8 +111,14 @@ export async function POST(
   });
 
   if (error || !data.properties?.action_link) {
+    // Mesmo padrão: loga o erro cru em vez de deixar essa falha invisível.
+    console.error(
+      "[gerar-acesso] auth.admin.generateLink falhou:",
+      processo.cliente_id,
+      error
+    );
     return NextResponse.json(
-      { erro: "Não foi possível gerar o link de acesso." },
+      { erro: "Não foi possível gerar o link de acesso. Veja os logs do servidor." },
       { status: 400 }
     );
   }

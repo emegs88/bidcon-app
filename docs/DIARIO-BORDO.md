@@ -78,18 +78,50 @@ env vars no momento do build, não em runtime; o deploy vigente (`36e68d3`)
 já tinha a chave embutida e seguiu funcionando. O risco era pro **próximo**
 build/redeploy, que sairia sem a var.
 
-**Status no momento deste registro**: Emerson reportou ter restaurado a
-chave (Production only) via dashboard; conferência via `vercel env ls` /
-`vercel env ls production` (leitura, MCP/CLI) **ainda não mostra
-`SUPABASE_SERVICE_ROLE_KEY` em nenhum ambiente** — discrepância sinalizada
-de volta pro Emerson na sessão, pendente de confirmação/novo re-check antes
-de qualquer redeploy.
+**Status**: restauração confirmada. Primeira conferência (`vercel env ls` /
+`vercel env ls production`, leitura) ainda não mostrava a var — discrepância
+sinalizada de volta pro Emerson na sessão. Re-check posterior confirmou
+`SUPABASE_SERVICE_ROLE_KEY` presente, escopo **Production only** (estado
+desejado), `NEXT_PUBLIC_*` seguem em Production+Preview.
+
+Timeline de deploys de produção reconstruída via `vercel inspect --json` +
+`git log --date=iso-strict` (todos os horários em UTC): último deploy antes
+do incidente foi o do próprio push `36e68d3` (push 15:23:10, build
+15:42:19) — nenhum deploy novo aconteceu entre o `env rm` e a restauração
+(`git fetch origin main` confirma HEAD remoto ainda em `36e68d3`, sem commit
+novo). Ou seja, por essa vez nenhum build saiu com a chave ausente — mas
+isso foi timing, não proteção de processo (ver seção abaixo).
 
 **Correção de processo**: nova regra em `CLAUDE.md` — comandos destrutivos
 de env var via CLI (`env rm`, `env add` com valor) ficam PROIBIDOS pro
 agente, mesmo com pedido explícito. Alteração de env var é sempre manual,
 pelo Emerson, no dashboard da Vercel; o agente só confere por leitura
 (`env ls`).
+
+## 2026-07 — Risco: bot de snapshot da vitrine publica em produção sem gate humano
+
+**O que é**: `chore(vitrine): snapshot automático do estoque` — commit
+automático (cron `0 * * * *` em `/api/sync-cotas`, ~1-3h de cadência, 20+
+ocorrências no histórico) que dá push **direto na `main`**. A Vercel tem
+deploy automático em todo push pra `main`, então cada um desses commits vira
+deploy de produção sozinho, sem revisão humana e sem relação com a palavra
+de gate PUBLICA (que só se aplica ao fluxo humano de push manual).
+
+**Por que importa**: durante o incidente da `SUPABASE_SERVICE_ROLE_KEY`
+apagada (seção acima), a janela de ~39min sem a chave no ambiente **não**
+coincidiu com nenhum desses commits automáticos — confirmado via timeline de
+deploys. Foi sorte de timing. Se o cron tivesse disparado nesse intervalo,
+o próximo build teria saído sem a var (rotas com `createAdminClient()`
+quebrando em produção), publicado automaticamente, sem ninguém no loop pra
+segurar.
+
+**Proposta pra próxima fatia de higiene** (não iniciada, fora do escopo do
+PORTAL-01):
+- Mover os commits de snapshot pra uma branch própria sem deploy automático
+  associado (ex.: `data/vitrine-snapshots`), ou
+- Configurar `ignoreCommand` no `vercel.json` pra pular o build quando o
+  diff for só os arquivos de snapshot (se a vitrine não depender de rebuild
+  do Next.js pra refletir esses dados — precisa confirmar antes de aplicar).
 
 ## Gap de produto conhecido — PONTE-01 (não iniciado)
 
