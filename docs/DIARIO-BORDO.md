@@ -571,3 +571,68 @@ status "Em negociação" só passa a aparecer de fato quando existir um
 arquitetura de promoção xtv→nnv da `PONTE-01`, **ainda não implementada**;
 até lá, toda carta de cedente aparece como "No ar"/"Reservada"/"Vendida"
 (espelho direto do xtv), nunca "Em negociação".
+
+## 2026-07 — Ordenação por custo, filtro de crédito e Modo Junção (fatia VITRINE-BUSCA-01) — ENCERRADA
+
+Escopo: 4 pedidos na vitrine pública (`public/index.html`) — (1) remover o
+bug visual "nº null" que aparecia no banner/card quando o número da cota
+vinha nulo; (2) trocar o default de ordenação pra "Menor custo efetivo
+(TIR a.m.)" e ajustar as opções do dropdown; (3) confirmar que o filtro de
+faixa de crédito já implementado funcionava; (4) construir do zero um
+"Modo Junção" — simulador que sugere combinações de 2-3 cartas da **mesma
+administradora** cuja soma de crédito chega perto (±10%) de um valor
+desejado pelo usuário, ranqueadas por custo efetivo ponderado.
+
+**Fix nº null**: `refCota()` (client, em `public/index.html`, e a cópia
+usada em SSR/snapshot no `scripts/gerar-vitrine.mjs`) não tratava `n ==
+null` — agora retorna string vazia nesse caso, cortando o bug na raiz nos
+três pontos onde o número aparece (SSR inicial, snapshot estático, render
+client pós-fetch).
+
+**Modo Junção**: combinatória roda 100% client-side sobre o pool já
+carregado (sem chamada extra ao backend) — agrupa por `administradora`,
+gera todos os pares (e, se nenhum par bater a faixa, todos os trios) cuja
+soma cai em `alvo±10%`, calcula custo efetivo ponderado pela participação
+de crédito de cada carta no combo, e ordena do menor pro maior custo.
+Nunca mistura administradora entre cartas de um mesmo combo (garantia
+verificada em QA com um caso real Sicredi+Tradição). Cards de resultado
+mostram soma de crédito/entrada, breakdown por carta e CTA de WhatsApp
+(reaproveita o mesmo `CWA`/`zap*()` já usado no resto do site — nenhum
+número novo foi introduzido). Aviso de compliance fixo no painel:
+"Simulação de referência — sujeito à análise e aprovação da
+administradora", não é garantia de aprovação.
+
+**QA com dados reais de produção**: extraí um snapshot ao vivo de 377
+cartas Itaú da vitrine (`/tmp/vitrine-work/itau-live.json`) e rodei a
+lógica de combinação isolada (`test-juncao-live.mjs`) fora do browser —
+confirmado: 0 combos misturando administradora, 0 combos fora da faixa
+±10%, pares sempre priorizados sobre trios quando ambos existem, e o
+mesmo resultado se sustenta tanto com o pool na ordem "real" de produção
+(custo asc, crédito asc) quanto em outras ordens — a lógica não depende de
+ordenação de entrada. Also verificado o caso-limite de fonte com só 1
+carta (Sicredi) — corretamente 0 combos (não dá pra formar par).
+
+**Ícone "somar"**: adicionado um ícone de "+" dentro de um círculo (chave
+`soma` no objeto `ICONS` já existente) — aparece no toggle "Simular
+junção" (ao lado do checkbox) e no cabeçalho de cada card de combinação
+("⊕ 2 cartas · Administradora"), seguindo o mesmo padrão visual/`.emo` já
+usado nos outros ícones do site.
+
+**Pergunta levantada e ainda em aberto** (fora desta fatia, não bloqueou o
+PUBLICA): Emerson pediu pra confirmar que o `wa.me` do CTA usa
+`5511973202967` — investigação (código-fonte, `/cotas.js` externo hospedado
+em `360prospere.vercel.app`, site ao vivo, `window.CWA` no browser) mostrou
+que o número real em produção, em **todos** os CTAs do site (não só o da
+Junção), é `5519997561909`. Não alterado por ser config site-wide fora do
+escopo desta fatia — decisão sobre trocar (e onde) fica pendente de
+confirmação explícita do Emerson numa próxima fatia.
+
+**Deploy**: preview local (`npx serve public`) usado pra validar
+visualmente os 2 pontos pedidos (barra de filtros com dropdown novo +
+toggle; painel de junção com alvo de exemplo R$ 500 mil mostrando cards e
+CTA) antes do PUBLICA — sem `<select>` nativo aberto no screenshot (limitação
+do automation tool pra popups nativos do SO; confirmado via árvore de
+acessibilidade em vez de captura visual). "PUBLICA" recebido em minúsculo
+("publica"), mesmo critério já usado em fatias anteriores. Sem colisão de
+`bidcon-bot` no momento do push (checado via `git fetch` antes de
+publicar). Commit `8b555fe` em `main`.
