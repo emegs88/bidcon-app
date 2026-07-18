@@ -111,6 +111,7 @@ async function buscarCartas() {
 const BRL = (v) => "R$ " + Math.round(v).toLocaleString("pt-BR");
 
 function refCota(n) {
+  if (n == null) return "";
   const s = String(n);
   if (/^-?\d+$/.test(s)) {
     const num = Number(s);
