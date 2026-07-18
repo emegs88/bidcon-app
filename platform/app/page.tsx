@@ -42,14 +42,26 @@ export default async function Home() {
 
   const tipo = profile?.tipo as "cliente" | "parceiro" | "admin" | undefined;
 
-  // processo mais recente do usuário (RLS: cliente vê só os próprios)
-  const { data: processo } = await supabase
-    .from("processos")
-    .select("status")
-    .order("criado_em", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // processo mais recente do usuário (RLS: cliente vê só os próprios) e
+  // vínculo de cedente (CEDENTE-01, RLS: só o próprio profile_id) em paralelo.
+  const [{ data: processo }, { data: vinculoCedente }] = await Promise.all([
+    supabase
+      .from("processos")
+      .select("status")
+      .order("criado_em", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("cedente_cartas").select("id").eq("profile_id", user.id).limit(1).maybeSingle(),
+  ]);
   const status = processo?.status as StatusProcesso | undefined;
+  const ehCedente = !!vinculoCedente;
+
+  // Cedente sem processo: /minha-carta é o destino natural pós-login (ela não
+  // tem nada pra ver em "Meu processo"). Com os dois, mostra os dois atalhos
+  // na home em vez de redirecionar — ela escolhe.
+  if (ehCedente && !status) {
+    redirect("/minha-carta");
+  }
 
   // Feed NEUTRO de cartas novas (client-safe): só cartas disponíveis, recorte
   // factual por janela de dias. RLS limita a leitura ao que o usuário pode ver.
@@ -101,6 +113,15 @@ export default async function Home() {
             Explore cotas de consórcio já contempladas, de imóvel e veículo.
           </span>
         </Card>
+
+        {ehCedente && (
+          <Card href="/minha-carta">
+            <span className={styles.cardTitle}>Minha carta</span>
+            <span className={styles.cardDesc}>
+              Acompanhe o anúncio da sua carta e envie atualizações de condições.
+            </span>
+          </Card>
+        )}
 
         {(tipo === "parceiro" || tipo === "admin") && (
           <Card href="/parceiro">

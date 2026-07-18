@@ -1,0 +1,116 @@
+.wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+.p {
+  margin: 0 0 14px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.p:last-child {
+  margin-bottom: 0;
+}
+
+/* Anel de gradiente permanente (mesma técnica da vitrine pública: uma borda
+   de 2px preenchida com --grad-brand via mask-composite, sem ocupar layout).
+   --grad-brand já existe em app/globals.css — mesma fórmula do --bc-grad do
+   site público (linear-gradient 100deg #8FB7FF -> #36C5F0 -> #1E6FE6), só com
+   nome de token diferente entre os dois projetos. */
+/* O <Card> filho já usa border-radius: var(--r-lg) (Card.module.css) — os 2px
+   de padding aqui é que criam o efeito de anel, sem precisar mirar a classe
+   interna do Card (que é hasheada pelo CSS Modules). */
+.ring {
+  position: relative;
+  border-radius: calc(var(--r-lg) + 2px);
+  padding: 2px;
+  background: var(--grad-brand);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.administradora {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.selo {
+  font-family: var(--font-title), "Space Grotesk", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--grad-brand);
+  color: #0a0e1a;
+  white-space: nowrap;
+}
+
+.tipo {
+  font-family: var(--font-title), "Space Grotesk", system-ui, sans-serif;
+  font-size: 20px;
+  margin: 0 0 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+  margin: 0 0 16px;
+}
+.grid dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.grid dd {
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-mono), "IBM Plex Mono", monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.statusRow {
+  display: flex;
+}
+.statusBadge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+}
+.statusBadge[data-status="disponivel"] {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.statusBadge[data-status="reservada"] {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.statusBadge[data-status="vendida"],
+.statusBadge[data-status="indisponivel"] {
+  color: var(--text-muted);
+}
+
+.compliance {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
