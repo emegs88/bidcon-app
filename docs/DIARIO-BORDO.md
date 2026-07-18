@@ -469,3 +469,91 @@ amanhã antes de codar):
 dimensionados, zero fix aplicado, zero dado perdido/corrompido, carta da
 Rafaela confirmada segura). `SYNC-CHURN-02` (fix) aberto como próxima
 fatia prioritária.
+
+## 2026-07 — Portal da vendedora `/minha-carta` (fatia CEDENTE-01)
+
+**O que foi feito**: primeira fatia do portal do cedente (vendedor de carta
+contemplada), pra Rafaela Cruz (`profiles.id`
+`ffee12ed-2f26-43f7-a6ac-9631e922bf30`, carta xtv `83f8af16-9fbf-41e3-81be-
+ff0a8dd45692`, exclusiva/`cliente_direto`, TIR 0,65% a.m.), primeira usuária
+real do fluxo. Migration `platform/supabase/migrations-nnv/0020_cedente_cartas.sql`
+(tabela `cedente_cartas`, RLS `profile_id = auth.uid() OR is_admin()`, sem
+policy de insert/update/delete pra `authenticated` — gestão só admin/
+service). Testada primeiro em staging (`szs`) com 4 cenários em transação
+`BEGIN...ROLLBACK` (cedente A só vê a própria linha, cedente B idem, admin
+vê as duas, insert como `authenticated` bloqueado por RLS) — todos PASS —
+antes de aplicar em produção (nnv) sob AUTORIZO explícito, e o seed da
+Rafaela sob um segundo AUTORIZO separado.
+
+**Arquitetura (bridge nnv↔xtv, mesmo padrão de PORTAL-01)**:
+`cedente_cartas.carta_xtv_id` é um uuid solto, sem FK (projetos Supabase
+distintos). A página (`app/minha-carta/page.tsx`, Server Component) lê o
+vínculo no nnv com o client anon normal (RLS protege: só o próprio
+`profile_id`), e resolve os dados reais da carta no xtv via
+`createXtvClient()` (service_role, só no servidor). Decisão consciente de
+**não** usar `vw_vitrine_viva` aqui: essa view filtra
+`status = 'disponivel'` e esconde cartas reservadas/vendidas (correto pra
+vitrine pública, errado pro portal da própria vendedora — ela precisa ver
+"Reservada"/"Vendida" como informação, não ter escondido). A leitura é
+direto na tabela `cartas`.
+
+**Bug de RLS capturado antes de publicar**: o check "existe negociação em
+andamento pra essa carta" (`processos.carta_id = carta.id`) foi escrito
+primeiro com o client anon — mas a policy `processos_select_envolvidos` só
+libera `cliente_id`/`parceiro_id`/`is_admin()`, e a cedente não é nenhum
+dos dois lados do processo do comprador. Com RLS normal essa consulta
+**sempre voltaria vazia pra ela**, mesmo com negociação ativa, mascarando
+silenciosamente o status "Em negociação". Corrigido trocando só esse
+check pontual pra `createAdminClient()` (service_role, nnv), lendo somente
+a coluna `id` (existência, nunca exposta ao client).
+
+**Discrepância de identidade visual descoberta e resolvida**: a missão
+presumia reuso de `--bc-grad`/Space Grotesk/IBM Plex Mono já existentes no
+app logado — na prática esses tokens **só existem em `public/bidcon-brand.css`**
+(o site público estático); `platform/` usa `--grad-brand` (mesma fórmula
+de gradiente, nome de token diferente) e `system-ui` em todo o resto do
+app, sem nenhuma fonte do Google carregada. Resolvido reaproveitando
+`--grad-brand` como está e importando as duas fontes via `next/font/google`
+**escopadas só a `/minha-carta`** (não é mudança de tipografia global).
+
+**Roteamento na home** (`app/page.tsx`): cedente sem `processo` é
+redirecionada direto pra `/minha-carta` pós-login (nada útil pra ver em
+"Meu processo"); cedente com os dois vê os dois atalhos na home e escolhe.
+
+**Deploy**: `tsc --noEmit` limpo + varredura de compliance limpa (termos
+proibidos só em comentários de código, nunca em texto voltado ao usuário).
+"PUBLICA" recebido em minúsculo ("publica") — tratado como equivalente,
+mesmo critério já usado pra "ok"/"AUTORIZO" em mensagens anteriores desta
+sessão. Push inicial rejeitado por colisão com commit automático do
+`bidcon-bot` (`chore(vitrine): snapshot automático do estoque`) — segunda
+ocorrência desse padrão (a primeira foi na fatia VITRINE-EXCLUSIVA-01,
+mesma sessão); confirmado via `git show --stat` que o commit do bot só
+tocou `public/index.html`, resolvido com `git pull --rebase` + reconfirmação
+do `tsc` antes de publicar. **Item de higiene ainda em aberto** (não
+resolvido nesta fatia): o cron do bot seguir colidindo com pushes manuais é
+candidato a virar sua própria fatia (`HIGIENE-01` ou nova), não urgente.
+
+**Pós-deploy — validação humana como Rafaela ainda pendente**: o roteiro
+da missão pedia gerar um magic link real pra Rafaela via
+`auth.admin.generateLink` (sem disparar e-mail real) pro Emerson abrir em
+aba anônima e validar card/RLS/WhatsApp. Bloqueio encontrado: o
+`SUPABASE_SERVICE_ROLE_KEY` em `platform/.env.local` é só um **placeholder**
+(37 caracteres, sem formato de JWT) — não há chave real de produção
+disponível neste ambiente local, nem `.vercel/`/CLI linkado pra puxar env
+real. Decisão do Emerson: gerar o link direto pelo **Supabase Studio**
+(projeto nnv → Authentication → Users → Rafaela), com a ressalva registrada
+de que a ação padrão do Studio ("Send magic link") tende a **disparar
+e-mail de verdade** em vez de só copiar o link — se for esse o caminho
+usado, não fere compliance, só diverge do "sem e-mail real" original.
+Resultado da validação (card correto, RLS isolada, WhatsApp com mensagem
+certa) ainda não confirmado nesta entrada — atualizar quando o Emerson
+reportar.
+
+**Pendente, fora de escopo desta fatia (CEDENTE-02)**: propostas reais
+(hoje é um card placeholder informativo), contador de interesse, upload de
+extrato pelo próprio portal (hoje só via WhatsApp/atendimento manual). O
+status "Em negociação" só passa a aparecer de fato quando existir um
+`processo` no nnv referenciando `carta_id = carta_xtv_id` — depende da
+arquitetura de promoção xtv→nnv da `PONTE-01`, **ainda não implementada**;
+até lá, toda carta de cedente aparece como "No ar"/"Reservada"/"Vendida"
+(espelho direto do xtv), nunca "Em negociação".
