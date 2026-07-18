@@ -636,3 +636,135 @@ acessibilidade em vez de captura visual). "PUBLICA" recebido em minúsculo
 ("publica"), mesmo critério já usado em fatias anteriores. Sem colisão de
 `bidcon-bot` no momento do push (checado via `git fetch` antes de
 publicar). Commit `8b555fe` em `main`.
+
+## 2026-07 — REPASSE-STOP: cotas "REPASSE (CAPITAL DE GIRO)" tiradas da vitrine (fatia ETAPA 2 da rodada RODADA NOTURNA)
+
+**O que aconteceu**: a vitrine pública (`vw_vitrine_viva`, consumida por
+`/api/vitrine` e por `public/index.html`) mostrava cotas com
+`administradora_raw` = "REPASSE (CAPITAL DE GIRO)" rotuladas como
+"CRÉDITO CONTEMPLADO" — rótulo incorreto. Investigação no xtv confirmou
+que são um produto diferente: crédito de consórcio já **utilizado como
+capital de giro** pelo cotista original (não uma carta contemplada
+disponível pra transferência de titularidade simples), vindo do sync
+PIFFER/360prospere.
+
+**Correção (migration `0055_repasse_stop.sql`, AUTORIZO recebido)**: filtro
+textual provisório direto em `vw_vitrine_viva` — exclui linhas onde
+`administradora_raw` ou o nome resolvido em `administradoras` bate
+`ilike '%repasse%'`. Sem apagar dado nenhum (as cartas continuam na
+tabela, só saem da view pública). Confirmado em produção: vitrine caiu de
+1.950 → 1.939 cotas (11 linhas REPASSE removidas), `/api/vitrine` bate.
+
+**Dívida técnica documentada explicitamente na própria migration**:
+critério textual é "provisório até existir a coluna `categoria`" — essa
+coluna chegou na migration seguinte (`0056`, ver entrada abaixo), que
+substitui esse filtro por uma classificação feita na ingestão.
+
+## 2026-07 — REPASSE-CAPGIRO-01: nova coluna `categoria`, `vw_repasse_viva` e grid em `/repasse` (fatia ETAPA 3 da RODADA NOTURNA)
+
+**Contexto / pedido**: depois do REPASSE-STOP (acima), o pedido seguinte
+foi trazer essas mesmas cotas de volta à tona — não na vitrine principal,
+mas como um produto próprio ("capital de giro" / assunção de dívida),
+alimentando um simulador já existente. Nome aprovado: **REPASSE-CAPGIRO-01**.
+
+**Duas coisas com o nome "repasse" que NÃO são a mesma fatia — registro
+explícito pra não confundir**:
+- `0017_repasse.sql` + `public/repasse.html` (já em produção antes desta
+  rodada): "Repasse — Assunção de Dívida". É o **motor de precificação**
+  (cascata Bidcon/parceiro/tarifa notarial, CET, Conta Notarial —
+  `precificarRepasse()` em `lib/reserve/repasse-pricing.ts`, portado 1:1
+  pro client-side em `repasse.html`). Até esta fatia, essa página era
+  **100% manual** — o visitante digitava saldo/parcela/prazo à mão, sem
+  nenhuma cota real por trás.
+- **REPASSE-CAPGIRO-01** (esta fatia): não cria um motor novo — **alimenta
+  o motor que já existe** com cotas REAIS vindas do sync PIFFER/
+  360prospere (as mesmas 11 cotas que saíram da vitrine no REPASSE-STOP).
+  No fundo é o mesmo PRODUTO (cota de consórcio com crédito já utilizado,
+  saldo a pagar, terceiro assume mediante garantia e anuência da
+  administradora) — a distinção real é só a ORIGEM do estoque: manual vs.
+  sync real.
+
+**Decisões de design vindas de correção direta do usuário** (não
+descobertas por mim sozinho):
+- **Saldo devedor** não é `valor_credito` nem uma coluna nova — é
+  `valor_parcela × qtd_parcelas` (nominal), a MESMA convenção que
+  `custosDe()` já usa no modal "Custos de transferência" da vitrine
+  principal (`public/index.html`), calculada na view, nunca armazenada.
+  Confirmado batendo com exemplo real (carta 710: 1.161 × 177 = 205.497).
+  Usar `valor_credito` esconderia parte real da dívida em casos como uma
+  cota com crédito 14.980 e dívida de 31.252 (52×601).
+- Integrar o grid **dentro da `/repasse` já existente** (não criar página
+  nova) — cards com CTA que muda pra aba "Simule seu bem" e pré-preenche
+  `b_saldo`/`b_parcela`/`b_n`/`b_seg` com os dados reais da cota, disparando
+  o `updateBem()` que já existe.
+
+**Implementação**:
+- `cartas.categoria` (`'contemplada'` default / `'repasse'`, check
+  constraint) — classificada na **ingestão**, dentro de
+  `sync_aplicar_cotas`, de forma **agnóstica de origem**: só olha
+  `administradora_raw ilike '%repasse%'` da linha, nunca `p_origem`. Se
+  amanhã LANCE/CBC/CARTAS/SERVOPA/PLAYCONTEMPLADAS mandarem uma linha com
+  "repasse" no nome, ela cai em `categoria='repasse'` sozinha — nada
+  hardcoded pra PIFFER.
+- `vw_vitrine_viva` trocou o filtro textual provisório da 0055 por
+  `categoria = 'contemplada'` — mesma dívida técnica documentada ali,
+  agora paga.
+- `vw_repasse_viva` (nova): mesma base de `vw_vitrine_viva`, filtrada em
+  `categoria = 'repasse'`, com `saldo_devedor` calculado. Pública, GRANT
+  SELECT pra `anon`/`authenticated` (paridade com a vitrine, mesmo a API
+  usando `service_role`).
+- `app/api/repasse/route.ts` (novo): espelha `/api/vitrine` quase linha a
+  linha — mesmas guardas de CORS/rate-limit (`lib/api-guard.ts`, sem
+  mudança nenhuma lá), mesmo client `service_role`. Sem paginação
+  `.range()` (volume pequeno — dezenas de cotas), `.limit(500)` como teto
+  de segurança.
+- Grid novo em `public/repasse.html` (cards + skeleton de loading + estado
+  de erro) — fetch em `https://app.bidcon.com.br/api/repasse`
+  (`cache:"no-store"`, mesmo padrão de `cotasAoVivo()` em `index.html`).
+  **O simulador manual continua 100% funcional offline** mesmo se esse
+  fetch falhar — é a ÚNICA parte da página que depende de rede agora
+  (quebra o invariante "100% estática" só pra essa seção nova, documentado
+  em comentário HTML no próprio arquivo).
+- Bug pego em auto-revisão antes de qualquer teste externo: o CTA
+  "Simular esta cota" usava `document.querySelector('.card h3')` pra
+  rolar até o simulador depois de trocar de aba — como as duas abas
+  (`data-panel="quitar"`/`data-panel="bem"`) ficam ambas no DOM (só
+  `display:none` esconde a inativa), isso sempre pegava o card ERRADO
+  (o painel "quitar", escondido). Corrigido pra
+  `document.querySelector('[data-panel="bem"] .card')`, escopado ao
+  painel certo.
+
+**Migration `0056` aplicada no xtv** (AUTORIZO recebido). Conferências
+pós-apply pedidas explicitamente, todas confirmadas:
+1. `vw_vitrine_viva` = 1.939 linhas, 0 repasses nela (inalterada).
+2. Carta Rafaela (`83f8af16-9fbf-41e3-81be-ff0a8dd45692`):
+   `categoria='contemplada'`, `exclusiva=true`.
+3. `vw_repasse_viva` = 11 linhas; spot-check crédito 14.980 →
+   `saldo_devedor=31.252,00` (52×601), e as 11 batem `parcela×parcelas`
+   centavo a centavo.
+
+**Divergência investigada: `categoria='repasse'` = 106, não 92**. Não é
+contaminação — todas as 106 linhas têm exatamente o mesmo
+`administradora_raw='REPASSE (CAPITAL DE GIRO)'`,
+`administradora_origem='PIFFER'`, `fonte='360prospere'`. A quebra real é
+por `fornecedor_id`:
+- **92** com `fornecedor_id is null` — pipeline PIFFER atual (bate com
+  `sync_fonte_config` de PIFFER, que também não tem fornecedor vinculado).
+- **14** com `fornecedor_id` apontando pro fornecedor legado "360prospere
+  (legado)" — lote único, todos `criado_em='2026-07-08'`, todos já
+  `status='indisponivel'` (12 delas com `numero_externo` já nulificado —
+  posições recicladas por um guard de identidade antigo), resquício de
+  antes da separação de fornecedor por fonte.
+
+**Decisão**: manter as 106. A regra de classificação é semântica (texto
+"repasse" no `administradora_raw` → `categoria='repasse'`), não filtrada
+por fornecedor — as 14 linhas legadas SÃO repasses de fato, reclassificar
+só 92 pra bater um número seria rotular errado pra forçar uma contagem.
+Sem efeito visível em produção: as 14 já estavam `indisponivel` antes da
+migration e nenhuma das duas views (`vw_vitrine_viva`/`vw_repasse_viva`)
+mostra linha fora de `status='disponivel'`.
+
+**Deploy**: preview local (`npx serve public`) da `/repasse` com o grid
+novo + teste do CTA "Simular esta cota" preenchendo a aba "Simule seu
+bem" — ver resultado abaixo/no commit. PUBLICA (commit/push) ainda
+pendente até a confirmação visual.
