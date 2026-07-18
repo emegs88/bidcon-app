@@ -470,7 +470,11 @@ dimensionados, zero fix aplicado, zero dado perdido/corrompido, carta da
 Rafaela confirmada segura). `SYNC-CHURN-02` (fix) aberto como próxima
 fatia prioritária.
 
-## 2026-07 — Portal da vendedora `/minha-carta` (fatia CEDENTE-01)
+## 2026-07 — Portal da vendedora `/minha-carta` (fatia CEDENTE-01) — ENCERRADA
+
+**Status**: entregue, publicada e validada ponta-a-ponta pelo Emerson em
+janela anônima. Sem pendência aberta nesta fatia (CEDENTE-02 é próxima
+fatia distinta, não bloqueante).
 
 **O que foi feito**: primeira fatia do portal do cedente (vendedor de carta
 contemplada), pra Rafaela Cruz (`profiles.id`
@@ -533,21 +537,31 @@ do `tsc` antes de publicar. **Item de higiene ainda em aberto** (não
 resolvido nesta fatia): o cron do bot seguir colidindo com pushes manuais é
 candidato a virar sua própria fatia (`HIGIENE-01` ou nova), não urgente.
 
-**Pós-deploy — validação humana como Rafaela ainda pendente**: o roteiro
-da missão pedia gerar um magic link real pra Rafaela via
-`auth.admin.generateLink` (sem disparar e-mail real) pro Emerson abrir em
-aba anônima e validar card/RLS/WhatsApp. Bloqueio encontrado: o
-`SUPABASE_SERVICE_ROLE_KEY` em `platform/.env.local` é só um **placeholder**
-(37 caracteres, sem formato de JWT) — não há chave real de produção
-disponível neste ambiente local, nem `.vercel/`/CLI linkado pra puxar env
-real. Decisão do Emerson: gerar o link direto pelo **Supabase Studio**
-(projeto nnv → Authentication → Users → Rafaela), com a ressalva registrada
-de que a ação padrão do Studio ("Send magic link") tende a **disparar
-e-mail de verdade** em vez de só copiar o link — se for esse o caminho
-usado, não fere compliance, só diverge do "sem e-mail real" original.
-Resultado da validação (card correto, RLS isolada, WhatsApp com mensagem
-certa) ainda não confirmado nesta entrada — atualizar quando o Emerson
-reportar.
+**Pós-deploy — validação humana como Rafaela: APROVADA.** Bloqueio original
+(`SUPABASE_SERVICE_ROLE_KEY` local só placeholder, sem `.vercel/`/CLI
+linkado) confirmado insuperável a partir deste ambiente — e o Supabase
+Studio, na prática, **não oferece "copiar link sem enviar"** (só "Send
+magic link", que dispara e-mail de verdade). Caminho final usado pelo
+Emerson: criou um usuário de teste com senha direto via SQL (não passou
+por `generateLink`/e-mail nenhum) e testou `/minha-carta` logado como esse
+usuário em janela anônima. Checklist completo aprovado: card idêntico ao
+esperado (CNP, valores, TIR 0,65%), selo "Exclusiva Bidcon", status "No
+ar", bloco "Atualização de condições (Cláusula 4ª)" com botão WhatsApp
+funcionando, varredura de compliance visual ok. Dados de teste removidos
+depois — confirmado por SQL nesta entrada: `cedente_cartas` com exatamente
+1 linha (o vínculo real da Rafaela, `e64d1341-...`), sem sobra de perfil
+de teste desta sessão (os 2 perfis com "teste" no nome no banco são de
+06/27 e 07/07, anteriores a hoje — não relacionados a esta fatia).
+
+**Nota de método pra próximas fatias**: QA ponta-a-ponta de página
+autenticada, quando não há `SUPABASE_SERVICE_ROLE_KEY` real disponível no
+ambiente de quem está codando (só o Emerson tem), não depende de
+`generateLink` — criar um usuário de teste **descartável** com senha via
+SQL direto (padrão já usado pra RLS: token vazio/conhecido, apagado depois)
+é caminho mais simples e não exige tocar em service_role nem no Studio.
+`scripts/gerar-magic-link.mjs` continua valendo como alternativa quando
+o objetivo for testar o fluxo de magic link em si (não só o conteúdo da
+página).
 
 **Pendente, fora de escopo desta fatia (CEDENTE-02)**: propostas reais
 (hoje é um card placeholder informativo), contador de interesse, upload de
