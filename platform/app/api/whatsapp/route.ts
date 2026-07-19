@@ -19,10 +19,15 @@
 // GET: handshake exigido pela Meta ao configurar o webhook (hub.mode=
 //   subscribe + hub.verify_token == WHATSAPP_VERIFY_TOKEN → devolve
 //   hub.challenge).
-// POST: 1) valida X-Hub-Signature-256 (HMAC-SHA256 com WHATSAPP_APP_SECRET,
-//   comparação timing-safe sobre os bytes crus do hex, sem o prefixo
-//   "sha256=") — assinatura ausente/inválida => 401 (com log temporário do
-//   motivo, sem vazar segredo/corpo), nada é processado; 2) ignora eventos
+// POST: 1) valida a origem do POST — em modo Meta direto (default), via
+//   X-Hub-Signature-256 (HMAC-SHA256 com WHATSAPP_APP_SECRET, comparação
+//   timing-safe sobre os bytes crus do hex, sem o prefixo "sha256="); em
+//   modo BSP (WHATSAPP_BSP="360dialog"), via segredo compartilhado
+//   configurável (WHATSAPP_BSP_WEBHOOK_SECRET) — a 360dialog reenvia o
+//   mesmo formato de payload da Cloud API mas não assina com HMAC, ver
+//   assinaturaValida()/segredoBspValido() abaixo — inválido em qualquer
+//   modo => 401 (com log temporário do motivo, sem vazar segredo/corpo),
+//   nada é processado; 2) ignora eventos
 //   que não sejam `messages` (statuses, echoes — fora de escopo F1);
 //   3) dedup por wa_message_id; 4) upsert da conversa por telefone + insert
 //   da mensagem (papel='cliente'); 5) Fatia 4-B: opt-out "Não quero
@@ -80,10 +85,58 @@ export async function GET(req: Request) {
   return NextResponse.json({ erro: "handshake_invalido" }, { status: 403 });
 }
 
-// --- Validação de assinatura (HMAC-SHA256, timing-safe) ---------------------
+// --- Validação de origem do webhook ------------------------------------------
+// Modo Meta direto (default): HMAC-SHA256 sobre o corpo cru via
+// X-Hub-Signature-256, com WHATSAPP_APP_SECRET (assinaturaValidaMeta).
+//
+// Modo BSP (WHATSAPP_BSP="360dialog"): o payload que a 360dialog reenvia
+// pro nosso webhook tem o mesmo formato da Cloud API, mas a 360dialog NÃO
+// assina o corpo com HMAC — não é um recurso que o relay deles oferece (o
+// hub.mode/X-Hub-Signature-256 é coisa do App Dashboard da própria Meta,
+// que não está no meio dessa configuração). Em vez de HMAC, validamos por
+// um segredo compartilhado configurável (WHATSAPP_BSP_WEBHOOK_SECRET) que
+// a gente mesmo embute na configuração do webhook do lado da 360dialog —
+// como o painel deles não permite header customizado no cadastro da URL,
+// o jeito prático é embutir o segredo na própria URL registrada
+// (?secret=...); por segurança também aceitamos vir por header
+// (X-BSP-Webhook-Secret), pra quando/se o relay usado permitir configurar
+// headers. Comparação timing-safe do mesmo jeito que o HMAC do modo Meta.
+function bspAtivo(): boolean {
+  return process.env.WHATSAPP_BSP === "360dialog";
+}
+
+function assinaturaValida(
+  req: Request,
+  corpoBruto: string
+): { valida: boolean; motivo?: string } {
+  if (bspAtivo()) {
+    return segredoBspValido(req);
+  }
+  return assinaturaValidaMeta(corpoBruto, req.headers.get("x-hub-signature-256"));
+}
+
+function segredoBspValido(req: Request): { valida: boolean; motivo?: string } {
+  const esperado = process.env.WHATSAPP_BSP_WEBHOOK_SECRET;
+  if (!esperado) return { valida: false, motivo: "bsp_segredo_ausente_env" };
+
+  const url = new URL(req.url);
+  const recebido =
+    req.headers.get("x-bsp-webhook-secret") ?? url.searchParams.get("secret");
+  if (!recebido) return { valida: false, motivo: "bsp_segredo_ausente_request" };
+
+  const bufRecebido = Buffer.from(recebido, "utf8");
+  const bufEsperado = Buffer.from(esperado, "utf8");
+  if (bufRecebido.length !== bufEsperado.length) {
+    return { valida: false, motivo: "bsp_segredo_tamanho_diferente" };
+  }
+
+  const ok = crypto.timingSafeEqual(bufRecebido, bufEsperado);
+  return { valida: ok, motivo: ok ? undefined : "bsp_segredo_nao_bate" };
+}
+
 // Retorna o motivo da rejeição (nunca o segredo nem o corpo) só pra dar pra
 // diagnosticar 401 em produção sem vazar dado sensível nos logs.
-function assinaturaValida(
+function assinaturaValidaMeta(
   corpoBruto: string,
   assinaturaHeader: string | null
 ): { valida: boolean; motivo?: string } {
@@ -146,20 +199,31 @@ type MensagemMeta = {
 export async function POST(req: Request) {
   const corpoBruto = await req.text();
 
-  const resultadoAssinatura = assinaturaValida(
-    corpoBruto,
-    req.headers.get("x-hub-signature-256")
-  );
+  const resultadoAssinatura = assinaturaValida(req, corpoBruto);
   if (!resultadoAssinatura.valida) {
     // LOG TEMPORÁRIO (diagnóstico do 401 em produção) — remover depois de
     // confirmado o motivo. Nunca loga o segredo nem o corpo inteiro, só
     // presença/tamanho, que já basta pra distinguir os casos comuns
     // (env ausente, secret errado/com espaço sobrando, header mal formado).
-    console.error("[whatsapp] assinatura rejeitada:", {
+    // Loga só as envs relevantes ao modo ativo (Meta vs. BSP) pra não
+    // confundir diagnóstico com env de um modo que nem está em uso.
+    console.error("[whatsapp] assinatura/segredo rejeitado:", {
+      modo: bspAtivo() ? "bsp_360dialog" : "meta_direto",
       motivo: resultadoAssinatura.motivo,
-      temSegredoEnv: !!process.env.WHATSAPP_APP_SECRET,
-      tamanhoSegredoEnv: process.env.WHATSAPP_APP_SECRET?.length ?? 0,
-      temHeader: !!req.headers.get("x-hub-signature-256"),
+      ...(bspAtivo()
+        ? {
+            temSegredoEnv: !!process.env.WHATSAPP_BSP_WEBHOOK_SECRET,
+            tamanhoSegredoEnv: process.env.WHATSAPP_BSP_WEBHOOK_SECRET?.length ?? 0,
+            temHeaderOuQuery: !!(
+              req.headers.get("x-bsp-webhook-secret") ??
+              new URL(req.url).searchParams.get("secret")
+            ),
+          }
+        : {
+            temSegredoEnv: !!process.env.WHATSAPP_APP_SECRET,
+            tamanhoSegredoEnv: process.env.WHATSAPP_APP_SECRET?.length ?? 0,
+            temHeader: !!req.headers.get("x-hub-signature-256"),
+          }),
       tamanhoCorpo: corpoBruto.length,
     });
     return NextResponse.json({ erro: "assinatura_invalida" }, { status: 401 });

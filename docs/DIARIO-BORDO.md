@@ -766,5 +766,91 @@ mostra linha fora de `status='disponivel'`.
 
 **Deploy**: preview local (`npx serve public`) da `/repasse` com o grid
 novo + teste do CTA "Simular esta cota" preenchendo a aba "Simule seu
-bem" — ver resultado abaixo/no commit. PUBLICA (commit/push) ainda
-pendente até a confirmação visual.
+bem" confirmado (via console, contornando flakiness de coordenada do
+Chrome MCP — chamada direta de `simularCotaRepasse()` bateu os valores
+reais da cota 715). **PUBLICA recebido e executado**: commit `9655d55`
+em `origin/main` com os 4 arquivos (migration 0056, `app/api/repasse/
+route.ts`, `public/repasse.html`, este diário). Fatia REPASSE-CAPGIRO-01
+fechada.
+
+## 2026-07 — pendência registrada: loop de embeddings adiado pra depois da SYNC-CHURN-02
+
+Pedido "faça o loop" (backfill de embeddings via `POST
+/api/backfill-embeddings` em loop até `"restantes":0`, ver
+`docs/checklist-deploy-amanha.md`). Tentei rodar contra produção e
+esbarrei em `CRON_SECRET` inacessível por dois caminhos: `.env.local`
+local tem só o placeholder `<EU PREENCHO — valor novo>`, e `vercel env
+pull --environment=production` traz o valor mascarado (`"[SENSITIVE]"`)
+porque a variável está marcada como Sensitive no dashboard da Vercel —
+correto ficar assim, não tentei nenhum atalho pra contornar.
+
+**Decisão do usuário**: não rodar agora. Adiado pra **depois da
+SYNC-CHURN-02** — rodar o loop sobre estoque instável (com churn ativo)
+desperdiça vetorização em cartas que somem em horas; faz sentido rodar
+uma vez só, depois do fix de churn, sobre um estoque mais estável.
+`CRON_SECRET` continua Sensitive na Vercel e nunca passa por chat/por
+este ambiente — quando for a hora, é rodado manualmente no terminal do
+usuário com o comando já documentado no checklist.
+
+**Próximo passo, registrado aqui como parte do fechamento da
+SYNC-CHURN-02** (não desta fatia): depois de aplicada e publicada a
+SYNC-CHURN-02, rodar o loop de embeddings uma vez sobre o estoque
+limpo/estável.
+
+## 2026-07 — WhatsApp: suporte a BSP 360dialog em lib/whatsapp/graph.ts + webhook
+
+**O que mudou**: `lib/whatsapp/graph.ts` e `app/api/whatsapp/route.ts`
+passam a suportar um segundo modo de operação, opcional e não-destrutivo
+— modo Meta direto (default, comportamento idêntico ao de antes) continua
+sendo o que roda se `WHATSAPP_BSP` não estiver setado.
+
+**Envio (`graph.ts`)**: com `WHATSAPP_BSP="360dialog"`, `chamarGraph()`
+passa a mandar pra `https://waba-v2.360dialog.io/messages` (sem
+`phoneId` no path — cada canal na 360dialog já tem sua própria API key,
+então o número é implícito) com header `D360-API-KEY: $D360_API_KEY`,
+em vez de `Authorization: Bearer $WHATSAPP_TOKEN` pra
+`graph.facebook.com`. O corpo da mensagem (`messaging_product`, `to`,
+`type`, `text`/`template`) não muda — a 360dialog espelha 1:1 o shape da
+Cloud API da Meta (confirmado na doc deles: mesmo payload de envio,
+mesmo formato de resposta `{messages:[{id}]}`/`{error:{message}}`), por
+isso o parsing de sucesso/erro em `chamarGraph()` não precisou mudar.
+
+**Webhook (`route.ts`)**: a 360dialog reenvia o payload recebido da Meta
+no mesmo formato de `entry[].changes[].value.messages` (por isso
+`extrairMensagens()` não mudou), mas **não assina o corpo com HMAC** —
+`X-Hub-Signature-256` é um recurso do App Dashboard da própria Meta, que
+não está no caminho quando o relay é a 360dialog. A validação de
+assinatura foi separada em duas funções: `assinaturaValidaMeta()` (a
+antiga, renomeada, comportamento idêntico — HMAC-SHA256 timing-safe com
+`WHATSAPP_APP_SECRET`) e `segredoBspValido()` (nova — compara, também
+timing-safe, um segredo compartilhado `WHATSAPP_BSP_WEBHOOK_SECRET`
+contra o que chegar no header `X-BSP-Webhook-Secret` OU na query string
+`?secret=`). `assinaturaValida()` agora é só o dispatcher: escolhe qual
+das duas rodar com base em `WHATSAPP_BSP`. Optei por aceitar tanto
+header quanto query porque o painel da 360dialog não deixa configurar
+header customizado no cadastro da URL do webhook — na prática, o
+segredo vai embutido na própria URL registrada lá
+(`.../api/whatsapp?secret=...`); o suporte a header fica pronto caso o
+relay usado permita configurar um no futuro.
+
+**Envs novas** (`.env.example` atualizado, nenhuma commitada com valor
+real): `WHATSAPP_BSP` (liga o modo, "360dialog" ou vazio/ausente = Meta
+direto), `D360_API_KEY` (uma por canal/número na 360dialog),
+`WHATSAPP_BSP_WEBHOOK_SECRET` (segredo do webhook, só usado em modo
+BSP). `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_APP_SECRET`
+continuam existindo e são ignoradas em modo BSP (não usadas nem em
+envio nem em validação nesse modo).
+
+**Não mudou**: o handshake GET (`hub.mode`/`hub.challenge`) continua só
+pro fluxo Meta — a 360dialog registra o webhook via API própria deles
+(não faz esse handshake), então essa rota GET simplesmente não é
+chamada em modo BSP; não precisou de tratamento especial.
+
+**Verificação**: `npx tsc --noEmit` limpo (nenhum erro em nenhum dos
+dois arquivos nem no resto do projeto). Não há ambiente de sandbox/API
+key real da 360dialog disponível nesta sessão pra um teste end-to-end
+contra o relay deles — a troca de modo Meta↔BSP nunca foi exercitada
+com uma chamada de rede real, só revisão de código + compilação. Testar
+de fato (enviar 1 mensagem via `D360_API_KEY` de sandbox e forçar 1
+POST assinado com `WHATSAPP_BSP_WEBHOOK_SECRET`) fica como validação
+pendente pra quando houver credenciais 360dialog configuradas.

@@ -18,10 +18,26 @@
 //
 // service_role (createXtvClient): mesmo motivo do webhook — sem sessão de
 // usuário, chamado de dentro de uma rota server-only.
+//
+// BSP 360dialog (opcional): quando WHATSAPP_BSP="360dialog", envia pro
+// relay da 360dialog em vez de ir direto na Graph API da Meta — mesmo
+// formato de payload (a 360dialog espelha 1:1 o shape da Cloud API), só
+// muda destino/autenticação:
+//   - URL: https://waba-v2.360dialog.io/messages (sem phoneId no path —
+//     o número já está amarrado à própria API key, uma key por canal).
+//   - Header: D360-API-KEY: $D360_API_KEY, em vez de
+//     Authorization: Bearer $WHATSAPP_TOKEN.
+// Modo Meta direto (default, WHATSAPP_BSP ausente/diferente de
+// "360dialog") continua igual, sem nenhuma mudança de comportamento.
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
 
 const GRAPH_VERSION = "v21.0";
+const BSP_360DIALOG_URL = "https://waba-v2.360dialog.io/messages";
+
+function bspAtivo(): boolean {
+  return process.env.WHATSAPP_BSP === "360dialog";
+}
 
 type EnvioBase = {
   conversaId: string;
@@ -48,23 +64,32 @@ async function conversaOptOut(
 async function chamarGraph(
   corpo: Record<string, unknown>
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneId) {
-    return { ok: false, erro: "env_ausente(WHATSAPP_TOKEN|WHATSAPP_PHONE_NUMBER_ID)" };
+  let url: string;
+  const headers: Record<string, string> = { "content-type": "application/json" };
+
+  if (bspAtivo()) {
+    const apiKey = process.env.D360_API_KEY;
+    if (!apiKey) {
+      return { ok: false, erro: "env_ausente(D360_API_KEY)" };
+    }
+    url = BSP_360DIALOG_URL;
+    headers["D360-API-KEY"] = apiKey;
+  } else {
+    const token = process.env.WHATSAPP_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!token || !phoneId) {
+      return { ok: false, erro: "env_ausente(WHATSAPP_TOKEN|WHATSAPP_PHONE_NUMBER_ID)" };
+    }
+    url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
+
   try {
-    const resp = await fetch(
-      `https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(corpo),
-      }
-    );
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(corpo),
+    });
     const data: unknown = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       const msg =
