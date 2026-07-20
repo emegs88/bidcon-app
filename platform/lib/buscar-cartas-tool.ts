@@ -26,6 +26,15 @@
 //     de sistema, não promessa solta do modelo;
 //   - valores sempre EXATAMENTE como a tool devolveu, nunca recalculados.
 //
+// TOM-02: `seloCustoExcelente` (booleano) é derivado aqui a partir de
+// bidcon_agio_120 (via vw_carousel_cartas, migration 0060) — MESMA regra já
+// usada em produção por components/CartaCard.tsx (agio_120 > 0). O valor
+// cru do ágio é lido da view mas NUNCA sai desta função: nem no tipo
+// CartaEncontrada, nem no JSON devolvido ao modelo — custo_am (TIR) é a
+// única métrica de custo exposta, ágio confunde a comparação (card do site
+// só mostra o selo textual, mesma regra que já valia pro recibo do
+// WhatsApp desde a TOM-01).
+//
 // Loop de tool-use: cada chamador (cerebro.ts/route.ts) limita a NO MÁXIMO
 // 2 rodadas de tool_use por turno — cap aplicado no laço de chamada à
 // Anthropic, não aqui (este módulo só define a tool e executa UMA busca).
@@ -83,6 +92,10 @@ export type CartaEncontrada = {
   parcelas: number;
   custo_am: number;
   administradora: string | null;
+  /** TOM-02: mesma regra de components/CartaCard.tsx (bidcon_agio_120 > 0).
+   *  Só o booleano — o valor cru do ágio NUNCA é exposto aqui (confunde a
+   *  comparação; custo_am/TIR é a métrica canônica mostrada ao cliente). */
+  seloCustoExcelente: boolean;
 };
 
 /** Executa a busca de verdade contra vw_carousel_cartas (mesma view pública
@@ -109,7 +122,7 @@ export async function buscarCartas(
 
   let q = db
     .from("vw_carousel_cartas")
-    .select("id, ref, tipo, credito, entrada, parcela, parcelas, custo_am, administradora")
+    .select("id, ref, tipo, credito, entrada, parcela, parcelas, custo_am, administradora, agio_120")
     .order("custo_am", { ascending: true })
     .limit(limite);
 
@@ -133,6 +146,7 @@ export async function buscarCartas(
     parcelas: Number(c.parcelas),
     custo_am: Number(c.custo_am),
     administradora: c.administradora ?? null,
+    seloCustoExcelente: Number((c as { agio_120?: unknown }).agio_120) > 0,
   }));
 }
 

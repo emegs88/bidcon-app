@@ -13,11 +13,13 @@
 //     sistema vs. cliente|agente|sistema — ver migration 0046).
 //   - blocoCartas: mesma query/formato do site (Serviço "CARTAS DISPONÍVEIS
 //     AGORA"), só que lendo daqui.
-//   - conversão de marcadores pra texto puro: [[CARTA]] e [[OPCOES]] foram
-//     desenhados pro widget do SITE renderizar como card/botão visual — o
-//     WhatsApp (sendText) só manda texto puro. Sem conversão, o cliente
-//     veria o código do marcador cru na mensagem. Aqui eles viram texto
-//     legível formatado (ver converterCartasParaTexto/converterOpcoesParaTexto).
+//   - conversão de marcadores pra texto puro: [[OPCOES]] foi desenhado pro
+//     widget do SITE renderizar como botões — o WhatsApp (sendText) só
+//     manda texto puro, então aqui vira uma lista numerada legível (ver
+//     converterOpcoesParaTexto). [[CARTA]] NÃO entra aqui: desde a TOM-02,
+//     montarSystem(agenteAtivo, 'whatsapp') instrui o modelo a apresentar
+//     carta em RECIBO (texto/bloco monoespaçado) neste canal — o WhatsApp
+//     nunca emite [[CARTA]], então não há marcador de carta pra converter.
 //   - [[RESERVAR]]: o site trava a carta de verdade (processarReservaCarta,
 //     com cross-check de identidade via carta_foco do widget). O WhatsApp
 //     NÃO tem esse mecanismo de identidade ainda — em vez de fingir uma
@@ -164,7 +166,7 @@ async function blocoCartas(db: ReturnType<typeof createXtvClient>): Promise<stri
     return `ref=${c.numero_externo}|tipo=${String(c.tipo) === "imovel" ? "IMÓVEL" : "VEÍCULO"}|credito=${fmt(c.valor_credito)}|entrada=${fmt(c.valor_entrada)}|nparcelas=${c.qtd_parcelas}|parcela=${fmt(c.valor_parcela)}|custo=${custo}${agio}${selo}`;
   };
   const txt = [
-    "CARTAS DISPONÍVEIS AGORA (dados reais do banco — ao emitir [[CARTA]], use SOMENTE estas linhas, copiando os valores exatamente):",
+    "CARTAS DISPONÍVEIS AGORA (amostra do banco — nunca a única fonte; para responder ao cliente use SEMPRE a tool buscar_cartas com o filtro dele, e monte o RECIBO só com o que ela devolver):",
     ...dImoveis.map(linha),
     ...dVeiculos.map(linha),
   ].join("\n");
@@ -174,37 +176,7 @@ async function blocoCartas(db: ReturnType<typeof createXtvClient>): Promise<stri
 
 // --- Conversão de marcadores (site-only) pra texto puro (WhatsApp) --------
 
-function parseCampos(bloco: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const par of bloco.split("|")) {
-    const idx = par.indexOf("=");
-    if (idx === -1) continue;
-    out[par.slice(0, idx).trim()] = par.slice(idx + 1).trim();
-  }
-  return out;
-}
-
-function formatarCartaTexto(campos: Record<string, string>): string {
-  const linhas = [`📋 REF ${campos.ref ?? "?"} · ${campos.tipo ?? ""}`.trim()];
-  if (campos.credito) linhas.push(`Crédito: R$ ${campos.credito}`);
-  if (campos.entrada) linhas.push(`Entrada: R$ ${campos.entrada}`);
-  if (campos.nparcelas && campos.parcela) {
-    linhas.push(`Parcelas: ${campos.nparcelas}x R$ ${campos.parcela}`);
-  }
-  if (campos.custo) linhas.push(`Custo: ${campos.custo}% a.m.`);
-  if (campos.agio) linhas.push(`Ágio: R$ ${campos.agio}`);
-  if (campos.selo) linhas.push(campos.selo);
-  return linhas.join("\n");
-}
-
-const RE_CARTA = /\[\[CARTA\]\]([^[]*)\[\[\/CARTA\]\]/g;
 const RE_OPCOES = /\[\[OPCOES\]\]([^[]*)\[\[\/OPCOES\]\]/g;
-
-function converterCartasParaTexto(texto: string): string {
-  return texto.replace(RE_CARTA, (_all, bloco: string) =>
-    formatarCartaTexto(parseCampos(bloco))
-  );
-}
 
 function converterOpcoesParaTexto(texto: string): string {
   return texto.replace(RE_OPCOES, (_all, bloco: string) => {
@@ -254,7 +226,7 @@ export async function gerarRespostaWhatsApp(
   const mensagens = montarMensagensWa((hist ?? []) as MensagemHist[]);
   if (!mensagens.length) return null;
 
-  let system = montarSystem(agenteAtivo);
+  let system = montarSystem(agenteAtivo, "whatsapp");
   const cartas = await blocoCartas(db);
   if (cartas) system += "\n\n" + cartas;
 
@@ -345,8 +317,7 @@ export async function gerarRespostaWhatsApp(
     escalarHumano = true;
   }
 
-  // Marcadores de UI (site-only) -> texto puro pro WhatsApp.
-  limpo = converterCartasParaTexto(limpo);
+  // Marcador de UI (site-only) -> texto puro pro WhatsApp.
   limpo = converterOpcoesParaTexto(limpo);
 
   // Barreira de compliance (fallback neutro obrigatório).

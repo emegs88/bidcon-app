@@ -189,7 +189,7 @@ async function blocoCartas(supabase: ReturnType<typeof createXtvClient>): Promis
     return `ref=${c.numero_externo}|tipo=${String(c.tipo) === 'imovel' ? 'IMÓVEL' : 'VEÍCULO'}|credito=${fmt(c.valor_credito)}|entrada=${fmt(c.valor_entrada)}|nparcelas=${c.qtd_parcelas}|parcela=${fmt(c.valor_parcela)}|custo=${custo}${agio}${selo}`;
   };
   const txt = [
-    'CARTAS DISPONÍVEIS AGORA (dados reais do banco — ao emitir [[CARTA]], use SOMENTE estas linhas, copiando os valores exatamente):',
+    'CARTAS DISPONÍVEIS AGORA (amostra do banco — nunca a única fonte; para montar um [[CARTA]] use SEMPRE a tool buscar_cartas com o filtro do cliente, e preencha só com o que ela devolver):',
     ...dImoveis.map(linha),
     ...dVeiculos.map(linha),
   ].join('\n');
@@ -577,7 +577,12 @@ export async function POST(req: Request) {
   // real do banco por trás. O adendo (Mudança D exige [[CARTA]] com dados reais;
   // Mudança E melhora a query dele) só faz sentido se o bloco estiver de fato
   // no system — por isso ele passa a ser buscado e concatenado aqui.
-  let system = montarSystem(agenteAtual);
+  // TOM-02: este endpoint é sempre o chat do SITE (o WhatsApp de verdade
+  // roda por um webhook à parte — ver lib/whatsapp/cerebro.ts, que chama
+  // montarSystem(agenteAtivo, 'whatsapp')). O `canal` acima (site/whatsapp)
+  // é só metadado de origem do interesse/conversa, não muda o formato de
+  // apresentação de carta aqui — este handler sempre usa o card [[CARTA]].
+  let system = montarSystem(agenteAtual, "site");
   const cartas = await blocoCartas(supabase);
   if (cartas) {
     system += "\n\n" + cartas;

@@ -1265,3 +1265,113 @@ depois, considerar se `SYNC-CHURN-02` deveria subir de prioridade dado
 que a view já mostra o problema em volume real (484 cartas). TOM-02
 segue na fila, deliberadamente não retomada nesta entrada (feedback da
 revisão pediu explicitamente pra mantê-la lá).
+
+## 2026-07 — FATIA TOM-02 (formato por canal: recibo no WhatsApp, card rico no site)
+
+A TOM-01 unificou os dois canais em RECIBO e deixou o card visual do
+site (`prosperito-widget.js` + marcador `[[CARTA]]`) sem uso. Esta fatia
+restaura o melhor de cada canal, sem tocar no formato WhatsApp (TOM-01
+fica intocado) e sem voltar a alimentar o card do site a partir do bloco
+estático — só da tool `buscar_cartas`.
+
+**`app/api/atende/_prompt.ts` — `montarSystem()` ganhou um segundo
+parâmetro `canal: 'whatsapp' | 'site'`.** O antigo `PROMPT_BASE`
+(exportado) virou `PROMPT_BASE_COMUM` (interno, sem export — conferido
+por grep que nada fora do arquivo importava `PROMPT_BASE` antes de
+remover o export) truncado logo após a seção `[[OPCOES]]`. Duas seções
+novas de apresentação de carta, escolhidas por canal em
+`montarPromptBase()`:
+- `APRESENTACAO_WHATSAPP` — texto do RECIBO da TOM-01, palavra por
+  palavra, só retitulado "(WHATSAPP)".
+- `APRESENTACAO_SITE` — nova: volta o marcador `[[CARTA]]`, agora com
+  campos `id` (uuid, pro link de detalhe) e `adm` (administradora), sem
+  campo `agio`, preenchido exclusivamente com dados de `buscar_cartas`.
+  Mesmas regras de quantidade da TOM-01 (máx 2 por mensagem + "Tenho
+  mais N opções — quer ver?").
+
+`buscaEstoqueEOrdem(canal)` (a seção BUSCA DE ESTOQUE + ORDEM
+OBRIGATÓRIA, hoje comum aos dois canais) foi parametrizada só nos dois
+trechos que citavam formato ("com o RECIBO"/"com o CARD"; "recibo(s)"/
+"marcador(es) [[CARTA]]") — o resto (guardrail de nunca negar estoque
+sem chamar a tool, cap de 2 chamadas por turno, `[[ESCALAR]]`) é
+idêntico nos dois ramos. Persona da Valentina teve as duas menções
+hardcoded a "RECIBO" trocadas por texto neutro ("a seção de apresentação
+de carta acima") já que persona é compartilhada entre os dois canais.
+
+**Seletor "Custo excelente" (`seloCustoExcelente`) — discrepância
+resolvida.** A decisão prévia (AskUserQuestion) foi "remover ágio, manter
+o selo, que é baseado no custo a.m.". Na prática, `components/
+CartaCard.tsx` (produção) deriva o selo de `bidcon_agio_120 > 0`, não de
+`custo_am` — mantive essa regra (consistência com o resto do produto) e
+resolvi a parte literal do pedido de outro jeito: o número cru do ágio
+nunca é exposto em lugar nenhum (nem no JSON da tool, nem no card do
+site) — só um booleano derivado. `lib/buscar-cartas-tool.ts` passou a
+selecionar `agio_120` de `vw_carousel_cartas` e devolver
+`seloCustoExcelente: boolean` em `CartaEncontrada` (nunca o valor cru).
+
+**Migration `supabase/migrations/0060_vw_carousel_cartas_agio120.sql`
+(projeto xtv) — criada, NÃO aplicada, aguardando AUTORIZO.** Amplia
+`vw_carousel_cartas` (estável desde a 0054, conferido ao vivo via
+`pg_get_viewdef` antes de escrever — sem drift) com a coluna `agio_120`
+(já pública em `vw_vitrine_viva`, a view de origem), acrescentada por
+último, sem reordenar nenhuma coluna existente (mesma disciplina de
+append-only da 0054).
+
+**⚠️ Ordem de deploy importa.** Testei ao vivo (read-only) que
+`vw_carousel_cartas` HOJE não tem `agio_120` — `select agio_120 from
+vw_carousel_cartas` já falha com `42703 column does not exist`. Como
+`buscarCartas()` engole erro de banco e devolve `[]` (por design — nunca
+derruba o turno), se este código for pro ar ANTES da migration 0060 ser
+aplicada, `buscar_cartas` vai devolver 0 resultados SEMPRE, disparando
+`[[ESCALAR]]` em toda apresentação de carta nos dois canais (regressão
+silenciosa, sem erro visível em log de aplicação — só nos logs do
+Supabase). **A migration 0060 precisa ir com AUTORIZO e ser aplicada
+ANTES (ou junto) do deploy deste código.** Conferido também, pro mesmo
+filtro de `vw_carousel_cartas` (1.941 linhas hoje), que 489 delas têm
+`agio_120 > 0` — a coluna nova vai popular o selo de verdade assim que a
+migration entrar.
+
+**`lib/whatsapp/cerebro.ts`** — chama `montarSystem(agenteAtivo,
+"whatsapp")`; removido o parser `[[CARTA]]`→texto que tinha ficado morto
+desde a TOM-01 (`parseCampos`, `formatarCartaTexto`, `RE_CARTA`,
+`converterCartasParaTexto`) — `converterOpcoesParaTexto`/`RE_OPCOES`
+(ainda em uso, `[[OPCOES]]` continua saindo nos dois canais) preservados
+intactos. Comentário do `blocoCartas()` (bloco estático "CARTAS
+DISPONÍVEIS AGORA") corrigido — não fala mais em `[[CARTA]]` (marcador
+que este canal nunca emite), agora orienta a sempre passar por
+`buscar_cartas` antes de montar o recibo.
+
+**`app/api/atende/route.ts`** — chama `montarSystem(agenteAtual,
+"site")` (literal fixo: este endpoint é sempre o chat do site; o
+`canal` do corpo da requisição — que já existia, valores `'site'|
+'whatsapp'` — é só metadado de origem do interesse/conversa, nunca
+decidiu formato de apresentação e continua não decidindo). Mesmo ajuste
+de comentário no `blocoCartas()` deste arquivo.
+
+**`public/prosperito-widget.js`** — `pwRenderCarta()`: administradora
+(`adm`) agora aparece no eyebrow dos dois modos ("REF. n · TIPO ·
+Administradora"); removido o box dourado "BIDCON PRICE" (modo destaque)
+e o texto "abaixo do teto" com o valor de ágio (modo mini) — CSS morta
+junto (`.pw-carta-price*`, `.pw-carta-info u`). Botão `.pw-carta-cta`
+ganhou `data-id` e `data-adm`. O handler de clique desse botão
+(populava `cartaFocoAtual` pro RESERVA-01 via chat) tinha `adm: ''`
+hardcoded — bug real, carta reservada pelo card dentro do chat nunca
+carregava administradora; agora lê `data-adm`.
+
+**Verificação**: `npx tsc --noEmit` limpo. Grep confirma zero sobra de
+`RE_CARTA`/`parseCampos`/`formatarCartaTexto`/`converterCartasParaTexto`
+no repo, e que `PROMPT_BASE` não é mais referenciado fora de
+`_prompt.ts`. Grep de compliance limpo (únicas ocorrências de termos
+proibidos são as próprias regras). Teste de aceite ficou no nível de
+dados (mesma limitação de sempre: sem `ANTHROPIC_API_KEY` real nesta
+sessão) — `vw_carousel_cartas` hoje tem 1.941 cartas, todas já com
+administradora; a contagem via `vw_vitrine_viva` com o mesmo filtro
+confirma que a 0060 não muda o total (sem drift), só acrescenta a coluna
+que falta pro selo.
+
+**Pendências**:
+1. Aplicar `0060` sob AUTORIZO — **antes** de publicar este código (ver
+   alerta de ordem de deploy acima).
+2. Teste de aceite fim-a-fim com o modelo real nos dois canais (mesma
+   pendência recorrente de F4-TOOL/TOM-01).
+3. Push — condicionado a PUBLICA explícito desta fatia.
