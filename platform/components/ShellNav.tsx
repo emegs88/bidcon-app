@@ -42,6 +42,7 @@ const EQUIPE: Link[] = [{ href: "/prospere-ancora", label: "byAncora" }];
 const ADMIN_CONSOLE: Link[] = [
   { href: "/admin/importar", label: "Importar" },
   { href: "/admin/revisao", label: "Revisão" },
+  { href: "/admin/conversas", label: "Conversas" },
 ];
 
 function linksPara(tipo?: Tipo, equipe?: boolean, equipeAdminConsole?: boolean): Link[] {

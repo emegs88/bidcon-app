@@ -1,0 +1,95 @@
+/* CRM-01 — Central de Conversas. Só CSS Modules + tokens globais, mesmo
+   espírito das demais áreas do admin (revisao/processos). */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.linha1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nomeLead {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Thread de mensagens (bolhas) */
+.thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.bolha {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cliente {
+  justify-self: start;
+  background: var(--surface);
+}
+.agente {
+  justify-self: end;
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+}
+.sistema {
+  justify-self: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-style: dashed;
+}
+.bolhaMeta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.acoesWrap {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.botoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.erro {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #f3a4a4;
+}
+.nota {
+  font-size: 13px;
+  color: var(--text-muted);
+}

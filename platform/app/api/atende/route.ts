@@ -510,14 +510,18 @@ export async function POST(req: Request) {
     }
   }
 
-  // 1) Conversa 'aberta' para o interesse; se não houver, cria.
-  let conversa: { id: string; agente_atual: string | null } | null = null;
+  // 1) Conversa não-fechada para o interesse (aberta OU humano — CRM-01:
+  // uma conversa escalada pra humano precisa continuar sendo encontrada
+  // aqui, senão a próxima mensagem do lead cria uma conversa nova e o bot
+  // volta a responder, anulando a escalação); se não houver, cria.
+  let conversa: { id: string; agente_atual: string | null; status: string } | null =
+    null;
   {
     const { data } = await supabase
       .from("conversas")
-      .select("id, agente_atual")
+      .select("id, agente_atual, status")
       .eq("interesse_id", interesseId)
-      .eq("status", "aberta")
+      .neq("status", "fechada")
       .maybeSingle();
     conversa = data;
   }
@@ -530,7 +534,7 @@ export async function POST(req: Request) {
         agente_atual: AGENTE_INICIAL,
         status: "aberta",
       })
-      .select("id, agente_atual")
+      .select("id, agente_atual, status")
       .single();
     if (error || !data) {
       return NextResponse.json(
@@ -556,6 +560,17 @@ export async function POST(req: Request) {
         { status: 500, headers: corsHeaders(req) }
       );
     }
+  }
+
+  // 2.5) CRM-01: conversa assumida por humano (admin clicou "Assumir" em
+  // /admin/conversas) -> mensagem do cliente já foi registrada acima, mas
+  // NÃO chama o modelo. Mesmo espírito do `podeResponder` do webhook do
+  // WhatsApp (platform/app/api/whatsapp/route.ts). `resposta: null` é
+  // tratado pelo widget (public/prosperito-widget.js linha ~218,
+  // `data.resposta || 'Recebi sua mensagem! Já te respondo.'`) sem
+  // necessidade de nenhuma mudança no front.
+  if (conversa.status === "humano") {
+    return NextResponse.json({ resposta: null }, { headers: corsHeaders(req) });
   }
 
   // 3) Histórico em ordem -> mensagens Anthropic (user/assistant alternados).

@@ -1,0 +1,39 @@
+// POST /api/admin/conversas/site/[id]/devolver — CRM-01.
+// Retoma o bot no chat do site: conversas.status='aberta'. Depende da
+// migration 0061 (alarga o CHECK, antes só permitia 'aberta'|'fechada') e do
+// gate adicionado em platform/app/api/atende/route.ts (passo 2.5) — com
+// status voltando a 'aberta', o lookup (`.neq("status","fechada")`) segue
+// encontrando a mesma conversa e o gate deixa de bloquear o modelo.
+// Não seta atualizado_em manualmente — a tabela `conversas` já tem o trigger
+// `conversas_touch` cuidando disso em qualquer UPDATE.
+// Gate: checarAdminConsoleApi() (mesmo padrão de /api/admin/cartas/*).
+import { NextResponse } from "next/server";
+import { checarAdminConsoleApi } from "@/lib/admin-console";
+import { createXtvClient } from "@/lib/supabase-xtv";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const acesso = await checarAdminConsoleApi();
+  if (!acesso.ok) {
+    return NextResponse.json({ erro: acesso.motivo }, { status: acesso.status });
+  }
+
+  const id = params.id;
+  if (!id) {
+    return NextResponse.json({ erro: "id é obrigatório." }, { status: 400 });
+  }
+
+  const supabase = createXtvClient();
+  const { error } = await supabase
+    .from("conversas")
+    .update({ status: "aberta" })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[admin/conversas/site/devolver] falha ao gravar:", error);
+    return NextResponse.json({ erro: "não foi possível devolver a conversa." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
