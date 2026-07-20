@@ -1214,3 +1214,54 @@ o que foi pedida a fazer.
    relacionado) devem ser limpos numa fatia futura, já que ficaram sem
    uso — não removidos aqui por estarem fora do escopo pedido.
 3. Push — condicionado a PUBLICA explícito desta fatia.
+
+## 2026-07 — Reconciliação da revisão de PLAYCONTEMPLADAS-01 (sem renumeração; nova view de vigilância)
+
+Retomada de um plano antigo (rascunhado antes das fatias 0054–0058) que
+pedia 3 ajustes na revisão: renumerar a migration, corpo fresco das RPCs,
+query de duplicata entre fontes, e um registro sobre o impacto no
+retrato da vitrine. Antes de tocar em qualquer arquivo, conferi o estado
+real do repo/banco — achado principal: **PLAYCONTEMPLADAS-01 já estava
+inteiramente entregue** (commit `0397ce6`, 17/07, ancestral do HEAD
+atual) e a migration `0053_playcontempladas_fonte` **já aplicada em
+produção** (xtv, version `20260717111805`) — inclusive já tinha gerado e
+fechado um incidente próprio (`SYNC-CHURN-01`, mesmo dia, ver entrada
+acima) com `SYNC-CHURN-02` (identidade por fingerprint estável) ainda em
+aberto na fila.
+
+**Ajuste 1 (renumerar 0053→0059) — não se aplica.** Não existe conflito:
+0053 foi tomado ANTES de 0054–0058 existirem, nenhuma fatia posterior
+reaproveitou o número, e as RPCs já estão no ar com `'PLAYCONTEMPLADAS'`
+liberado. Renumerar/reaplicar seria puro retrabalho sem efeito (as
+guardas do arquivo já são idempotentes — `on conflict do nothing`,
+checagem `not (x = any(aliases))`).
+
+**Ajuste 2 (query de duplicata entre fontes) — real, implementado como
+proposta.** Descoberta ao consultar o schema ao vivo: `cartas` não tem
+`grupo`/`cota` (só `extratos_cotas`, tabela não relacionada, tem essas
+colunas) — não dá pra agrupar por `(administradora_id, grupo, cota)`
+literalmente. Proxy usado: fingerprint de campos estáveis e comparáveis
+entre fontes — `(administradora_id, tipo, valor_credito, valor_parcela,
+qtd_parcelas)` — mesmo raciocínio já escopado (não implementado) em
+SYNC-CHURN-02. Testado como SELECT direto (read-only) antes de virar
+migration: **242 grupos suspeitos, 484 cartas envolvidas** hoje,
+majoritariamente PLAYCONTEMPLADAS batendo de frente com CBC/CARTAS na
+administradora Itaú (ex.: imóvel 70.700/859×70 aparecendo em CARTAS e
+PLAYCONTEMPLADAS com os mesmos 5 valores) — confirma que o risco
+apontado na revisão é real, não hipotético. Migration nova
+`0059_vw_sync_possiveis_duplicatas.sql` (view read-only, `security_invoker
+= on`, comentário explicando o proxy e a limitação de schema) criada e
+**aguardando AUTORIZO** — não aplicada ainda. É paliativo de
+visibilidade pro admin, não resolve a causa raiz (que é SYNC-CHURN-02).
+
+**Ajuste 3 (nota sobre retrato da vitrine pós-Play) — só registro, sem
+ação.** Mantido como está: quando o template de campanha for aprovado,
+regenerar os cards com o estoque pós-Play antes do piloto — nenhuma
+mudança de código necessária agora.
+
+**Status**: PLAYCONTEMPLADAS-01 confirmada como já encerrada (nada a
+reabrir). Novo item pendente: aplicar `0059` sob AUTORIZO e,
+depois, considerar se `SYNC-CHURN-02` deveria subir de prioridade dado
+que a view já mostra o problema em volume real (484 cartas). TOM-02
+segue na fila, deliberadamente não retomada nesta entrada (feedback da
+revisão pediu explicitamente pra mantê-la lá).
