@@ -5,6 +5,7 @@
 // Requer as rotas /api/analista-grupos e /api/analista-ia deste pacote.
 
 import { useEffect, useState } from "react";
+import { SimuladorTabNav } from "../SimuladorTabNav";
 
 const fmt = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -88,6 +89,7 @@ export default function SimuladorPorto() {
   return (
     <main style={{ minHeight: "100vh", background: "#0A0E1A", color: "#E5E9F0", fontFamily: "'Space Grotesk', system-ui, sans-serif", padding: "32px 16px" }}>
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+        <SimuladorTabNav ativo="porto" />
         <h1 style={{ fontSize: 28, margin: 0, background: "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)", WebkitBackgroundClip: "text", color: "transparent" }}>
           Analista de Grupos · Bidcon
         </h1>
