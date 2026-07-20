@@ -1120,3 +1120,97 @@ entre as "melhores por ágio" simplesmente não existia pro modelo.
    produção/preview e confirmar que a resposta cita uma carta real ≤150k
    (REF 652 ou equivalente do momento), nunca uma negativa de estoque.
 2. Push — aguardando PUBLICA explícito desta fatia.
+
+_Nota: publicado logo em seguida (commit `8d80ac8`, PUBLICA confirmado nesta
+mesma sessão) — pendência 2 resolvida; pendência 1 (teste fim-a-fim com
+modelo real) segue aberta, mesma limitação de ambiente local descrita acima._
+
+## 2026-07 — TOM-01: recibo Bidcon como formato canônico de carta
+
+**O que mudou**: até aqui, apresentar carta usava o marcador de sistema
+`[[CARTA]]...[[/CARTA]]`, que virava card visual só no widget do site
+(`public/prosperito-widget.js`) e virava um texto formatado à parte no
+WhatsApp (`converterCartasParaTexto` em `lib/whatsapp/cerebro.ts`). A
+partir desta fatia, **o próprio modelo escreve o recibo** — um bloco de
+texto monoespaçado (crase tripla, que tanto WhatsApp quanto o site
+renderizam) — como formato ÚNICO e canônico de apresentação, nos dois
+canais. Único arquivo tocado: `app/api/atende/_prompt.ts`.
+
+**Mudanças no `_prompt.ts` (`PROMPT_BASE` + persona Serena)**:
+- Seção "CARDS DE CARTA ([[CARTA]])" **substituída** por "RECIBO —
+  FORMATO CANÔNICO DE APRESENTAÇÃO DE CARTA (TOM-01)": template exato
+  (administradora · tipo · REF na primeira linha, linhas de
+  crédito/entrada/parcelas/custo, rodapé fixo "Pagamento protegido por
+  Conta Notarial"), regras inegociáveis (sem emoji dentro do bloco, sem
+  "R$", milhar em pt-BR com ponto — 116050 → 116.050 —, nunca
+  recalcular/arredondar valor).
+- Recibo é preenchido SÓ com dados da tool `buscar_cartas` — é a única
+  fonte que tem `administradora` e `id` (uuid); o bloco estático "CARTAS
+  DISPONÍVEIS AGORA" não tem essas duas colunas, então a seção deixa
+  explícito que não dá pra montar recibo só a partir dele.
+- Quantidade: no máximo 2 recibos por mensagem; busca com 3+ resultados
+  -> mostra os 2 de melhor custo + linha "Tenho mais [n] opções nessa
+  faixa — quer ver?"; detalhe de 1 carta -> recibo + 1 frase (entrada é
+  valor final) + link `app.bidcon.com.br/cartas/[id]`.
+- Guardrail "BUSCA DE ESTOQUE EM TEMPO REAL" e "ORDEM OBRIGATÓRIA"
+  atualizados pra referenciar RECIBO em vez de `[[CARTA]]` (ordem agora:
+  texto normal com recibo(s) embutido -> `[[OPCOES]]` -> `[[ESCALAR]]`
+  -> `##AGENTE:xxx##`).
+- Persona Valentina (etapa 3, APRESENTAÇÃO): passa a chamar
+  `buscar_cartas` e apresentar até 2 RECIBOS na mesma resposta, em vez
+  de citar o bloco estático via `[[CARTA]]`.
+- Persona Serena: nova seção "FECHAMENTO PADRÃO" com a frase fixa "Pra
+  reservar a REF [x] eu só preciso de dois passos: seus dados básicos e
+  a análise do nosso time, sem custo e sem compromisso. Posso iniciar
+  sua reserva?" — a resposta afirmativa do cliente a essa pergunta é
+  quem autoriza o marcador `[[RESERVAR]]` já existente (RESERVA-01, sem
+  nenhuma mudança na mecânica desse marcador).
+- TOM: parágrafos de até 2 frases, proibição explícita de abrir com
+  "Boa notícia!", e lista de emoji sempre proibidos (🙌 📋 💪) — além do
+  limite de 1 emoji/mensagem já existente.
+- Léxico de compliance, guardrail da tool, `MARCADOR_BASTAO`,
+  `MARCADOR_RESERVAR`, `MARCADOR_ESCALAR` e `[[OPCOES]]`: intocados.
+
+**Efeito colateral conhecido (fora do escopo desta fatia)**: como o
+modelo não emite mais `[[CARTA]]`, o parser desse marcador em
+`lib/whatsapp/cerebro.ts` (`converterCartasParaTexto`/`RE_CARTA`) e em
+`public/prosperito-widget.js` (`pwParseCarta`, incluindo o card visual
+com `modo=destaque`, selo "Custo excelente" e badge de ágio) ficam sem
+uso — não foram removidos (a fatia pediu só ajuste em `_prompt.ts`).
+Consequência real pro site: a experiência de card visual clicável do
+widget é substituída por um recibo em texto simples na bolha de chat,
+sem o realce de "BIDCON PRICE"/selo que o widget desenhava. Registrado
+aqui pra decisão consciente — não é um bug, é a fatia fazendo exatamente
+o que foi pedida a fazer.
+
+**Verificação**:
+- `npx tsc --noEmit` limpo.
+- Grep de compliance limpo (únicas ocorrências de
+  "investimento/rendimento/retorno" são as próprias regras de
+  compliance em texto).
+- Validado que o template do recibo (com crase tripla escapada dentro
+  do template literal de `PROMPT_BASE`) evalua corretamente pra um bloco
+  de código real — testado via `montarSystem('valentina')` num script
+  ad-hoc (`tsx`, apagado depois).
+- Teste de aceite: rodado igual ao de F4-TOOL, só no nível de dados
+  (**chamada real ao modelo não é possível nesta sessão** — mesma
+  limitação de `.env.local` com `ANTHROPIC_API_KEY` placeholder).
+  Executor real `buscarCartas()` contra o filtro do caso de aceite
+  (`tipo=imovel, credito_max=150000, entrada_max=60000`) devolveu 10
+  cartas reais, cada uma já com `administradora` e `id` (uuid) — os dois
+  dados que só a tool tem e que o recibo exige. As 2 melhores por custo
+  seriam REF 413 (Embracon, custo 0,64%) e REF 412 (Embracon, custo
+  0,66%); a REF 652 do caso de auditoria original também está na lista
+  (posição 3, custo 0,67%). Confirma que os dados pra montar 2 recibos
+  corretos (com administradora e milhar formatado) estão disponíveis;
+  não confirma que o MODELO de fato segue o template à risca — isso só
+  em produção/preview com chave real.
+
+**Pendências**:
+1. Teste de aceite fim-a-fim com o modelo real (mesma pendência de
+   F4-TOOL, agora também cobrindo o formato do recibo em si).
+2. Avaliar/decidir se `lib/whatsapp/cerebro.ts` (conversores de
+   `[[CARTA]]`) e `public/prosperito-widget.js` (`pwParseCarta` e CSS
+   relacionado) devem ser limpos numa fatia futura, já que ficaram sem
+   uso — não removidos aqui por estarem fora do escopo pedido.
+3. Push — condicionado a PUBLICA explícito desta fatia.
