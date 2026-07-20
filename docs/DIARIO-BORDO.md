@@ -854,3 +854,78 @@ com uma chamada de rede real, só revisão de código + compilação. Testar
 de fato (enviar 1 mensagem via `D360_API_KEY` de sandbox e forçar 1
 POST assinado com `WHATSAPP_BSP_WEBHOOK_SECRET`) fica como validação
 pendente pra quando houver credenciais 360dialog configuradas.
+
+## 2026-07 — WHATSAPP-EXTRATO-01: ingestão e leitura de extratos de cota via WhatsApp
+
+**O que foi implementado**: o webhook (`app/api/whatsapp/route.ts`) passa a
+tratar mensagens `messages[].type === "document"|"image"` como possíveis
+extratos de cota anexados. Dois módulos novos:
+
+- `lib/whatsapp/media.ts` — `baixarMidia(mediaId)` faz o download em dois
+  passos da Graph Media API (GET `/{media_id}` pra pegar a URL efêmera
+  assinada + metadados, depois GET nessa URL, ambos com
+  `Authorization: Bearer $WHATSAPP_TOKEN` — a URL sozinha não autentica) e
+  `subirParaStorage(conversaId, mediaId, midia)` sobe os bytes pro bucket
+  privado `wa-extratos` (Supabase Storage, projeto **xtv**, via
+  `createXtvClient()` service_role), path
+  `{conversa_id}/{media_id}.{ext}`.
+- `lib/whatsapp/extrato.ts` — `extrairExtrato(doc)` espelha
+  `lib/verificador.ts` (fetch puro na Anthropic Messages API, content
+  block `document`/`image` em base64, prompt fechado pedindo só JSON) mas
+  com schema próprio (`administradora`, `grupo`, `cota`, `valor_credito`,
+  `saldo_devedor`, `parcelas_pagas`, `parcelas_restantes`,
+  `valor_parcela`, `contemplada`, `confianca`) e modelo
+  **`claude-fable-5`** (mesmo hardcoded de `/api/atende` e
+  `cerebro.ts` — pedido explícito, diferente do
+  `claude-3-5-sonnet-20241022` do verificador). `resumoExtratoWa(e)` monta
+  o texto de resposta a partir dos campos JÁ TIPADOS (nunca prosa livre
+  do modelo — mesmo espírito de `FRASE_RESERVA_WA` em `cerebro.ts`) e
+  passa por `sanitizarCompliance()` (`lib/ia.ts`) como última barreira.
+
+**Fluxo no webhook**: depois do insert em `wa_mensagens` (agora com
+`media_id` quando há anexo, e `.select("id")` pra capturar o id da
+própria linha), um bloco novo — isolado em try/catch, nunca derruba o ack
+200 — baixa a mídia, sobe pro storage, grava `storage_path` de volta em
+`wa_mensagens`, chama `extrairExtrato()` e insere em `extratos_cotas` com
+`status='pendente_revisao'`. **Nunca escreve em `cartas`.** Se
+`WHATSAPP_AGENT_ATIVO==="true"` e a conversa não está opt-out/escalada,
+envia o resumo via `sendText()` com `agente:"sistema_extrato"`.
+
+**Decisões de arquitetura não explícitas no pedido original** (resolvidas
+por precedente já estabelecido no repo, documentadas aqui pra não
+precisar redescobrir):
+
+- **RLS de `extratos_cotas`**: o pedido dizia "RLS: só admin lê", mas o
+  projeto **xtv** não tem `auth.users` nem `is_admin()` — é acessado
+  100% via `service_role`, sem sessão de usuário (mesmo motivo de
+  `wa_conversas`/`wa_mensagens`/`fornecedores`/`importacoes`, migrations
+  0037/0046). A migration usa o padrão já estabelecido "RLS ligado + ZERO
+  policies"; o "só admin lê" fica garantido na CAMADA DE APLICAÇÃO, por
+  uma futura rota `/api/admin/*` que chame `checarAdminConsoleApi()`
+  (sessão no projeto **nnv** + allowlist `BIDCON_ADMIN_EMAILS`) antes de
+  usar `createXtvClient()` — não existe hoje uma tela admin pra isso,
+  fica pra quando for pedida.
+- **Bucket `wa-extratos`**: PRIVADO, precisa ser criado MANUALMENTE no
+  painel do Supabase (projeto xtv) antes do primeiro extrato real chegar
+  — mesmo padrão de `kyc-doc`/`processo-docs` (migrations 0008/0014,
+  projeto nnv: buckets nunca são criados via SQL). Sem policy de
+  `storage.objects` necessária, porque o acesso é 100% via service_role.
+  **Isto é um prerequisito de infra, não coberto por esta fatia de
+  código.**
+- Nenhuma env nova — `WHATSAPP_TOKEN`, `ANTHROPIC_API_KEY`,
+  `BIDCON_XTV_URL`/`BIDCON_XTV_SERVICE_ROLE_KEY` já existiam.
+
+**Verificação**: `npx tsc --noEmit` limpo. Grep de compliance (termos de
+`TERMOS_PROIBIDOS` em `lib/ia.ts`) limpo nos 3 arquivos novos/editados.
+Sem teste end-to-end contra a Graph API/Anthropic real nesta sessão (sem
+extrato de exemplo nem sandbox disponível) — só revisão de código +
+compilação, mesmo nível de verificação do suporte a 360dialog acima.
+
+**Pendências antes de funcionar em produção** (nenhuma delas foi
+executada nesta sessão — aguardando o usuário):
+1. Migration `0057_whatsapp_extratos.sql` — rascunhada, **NÃO aplicada**
+   (aguardando AUTORIZO explícito).
+2. Bucket `wa-extratos` — precisa ser criado manualmente no painel do
+   Supabase (projeto xtv), privado, antes do primeiro teste real.
+3. Push pra `main` — **NÃO feito** (aguardando PUBLICA explícito);
+   commit ficou só local nesta sessão.

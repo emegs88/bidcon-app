@@ -1,12 +1,13 @@
 // ============================================================================
-// Webhook do WhatsApp (Meta Cloud API) — WHATSAPP-01 · F1+F2+F3.
+// Webhook do WhatsApp (Meta Cloud API) — WHATSAPP-01 · F1+F2+F3 +
+// WHATSAPP-EXTRATO-01.
 // ----------------------------------------------------------------------------
 // F1 cuida do encanamento: handshake GET + POST que valida assinatura,
 // deduplica por wa_message_id e grava a mensagem recebida em wa_conversas/
 // wa_mensagens (projeto xtv — ver migration 0046 e a nota de correção de
 // arquitetura nnv→xtv nela).
 //
-// F2+F3 (esta fatia): depois de gravar a mensagem do cliente, se
+// F2+F3: depois de gravar a mensagem do cliente, se
 // WHATSAPP_AGENT_ATIVO==="true" (kill-switch, default desligado) e a
 // conversa não estiver opt-out nem escalada pra humano, chama o cérebro do
 // Time Prosperito (lib/whatsapp/cerebro.ts — reaproveita persona/compliance
@@ -15,6 +16,17 @@
 // só loga. Escopo desta fatia é mais enxuto que o §10.3 completo da spec
 // (sem orquestrador em rota separada, sem debounce/lock, sem tools de
 // busca via RPC, sem guardrail module dedicado — ver relatório da sessão).
+//
+// WHATSAPP-EXTRATO-01 (esta fatia): mensagens do tipo `document`/`image`
+// (extrato de cota anexado) ganham um caminho próprio, ver
+// processarAnexoExtrato() abaixo — baixa da Graph Media API
+// (lib/whatsapp/media.ts), sobe pro bucket privado `wa-extratos`, extrai os
+// campos via IA (lib/whatsapp/extrato.ts) e grava um registro
+// 'pendente_revisao' em extratos_cotas (migration 0057, AUTORIZO
+// pendente). NUNCA escreve em `cartas`. Se WHATSAPP_AGENT_ATIVO==="true",
+// responde com um resumo dos campos (texto fixo, não gerado pelo modelo —
+// ver resumoExtratoWa em lib/whatsapp/extrato.ts). Qualquer falha do
+// caminho de extrato é capturada e só loga — mesmo contrato do F2+F3.
 //
 // GET: handshake exigido pela Meta ao configurar o webhook (hub.mode=
 //   subscribe + hub.verify_token == WHATSAPP_VERIFY_TOKEN → devolve
@@ -34,25 +46,25 @@
 //   receber" (normalizado) => wa_conversas.opt_out=true — detecta nas três
 //   formas em que pode chegar: quick reply de TEMPLATE (button.text),
 //   quick reply de interativa comum (interactive.button_reply.title) ou
-//   texto digitado livremente (text.body); 6) Fatia F2+F3: se ativo e a
+//   texto digitado livremente (text.body); 6) anexo (document/image):
+//   processarAnexoExtrato() — ver acima; 7) Fatia F2+F3: se ativo e a
 //   conversa está livre (sem opt-out, status!=='humano'), gera e envia a
 //   resposta do Time Prosperito (await dentro do try/catch — ver nota
 //   abaixo sobre a escolha de não usar fire-and-forget literal);
-//   7) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
+//   8) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
 //   Meta reenviar por erro de aplicação, mesmo padrão de
 //   /api/hooks/novo-cadastro.
 //
-// Nota de desenho (F2+F3): o pedido original falava em "fire-and-forget".
-// Em runtime serverless (Vercel/Node), uma promise não aguardada corre risco
-// real de ser encerrada junto com a função antes de terminar — não é
-// fire-and-forget seguro, é só "talvez rode". Por isso o processamento do
-// agente é AGUARDADO (await) dentro do try/catch: a falha nunca derruba o
-// 200 (mesmo efeito pedido), mas o trabalho tem garantia de rodar até o
-// fim antes da função retornar. Efeito colateral: o ack pode demorar um
-// pouco mais quando o agente está ativo (1 chamada Anthropic + 1 chamada
-// Graph API, tipicamente poucos segundos) — aceitável nesta fatia; um
-// mecanismo de fila/waitUntil fica para uma fatia de blindagem (F4) se a
-// latência dessa ack virar problema real em produção.
+// Nota de desenho (F2+F3, reaproveitada pro anexo): o pedido original
+// falava em "fire-and-forget". Em runtime serverless (Vercel/Node), uma
+// promise não aguardada corre risco real de ser encerrada junto com a
+// função antes de terminar — não é fire-and-forget seguro, é só "talvez
+// rode". Por isso o processamento (agente E extrato) é AGUARDADO (await)
+// dentro do try/catch: a falha nunca derruba o 200 (mesmo efeito pedido),
+// mas o trabalho tem garantia de rodar até o fim antes da função retornar.
+// Efeito colateral: o ack pode demorar mais quando há anexo (download +
+// upload + 1 chamada de visão) — aceitável nesta fatia; fila/waitUntil
+// fica pra uma fatia de blindagem (F4) se a latência virar problema real.
 //
 // service_role (createXtvClient): usado aqui porque não há sessão de
 // usuário (mensagem chega de fora, sem cookie) — mesmo motivo de
@@ -63,6 +75,8 @@ import crypto from "crypto";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { gerarRespostaWhatsApp, agenteValido } from "@/lib/whatsapp/cerebro";
 import { sendText } from "@/lib/whatsapp/graph";
+import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
+import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -183,6 +197,10 @@ function assinaturaValidaMeta(
 type MensagemMeta = {
   id?: string;
   from?: string;
+  // "text" | "button" | "interactive" | "document" | "image" | ... — só os
+  // tipos que este webhook trata de fato são desestruturados abaixo; os
+  // demais (audio, video, sticker, location, ...) caem no fallback vazio.
+  type?: string;
   text?: { body?: string };
   interactive?: {
     button_reply?: { title?: string };
@@ -193,6 +211,11 @@ type MensagemMeta = {
   // interactive.button_reply.title — esse é só pra botões de mensagem
   // interativa comum, formato diferente).
   button?: { text?: string; payload?: string };
+  // Extrato de cota anexado (WHATSAPP-EXTRATO-01) — document tem filename/
+  // caption opcionais, image só caption. `id` aqui é o media_id da Graph
+  // API, baixado depois via lib/whatsapp/media.ts.
+  document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
+  image?: { id?: string; caption?: string; mime_type?: string };
 };
 
 // --- POST: recebe eventos; F1 só grava (sem Claude, sem resposta) ----------
@@ -261,12 +284,20 @@ export async function POST(req: Request) {
     const telefone = m.from;
     if (!telefone) continue;
 
+    // Extrato de cota anexado (WHATSAPP-EXTRATO-01): document/image trazem
+    // um media_id da Graph API que é baixado/processado abaixo, depois do
+    // insert em wa_mensagens (precisa do id da própria mensagem primeiro).
+    const anexo: { id?: string; filename?: string; caption?: string; mime_type?: string } | undefined =
+      m.type === "document" ? m.document : m.type === "image" ? m.image : undefined;
+
     const conteudo =
       m.text?.body ??
       m.button?.text ??
       m.interactive?.button_reply?.title ??
       m.interactive?.list_reply?.title ??
-      "";
+      anexo?.filename ??
+      anexo?.caption ??
+      (anexo ? "[anexo sem nome/legenda]" : "");
 
     const { data: conversa, error: errConversa } = await db
       .from("wa_conversas")
@@ -275,12 +306,18 @@ export async function POST(req: Request) {
       .single();
     if (errConversa || !conversa) continue;
 
-    await db.from("wa_mensagens").insert({
-      conversa_id: conversa.id,
-      papel: "cliente",
-      conteudo,
-      wa_message_id: waMessageId,
-    });
+    const { data: msgInserida, error: errMsg } = await db
+      .from("wa_mensagens")
+      .insert({
+        conversa_id: conversa.id,
+        papel: "cliente",
+        conteudo,
+        wa_message_id: waMessageId,
+        media_id: anexo?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (errMsg || !msgInserida) continue;
 
     // Fatia 4 (LGPD/opt-out) — "não quero receber" marca opt_out=true,
     // detectado em qualquer uma das 3 formas (ver ehOptOut); F2/F3 devem
@@ -292,6 +329,62 @@ export async function POST(req: Request) {
         .from("wa_conversas")
         .update({ opt_out: true })
         .eq("id", conversa.id);
+    }
+
+    // WHATSAPP-EXTRATO-01 — extrato de cota anexado (document/image): baixa
+    // da Graph Media API, sobe pro bucket privado wa-extratos, extrai os
+    // campos via IA e grava 'pendente_revisao' em extratos_cotas. NUNCA
+    // escreve em `cartas`. Falha em qualquer etapa é só logada — nunca
+    // derruba o ack 200 (mesmo contrato do bloco F2+F3 abaixo).
+    if (anexo?.id) {
+      try {
+        const midia = await baixarMidia(anexo.id);
+        const storagePath = await subirParaStorage(conversa.id, anexo.id, midia);
+
+        await db
+          .from("wa_mensagens")
+          .update({ storage_path: storagePath })
+          .eq("id", msgInserida.id);
+
+        const base64 = Buffer.from(midia.bytes).toString("base64");
+        const extrato = await extrairExtrato({ mimeType: midia.mimeType, base64 });
+
+        await db.from("extratos_cotas").insert({
+          conversa_id: conversa.id,
+          mensagem_id: msgInserida.id,
+          storage_path: storagePath,
+          dados: extrato,
+          administradora: extrato.administradora,
+          grupo: extrato.grupo,
+          cota: extrato.cota,
+          valor_credito: extrato.valor_credito,
+          saldo_devedor: extrato.saldo_devedor,
+          parcelas_pagas: extrato.parcelas_pagas,
+          parcelas_restantes: extrato.parcelas_restantes,
+          valor_parcela: extrato.valor_parcela,
+          contemplada: extrato.contemplada,
+          confianca: extrato.confianca,
+        });
+
+        if (
+          process.env.WHATSAPP_AGENT_ATIVO === "true" &&
+          conversa.opt_out !== true &&
+          conversa.status !== "humano"
+        ) {
+          await sendText({
+            conversaId: conversa.id,
+            telefone,
+            texto: resumoExtratoWa(extrato),
+            agente: "sistema_extrato",
+          });
+        }
+      } catch (e) {
+        // Falha no caminho de extrato NUNCA derruba o ack 200 — só loga.
+        console.error(
+          "[whatsapp] falha ao processar extrato (anexo):",
+          e instanceof Error ? e.message : e
+        );
+      }
     }
 
     // Fatia F2+F3 — Time Prosperito responde, se ligado (kill-switch) e a
