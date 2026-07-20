@@ -11,6 +11,14 @@
 // persistida ou devolvida. Nunca investimento/rendimento/retorno; nunca promessa
 // de data de contemplação; "Bidcon Price" é referência, não oferta.
 //
+// F4-TOOL: a chamada à Anthropic roda em loop (até 2 rodadas de tool_use) com
+// a tool `buscar_cartas` (definição/executor únicos em
+// lib/buscar-cartas-tool.ts, compartilhados com lib/whatsapp/cerebro.ts) —
+// busca de verdade em vw_carousel_cartas, corrige o caso em que a persona só
+// enxergava o recorte estático de blocoCartas() e negava estoque que existia
+// de verdade fora dele. [[ESCALAR]] (tool devolveu 0) aciona
+// conversas.status='humano', sem substituir o texto do modelo.
+//
 // LEAD ANÔNIMO: não há sessão de usuário. As tabelas interesses/conversas/
 // mensagens vivem no projeto Supabase "xtv" — usamos createXtvClient()
 // (service_role, server-only) porque o lead não tem sessão/cookie para RLS.
@@ -32,10 +40,17 @@ import {
   montarSystem,
   MARCADOR_BASTAO,
   MARCADOR_RESERVAR,
+  MARCADOR_ESCALAR,
   AGENTE_INICIAL,
   AGENTES,
   type AgenteId,
 } from "./_prompt";
+import {
+  BUSCAR_CARTAS_TOOL,
+  buscarCartas,
+  resultadoParaTool,
+  type BuscarCartasInput,
+} from "@/lib/buscar-cartas-tool";
 
 export const dynamic = "force-dynamic";
 
@@ -574,30 +589,67 @@ export async function POST(req: Request) {
     system += "\n\n" + blocoCartaFoco(cartaFoco);
   }
 
-  // 5) Anthropic Messages API (fetch cru).
+  // 5) Anthropic Messages API (fetch cru), em loop de tool-use (F4-TOOL):
+  // a persona tem a tool `buscar_cartas` (busca de verdade em
+  // vw_carousel_cartas — ver lib/buscar-cartas-tool.ts) pra nunca negar
+  // estoque numa faixa sem ter consultado o banco de verdade primeiro.
+  // No máximo 2 rodadas de tool_use por turno; na rodada seguinte ao teto
+  // omitimos `tools` do body pra forçar o modelo a fechar com texto.
+  const MAX_RODADAS_TOOL = 2;
+  type MsgApi = { role: "user" | "assistant"; content: unknown };
+  const apiMensagens: MsgApi[] = mensagens.map((m) => ({ role: m.role, content: m.content }));
+
   let data: unknown;
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-fable-5",
-        max_tokens: 1024,
-        system,
-        messages: mensagens,
-      }),
-    });
-    if (!resp.ok) {
-      return NextResponse.json(
-        { erro: "Falha ao consultar o provedor de IA." },
-        { status: 502, headers: corsHeaders(req) }
+    let rodada = 0;
+    for (;;) {
+      const usarTools = rodada < MAX_RODADAS_TOOL;
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-fable-5",
+          max_tokens: 1024,
+          system,
+          messages: apiMensagens,
+          ...(usarTools ? { tools: [BUSCAR_CARTAS_TOOL] } : {}),
+        }),
+      });
+      if (!resp.ok) {
+        return NextResponse.json(
+          { erro: "Falha ao consultar o provedor de IA." },
+          { status: 502, headers: corsHeaders(req) }
+        );
+      }
+      data = await resp.json();
+
+      const stopReason = (data as { stop_reason?: string })?.stop_reason;
+      const content = (data as { content?: unknown }).content;
+      const toolUses = Array.isArray(content)
+        ? (
+            content as Array<{ type?: string; name?: string; id?: string; input?: unknown }>
+          ).filter((b) => b?.type === "tool_use" && b?.name === "buscar_cartas")
+        : [];
+
+      if (stopReason !== "tool_use" || !usarTools || !toolUses.length) break;
+
+      rodada++;
+      apiMensagens.push({ role: "assistant", content });
+      const toolResults = await Promise.all(
+        toolUses.map(async (tu) => ({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: resultadoParaTool(
+            await buscarCartas(supabase, (tu.input ?? {}) as BuscarCartasInput)
+          ),
+        }))
       );
+      apiMensagens.push({ role: "user", content: toolResults });
     }
-    data = await resp.json();
   } catch {
     return NextResponse.json(
       { erro: "Provedor de IA indisponível." },
@@ -612,6 +664,16 @@ export async function POST(req: Request) {
   const m = bruto.match(MARCADOR_BASTAO);
   const proximoBruto = m ? m[1] : null;
   let limpo = bruto.replace(MARCADOR_BASTAO, "").trimEnd();
+
+  // 7.4) F4-TOOL: captura [[ESCALAR]]motivo=...[[/ESCALAR]] — emitido quando
+  // buscar_cartas devolveu 0 pro filtro pedido. SEMPRE remove do texto
+  // exibido; diferente de [[RESERVAR]], NÃO substitui o texto do modelo
+  // (não há identidade/dado financeiro em jogo aqui) — só aciona
+  // status='humano' abaixo (passo 10.5). Garantia de escalação é do
+  // sistema, não da prosa do modelo.
+  const marcadorEscalar = limpo.match(MARCADOR_ESCALAR);
+  limpo = limpo.replace(MARCADOR_ESCALAR, "").trimEnd();
+  const escalarHumano = !!marcadorEscalar;
 
   // 7.5) RESERVA-01: captura [[RESERVAR]]ref=NNN[[/RESERVAR]] — SEMPRE remove
   // do texto exibido (sucesso ou não; o cliente nunca vê o marcador cru). Se
@@ -652,6 +714,17 @@ export async function POST(req: Request) {
         .update({ agente_atual: proximo, atualizado_em: new Date().toISOString() })
         .eq("id", conversa.id);
     }
+  }
+
+  // 10.5) F4-TOOL: buscar_cartas devolveu 0 nesta resposta -> escala pra
+  // humano (status='humano'), mesmo padrão de garantia-de-sistema do
+  // RESERVA-01. Não interfere na resposta já devolvida ao cliente (texto
+  // do próprio modelo, já filtrado por compliance).
+  if (escalarHumano) {
+    await supabase
+      .from("conversas")
+      .update({ status: "humano", atualizado_em: new Date().toISOString() })
+      .eq("id", conversa.id);
   }
 
   // 11) Devolve só o texto limpo ao cliente.

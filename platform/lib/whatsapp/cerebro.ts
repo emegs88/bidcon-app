@@ -27,6 +27,14 @@
 //     prosa da IA). Travar a carta de fato via WhatsApp fica pra quando
 //     houver um mecanismo de identidade equivalente — fora desta fatia.
 //
+// F4-TOOL: a chamada à Anthropic agora roda em loop (até 2 rodadas de
+// tool_use) com a tool `buscar_cartas` (definição/executor únicos em
+// lib/buscar-cartas-tool.ts, importados por este arquivo e por
+// app/api/atende/route.ts) — corrige o caso em que o modelo só enxergava o
+// recorte estático de blocoCartas() e negava estoque que existia de
+// verdade fora dele. [[ESCALAR]] (tool devolveu 0) segue o mesmo padrão de
+// [[RESERVAR]]: aciona wa_conversas.status='humano' via `escalarHumano`.
+//
 // Modelo: mesmo "claude-fable-5" hardcoded do /api/atende (valor provado em
 // produção) — a spec (docs/WHATSAPP-01-SPEC.md §4/§6) sugere env
 // ANTHROPIC_MODEL com default claude-sonnet-4-6; optei por reaproveitar o
@@ -38,10 +46,17 @@ import {
   montarSystem,
   MARCADOR_BASTAO,
   MARCADOR_RESERVAR,
+  MARCADOR_ESCALAR,
   AGENTE_INICIAL,
   AGENTES,
   type AgenteId,
 } from "@/app/api/atende/_prompt";
+import {
+  BUSCAR_CARTAS_TOOL,
+  buscarCartas,
+  resultadoParaTool,
+  type BuscarCartasInput,
+} from "@/lib/buscar-cartas-tool";
 
 const FALLBACK_WA =
   "Posso te ajudar a entender como funciona o processo e os próximos passos. " +
@@ -243,24 +258,60 @@ export async function gerarRespostaWhatsApp(
   const cartas = await blocoCartas(db);
   if (cartas) system += "\n\n" + cartas;
 
+  // Loop de tool-use (buscar_cartas) — no máximo 2 rodadas de tool_use por
+  // turno (F4-TOOL; ver header de lib/buscar-cartas-tool.ts). Na rodada
+  // seguinte ao teto, omitimos `tools` do body pra forçar o modelo a
+  // fechar com texto, mesmo que "quisesse" mais uma busca.
+  const MAX_RODADAS_TOOL = 2;
+  type MsgApi = { role: "user" | "assistant"; content: unknown };
+  const apiMensagens: MsgApi[] = mensagens.map((m) => ({ role: m.role, content: m.content }));
+
   let data: unknown;
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-fable-5",
-        max_tokens: 1024,
-        system,
-        messages: mensagens,
-      }),
-    });
-    if (!resp.ok) return null;
-    data = await resp.json();
+    let rodada = 0;
+    for (;;) {
+      const usarTools = rodada < MAX_RODADAS_TOOL;
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-fable-5",
+          max_tokens: 1024,
+          system,
+          messages: apiMensagens,
+          ...(usarTools ? { tools: [BUSCAR_CARTAS_TOOL] } : {}),
+        }),
+      });
+      if (!resp.ok) return null;
+      data = await resp.json();
+
+      const stopReason = (data as { stop_reason?: string })?.stop_reason;
+      const content = (data as { content?: unknown }).content;
+      const toolUses = Array.isArray(content)
+        ? (
+            content as Array<{ type?: string; name?: string; id?: string; input?: unknown }>
+          ).filter((b) => b?.type === "tool_use" && b?.name === "buscar_cartas")
+        : [];
+
+      if (stopReason !== "tool_use" || !usarTools || !toolUses.length) break;
+
+      rodada++;
+      apiMensagens.push({ role: "assistant", content });
+      const toolResults = await Promise.all(
+        toolUses.map(async (tu) => ({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: resultadoParaTool(
+            await buscarCartas(db, (tu.input ?? {}) as BuscarCartasInput)
+          ),
+        }))
+      );
+      apiMensagens.push({ role: "user", content: toolResults });
+    }
   } catch {
     return null;
   }
@@ -275,9 +326,18 @@ export async function gerarRespostaWhatsApp(
   const proximoAgente = mBastao ? (mBastao[1] as AgenteId) : null;
   let limpo = bruto.replace(MARCADOR_BASTAO, "").trimEnd();
 
+  // [[ESCALAR]]: buscar_cartas devolveu 0 pro filtro pedido — aciona o
+  // time humano (status='humano'), mas MANTÉM o texto do modelo (já vai
+  // passar pela barreira de compliance abaixo) — diferente de
+  // [[RESERVAR]], aqui não há identidade/dado financeiro em jogo pra
+  // justificar substituir a frase inteira por uma fixa.
+  let escalarHumano = false;
+  const mEscalar = limpo.match(MARCADOR_ESCALAR);
+  limpo = limpo.replace(MARCADOR_ESCALAR, "").trimEnd();
+  if (mEscalar) escalarHumano = true;
+
   // [[RESERVAR]]: sem mecanismo de identidade (carta_foco) no WhatsApp
   // ainda — escala pra humano em vez de fingir uma trava real.
-  let escalarHumano = false;
   const mReserva = limpo.match(MARCADOR_RESERVAR);
   limpo = limpo.replace(MARCADOR_RESERVAR, "").trimEnd();
   if (mReserva) {

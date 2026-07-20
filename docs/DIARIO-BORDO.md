@@ -1045,3 +1045,78 @@ abaixo); não havia necessidade de reprocessar nada manualmente.
    o log de servidor agora traz o corpo completo do erro da Anthropic —
    ver item (1) acima.
 3. Push — aguardando PUBLICA explícito desta fatia.
+
+## 2026-07 — F4-TOOL: buscar_cartas (busca de verdade contra negação de estoque)
+
+**O que aconteceu**: auditoria de 19/07 pegou a Valentina afirmando "não
+tenho imóvel na faixa de 150 mil, as menores começam perto de 400 mil"
+com o cliente pedindo justamente uma carta de imóvel até 150 mil — quando
+o banco TINHA a REF 690 (hoje renumerada pro sync pra REF 652: crédito
+116.050, entrada 52.624, custo 0,67% a.m.), um encaixe quase perfeito.
+Causa raiz: `blocoCartas()` (em `cerebro.ts`/`route.ts`) só injeta no
+system prompt um recorte ESTÁTICO — top ~20 cartas por tipo, ordenadas
+por ágio/custo — e o modelo nunca tinha como consultar o banco de
+verdade fora desse recorte; uma carta de crédito menor que não estivesse
+entre as "melhores por ágio" simplesmente não existia pro modelo.
+
+**Correção — tool Anthropic `buscar_cartas`**:
+- Módulo novo e ÚNICO `lib/buscar-cartas-tool.ts` (definição da tool +
+  executor `buscarCartas()` + `resultadoParaTool()`), importado tanto por
+  `lib/whatsapp/cerebro.ts` (WhatsApp) quanto por `app/api/atende/route.ts`
+  (site) — mesmo padrão de reuso já usado pra `montarSystem`/
+  `sanitizarCompliance`. Consulta `vw_carousel_cartas` (a MESMA view
+  pública da vitrine, RLS-safe, sem coluna sensível) com filtros
+  opcionais `tipo`/`credito_max`/`entrada_max`, ordenada por `custo_am
+  asc`, `limite` padrão 5 (teto 10). Nunca lança: filtro malformado é
+  ignorado, erro de banco vira lista vazia — a tool sempre devolve algo
+  consultável pro modelo.
+- Loop de tool-use em AMBOS os handlers (`cerebro.ts` e `route.ts`,
+  lógica duplicada de propósito — mesmo padrão já usado pro resto do
+  cérebro): até 2 rodadas de `tool_use`; na chamada seguinte ao teto o
+  `tools` é omitido do body pra forçar o modelo a fechar com texto.
+- Guardrail inegociável em `_prompt.ts` (`PROMPT_BASE`, nova seção "BUSCA
+  DE ESTOQUE EM TEMPO REAL"): nunca negar estoque numa faixa sem ter
+  chamado `buscar_cartas` com aqueles filtros primeiro nesta mesma
+  resposta; valores sempre EXATAMENTE como a tool devolveu; tool vazia ->
+  diz que vai confirmar com a equipe e emite `[[ESCALAR]]motivo=
+  sem_estoque[[/ESCALAR]]`.
+- Marcador novo `MARCADOR_ESCALAR` (`_prompt.ts`) — ao contrário do
+  `[[RESERVAR]]` (que SUBSTITUI o texto inteiro do modelo por uma frase
+  fixa, porque há identidade/dado financeiro em jogo), o `[[ESCALAR]]`
+  só é removido do texto exibido; o texto do modelo (já passado por
+  `sanitizarCompliance`) segue pro cliente normalmente. O que é garantia
+  de sistema aqui é só o `status='humano'` — `wa_conversas.status` (já
+  suportava, reaproveitado do fluxo de reserva do WhatsApp — o handler
+  de `escalarHumano` no webhook já era genérico) e `conversas.status`
+  (site — capacidade nova, adicionada nesta fatia; a coluna já era texto
+  livre, sem mudança de schema).
+- Tom (pedido à parte): máximo 1 emoji por mensagem, nunca colado num
+  valor/condição — regra nova na seção TOM do `PROMPT_BASE`.
+
+**Verificação**:
+- `npx tsc --noEmit` limpo.
+- Grep de compliance limpo nos 4 arquivos tocados (as únicas ocorrências
+  de "investimento/rendimento/retorno" são as PRÓPRIAS regras de
+  compliance em texto, não conteúdo violando-as).
+- Teste de aceite: rodado em duas partes. (a) **Executor da tool contra o
+  banco real** (script ad-hoc, apagado depois) confirmou que o filtro do
+  caso de auditoria (`tipo=imovel, credito_max=150000, entrada_max=
+  60000`) devolve 5 cartas reais, incluindo a REF 652 (crédito 116.050,
+  entrada 52.624, custo 0,67% a.m.) — a mesma carta que devia ter sido
+  oferecida em 19/07; filtro absurdo devolve 0; `limite=999` capa em 10.
+  (b) **Chamada real ao modelo NÃO foi possível nesta sessão** —
+  `.env.local` só tem um placeholder pra `ANTHROPIC_API_KEY`
+  (`<EU PREENCHO...>`), sem chave real disponível localmente. O caminho
+  de código (loop de tool-use, extração de `tool_use`/`tool_result`,
+  parsing de `[[ESCALAR]]`) foi revisado linha a linha e bate com o
+  contrato da Anthropic Messages API, mas o comportamento fim-a-fim do
+  MODELO (se ele de fato chama a tool e cita a REF 652 em vez de negar
+  estoque) só pode ser confirmado num ambiente com chave real
+  (produção/preview) — ver pendência abaixo.
+
+**Pendências**:
+1. Teste de aceite fim-a-fim com o modelo real: mandar "quero carta de
+   imóvel até 150 mil, entrada de uns 60" pro site ou WhatsApp em
+   produção/preview e confirmar que a resposta cita uma carta real ≤150k
+   (REF 652 ou equivalente do momento), nunca uma negativa de estoque.
+2. Push — aguardando PUBLICA explícito desta fatia.

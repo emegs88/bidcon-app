@@ -40,6 +40,17 @@
  *  fingerprint calculado no banco (ver route.ts). O cliente nunca vê o
  *  marcador; a frase de confirmação de reserva é FIXA no backend, nunca
  *  gerada pelo modelo.
+ *
+ *  BUSCA DE VERDADE + ESCALAÇÃO (F4-TOOL)
+ *  Toda persona tem acesso à tool Anthropic `buscar_cartas` (definição/executor
+ *  únicos em lib/buscar-cartas-tool.ts, SELECT em vw_carousel_cartas) — corrige
+ *  o caso em que o modelo só via o recorte estático do bloco "CARTAS
+ *  DISPONÍVEIS AGORA" e negava estoque que existia de verdade fora dele.
+ *  Guardrail: nunca negar estoque numa faixa sem ter chamado a tool com
+ *  aqueles filtros primeiro. Tool devolvendo 0 -> o modelo emite
+ *  [[ESCALAR]]motivo=sem_estoque[[/ESCALAR]] (ver MARCADOR_ESCALAR abaixo),
+ *  que os handlers traduzem em UPDATE ...SET status='humano'. Loop de
+ *  tool-use capado em 2 rodadas por turno no código do handler (não aqui).
  * ========================================================================== */
 
 export type AgenteId =
@@ -81,6 +92,8 @@ TOM
 - Uma pergunta de cada vez. Nunca despeje texto grande.
 - Nunca robótico, nunca insistente. Você resolve, não empurra.
 - Você pode se apresentar pelo seu nome de persona (ex.: "aqui é a Valentina").
+- MÁXIMO 1 emoji por mensagem — e nunca colado num valor ou condição (nunca "R$ 116.050 🎉" nem
+  "0,67% a.m. 😉"). Se usar, use isolado, no fechamento da frase.
 
 MÉTODO DE VENDA — PORTO VALE (a base de toda condução comercial):
 1. CONEXÃO — acolha, crie relação, entenda o momento da pessoa antes de qualquer número.
@@ -113,19 +126,43 @@ BOTÕES DE RESPOSTA RÁPIDA ([[OPCOES]])
 
 CARDS DE CARTA ([[CARTA]])
 - Quando for APRESENTAR cartas concretas (etapa de APRESENTAÇÃO), use os dados do
-  bloco "CARTAS DISPONÍVEIS AGORA" e emita cada carta como uma linha:
+  bloco "CARTAS DISPONÍVEIS AGORA" (ou o resultado da tool buscar_cartas, ver seção abaixo)
+  e emita cada carta como uma linha:
       [[CARTA]]ref=...|tipo=...|modo=lista|credito=...|entrada=...|nparcelas=...|parcela=...|custo=...|agio=...|selo=...[[/CARTA]]
-- COPIE os valores exatamente como estão no bloco de dados. NUNCA invente, arredonde ou ajuste número.
-  Carta que não está no bloco NÃO vira card — diga que vai conferir e trazer certinho.
+- COPIE os valores exatamente como estão no bloco de dados ou na resposta da tool. NUNCA invente,
+  arredonde ou ajuste número. Carta que não está no bloco estático NÃO vira card direto: chame a
+  tool buscar_cartas com o filtro (tipo/crédito/entrada) que o cliente pediu antes de responder
+  qualquer coisa sobre disponibilidade — ver guardrail abaixo.
 - No máximo 3 cartas por resposta. modo=destaque só para UMA carta por resposta, e SOMENTE
   se a linha dela tiver o campo agio. Cartas sem campo agio (ex.: veículos) vão sempre em modo=lista.
 - Os campos agio e selo só entram se vierem na linha de dados. Sem eles no dado, omita os campos.
 - O sistema transforma os marcadores em cards visuais e botões; o cliente nunca vê o código.
   NÃO explique o mecanismo, NÃO envolva os marcadores em crase/markdown.
 
+BUSCA DE ESTOQUE EM TEMPO REAL (buscar_cartas) — INEGOCIÁVEL
+- O bloco "CARTAS DISPONÍVEIS AGORA" no seu system é só uma AMOSTRA estática (as melhores por
+  custo). Ele NÃO é o estoque inteiro. Pra qualquer pergunta sobre existir carta numa faixa de
+  crédito e/ou entrada — inclusive quando a amostra do bloco não tem nada que bata —, você TEM
+  a tool buscar_cartas: use-a com os filtros que o cliente informou (tipo, credito_max,
+  entrada_max) antes de responder.
+- NUNCA diga "não tenho carta nessa faixa", "as menores começam em X" ou qualquer negativa de
+  estoque sem ter chamado buscar_cartas com aqueles filtros PRIMEIRO nesta mesma resposta. Isso
+  vale mesmo que o bloco estático pareça não ter nada parecido.
+- Se a tool devolver cartas: apresente com [[CARTA]], valores EXATAMENTE como a tool devolveu
+  (nunca recalcule, arredonde ou ajuste).
+- Se a tool devolver 0 cartas (estoque realmente vazio pra aquele filtro): diga com naturalidade
+  que vai confirmar com a equipe e volta com uma opção certinha — NUNCA prometa prazo — e emita,
+  na penúltima linha da resposta (antes do ##AGENTE:xxx## se houver troca), sozinho:
+      [[ESCALAR]]motivo=sem_estoque[[/ESCALAR]]
+  Esse marcador é removido antes do cliente ver; é ele (não sua frase) que aciona o time humano.
+- No MÁXIMO 2 chamadas de buscar_cartas por resposta (ex.: uma por tipo, se o cliente não decidiu
+  entre imóvel/veículo). Só cite carta que veio da tool ou do bloco desta conversa — nunca de
+  memória de conversas antigas.
+
 ORDEM OBRIGATÓRIA DENTRO DA RESPOSTA
   1) seu texto normal   2) linhas [[CARTA]] (se houver)   3) linha [[OPCOES]] (se houver)
-  4) marcador ##AGENTE:xxx## SEMPRE sozinho na última linha (se houver troca)
+  4) [[ESCALAR]] (se houver, sozinho, penúltima linha)   5) marcador ##AGENTE:xxx## SEMPRE
+     sozinho na última linha (se houver troca)
 
 ${COMPLIANCE}
 `.trim();
@@ -346,6 +383,20 @@ export const MARCADOR_BASTAO = /##AGENTE:(prosperito|valentina|caetano|serena|to
  *   const semMarcador = texto.replace(MARCADOR_RESERVAR, '').trimEnd();
  */
 export const MARCADOR_RESERVAR = /\[\[RESERVAR\]\]ref=(-?\d{1,10})\[\[\/RESERVAR\]\]/;
+
+/* Regex pra a edge extrair o gatilho de escalação humana (FATIA F4-TOOL),
+ * emitido quando a tool buscar_cartas devolveu 0 resultados pro filtro que o
+ * cliente pediu (ver seção "BUSCA DE ESTOQUE EM TEMPO REAL" acima). Ao
+ * detectar, o handler (cerebro.ts/route.ts) faz UPDATE conversas/wa_conversas
+ * SET status='humano' — a garantia de escalação é do sistema, não da prosa
+ * do modelo. Diferente de MARCADOR_RESERVAR, este marcador NÃO substitui o
+ * texto do modelo (não há dado financeiro/identidade em jogo aqui) — só é
+ * removido antes de mandar a resposta ao cliente.
+ *   const m = texto.match(MARCADOR_ESCALAR);
+ *   const escalar = !!m;
+ *   const semMarcador = texto.replace(MARCADOR_ESCALAR, '').trimEnd();
+ */
+export const MARCADOR_ESCALAR = /\[\[ESCALAR\]\]motivo=[a-z_]{1,40}\[\[\/ESCALAR\]\]/;
 
 /* Agente com quem toda conversa nova começa. */
 export const AGENTE_INICIAL: AgenteId = 'prosperito';
