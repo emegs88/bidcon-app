@@ -102,7 +102,13 @@ function blocoDeConteudo(doc: DocEntrada): unknown {
 }
 
 // fetch com timeout — uma chamada de IA travada nunca pode pendurar o webhook.
-// Não vaza corpo de erro do provedor (só status).
+// EXTRATO-01-FIX: em caso de erro, o corpo completo da resposta é logado
+// (console.error, só no servidor — nunca sobe pra `Error` nem vai pra
+// resposta HTTP de nada) porque até aqui só logávamos o status (ex.: 400)
+// sem detalhe nenhum, o que deixava qualquer diagnóstico cego. A mensagem
+// lançada pro chamador continua sem o corpo (mesma cautela de sempre —
+// não repassar detalhe de conta/provedor adiante), só o log de servidor
+// ganha o corpo cru.
 async function chamarAnthropic(doc: DocEntrada): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -129,6 +135,13 @@ async function chamarAnthropic(doc: DocEntrada): Promise<string> {
       signal: ctrl.signal,
     });
     if (!resp.ok) {
+      const corpoErro = await resp.text().catch(() => "<corpo ilegível>");
+      console.error("[whatsapp/extrato] Anthropic respondeu erro:", {
+        status: resp.status,
+        mimeTypeEnviado: doc.mimeType,
+        tipoBlocoEnviado: doc.mimeType === "application/pdf" ? "document" : "image",
+        corpo: corpoErro,
+      });
       throw new Error(`Anthropic respondeu ${resp.status}`);
     }
     const json = (await resp.json()) as { content?: { type?: string; text?: string }[] };

@@ -91,6 +91,19 @@ export const runtime = "nodejs";
 // Mesmo padrão de app/api/backfill-embeddings/route.ts.
 export const maxDuration = 60;
 
+// EXTRATO-01-FIX + DEBOUNCE: se o cliente manda várias mensagens em
+// sequência rápida (rajada), cada webhook chamava gerarRespostaWhatsApp
+// na hora — resultado: respostas fora de ordem/duplicadas, cada uma
+// vendo só um pedaço da rajada. DEBOUNCE_MS é quanto se espera, depois de
+// gravar a mensagem do cliente, antes de decidir se É esta mensagem que
+// deve gerar a resposta (só a mais recente da conversa no fim da espera
+// dispara — ver checagem antes do lock, abaixo). LOCK_TTL_MS é só rede de
+// segurança contra o lock (`wa_conversas.respondendo_desde`) ficar preso
+// pra sempre se a função for encerrada no meio (ex.: timeout) antes de
+// liberar — não é o tempo normal de uso do lock.
+const DEBOUNCE_MS = 8_000;
+const LOCK_TTL_MS = 2 * 60_000;
+
 // --- GET: handshake da Meta -------------------------------------------------
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -409,33 +422,82 @@ export async function POST(req: Request) {
 
     if (podeResponder) {
       try {
-        const resultado = await gerarRespostaWhatsApp(
-          db,
-          conversa.id,
-          agenteValido(conversa.agente_ativo)
-        );
-        if (resultado) {
-          await sendText({
-            conversaId: conversa.id,
-            telefone,
-            texto: resultado.texto,
-            agente: resultado.agenteQueRespondeu,
-            tokensIn: resultado.tokensIn,
-            tokensOut: resultado.tokensOut,
-          });
+        // Debounce: espera DEBOUNCE_MS e confere se chegou mensagem mais
+        // nova do cliente nesta conversa nesse meio-tempo. Se chegou, esta
+        // mensagem sai de cena silenciosamente (não é falha) — é a
+        // mensagem mais nova, na sua própria passada pelo webhook, quem
+        // vai fazer essa mesma checagem e (assumindo silêncio de
+        // DEBOUNCE_MS) gerar a resposta cobrindo a rajada inteira.
+        await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
 
-          const updates: Record<string, unknown> = {};
-          if (
-            resultado.proximoAgente &&
-            resultado.proximoAgente !== resultado.agenteQueRespondeu
-          ) {
-            updates.agente_ativo = resultado.proximoAgente;
-          }
-          if (resultado.escalarHumano) {
-            updates.status = "humano";
-          }
-          if (Object.keys(updates).length > 0) {
-            await db.from("wa_conversas").update(updates).eq("id", conversa.id);
+        const { data: ultimaMsgCliente } = await db
+          .from("wa_mensagens")
+          .select("id")
+          .eq("conversa_id", conversa.id)
+          .eq("papel", "cliente")
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const souAUltima = !ultimaMsgCliente || ultimaMsgCliente.id === msgInserida.id;
+
+        if (souAUltima) {
+          // Lock: impede duas gerações simultâneas na mesma conversa (ex.:
+          // duas invocações do webhook cujo debounce vence quase junto).
+          // UPDATE...WHERE é atômico por linha no Postgres — das tentativas
+          // concorrentes, só uma consegue de fato casar o WHERE e setar
+          // respondendo_desde; a(s) outra(s) veem 0 linhas afetadas e
+          // desistem sem erro. O braço `lt` do WHERE é só destrave de lock
+          // preso (função anterior encerrada no meio, ex. por timeout) —
+          // não é o caminho normal.
+          const agoraIso = new Date().toISOString();
+          const limiteStaleIso = new Date(Date.now() - LOCK_TTL_MS).toISOString();
+          const { data: lockAdquirido } = await db
+            .from("wa_conversas")
+            .update({ respondendo_desde: agoraIso })
+            .eq("id", conversa.id)
+            .or(`respondendo_desde.is.null,respondendo_desde.lt.${limiteStaleIso}`)
+            .select("id");
+
+          if (lockAdquirido && lockAdquirido.length > 0) {
+            try {
+              const resultado = await gerarRespostaWhatsApp(
+                db,
+                conversa.id,
+                agenteValido(conversa.agente_ativo)
+              );
+              if (resultado) {
+                await sendText({
+                  conversaId: conversa.id,
+                  telefone,
+                  texto: resultado.texto,
+                  agente: resultado.agenteQueRespondeu,
+                  tokensIn: resultado.tokensIn,
+                  tokensOut: resultado.tokensOut,
+                });
+
+                const updates: Record<string, unknown> = {};
+                if (
+                  resultado.proximoAgente &&
+                  resultado.proximoAgente !== resultado.agenteQueRespondeu
+                ) {
+                  updates.agente_ativo = resultado.proximoAgente;
+                }
+                if (resultado.escalarHumano) {
+                  updates.status = "humano";
+                }
+                if (Object.keys(updates).length > 0) {
+                  await db.from("wa_conversas").update(updates).eq("id", conversa.id);
+                }
+              }
+            } finally {
+              // Libera o lock sempre — sucesso, falha do agente (capturada
+              // abaixo) ou qualquer outro caminho.
+              await db
+                .from("wa_conversas")
+                .update({ respondendo_desde: null })
+                .eq("id", conversa.id);
+            }
           }
         }
       } catch (e) {

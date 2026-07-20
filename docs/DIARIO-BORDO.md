@@ -954,3 +954,94 @@ tinha. Adicionado `export const maxDuration = 60;` em
 Pendência (1) fechada. Pendência (2) — bucket `wa-extratos` — **segue
 aberta**, é passo manual do Emerson no painel. Pendência (3) — push —
 segue aguardando PUBLICA explícito nesta sessão.
+
+**Atualização — push feito, aguardando teste real do Emerson**: PUBLICA
+recebido (mensagem direta na sessão). Antes do push, `git fetch` trouxe 3
+commits automáticos (`chore(vitrine): snapshot automático do estoque`)
+que tinham entrado no remoto nesse meio-tempo — `git rebase origin/main`
+limpo, sem conflito, `tsc` reconferido depois. `main` publicado em
+`7a88539`.
+
+## 2026-07 — EXTRATO-01-FIX + DEBOUNCE
+
+Depois do primeiro teste real do Emerson (reenvio de um extrato pelo
+WhatsApp), o insert em `extratos_cotas` não apareceu — a extração estava
+falhando calada: o log só registrava `Anthropic respondeu 400`, sem
+nenhum detalhe do motivo. Três frentes:
+
+**(1) Log cego corrigido** — `lib/whatsapp/extrato.ts`: no branch de erro
+de `chamarAnthropic()`, agora loga (`console.error`, só servidor — nunca
+sobe pra `Error` nem pra resposta HTTP) o corpo completo da resposta de
+erro da Anthropic (`await resp.text()`) junto com `status`, o
+`mimeType` que foi enviado e o tipo de bloco escolhido
+(`document`/`image`) — antes só o `status` aparecia, impossível
+diagnosticar um 400 sem saber SE era formato de bloco, mime não
+suportado, base64 malformado ou outra coisa. A mensagem lançada pro
+chamador (webhook) continua sem o corpo — só o log de servidor ganhou o
+detalhe, mesma cautela de sempre contra vazar dado de conta/provedor
+adiante.
+
+**(2) Content block/modelo conferidos, sem bug encontrado** — a
+montagem em `blocoDeConteudo()` já estava correta antes desta fatia:
+`type:"document"` só quando `mimeType==="application/pdf"`, senão
+`type:"image"`, `media_type` sempre o mime real do arquivo baixado —
+nunca imagem dentro de bloco `document`. O modelo (`"claude-fable-5"`)
+já batia exatamente com o hardcoded de `app/api/atende/route.ts` (mesmo
+`max_tokens:1024`, mesmos headers `x-api-key`/`anthropic-version:
+2023-06-01`/`content-type`). Nenhuma mudança de código aqui — o log do
+item (1) é o que vai revelar a causa real do 400 assim que o Emerson
+reenviar o extrato de teste; hipóteses não confirmadas (mime não
+suportado pela Anthropic, PDF exigindo algum cabeçalho extra, etc.) não
+foram "corrigidas às cegas" sem evidência.
+
+**(3) Debounce + lock contra rajada de mensagens** —
+`app/api/whatsapp/route.ts`: antes desta fatia, cada mensagem do
+cliente que passasse pelo kill-switch disparava `gerarRespostaWhatsApp`
+na hora — se o cliente mandasse 2-3 mensagens em sequência rápida
+(rajada comum de digitação no WhatsApp), cada uma gerava sua própria
+resposta, cada uma vendo só um pedaço do que o cliente queria dizer
+(resposta fora de ordem / picotada). Agora, antes de gerar:
+  1. Espera `DEBOUNCE_MS` (8s) depois de gravar a mensagem do cliente.
+  2. Confere se, nesse meio-tempo, chegou uma mensagem MAIS NOVA do
+     cliente na mesma conversa (`wa_mensagens`, `papel='cliente'`,
+     maior `id`). Se chegou, esta mensagem desiste silenciosamente —
+     não é falha, é o desenho esperado: a mensagem mais nova, na sua
+     própria passada pelo webhook, vai fazer essa mesma checagem e
+     (assumindo silêncio de 8s) gerar a resposta cobrindo a rajada
+     inteira.
+  3. Se esta É a mensagem mais nova, tenta adquirir um lock —
+     `wa_conversas.respondendo_desde timestamptz` (migration 0058) — via
+     `UPDATE ... WHERE id=X AND (respondendo_desde IS NULL OR
+     respondendo_desde < <agora - LOCK_TTL_MS>)`. `UPDATE...WHERE` é
+     atômico por linha no Postgres: de duas tentativas concorrentes
+     (ex.: duas invocações do webhook cujo debounce vence quase junto),
+     só uma consegue de fato casar o `WHERE` e setar o lock; a outra vê
+     0 linhas afetadas e desiste sem erro. `LOCK_TTL_MS` (2min) é só
+     rede de segurança pro lock não ficar preso pra sempre se a função
+     for encerrada no meio (ex.: timeout) antes de liberar — não é o
+     caminho normal.
+  4. Gera e envia a resposta dentro de um `try/finally` que SEMPRE
+     libera o lock (`respondendo_desde=null`) no fim, sucesso ou falha.
+
+Efeito colateral aceito: toda resposta do agente agora demora pelo menos
+8s a mais pra sair — inerente ao desenho de debounce pedido, e ainda bem
+dentro do orçamento do `maxDuration=60` já configurado.
+
+**Verificação**: `npx tsc --noEmit` limpo. Grep de compliance limpo nos
+3 arquivos tocados (`extrato.ts`, `media.ts` inalterado mas reconferido,
+`route.ts`). Migration `0058_whatsapp_debounce_lock.sql` aplicada em
+produção (xtv) — AUTORIZO pré-registrado pelo Emerson nesta sessão para
+esta migration específica — conferida via `information_schema`
+(`wa_conversas.respondendo_desde`, `timestamptz`, existe). Sem teste
+end-to-end contra a Graph API/Anthropic real nesta sessão — aguardando o
+Emerson reenviar o extrato de teste após o deploy (ver pendências
+abaixo); não havia necessidade de reprocessar nada manualmente.
+
+**Pendências**:
+1. Bucket `wa-extratos` (Supabase Storage, xtv) — segue como passo
+   manual do Emerson, ainda não confirmado se já foi criado.
+2. Teste de aceite — Emerson reenvia o extrato após o deploy; critério
+   de sucesso é a linha aparecer em `extratos_cotas`. Se falhar de novo,
+   o log de servidor agora traz o corpo completo do erro da Anthropic —
+   ver item (1) acima.
+3. Push — aguardando PUBLICA explícito desta fatia.
