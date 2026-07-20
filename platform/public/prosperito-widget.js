@@ -396,7 +396,21 @@ function pwEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){ret
 /* negrito simples **texto** -> <b>texto</b>, sempre sobre texto já escapado
  * (pwEsc primeiro) pra nunca abrir brecha de HTML injection via resposta do modelo. */
 function pwBoldEsc(s){return pwEsc(s).replace(/\*\*([^\*]+?)\*\*/g,'<b>$1</b>');}
-function pwBRL(n){var v=parseInt(String(n).replace(/\D/g,''),10);return isNaN(v)?pwEsc(n):'R$ '+v.toLocaleString('pt-BR');}
+function pwBRL(n){
+  var v;
+  if (typeof n === 'number') {
+    v = Math.round(n);
+  } else {
+    var s = String(n).trim().replace(/[^\d.,-]/g, '');
+    if (s.indexOf(',') !== -1) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if ((s.match(/\./g) || []).length > 1) {
+      s = s.replace(/\./g, '');
+    }
+    v = Math.round(parseFloat(s));
+  }
+  return isNaN(v) ? pwEsc(n) : 'R$ ' + v.toLocaleString('pt-BR');
+}
 function pwParseCarta(body){var c={};body.split('|').forEach(function(p){var i=p.indexOf('=');if(i>0)c[p.slice(0,i).trim().toLowerCase()]=p.slice(i+1).trim();});return c;}
 function pwRenderCarta(c){
   var ref=pwEsc(c.ref||''),tipo=pwEsc((c.tipo||'').toUpperCase()),custo=pwEsc(c.custo||''),adm=pwEsc(c.adm||'');
