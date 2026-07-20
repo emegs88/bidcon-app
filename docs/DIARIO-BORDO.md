@@ -929,3 +929,28 @@ executada nesta sessão — aguardando o usuário):
    Supabase (projeto xtv), privado, antes do primeiro teste real.
 3. Push pra `main` — **NÃO feito** (aguardando PUBLICA explícito);
    commit ficou só local nesta sessão.
+
+**Atualização — AUTORIZO recebido, migration aplicada + fix de timeout**:
+Emerson deu AUTORIZO condicionado ("se o arquivo bater com o desenho
+combinado") — conferido (bucket privado, RLS admin-only via app,
+`status` default `'pendente_revisao'`, nenhuma escrita em `cartas`) e
+aplicado via MCP no projeto **xtv**. Conferência pós-apply via
+`information_schema`/`pg_class`/`pg_policies`: colunas `media_id`/
+`storage_path` em `wa_mensagens`, tabela `extratos_cotas` com o schema
+completo, `relrowsecurity=true`, `0` policies — bate exatamente com o
+desenhado. `get_advisors(security)` não aponta nada novo além do
+`rls_enabled_no_policy` (INFO, esperado — mesmo padrão das outras
+tabelas do projeto).
+
+Emerson também pediu (nº 2 da revisão) checar se o processamento do
+anexo — que roda **dentro** do request do webhook (download da Graph,
+timeout até 20s, + chamada de visão na Anthropic, timeout até 30s) —
+tinha `export const maxDuration` configurado, já que a função podia ser
+morta pelo limite default antes de terminar o upload/extração. Não
+tinha. Adicionado `export const maxDuration = 60;` em
+`app/api/whatsapp/route.ts` (mesmo padrão de
+`app/api/backfill-embeddings/route.ts`), commitado junto.
+
+Pendência (1) fechada. Pendência (2) — bucket `wa-extratos` — **segue
+aberta**, é passo manual do Emerson no painel. Pendência (3) — push —
+segue aguardando PUBLICA explícito nesta sessão.

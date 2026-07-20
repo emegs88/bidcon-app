@@ -80,6 +80,16 @@ import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// WHATSAPP-EXTRATO-01: o caminho de anexo (download da Graph Media API,
+// timeout até 20s em lib/whatsapp/media.ts, + chamada de visão na
+// Anthropic, timeout até 30s em lib/whatsapp/extrato.ts) é AGUARDADO
+// dentro do próprio request do webhook (ver nota de desenho no cabeçalho
+// deste arquivo) — soma facilmente acima do limite default de função
+// serverless. Sem isso, a função pode ser encerrada no meio do
+// upload/extração; o dedup por wa_message_id evita duplicar dado quando a
+// Meta reenvia por timeout, mas o extrato daquela tentativa se perde.
+// Mesmo padrão de app/api/backfill-embeddings/route.ts.
+export const maxDuration = 60;
 
 // --- GET: handshake da Meta -------------------------------------------------
 export async function GET(req: Request) {

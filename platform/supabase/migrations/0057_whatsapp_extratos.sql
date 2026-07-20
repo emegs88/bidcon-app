@@ -1,9 +1,14 @@
 -- 0057_whatsapp_extratos — projeto xtv (xtvjpnyadcdeadhmzyff).
 -- FATIA WHATSAPP-EXTRATO-01 — ingestão e leitura de extratos de cota
--- (PDF/imagem) recebidos via WhatsApp. AUTORIZO pendente — NÃO aplicar
--- sem confirmação explícita do usuário (mesmo ritual das fatias
--- anteriores). Ver lib/whatsapp/media.ts, lib/whatsapp/extrato.ts e
--- app/api/whatsapp/route.ts.
+-- (PDF/imagem) recebidos via WhatsApp. Aplicada com AUTORIZO do Emerson,
+-- condicionado a bater com o desenho combinado (bucket wa-extratos
+-- privado, RLS admin-only via camada de aplicação, status default
+-- 'pendente_revisao', nenhuma escrita em cartas) — conferido antes do
+-- apply e depois confirmado via information_schema/pg_policies
+-- (0 policies, RLS ligado). Ver lib/whatsapp/media.ts,
+-- lib/whatsapp/extrato.ts e app/api/whatsapp/route.ts. Bucket
+-- `wa-extratos` continua como prerequisito de infra pendente (ver nota
+-- abaixo) — não é criado por esta migration.
 --
 -- wa_mensagens ganha:
 --   media_id     : id da mídia na Graph API (Meta), quando a mensagem é um
