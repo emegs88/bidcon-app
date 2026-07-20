@@ -151,7 +151,6 @@ async function chamarAnthropic(docs: DocEntrada[], timeoutMs = 30_000): Promise<
       body: JSON.stringify({
         model: MODELO,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         system: PROMPT_SISTEMA,
         messages: [{ role: "user", content: conteudo }],
       }),

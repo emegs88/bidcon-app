@@ -123,7 +123,6 @@ async function chamarAnthropic(doc: DocEntrada): Promise<string> {
       body: JSON.stringify({
         model: MODELO,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         system: PROMPT_SISTEMA,
         messages: [
           {
