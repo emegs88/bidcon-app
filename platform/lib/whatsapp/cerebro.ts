@@ -227,7 +227,10 @@ export async function gerarRespostaWhatsApp(
   telefone: string
 ): Promise<ResultadoCerebro | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error("[cerebro][diag] retorno null: ANTHROPIC_API_KEY ausente no ambiente");
+    return null;
+  }
 
   const { data: hist } = await db
     .from("wa_mensagens")
@@ -237,7 +240,13 @@ export async function gerarRespostaWhatsApp(
     .limit(30);
 
   const mensagens = montarMensagensWa((hist ?? []) as MensagemHist[]);
-  if (!mensagens.length) return null;
+  if (!mensagens.length) {
+    console.error(
+      "[cerebro][diag] retorno null: histórico vazio após montarMensagensWa",
+      JSON.stringify({ conversaId, histLen: hist?.length ?? 0 })
+    );
+    return null;
+  }
 
   let system = montarSystem(agenteAtivo, "whatsapp");
   const cartas = await blocoCartas(db);
@@ -318,7 +327,14 @@ export async function gerarRespostaWhatsApp(
       } finally {
         clearTimeout(timer);
       }
-      if (!resp.ok) return null;
+      if (!resp.ok) {
+        const corpoErro = await resp.text().catch(() => "(sem corpo)");
+        console.error(
+          "[cerebro][diag] retorno null: Anthropic respondeu não-ok",
+          JSON.stringify({ conversaId, status: resp.status, corpoErro: corpoErro.slice(0, 500) })
+        );
+        return null;
+      }
       data = await resp.json();
 
       const stopReason = (data as { stop_reason?: string })?.stop_reason;
@@ -342,14 +358,21 @@ export async function gerarRespostaWhatsApp(
       );
       apiMensagens.push({ role: "user", content: toolResults });
     }
-  } catch {
+  } catch (e) {
+    console.error(
+      "[cerebro][diag] retorno null: exceção no loop de tool-use (timeout/AbortError inclusive)",
+      JSON.stringify({ conversaId, erro: e instanceof Error ? e.message : String(e) })
+    );
     return null;
   }
 
   const usage = (data as { usage?: { input_tokens?: number; output_tokens?: number } })
     ?.usage;
   const bruto = extrairTexto((data as { content?: unknown }).content);
-  if (!bruto.trim()) return null;
+  if (!bruto.trim()) {
+    console.error("[cerebro][diag] retorno null: texto extraído vazio", JSON.stringify({ conversaId }));
+    return null;
+  }
 
   // Bastão: captura ##AGENTE:<id>## e remove do texto exibido.
   const mBastao = bruto.match(MARCADOR_BASTAO);

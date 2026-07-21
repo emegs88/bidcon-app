@@ -162,6 +162,10 @@ async function processarUmJob(
       .maybeSingle();
 
     const souAUltima = !ultimaMsgCliente || ultimaMsgCliente.id === msgInseridaId;
+    console.log(
+      "[whatsapp/background][diag] pós-debounce",
+      JSON.stringify({ conversaId, msgInseridaId, ultimaMsgClienteId: ultimaMsgCliente?.id ?? null, souAUltima })
+    );
     if (!souAUltima) return;
 
     // Lock: impede duas gerações simultâneas na mesma conversa (ex.: dois
@@ -180,6 +184,10 @@ async function processarUmJob(
       .or(`respondendo_desde.is.null,respondendo_desde.lt.${limiteStaleIso}`)
       .select("id");
 
+    console.log(
+      "[whatsapp/background][diag] lock",
+      JSON.stringify({ conversaId, lockAdquirido: !!(lockAdquirido && lockAdquirido.length > 0) })
+    );
     if (!lockAdquirido || lockAdquirido.length === 0) return;
 
     try {
@@ -188,6 +196,10 @@ async function processarUmJob(
         conversaId,
         agenteValido(job.agenteAtivo),
         telefone
+      );
+      console.log(
+        "[whatsapp/background][diag] resultado gerarRespostaWhatsApp",
+        JSON.stringify({ conversaId, temResultado: !!resultado })
       );
       if (resultado) {
         await sendText({
