@@ -57,9 +57,17 @@ export async function processarJobsWhatsapp(
   db: ReturnType<typeof createXtvClient>,
   jobs: WaJob[]
 ): Promise<void> {
+  // SONDA-DIAG (temporário, 2026-07-21): confirma que o background de fato
+  // começou a rodar — remover depois que o F4a fechar verde.
+  console.log("[whatsapp/background][diag] iniciando", jobs.length, "job(s)");
   for (const job of jobs) {
     try {
+      console.log(
+        "[whatsapp/background][diag] job start",
+        JSON.stringify({ conversaId: job.conversaId, podeResponder: job.podeResponder, temAnexo: !!job.anexoId })
+      );
       await processarUmJob(db, job);
+      console.log("[whatsapp/background][diag] job fim ok", job.conversaId);
     } catch (e) {
       // Rede de segurança extra — os blocos internos já têm try/catch
       // próprio, mas um job não pode derrubar os seguintes da mesma

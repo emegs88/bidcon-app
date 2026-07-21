@@ -374,6 +374,24 @@ export async function POST(req: Request) {
       conversa.opt_out !== true &&
       conversa.status !== "humano";
 
+    // SONDA-DIAG (temporário, 2026-07-21): instrumentação pra achar onde a
+    // invocação está saindo antes do processamento — remover depois que o
+    // F4a fechar verde. Sem dado sensível (telefone mascarado).
+    console.log(
+      "[whatsapp][diag] msg persistida",
+      JSON.stringify({
+        msgId: msgInserida.id,
+        telefoneMascarado: telefone.slice(0, 4) + "***" + telefone.slice(-2),
+        kill_switch_raw: process.env.WHATSAPP_AGENT_ATIVO ?? "(unset)",
+        acabaDeOptarSair,
+        conversaOptOut: conversa.opt_out,
+        conversaStatus: conversa.status,
+        agenteAtivo: conversa.agente_ativo,
+        podeResponder,
+        temAnexo: !!anexo?.id,
+      })
+    );
+
     if (anexo?.id || podeResponder) {
       jobs.push({
         conversaId: conversa.id,
@@ -409,6 +427,20 @@ export async function POST(req: Request) {
   // do 200 sair, sem risco de morte silenciosa). Nunca fica pior que o
   // estado anterior; melhora sozinho se/quando o contexto passar a existir
   // (Fluid Compute habilitado), sem precisar de outro deploy.
+  // SONDA-DIAG (temporário): loga a decisão ANTES de tentar qualquer
+  // caminho — se esta linha não aparecer no log, a morte é antes daqui
+  // (no loop de persistência acima); se aparecer mas a próxima linha do
+  // job (processar-background.ts) não aparecer, a morte é na fronteira
+  // waitUntil/await; se ambas aparecerem mas não houver envio, a morte é
+  // dentro do processamento (debounce/lock/Anthropic/Graph).
+  console.log(
+    "[whatsapp][diag] decisão pré-dispatch",
+    JSON.stringify({
+      jobsCount: jobs.length,
+      contextoWaitUntilDisponivel: contextoVercelSuportaWaitUntil(),
+    })
+  );
+
   if (jobs.length > 0) {
     if (contextoVercelSuportaWaitUntil()) {
       waitUntil(processarJobsWhatsapp(db, jobs));
@@ -420,6 +452,7 @@ export async function POST(req: Request) {
     }
   }
 
+  console.log("[whatsapp][diag] prestes a retornar ack 200");
   return NextResponse.json({ ok: true });
 }
 
