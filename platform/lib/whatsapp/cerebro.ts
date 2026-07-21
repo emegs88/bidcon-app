@@ -232,12 +232,25 @@ export async function gerarRespostaWhatsApp(
     return null;
   }
 
-  const { data: hist } = await db
+  // CAUSA RAIZ (2026-07-21, achada via sonda + evidência de banco): esta
+  // query estava `order(criado_em, {ascending:true}).limit(30)` — isso
+  // busca as 30 mensagens MAIS ANTIGAS da conversa, não as 30 mais
+  // recentes. Pra qualquer conversa com >30 mensagens (caso real: a
+  // conversa de teste 9eb5f278 tinha 38), a mensagem atual do cliente
+  // ficava de fora do corte, e a última linha do resultado podia ser
+  // 'prosperito' (assistant) — a Anthropic rejeita com 400
+  // "conversation must end with a user message" (prefill não suportado
+  // neste modelo). gerarRespostaWhatsApp devolvia null SILENCIOSAMENTE
+  // (só logado depois do F4a-diag), explicando as sondas vermelhas desde
+  // que a conversa cruzou 30 mensagens. Fix: DESC + limit, depois
+  // reverte pra ordem cronológica antes de montar as mensagens da API.
+  const { data: histDesc } = await db
     .from("wa_mensagens")
     .select("papel,conteudo")
     .eq("conversa_id", conversaId)
-    .order("criado_em", { ascending: true })
+    .order("criado_em", { ascending: false })
     .limit(30);
+  const hist = histDesc ? [...histDesc].reverse() : histDesc;
 
   const mensagens = montarMensagensWa((hist ?? []) as MensagemHist[]);
   if (!mensagens.length) {
