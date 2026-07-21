@@ -16,7 +16,8 @@ type Opcao = {
   tempoEsperadoMeses: number; lancePct: number; lanceProprioRS: number;
   comissaoRS: number; desembolsoContemplacao: number;
   saldoDevedorPos: number; parcelasRestantesPos: number;
-  tirMes: number | null; corteReferencia: number | null;
+  tirMes: number | null; tirMesComIndice: number | null; indiceLabel: "INCC" | "IPCA" | null;
+  corteReferencia: number | null;
   tendencia: string | null; mesesHistorico: number; veredito: string;
 };
 
@@ -161,7 +162,8 @@ export default function SimuladorPorto() {
               ["Parcela total pós-reajuste (12m)", fmt(opcoes.reduce((s, o) => s + parcelaPosReajuste(o).valor, 0))],
               ["Desembolso na contemplação", fmt(resumo.desembolsoTotal)],
               ["Saldo devedor pós", fmt(resumo.saldoDevedorTotal)], ["Tempo esperado", `${resumo.tempoEsperadoMeses} ass.`],
-              ["TIR média", resumo.tirMedia != null ? `${resumo.tirMedia}%` : "—"]]
+              ["TIR média", resumo.tirMedia != null ? `${resumo.tirMedia}%` : "—"],
+              ["TIR média (com índice)", resumo.tirMediaComIndice != null ? `${resumo.tirMediaComIndice}% — estimativa` : "—"]]
               .map(([k, v]) => (
                 <div key={String(k)} style={{ background: "#0F1526", borderRadius: 12, padding: 12, border: "1px solid #16213A" }}>
                   <div style={{ fontSize: 11, opacity: 0.6 }}>{k}</div>
@@ -174,7 +176,7 @@ export default function SimuladorPorto() {
           <div style={{ marginTop: 20, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "'IBM Plex Mono',monospace" }}>
               <thead><tr style={{ color: "#8FB7FF", textAlign: "left" }}>
-                {["Grupo", "Adm", "Crédito", "Parcela", "Pós-reajuste (12m)", "Tempo", "Corte ref.", "Hist.", "Desembolso", "TIR/mês", "Veredito"].map(h =>
+                {["Grupo", "Adm", "Crédito", "Parcela", "Pós-reajuste (12m)", "Tempo", "Corte ref.", "Hist.", "Desembolso", "TIR/mês", "TIR/mês (com índice)", "Veredito"].map(h =>
                   <th key={h} style={{ padding: "8px 10px", borderBottom: "1px solid #16213A" }}>{h}</th>)}
               </tr></thead>
               <tbody>{opcoes.map((o, i) => {
@@ -196,6 +198,11 @@ export default function SimuladorPorto() {
                   <td style={{ padding: "8px 10px", opacity: .7 }}>{o.mesesHistorico}m {o.tendencia && o.tendencia !== "base_1_mes" ? `· ${o.tendencia}` : ""}</td>
                   <td style={{ padding: "8px 10px" }}>{fmt(o.desembolsoContemplacao)}</td>
                   <td style={{ padding: "8px 10px", color: "#36C5F0" }}>{o.tirMes != null ? `${o.tirMes}%` : "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "#8FB7FF" }}>
+                    {o.tirMesComIndice != null
+                      ? `${o.tirMesComIndice}% ${o.indiceLabel ?? ""}`.trim()
+                      : "—"}
+                  </td>
                   <td style={{ padding: "8px 10px" }}>
                     <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11,
                       background: o.veredito === "vence_agora" ? "#052e16" : o.veredito === "janela_3m" ? "#1e293b" : "#27272a",

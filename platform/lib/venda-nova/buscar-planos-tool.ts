@@ -22,6 +22,19 @@
 // calculada AQUI (via lib/disal/calculo.ts/composicaoImovel), nunca pelo
 // modelo — regra inegociável (composição só na mesma administradora) vira
 // código. O agente só apresenta o que esta tool devolve.
+//
+// Regra permanente do Emerson ("toda simulação termina em TIR" — ver plano
+// noble-herding-melody.md): a tool devolve DOIS campos de texto já prontos
+// (`fasesTexto`, `custoEfetivoTexto`) que o modelo cita VERBATIM — nunca
+// recompõe enumeração de parcelas nem custo de cabeça (fix do bug de
+// composição observado em wa_mensagens id=48: modelo enumerou 2 das 3 fases
+// mas declarou "220 meses"). Custo efetivo via TIR real sobre o fluxo de
+// caixa (lib/disal/custo-efetivo-plano-novo.ts), cenário de contemplação
+// declarado (nunca prometido) — default 36 meses (imóvel) / 24 (veículo),
+// sobrescrevível por `mes_cenario`. Lance (`lance_pct`) NÃO muda o cenário
+// de contemplação (Disal venda nova não tem corte_ultimo empírico como a
+// Porto) — só muda o fluxo de caixa (crédito líquido recebido + abate de
+// parcelas finais).
 // ============================================================================
 import { BOLETIM_DISAL_ATUAL } from "@/lib/disal/atual";
 import {
@@ -34,6 +47,19 @@ import {
   totalImovel,
 } from "@/lib/disal/calculo";
 import type { FaixaAuto, LinhaAuto, LinhaImovel } from "@/lib/disal/types";
+import {
+  custoEfetivoPlanoNovo,
+  formatarCustoEfetivoTexto,
+  formatarFasesTexto,
+  chaveIndiceBcb,
+  type FaseFluxo,
+} from "@/lib/disal/custo-efetivo-plano-novo";
+import { getIndicesBcb } from "@/lib/indices-bcb";
+
+// Cenário de referência default (mês de contemplação DECLARADO, nunca uma
+// promessa — regra permanente do Emerson). Mesmos defaults do
+// simulador-cliente estático. `mes_cenario` no input da tool sobrescreve.
+const MES_CENARIO_DEFAULT = { imovel: 36, veiculo: 24 } as const;
 
 export const BUSCAR_PLANOS_TOOL = {
   name: "buscar_planos",
@@ -67,6 +93,19 @@ export const BUSCAR_PLANOS_TOOL = {
         type: "string",
         description: "Administradora do plano. Padrão 'disal' (única disponível nesta fatia).",
       },
+      lance_pct: {
+        type: "number",
+        description:
+          "Opcional: % do crédito em lance (0-100) que o cliente pretende dar na contemplação. Afeta o " +
+          "custo_efetivo_texto (reduz o crédito líquido recebido e abate parcelas finais). Omitir = sem lance.",
+      },
+      mes_cenario: {
+        type: "number",
+        description:
+          "Opcional: mês de contemplação usado como CENÁRIO DE REFERÊNCIA (nunca uma promessa) pro cálculo " +
+          "do custo efetivo. Padrão: 36 (imóvel) / 24 (veículo). Só ajuste se o cliente pedir um cenário " +
+          "específico — nunca invente um valor pra parecer mais rápido.",
+      },
     },
     required: ["tipo"],
   },
@@ -77,6 +116,8 @@ export type BuscarPlanosInput = {
   credito_desejado?: unknown;
   parcela_max?: unknown;
   administradora?: unknown;
+  lance_pct?: unknown;
+  mes_cenario?: unknown;
 };
 
 export type FaseParcela = { meses: number; valor100: number; valor75: number };
@@ -93,6 +134,13 @@ export type PlanoEncontrado = {
   fases: FaseParcela[];
   total100: number;
   total75: number;
+  /** Texto pronto da enumeração de fases (base 100%) — citar VERBATIM (nunca
+   *  recompor de cabeça; fix do bug de composição de wa_mensagens id=48). */
+  fasesTexto: string;
+  /** Texto pronto do custo efetivo mensal via TIR (regra permanente do
+   *  Emerson) — citar VERBATIM como última linha antes da pergunta de
+   *  fechamento. Nunca recalcular nem reformular. */
+  custoEfetivoTexto: string;
   /** Só imóvel: creditoDesejado > 400k (clampado no tier de 400k) ou < 200k (clampado em 200k). */
   tetoAtingido?: boolean;
   pisoAtingido?: boolean;
@@ -108,8 +156,22 @@ export type PlanoEncontrado = {
 
 export type ResultadoBuscarPlanos = { erro: string } | { total: 1; plano: PlanoEncontrado };
 
-function montarPlanoAuto(linha: LinhaAuto, faixa: FaixaAuto): PlanoEncontrado {
+type CtxCustoEfetivo = {
+  lancePct: number;
+  mesCenario: number;
+  indiceAnualPct: number | null;
+};
+
+function montarPlanoAuto(linha: LinhaAuto, faixa: FaixaAuto, ctx: CtxCustoEfetivo): PlanoEncontrado {
   const [credito, cod, parcela100, parcela75] = linha;
+  const fasesBase100: FaseFluxo[] = [{ meses: faixa.prazo, valor: parcela100 }];
+  const custoEfetivo = custoEfetivoPlanoNovo({
+    fases: fasesBase100,
+    credito,
+    lancePct: ctx.lancePct,
+    C: ctx.mesCenario,
+    indiceAnualPct: ctx.indiceAnualPct,
+  });
   return {
     tipo: "veiculo",
     administradora: "Disal",
@@ -121,6 +183,13 @@ function montarPlanoAuto(linha: LinhaAuto, faixa: FaixaAuto): PlanoEncontrado {
     fases: [{ meses: faixa.prazo, valor100: parcela100, valor75: parcela75 }],
     total100: totalAuto(faixa, parcela100),
     total75: totalAuto(faixa, parcela75),
+    fasesTexto: formatarFasesTexto(fasesBase100),
+    custoEfetivoTexto: formatarCustoEfetivoTexto({
+      resultado: custoEfetivo,
+      C: ctx.mesCenario,
+      indiceNome: faixa.indice,
+      indiceAnualPct: ctx.indiceAnualPct,
+    }),
   };
 }
 
@@ -138,8 +207,17 @@ function montarPlanoImovel(
   linha: LinhaImovel,
   tetoAtingido: boolean,
   pisoAtingido: boolean,
+  ctx: CtxCustoEfetivo,
   composicao?: ReturnType<typeof composicaoImovel>
 ): PlanoEncontrado {
+  const fasesBase100: FaseFluxo[] = FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: linha.b100[i] }));
+  const custoEfetivo = custoEfetivoPlanoNovo({
+    fases: fasesBase100,
+    credito: linha.credito,
+    lancePct: ctx.lancePct,
+    C: ctx.mesCenario,
+    indiceAnualPct: ctx.indiceAnualPct,
+  });
   return {
     tipo: "imovel",
     administradora: "Disal",
@@ -151,6 +229,13 @@ function montarPlanoImovel(
     fases: fasesImovel(linha),
     total100: totalImovel(linha.b100),
     total75: totalImovel(linha.b75),
+    fasesTexto: formatarFasesTexto(fasesBase100),
+    custoEfetivoTexto: formatarCustoEfetivoTexto({
+      resultado: custoEfetivo,
+      C: ctx.mesCenario,
+      indiceNome: "INCC",
+      indiceAnualPct: ctx.indiceAnualPct,
+    }),
     tetoAtingido,
     pisoAtingido,
     ...(composicao
@@ -173,7 +258,11 @@ function montarPlanoImovel(
 /** Executa a busca no boletim estático (sem I/O — mesma fonte do simulador
  *  interno). Nunca lança: entrada fora do formato/regra esperado devolve
  *  { erro } explícito (nunca adivinha tipo, nunca mistura credito_desejado
- *  com parcela_max, nunca finge administradora que não tem). */
+ *  com parcela_max, nunca finge administradora que não tem). Único I/O:
+ *  busca dos índices BCB (INCC/IPCA) pro custo efetivo "com projeção" —
+ *  cacheada 12h (lib/indices-bcb.ts), nunca bloqueia a resposta por muito
+ *  tempo; se falhar, custoEfetivoTexto cai no fallback "projeção
+ *  indisponível" (nunca inventa número). */
 export async function buscarPlanos(input: BuscarPlanosInput): Promise<ResultadoBuscarPlanos> {
   const tipo = input.tipo === "imovel" || input.tipo === "veiculo" ? input.tipo : null;
   if (!tipo) return { erro: "tipo obrigatório: 'imovel' ou 'veiculo'." };
@@ -190,6 +279,8 @@ export async function buscarPlanos(input: BuscarPlanosInput): Promise<ResultadoB
 
   const numPositivo = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+  const numNaoNegativo = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
   const creditoDesejado = numPositivo(input.credito_desejado);
   const parcelaMax = numPositivo(input.parcela_max);
 
@@ -203,8 +294,22 @@ export async function buscarPlanos(input: BuscarPlanosInput): Promise<ResultadoB
     };
   }
 
+  const lancePctInput = numNaoNegativo(input.lance_pct);
+  const lancePct = lancePctInput != null ? Math.min(lancePctInput, 100) : 0;
+  const mesCenarioInput = numPositivo(input.mes_cenario);
+  const mesCenario = mesCenarioInput ?? MES_CENARIO_DEFAULT[tipo === "veiculo" ? "veiculo" : "imovel"];
+
   try {
     const boletim = BOLETIM_DISAL_ATUAL;
+
+    // índice projetado (INCC imóvel / IPCA veículo) — real, acumulado 12m,
+    // fonte BCB (lib/indices-bcb.ts). Nunca inventado; null em caso de falha.
+    const indiceNomeBoletim = tipo === "veiculo" ? boletim.autosFaixaII.indice : boletim.imoveis220.indice;
+    const chave = chaveIndiceBcb(indiceNomeBoletim);
+    const { indices } = await getIndicesBcb();
+    const indiceAnualPct = chave ? indices[chave]?.acumulado12m ?? null : null;
+
+    const ctx: CtxCustoEfetivo = { lancePct, mesCenario, indiceAnualPct };
 
     if (tipo === "veiculo") {
       if (creditoDesejado !== null) {
@@ -213,11 +318,11 @@ export async function buscarPlanos(input: BuscarPlanosInput): Promise<ResultadoB
           boletim.autosFaixaII,
           boletim.autosFaixaIII
         );
-        return { total: 1, plano: montarPlanoAuto(linha, faixa) };
+        return { total: 1, plano: montarPlanoAuto(linha, faixa, ctx) };
       }
       const r = creditoMaximoAutoPorParcela(parcelaMax!, boletim.autosFaixaII, boletim.autosFaixaIII);
       if (!r) return { erro: "nenhum crédito de veículo no boletim atual cabe nessa parcela." };
-      return { total: 1, plano: montarPlanoAuto(r.linha, r.faixa) };
+      return { total: 1, plano: montarPlanoAuto(r.linha, r.faixa, ctx) };
     }
 
     // imovel
@@ -228,11 +333,11 @@ export async function buscarPlanos(input: BuscarPlanosInput): Promise<ResultadoB
       );
       const composicao =
         creditoDesejado > 400000 ? composicaoImovel(creditoDesejado, boletim.imoveis220) : undefined;
-      return { total: 1, plano: montarPlanoImovel(linha, tetoAtingido, pisoAtingido, composicao) };
+      return { total: 1, plano: montarPlanoImovel(linha, tetoAtingido, pisoAtingido, ctx, composicao) };
     }
     const r = creditoMaximoImovelPorParcela(parcelaMax!, boletim.imoveis220);
     if (!r) return { erro: "nenhum crédito de imóvel no boletim atual cabe nessa parcela." };
-    return { total: 1, plano: montarPlanoImovel(r.linha, false, false) };
+    return { total: 1, plano: montarPlanoImovel(r.linha, false, false, ctx) };
   } catch (e) {
     console.error("[buscar_planos] erro inesperado:", e);
     return { erro: "erro ao consultar o boletim de planos." };

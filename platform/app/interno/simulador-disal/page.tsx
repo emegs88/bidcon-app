@@ -5,7 +5,7 @@
 // /interno/simulador-porto — mas SEM motor/API: dados 100% estáticos do
 // boletim (lib/disal/atual.ts), zero chamada de rede.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { linkWhatsApp } from "@/lib/format";
 import { BOLETIM_DISAL_ATUAL } from "@/lib/disal/atual";
 import type { LinhaImovel } from "@/lib/disal/types";
@@ -14,10 +14,22 @@ import {
   totalAuto as calcTotalAuto,
   totalImovel as calcTotalImovel,
 } from "@/lib/disal/calculo";
+import {
+  custoEfetivoPlanoNovo,
+  formatarCustoEfetivoTexto,
+  chaveIndiceBcb,
+  type FaseFluxo,
+} from "@/lib/disal/custo-efetivo-plano-novo";
 import { SimuladorTabNav } from "../SimuladorTabNav";
 
 type Segmento = "veiculo" | "imovel";
 type Base = "100" | "75";
+
+// Cenário de referência do mês de contemplação — mesmo default usado pela
+// tool buscar_planos (regra permanente "toda simulação termina em TIR").
+// Sem slider aqui de propósito: isso fica só no simulador-cliente estático.
+const C_REF = { veiculo: 24, imovel: 36 } as const;
+const FASES_IMOVEL_MESES: [number, number, number] = [12, 207, 1];
 
 const fmtValor = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtCredito = (v: number) =>
@@ -57,6 +69,18 @@ export default function SimuladorDisal() {
   const [nomeCliente, setNomeCliente] = useState("");
   const [copiado, setCopiado] = useState(false);
 
+  // Índices BCB (INCC/IPCA) pro custo efetivo "com correção projetada" —
+  // mesma fonte real (acumulado 12m) que a tool buscar_planos usa. Nunca
+  // inventa valor: se a chamada falhar, indiceAnualPct fica null e o texto
+  // de custo efetivo já sai com o fallback "projeção indisponível".
+  const [indicesBcb, setIndicesBcb] = useState<Record<string, { acumulado12m: number | null }> | null>(null);
+  useEffect(() => {
+    fetch("/api/indices")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setIndicesBcb(data?.indices ?? null))
+      .catch(() => setIndicesBcb(null));
+  }, []);
+
   // Snap do slider pro crédito válido mais próximo — mesma lógica de
   // nearest-neighbor, agora em lib/disal/calculo.ts (reaproveitada pela tool
   // buscar_planos). Existe um furo real nos dados entre 180.000 e 190.000.
@@ -77,12 +101,45 @@ export default function SimuladorDisal() {
   const custoAlemAuto = totalAuto - creditoAuto;
   const custoAlemAutoPct = (custoAlemAuto / creditoAuto) * 100;
 
+  // Custo efetivo (TIR) — regra permanente "toda simulação termina em TIR".
+  // Sempre calculado sobre a Base 100% (referência), independente da base
+  // selecionada na UI — mesma convenção da tool buscar_planos.
+  const indiceChaveAuto = chaveIndiceBcb(faixaAuto.indice);
+  const indiceAnualPctAuto = indiceChaveAuto ? indicesBcb?.[indiceChaveAuto]?.acumulado12m ?? null : null;
+  const fasesBase100Auto: FaseFluxo[] = [{ meses: faixaAuto.prazo, valor: parcelaAuto100 }];
+  const custoEfetivoTextoAuto = formatarCustoEfetivoTexto({
+    resultado: custoEfetivoPlanoNovo({
+      fases: fasesBase100Auto,
+      credito: creditoAuto,
+      C: C_REF.veiculo,
+      indiceAnualPct: indiceAnualPctAuto,
+    }),
+    C: C_REF.veiculo,
+    indiceNome: faixaAuto.indice,
+    indiceAnualPct: indiceAnualPctAuto,
+  });
+
   const linhaImovel: LinhaImovel = imoveis220.linhas[imovelIdx];
   const fasesImovel = base === "100" ? linhaImovel.b100 : linhaImovel.b75;
   const fasesImovelAlt = base === "100" ? linhaImovel.b75 : linhaImovel.b100;
   const totalImovel = calcTotalImovel(fasesImovel);
   const custoAlemImovel = totalImovel - linhaImovel.credito;
   const custoAlemImovelPct = (custoAlemImovel / linhaImovel.credito) * 100;
+
+  const indiceChaveImovel = chaveIndiceBcb(imoveis220.indice);
+  const indiceAnualPctImovel = indiceChaveImovel ? indicesBcb?.[indiceChaveImovel]?.acumulado12m ?? null : null;
+  const fasesBase100Imovel: FaseFluxo[] = FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: linhaImovel.b100[i] }));
+  const custoEfetivoTextoImovel = formatarCustoEfetivoTexto({
+    resultado: custoEfetivoPlanoNovo({
+      fases: fasesBase100Imovel,
+      credito: linhaImovel.credito,
+      C: C_REF.imovel,
+      indiceAnualPct: indiceAnualPctImovel,
+    }),
+    C: C_REF.imovel,
+    indiceNome: imoveis220.indice,
+    indiceAnualPct: indiceAnualPctImovel,
+  });
 
   function gerarTexto(): string {
     const nome = nomeCliente.trim() || "Olá";
@@ -100,6 +157,8 @@ export default function SimuladorDisal() {
         `✅ *Parcela Base ${base === "100" ? "100%" : "75% Light"}: ${fmtValor(parcelaAuto)}/mês*`,
         `_(opção ${base === "100" ? "75% Light" : "Base 100%"}: ${fmtValor(parcelaAutoAlt)}/mês)_`,
         `🔖 Cód. bem: ${codAuto}`,
+        ``,
+        `📈 ${custoEfetivoTextoAuto}`,
         ``,
         `Compra programada para o seu patrimônio, sem juros de financiamento.`,
         `Contemplação por sorteio ou lance mensal.`,
@@ -123,6 +182,8 @@ export default function SimuladorDisal() {
       `   220ª: ${fmtValor(fasesImovel[2])}/mês`,
       `_(opção ${base === "100" ? "75% Light" : "Base 100%"}: ${fmtValor(fasesImovelAlt[0])} / ${fmtValor(fasesImovelAlt[1])} / ${fmtValor(fasesImovelAlt[2])})_`,
       `🔖 Cód. bem: ${linhaImovel.cod}`,
+      ``,
+      `📈 ${custoEfetivoTextoImovel}`,
       ``,
       `Compra programada para o seu patrimônio, sem juros de financiamento.`,
       `Contemplação por sorteio ou lance mensal.`,
@@ -240,6 +301,13 @@ export default function SimuladorDisal() {
                 </div>
               ))}
             </div>
+
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>Custo efetivo (TIR sobre o fluxo real)</div>
+              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#8FB7FF", marginTop: 2 }}>
+                {custoEfetivoTextoAuto}
+              </div>
+            </div>
           </>
         ) : (
           <>
@@ -276,6 +344,13 @@ export default function SimuladorDisal() {
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: "#8FB7FF" }}>{v}</div>
                 </div>
               ))}
+            </div>
+
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>Custo efetivo (TIR sobre o fluxo real)</div>
+              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#8FB7FF", marginTop: 2 }}>
+                {custoEfetivoTextoImovel}
+              </div>
             </div>
           </>
         )}

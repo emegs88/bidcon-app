@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { tirMensal, tirMensalMenorRaiz } from "@/lib/tir";
+import { getIndicesBcb } from "@/lib/indices-bcb";
 
 export const dynamic = "force-dynamic";
 
@@ -76,20 +78,31 @@ function parcelaDiluicao(g: Grupo, credito: number): number {
   return (credito * (1 + taxa + FR)) / g.restantes;
 }
 
-// TIR mensal por bisseção (robusta; Newton puro estoura nesse fluxo)
-function tirMensal(fluxo: number[]): number | null {
-  const npv = (r: number) =>
-    fluxo.reduce((s, f, t) => s + f / Math.pow(1 + r, t), 0);
-  let lo = -0.9, hi = 5.0;
-  let flo = npv(lo), fhi = npv(hi);
-  if (isNaN(flo) || isNaN(fhi) || flo * fhi > 0) return null;
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    const fm = npv(mid);
-    if (Math.abs(fm) < 1e-7) return mid;
-    if (flo * fm < 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
-  }
-  return (lo + hi) / 2;
+// TIR mensal por bisseção — ver lib/tir.ts (extraído daqui pra reaproveitar
+// noutras superfícies; comportamento idêntico, zero mudança de resultado).
+
+// Regra permanente "toda simulação termina em TIR": além do tirMes nominal
+// (já validado em produção, comportamento inalterado), cada opção também
+// traz o custo efetivo COM índice projetado — mesmo padrão do vendanova
+// (lib/disal/custo-efetivo-plano-novo.ts): parcela reajustada em degrau
+// anual pelo índice real (BCB, acumulado 12m) e o crédito recebido na
+// contemplação também corrigido até lá (mesma correção validada no caso
+// Disal — reajuste pré-contemplação acompanha o crédito, não só a parcela).
+// vw_grupos_calibrados não tem coluna de índice por grupo — mapeamento
+// estático por segmento, igual ao vendanova: imovel→INCC, auto→IPCA.
+export type IndicesSegmento = { imovel: number | null; auto: number | null };
+
+function indiceLabelSegmento(segmento: string): "INCC" | "IPCA" | null {
+  if (segmento === "imovel") return "INCC";
+  if (segmento === "auto") return "IPCA";
+  return null;
+}
+
+function indicePctSegmento(segmento: string, indices?: IndicesSegmento | null): number | null {
+  if (!indices) return null;
+  if (segmento === "imovel") return indices.imovel;
+  if (segmento === "auto") return indices.auto;
+  return null;
 }
 
 export type Opcao = {
@@ -109,13 +122,21 @@ export type Opcao = {
   saldoDevedorPos: number;
   parcelasRestantesPos: number;
   tirMes: number | null; // custo financeiro ao mês — métrica canônica
+  tirMesComIndice: number | null; // idem, com índice projetado (estimativa)
+  indiceLabel: "INCC" | "IPCA" | null;
   corteReferencia: number | null;
   tendencia: string | null;
   mesesHistorico: number;
   veredito: "vence_agora" | "janela_3m" | "fila";
 };
 
-function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre" | "embutido"): Opcao | null {
+function simular(
+  g: Grupo,
+  credito: number,
+  lancePct: number,
+  tipoLance: "livre" | "embutido",
+  indices?: IndicesSegmento | null
+): Opcao | null {
   if (!g.restantes || g.restantes < 1) return null;
   const tetoEmb = Number(g.lance_embutido_pct ?? 0);
   const emb = tipoLance === "embutido" ? Math.min(lancePct, tetoEmb) : 0;
@@ -140,6 +161,26 @@ function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre"
   }
   const tir = tirMensal(fluxo);
 
+  // fluxo com índice projetado (estimativa) — parcela em degrau anual pelo
+  // índice real do segmento; crédito e lance próprio recebidos/pagos em T
+  // também corrigidos pelo fator acumulado até lá (mesmo padrão validado
+  // no vendanova). tirMensalMenorRaiz (não tirMensal) porque esse fluxo
+  // pode ter mais de uma raiz — pega a economicamente relevante.
+  const gPct = indicePctSegmento(g.segmento, indices);
+  let tirComIndice: number | null = null;
+  if (gPct != null) {
+    const gFrac = gPct / 100;
+    const fatorEmT = Math.pow(1 + gFrac, Math.floor((T - 1) / 12));
+    const fluxoComIndice: number[] = [-comissao];
+    for (let t = 1; t <= nTotal; t++) {
+      const fatorMes = Math.pow(1 + gFrac, Math.floor((t - 1) / 12));
+      let f = -(parcela * fatorMes);
+      if (t === T) f += (creditoLiquido - lanceProprioRS) * fatorEmT;
+      fluxoComIndice.push(f);
+    }
+    tirComIndice = tirMensalMenorRaiz(fluxoComIndice);
+  }
+
   const corte = corteRef(g);
   const veredito: Opcao["veredito"] =
     corte != null && lancePct >= corte ? "vence_agora"
@@ -158,6 +199,8 @@ function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre"
     saldoDevedorPos: parcelasPos * parcela,
     parcelasRestantesPos: parcelasPos,
     tirMes: tir != null ? Math.round(tir * 10000) / 100 : null, // % a.m.
+    tirMesComIndice: tirComIndice != null ? Math.round(tirComIndice * 10000) / 100 : null,
+    indiceLabel: indiceLabelSegmento(g.segmento),
     corteReferencia: corte,
     tendencia: g.tendencia_lance,
     mesesHistorico: Number(g.meses_lance ?? 0),
@@ -176,13 +219,20 @@ function simular(g: Grupo, credito: number, lancePct: number, tipoLance: "livre"
 //    e aloca em rodízio (round-robin) entre os grupos, respeitando cap por
 //    grupo = min(vencedores_ultimo ?? 2, 3) e estoque (cotas_venda) — evita
 //    concentrar tudo num único grupo.
-function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance: "livre" | "embutido", segmento?: string) {
+function multiJuncao(
+  grupos: Grupo[],
+  alvo: number,
+  lancePct: number,
+  tipoLance: "livre" | "embutido",
+  segmento?: string,
+  indices?: IndicesSegmento | null
+) {
   const CAMADAS: Opcao["veredito"][] = ["vence_agora", "janela_3m", "fila"];
 
   const eleg = grupos
     .filter(g => (!segmento || g.segmento === segmento) && g.cred_max && g.restantes >= 10)
     .map(g => {
-      const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance);
+      const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance, indices);
       const capGrupo = Math.max(1, Math.min(Number(g.vencedores_ultimo ?? 2), 3));
       const estoque = g.cotas_venda != null ? Number(g.cotas_venda) : 1;
       const limiteGrupo = Math.min(capGrupo, estoque);
@@ -212,7 +262,7 @@ function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance:
         if (usadas >= limiteGrupo) continue;
         const falta = alvo - acumulado;
         const credito = Math.min(Number(g.cred_max), Math.max(Number(g.cred_min ?? 0), falta));
-        const op = simular(g, credito, lancePct, tipoLance);
+        const op = simular(g, credito, lancePct, tipoLance, indices);
         if (!op || op.tirMes == null || op.tirMes <= 0) continue;
         cartas.push(op);
         acumulado += credito;
@@ -237,6 +287,14 @@ function multiJuncao(grupos: Grupo[], alvo: number, lancePct: number, tipoLance:
             (cartas.reduce((s, c) => s + (c.tirMes ?? 0), 0) / cartas.length) * 100
           ) / 100
         : null,
+    tirMediaComIndice: (() => {
+      const comIndice = cartas.filter(c => c.tirMesComIndice != null);
+      return comIndice.length > 0
+        ? Math.round(
+            (comIndice.reduce((s, c) => s + (c.tirMesComIndice ?? 0), 0) / comIndice.length) * 100
+          ) / 100
+        : null;
+    })(),
   };
   return { resumo, cartas };
 }
@@ -277,9 +335,18 @@ export async function POST(req: NextRequest) {
 
     // RPC (security definer, sem args) — evita expor o schema `consorcios`
     // via .schema().from() e cobre o caso do schema não estar em "Exposed
-    // schemas" da API. Filtros aplicados aqui, em memória.
-    const { data, error } = await db.rpc("consorcios_grupos_calibrados");
+    // schemas" da API. Filtros aplicados aqui, em memória. Índices BCB
+    // buscados em paralelo (cache 12h — ver lib/indices-bcb.ts) pro
+    // tirMesComIndice; nunca inventa valor, só null se indisponível.
+    const [{ data, error }, indicesResult] = await Promise.all([
+      db.rpc("consorcios_grupos_calibrados"),
+      getIndicesBcb(),
+    ]);
     if (error) throw error;
+    const indices: IndicesSegmento = {
+      imovel: indicesResult.indices.incc.acumulado12m,
+      auto: indicesResult.indices.ipca.acumulado12m,
+    };
     let grupos = (data ?? []) as unknown as Grupo[];
     if (administradora) grupos = grupos.filter((g) => g.administradora === administradora);
     if (segmento) grupos = grupos.filter((g) => g.segmento === segmento);
@@ -291,18 +358,18 @@ export async function POST(req: NextRequest) {
     if (modo === "grupo") {
       const g = grupos[0];
       if (!g) return NextResponse.json({ erro: "grupo não encontrado" }, { status: 404 });
-      return NextResponse.json({ opcao: simular(g, credito, lancePct, tipoLance) });
+      return NextResponse.json({ opcao: simular(g, credito, lancePct, tipoLance, indices) });
     }
 
     if (modo === "juncao") {
-      return NextResponse.json(multiJuncao(grupos, creditoAlvo, lancePct, tipoLance, segmento));
+      return NextResponse.json(multiJuncao(grupos, creditoAlvo, lancePct, tipoLance, segmento, indices));
     }
 
     // ranking: melhores opções para o crédito informado
     const ops = grupos
       .filter(g => g.cred_min != null && g.cred_max != null &&
                    credito >= Number(g.cred_min) && credito <= Number(g.cred_max))
-      .map(g => simular(g, credito, lancePct, tipoLance))
+      .map(g => simular(g, credito, lancePct, tipoLance, indices))
       .filter((o): o is Opcao => !!o && o.tirMes != null)
       .sort((a, b) => (a.tempoEsperadoMeses - b.tempoEsperadoMeses) || (a.tirMes! - b.tirMes!))
       .slice(0, limite);
