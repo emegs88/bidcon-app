@@ -388,16 +388,55 @@ export async function POST(req: Request) {
     }
   }
 
-  // F4a: ack imediato — dispara o processamento pesado em background
-  // (waitUntil garante que a Vercel mantém a invocação viva até
-  // processarJobsWhatsapp terminar, mesmo depois do response já ter sido
-  // devolvido pra Meta) e retorna 200 na hora, sem esperar nenhuma chamada
-  // à Anthropic/Graph API/debounce.
+  // F4a-FALLBACK (2026-07-21, sonda vermelha pós-deploy do F4a original):
+  // @vercel/functions#waitUntil só de fato segura a invocação viva se o
+  // runtime tiver publicado o contexto da Vercel em
+  // globalThis[Symbol.for("@vercel/request-context")] — ver
+  // node_modules/@vercel/functions/{wait-until,get-context}.js:
+  // `getContext().waitUntil?.(promise)`. Se esse contexto não existir
+  // (ex.: Fluid Compute não habilitado neste projeto/ambiente), a chamada
+  // NÃO lança erro nenhum — o `?.()` simplesmente não executa nada, a
+  // promise fica "solta" sem ninguém segurando a invocação viva, e o
+  // container pode congelar assim que o 200 sai, matando o processamento
+  // (debounce/Anthropic/Graph) no meio, silenciosamente. Foi exatamente
+  // essa a assinatura reproduzida às 16:21:51Z: respondendo_desde nunca
+  // setado (nem chegou a passar dos 8s de debounce) e zero log de erro.
+  //
+  // Detectamos aqui, na hora, se o contexto existe. Se existir, usamos
+  // waitUntil normalmente (ack rápido, ganho real do F4a). Se NÃO existir,
+  // caímos pra AWAIT síncrono — mesmo comportamento do código anterior ao
+  // F4a (ack mais lento, mas o processamento é garantido até o fim antes
+  // do 200 sair, sem risco de morte silenciosa). Nunca fica pior que o
+  // estado anterior; melhora sozinho se/quando o contexto passar a existir
+  // (Fluid Compute habilitado), sem precisar de outro deploy.
   if (jobs.length > 0) {
-    waitUntil(processarJobsWhatsapp(db, jobs));
+    if (contextoVercelSuportaWaitUntil()) {
+      waitUntil(processarJobsWhatsapp(db, jobs));
+    } else {
+      console.error(
+        "[whatsapp] contexto @vercel/request-context ausente (Fluid Compute indisponível?) — processando em fallback síncrono antes do ack."
+      );
+      await processarJobsWhatsapp(db, jobs);
+    }
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// Lê o mesmo símbolo global que @vercel/functions usa internamente (ver
+// node_modules/@vercel/functions/get-context.js) só pra checar, sem
+// efeitos colaterais, se `.waitUntil` está de fato disponível nesta
+// invocação — não é API privada nossa, é o mesmo contrato documentado que
+// o próprio pacote depende (Symbol.for é global por natureza).
+function contextoVercelSuportaWaitUntil(): boolean {
+  const SYMBOL_REQUEST_CONTEXT = Symbol.for("@vercel/request-context");
+  const contexto = (
+    globalThis as unknown as Record<
+      symbol,
+      { get?: () => { waitUntil?: unknown } } | undefined
+    >
+  )[SYMBOL_REQUEST_CONTEXT];
+  return typeof contexto?.get?.()?.waitUntil === "function";
 }
 
 // Texto do quick reply de opt-out usado no template de marketing (carrossel
