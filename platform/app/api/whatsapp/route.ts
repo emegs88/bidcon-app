@@ -1,11 +1,12 @@
 // ============================================================================
 // Webhook do WhatsApp (Meta Cloud API) — WHATSAPP-01 · F1+F2+F3 +
-// WHATSAPP-EXTRATO-01.
+// WHATSAPP-EXTRATO-01 + F4a (blindagem: ack imediato + waitUntil).
 // ----------------------------------------------------------------------------
 // F1 cuida do encanamento: handshake GET + POST que valida assinatura,
 // deduplica por wa_message_id e grava a mensagem recebida em wa_conversas/
 // wa_mensagens (projeto xtv — ver migration 0046 e a nota de correção de
-// arquitetura nnv→xtv nela).
+// arquitetura nnv→xtv nela). F1 é a ÚNICA parte que roda de fato dentro do
+// ciclo request/response com a Meta agora (ver F4a abaixo).
 //
 // F2+F3: depois de gravar a mensagem do cliente, se
 // WHATSAPP_AGENT_ATIVO==="true" (kill-switch, default desligado) e a
@@ -13,20 +14,29 @@
 // Time Prosperito (lib/whatsapp/cerebro.ts — reaproveita persona/compliance
 // do /api/atende) e responde via Graph API (lib/whatsapp/graph.ts). Falha
 // do agente é capturada em try/catch e NUNCA derruba o ack 200 do webhook —
-// só loga. Escopo desta fatia é mais enxuto que o §10.3 completo da spec
-// (sem orquestrador em rota separada, sem debounce/lock, sem tools de
-// busca via RPC, sem guardrail module dedicado — ver relatório da sessão).
+// só loga.
 //
-// WHATSAPP-EXTRATO-01 (esta fatia): mensagens do tipo `document`/`image`
-// (extrato de cota anexado) ganham um caminho próprio, ver
-// processarAnexoExtrato() abaixo — baixa da Graph Media API
+// WHATSAPP-EXTRATO-01: mensagens do tipo `document`/`image` (extrato de
+// cota anexado) ganham um caminho próprio — baixa da Graph Media API
 // (lib/whatsapp/media.ts), sobe pro bucket privado `wa-extratos`, extrai os
 // campos via IA (lib/whatsapp/extrato.ts) e grava um registro
-// 'pendente_revisao' em extratos_cotas (migration 0057, AUTORIZO
-// pendente). NUNCA escreve em `cartas`. Se WHATSAPP_AGENT_ATIVO==="true",
-// responde com um resumo dos campos (texto fixo, não gerado pelo modelo —
-// ver resumoExtratoWa em lib/whatsapp/extrato.ts). Qualquer falha do
-// caminho de extrato é capturada e só loga — mesmo contrato do F2+F3.
+// 'pendente_revisao' em extratos_cotas (migration 0057). NUNCA escreve em
+// `cartas`. Se WHATSAPP_AGENT_ATIVO==="true", responde com um resumo dos
+// campos (texto fixo, não gerado pelo modelo — ver resumoExtratoWa em
+// lib/whatsapp/extrato.ts). Qualquer falha do caminho de extrato é
+// capturada e só loga — mesmo contrato do F2+F3.
+//
+// F4a (blindagem, 2026-07-21): 3 reproduções ao vivo (12:05:31Z, 14:51:35Z,
+// 15:36:01Z) confirmaram inbound persistido + ZERO resposta + ZERO log de
+// erro — hipótese forte: a cadeia inteira de F2+F3/EXTRATO-01 (debounce de
+// 8s + Anthropic + Graph API, ou download+visão) rodava síncrona dentro do
+// mesmo ciclo HTTP do webhook da Meta, vulnerável a um timeout DO LADO DA
+// META encerrar a conexão/invocação no meio, sem exceção capturável. Fix:
+// F1 (persistência) continua síncrono e rápido (<500ms); o resto
+// (EXTRATO-01 + F2+F3, agora em lib/whatsapp/processar-background.ts) roda
+// via waitUntil() DEPOIS do ack — desacoplado do ciclo de vida da conexão
+// HTTP com a Meta. `db` (service_role, sem cookie/sessão atrelada ao
+// Request) é seguro de manter vivo através dessa fronteira.
 //
 // GET: handshake exigido pela Meta ao configurar o webhook (hub.mode=
 //   subscribe + hub.verify_token == WHATSAPP_VERIFY_TOKEN → devolve
@@ -46,25 +56,13 @@
 //   receber" (normalizado) => wa_conversas.opt_out=true — detecta nas três
 //   formas em que pode chegar: quick reply de TEMPLATE (button.text),
 //   quick reply de interativa comum (interactive.button_reply.title) ou
-//   texto digitado livremente (text.body); 6) anexo (document/image):
-//   processarAnexoExtrato() — ver acima; 7) Fatia F2+F3: se ativo e a
-//   conversa está livre (sem opt-out, status!=='humano'), gera e envia a
-//   resposta do Time Prosperito (await dentro do try/catch — ver nota
-//   abaixo sobre a escolha de não usar fire-and-forget literal);
-//   8) SEMPRE 200 (exceto assinatura inválida) — webhook não deve fazer a
-//   Meta reenviar por erro de aplicação, mesmo padrão de
+//   texto digitado livremente (text.body); 6) empilha um job leve por
+//   mensagem (anexo/F2+F3 ficam pro background); 7) ACK imediato
+//   (NextResponse.json({ok:true})) assim que o loop de persistência
+//   termina, disparando waitUntil(processarJobsWhatsapp(...)) antes de
+//   retornar; 8) SEMPRE 200 (exceto assinatura inválida) — webhook não
+//   deve fazer a Meta reenviar por erro de aplicação, mesmo padrão de
 //   /api/hooks/novo-cadastro.
-//
-// Nota de desenho (F2+F3, reaproveitada pro anexo): o pedido original
-// falava em "fire-and-forget". Em runtime serverless (Vercel/Node), uma
-// promise não aguardada corre risco real de ser encerrada junto com a
-// função antes de terminar — não é fire-and-forget seguro, é só "talvez
-// rode". Por isso o processamento (agente E extrato) é AGUARDADO (await)
-// dentro do try/catch: a falha nunca derruba o 200 (mesmo efeito pedido),
-// mas o trabalho tem garantia de rodar até o fim antes da função retornar.
-// Efeito colateral: o ack pode demorar mais quando há anexo (download +
-// upload + 1 chamada de visão) — aceitável nesta fatia; fila/waitUntil
-// fica pra uma fatia de blindagem (F4) se a latência virar problema real.
 //
 // service_role (createXtvClient): usado aqui porque não há sessão de
 // usuário (mensagem chega de fora, sem cookie) — mesmo motivo de
@@ -72,37 +70,19 @@
 // ============================================================================
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { waitUntil } from "@vercel/functions";
 import { createXtvClient } from "@/lib/supabase-xtv";
-import { gerarRespostaWhatsApp, agenteValido } from "@/lib/whatsapp/cerebro";
-import { sendText } from "@/lib/whatsapp/graph";
-import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
-import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
+import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// WHATSAPP-EXTRATO-01: o caminho de anexo (download da Graph Media API,
-// timeout até 20s em lib/whatsapp/media.ts, + chamada de visão na
-// Anthropic, timeout até 30s em lib/whatsapp/extrato.ts) é AGUARDADO
-// dentro do próprio request do webhook (ver nota de desenho no cabeçalho
-// deste arquivo) — soma facilmente acima do limite default de função
-// serverless. Sem isso, a função pode ser encerrada no meio do
-// upload/extração; o dedup por wa_message_id evita duplicar dado quando a
-// Meta reenvia por timeout, mas o extrato daquela tentativa se perde.
-// Mesmo padrão de app/api/backfill-embeddings/route.ts.
-export const maxDuration = 60;
-
-// EXTRATO-01-FIX + DEBOUNCE: se o cliente manda várias mensagens em
-// sequência rápida (rajada), cada webhook chamava gerarRespostaWhatsApp
-// na hora — resultado: respostas fora de ordem/duplicadas, cada uma
-// vendo só um pedaço da rajada. DEBOUNCE_MS é quanto se espera, depois de
-// gravar a mensagem do cliente, antes de decidir se É esta mensagem que
-// deve gerar a resposta (só a mais recente da conversa no fim da espera
-// dispara — ver checagem antes do lock, abaixo). LOCK_TTL_MS é só rede de
-// segurança contra o lock (`wa_conversas.respondendo_desde`) ficar preso
-// pra sempre se a função for encerrada no meio (ex.: timeout) antes de
-// liberar — não é o tempo normal de uso do lock.
-const DEBOUNCE_MS = 8_000;
-const LOCK_TTL_MS = 2 * 60_000;
+// F4a: o ack em si (F1 síncrono) é rápido (<500ms); maxDuration agora
+// cobre o processamento em BACKGROUND via waitUntil (EXTRATO-01 até ~50s +
+// debounce 8s + Anthropic/Graph API), que a Vercel mede como parte da
+// mesma invocação mesmo depois do response já ter saído. 180s dá folga
+// confortável pro pior caso combinado numa mesma mensagem — bem dentro do
+// que o plano já comprovadamente suporta (sync-cotas usa 800).
+export const maxDuration = 180;
 
 // --- GET: handshake da Meta -------------------------------------------------
 export async function GET(req: Request) {
@@ -309,6 +289,7 @@ export async function POST(req: Request) {
   }
 
   const db = createXtvClient();
+  const jobs: WaJob[] = [];
 
   for (const m of msgs) {
     const waMessageId = m.id;
@@ -380,161 +361,40 @@ export async function POST(req: Request) {
         .eq("id", conversa.id);
     }
 
-    // WHATSAPP-EXTRATO-01 — extrato de cota anexado (document/image): baixa
-    // da Graph Media API, sobe pro bucket privado wa-extratos, extrai os
-    // campos via IA e grava 'pendente_revisao' em extratos_cotas. NUNCA
-    // escreve em `cartas`. Falha em qualquer etapa é só logada — nunca
-    // derruba o ack 200 (mesmo contrato do bloco F2+F3 abaixo).
-    if (anexo?.id) {
-      try {
-        const midia = await baixarMidia(anexo.id);
-        const storagePath = await subirParaStorage(conversa.id, anexo.id, midia);
-
-        await db
-          .from("wa_mensagens")
-          .update({ storage_path: storagePath })
-          .eq("id", msgInserida.id);
-
-        const base64 = Buffer.from(midia.bytes).toString("base64");
-        const extrato = await extrairExtrato({ mimeType: midia.mimeType, base64 });
-
-        await db.from("extratos_cotas").insert({
-          conversa_id: conversa.id,
-          mensagem_id: msgInserida.id,
-          storage_path: storagePath,
-          dados: extrato,
-          administradora: extrato.administradora,
-          grupo: extrato.grupo,
-          cota: extrato.cota,
-          valor_credito: extrato.valor_credito,
-          saldo_devedor: extrato.saldo_devedor,
-          parcelas_pagas: extrato.parcelas_pagas,
-          parcelas_restantes: extrato.parcelas_restantes,
-          valor_parcela: extrato.valor_parcela,
-          contemplada: extrato.contemplada,
-          confianca: extrato.confianca,
-        });
-
-        if (
-          process.env.WHATSAPP_AGENT_ATIVO === "true" &&
-          conversa.opt_out !== true &&
-          conversa.status !== "humano"
-        ) {
-          await sendText({
-            conversaId: conversa.id,
-            telefone,
-            texto: resumoExtratoWa(extrato),
-            agente: "sistema_extrato",
-          });
-        }
-      } catch (e) {
-        // Falha no caminho de extrato NUNCA derruba o ack 200 — só loga.
-        console.error(
-          "[whatsapp] falha ao processar extrato (anexo):",
-          e instanceof Error ? e.message : e
-        );
-      }
-    }
-
-    // Fatia F2+F3 — Time Prosperito responde, se ligado (kill-switch) e a
-    // conversa está livre (sem opt-out — nem o histórico nem esta mesma
-    // mensagem — e não escalada pra humano). Nunca responde à própria
-    // mensagem de opt-out.
+    // F4a: EXTRATO-01 e F2+F3 não rodam mais aqui — só empilham um job
+    // leve com o mínimo necessário. O processamento de fato (download de
+    // mídia, chamada de visão, debounce, Anthropic, Graph API) roda em
+    // background via waitUntil() depois do ack (ver fora do loop, abaixo).
+    // "Nunca responde à própria mensagem de opt-out": acabaDeOptarSair
+    // entra no cálculo de podeResponder abaixo, igual ao comportamento
+    // anterior.
     const podeResponder =
       process.env.WHATSAPP_AGENT_ATIVO === "true" &&
       !acabaDeOptarSair &&
       conversa.opt_out !== true &&
       conversa.status !== "humano";
 
-    if (podeResponder) {
-      try {
-        // Debounce: espera DEBOUNCE_MS e confere se chegou mensagem mais
-        // nova do cliente nesta conversa nesse meio-tempo. Se chegou, esta
-        // mensagem sai de cena silenciosamente (não é falha) — é a
-        // mensagem mais nova, na sua própria passada pelo webhook, quem
-        // vai fazer essa mesma checagem e (assumindo silêncio de
-        // DEBOUNCE_MS) gerar a resposta cobrindo a rajada inteira.
-        await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
-
-        const { data: ultimaMsgCliente } = await db
-          .from("wa_mensagens")
-          .select("id")
-          .eq("conversa_id", conversa.id)
-          .eq("papel", "cliente")
-          .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const souAUltima = !ultimaMsgCliente || ultimaMsgCliente.id === msgInserida.id;
-
-        if (souAUltima) {
-          // Lock: impede duas gerações simultâneas na mesma conversa (ex.:
-          // duas invocações do webhook cujo debounce vence quase junto).
-          // UPDATE...WHERE é atômico por linha no Postgres — das tentativas
-          // concorrentes, só uma consegue de fato casar o WHERE e setar
-          // respondendo_desde; a(s) outra(s) veem 0 linhas afetadas e
-          // desistem sem erro. O braço `lt` do WHERE é só destrave de lock
-          // preso (função anterior encerrada no meio, ex. por timeout) —
-          // não é o caminho normal.
-          const agoraIso = new Date().toISOString();
-          const limiteStaleIso = new Date(Date.now() - LOCK_TTL_MS).toISOString();
-          const { data: lockAdquirido } = await db
-            .from("wa_conversas")
-            .update({ respondendo_desde: agoraIso })
-            .eq("id", conversa.id)
-            .or(`respondendo_desde.is.null,respondendo_desde.lt.${limiteStaleIso}`)
-            .select("id");
-
-          if (lockAdquirido && lockAdquirido.length > 0) {
-            try {
-              const resultado = await gerarRespostaWhatsApp(
-                db,
-                conversa.id,
-                agenteValido(conversa.agente_ativo),
-                telefone
-              );
-              if (resultado) {
-                await sendText({
-                  conversaId: conversa.id,
-                  telefone,
-                  texto: resultado.texto,
-                  agente: resultado.agenteQueRespondeu,
-                  tokensIn: resultado.tokensIn,
-                  tokensOut: resultado.tokensOut,
-                });
-
-                const updates: Record<string, unknown> = {};
-                if (
-                  resultado.proximoAgente &&
-                  resultado.proximoAgente !== resultado.agenteQueRespondeu
-                ) {
-                  updates.agente_ativo = resultado.proximoAgente;
-                }
-                if (resultado.escalarHumano) {
-                  updates.status = "humano";
-                }
-                if (Object.keys(updates).length > 0) {
-                  await db.from("wa_conversas").update(updates).eq("id", conversa.id);
-                }
-              }
-            } finally {
-              // Libera o lock sempre — sucesso, falha do agente (capturada
-              // abaixo) ou qualquer outro caminho.
-              await db
-                .from("wa_conversas")
-                .update({ respondendo_desde: null })
-                .eq("id", conversa.id);
-            }
-          }
-        }
-      } catch (e) {
-        // Falha do agente NUNCA derruba o ack 200 do webhook — só loga.
-        console.error(
-          "[whatsapp] falha ao gerar/enviar resposta do agente:",
-          e instanceof Error ? e.message : e
-        );
-      }
+    if (anexo?.id || podeResponder) {
+      jobs.push({
+        conversaId: conversa.id,
+        telefone,
+        msgInseridaId: msgInserida.id,
+        anexoId: anexo?.id ?? null,
+        conversaOptOut: conversa.opt_out === true,
+        conversaStatus: conversa.status ?? null,
+        agenteAtivo: conversa.agente_ativo ?? null,
+        podeResponder,
+      });
     }
+  }
+
+  // F4a: ack imediato — dispara o processamento pesado em background
+  // (waitUntil garante que a Vercel mantém a invocação viva até
+  // processarJobsWhatsapp terminar, mesmo depois do response já ter sido
+  // devolvido pra Meta) e retorna 200 na hora, sem esperar nenhuma chamada
+  // à Anthropic/Graph API/debounce.
+  if (jobs.length > 0) {
+    waitUntil(processarJobsWhatsapp(db, jobs));
   }
 
   return NextResponse.json({ ok: true });

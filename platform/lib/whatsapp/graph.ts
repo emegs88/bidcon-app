@@ -61,6 +61,12 @@ async function conversaOptOut(
   return data?.opt_out === true;
 }
 
+// F4a (blindagem): fetch pra Graph API/relay BSP sem timeout ficava
+// pendurado indefinidamente se a Meta/360dialog não respondesse — dentro
+// do waitUntil isso consumiria o maxDuration inteiro à toa. Mesmo padrão
+// de AbortController já usado em lib/whatsapp/media.ts/extrato.ts.
+const TIMEOUT_GRAPH_MS = 15_000;
+
 async function chamarGraph(
   corpo: Record<string, unknown>
 ): Promise<{ ok: boolean; id?: string; erro?: string }> {
@@ -84,11 +90,14 @@ async function chamarGraph(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_GRAPH_MS);
   try {
     const resp = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(corpo),
+      signal: controller.signal,
     });
     const data: unknown = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -100,10 +109,15 @@ async function chamarGraph(
     const id = (data as { messages?: Array<{ id?: string }> })?.messages?.[0]?.id;
     return { ok: true, id };
   } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return { ok: false, erro: `timeout_graph_api(${TIMEOUT_GRAPH_MS}ms)` };
+    }
     return {
       ok: false,
       erro: e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido",
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

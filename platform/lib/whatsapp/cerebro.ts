@@ -283,26 +283,41 @@ export async function gerarRespostaWhatsApp(
     }
   }
 
+  // F4a (blindagem): achado durante a exploração — o comentário antigo
+  // deste arquivo falava em "~12s" de timeout, mas não existia
+  // AbortController nenhum aqui; o fetch podia ficar pendurado
+  // indefinidamente. Timeout por rodada (não pro loop inteiro) — cada
+  // rodada de tool_use é uma chamada HTTP independente.
+  const TIMEOUT_ANTHROPIC_MS = 20_000;
+
   let data: unknown;
   try {
     let rodada = 0;
     for (;;) {
       const usarTools = rodada < MAX_RODADAS_TOOL;
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-fable-5",
-          max_tokens: 1024,
-          system,
-          messages: apiMensagens,
-          ...(usarTools ? { tools: toolsParaAgente(agenteAtivo) } : {}),
-        }),
-      });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_ANTHROPIC_MS);
+      let resp: Response;
+      try {
+        resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-fable-5",
+            max_tokens: 1024,
+            system,
+            messages: apiMensagens,
+            ...(usarTools ? { tools: toolsParaAgente(agenteAtivo) } : {}),
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!resp.ok) return null;
       data = await resp.json();
 
