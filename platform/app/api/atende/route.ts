@@ -46,11 +46,20 @@ import {
   type AgenteId,
 } from "./_prompt";
 import {
-  BUSCAR_CARTAS_TOOL,
   buscarCartas,
   resultadoParaTool,
   type BuscarCartasInput,
 } from "@/lib/buscar-cartas-tool";
+import { toolsParaAgente } from "@/lib/tools-por-agente";
+import { buscarPlanos, resultadoParaToolPlanos, type BuscarPlanosInput } from "@/lib/venda-nova/buscar-planos-tool";
+import {
+  executarSalvarLead,
+  resultadoParaToolSalvarLead,
+  type SalvarLeadInput,
+} from "@/lib/venda-nova/salvar-lead-tool";
+import { statusVenda, resultadoParaToolStatusVenda } from "@/lib/venda-nova/status-venda-tool";
+import { createAdminClient } from "@/lib/supabase-admin";
+import { sanitizarUtm } from "@/lib/utm";
 
 export const dynamic = "force-dynamic";
 
@@ -443,11 +452,17 @@ export async function POST(req: Request) {
     interesse_id?: unknown;
     texto?: unknown;
     carta_foco?: unknown;
+    utm?: unknown;
   };
 
   const canal = String(body.canal ?? "").trim() as Canal;
   const interesseId = String(body.interesse_id ?? "").trim();
   const texto = String(body.texto ?? "").trim().slice(0, 4000);
+  // FATIA 1 (venda nova, ajuste obrigatório #4): utm opcional vindo do widget
+  // (query string da página em que o chat abriu) — só pra tool salvar_lead
+  // registrar origem do lead. Allowlist em lib/utm.ts; qualquer chave fora
+  // dela é descartada, nunca repassada pro banco.
+  const utm = sanitizarUtm(body.utm);
 
   if (!CANAIS.includes(canal)) {
     return NextResponse.json(
@@ -486,10 +501,14 @@ export async function POST(req: Request) {
   // Contrato "já contatável": o interesse PRECISA existir. Nunca criamos aqui.
   // Erro de banco -> 500 (com log); registro inexistente -> 400 com a mesma
   // orientação de captura no front.
+  // nome/telefone trazidos aqui (não só "id") pra alimentar o `ctx` confiável
+  // das tools salvar_lead/status_venda (FATIA 1) — mesmo padrão de identidade
+  // confiável já usado em processarReservaCarta, nunca do texto do modelo.
+  let interesseInfo: { id: string; nome: string | null; telefone: string | null } | null = null;
   {
     const { data: interesse, error } = await supabase
       .from("interesses")
-      .select("id")
+      .select("id, nome, telefone")
       .eq("id", interesseId)
       .maybeSingle();
     if (error) {
@@ -508,6 +527,7 @@ export async function POST(req: Request) {
         { status: 400, headers: corsHeaders(req) }
       );
     }
+    interesseInfo = interesse;
   }
 
   // 1) Conversa não-fechada para o interesse (aberta OU humano — CRM-01:
@@ -610,14 +630,50 @@ export async function POST(req: Request) {
   }
 
   // 5) Anthropic Messages API (fetch cru), em loop de tool-use (F4-TOOL):
-  // a persona tem a tool `buscar_cartas` (busca de verdade em
-  // vw_carousel_cartas — ver lib/buscar-cartas-tool.ts) pra nunca negar
-  // estoque numa faixa sem ter consultado o banco de verdade primeiro.
+  // cada persona tem o conjunto de tools que `toolsParaAgente` decide (ver
+  // lib/tools-por-agente.ts) — as 7 pré-existentes continuam só com
+  // `buscar_cartas` (busca de verdade em vw_carousel_cartas), sem nenhuma
+  // mudança de comportamento; o vendanova (FATIA 1) ganha
+  // buscar_planos/salvar_lead/status_venda no lugar dela.
   // No máximo 2 rodadas de tool_use por turno; na rodada seguinte ao teto
   // omitimos `tools` do body pra forçar o modelo a fechar com texto.
   const MAX_RODADAS_TOOL = 2;
   type MsgApi = { role: "user" | "assistant"; content: unknown };
   const apiMensagens: MsgApi[] = mensagens.map((m) => ({ role: m.role, content: m.content }));
+
+  // nnvAdmin (service_role, projeto nnv) só é criado se uma tool da venda
+  // nova for de fato chamada nesta resposta — as 7 personas pré-existentes
+  // nunca instanciam esse client, zero mudança de comportamento/risco pra elas.
+  let _nnvAdmin: ReturnType<typeof createAdminClient> | null = null;
+  const nnvAdmin = () => (_nnvAdmin ??= createAdminClient());
+
+  // Dispatcher único de execução de tool por nome — cada tool já nunca lança
+  // (contrato dos módulos em lib/*-tool.ts); erro de criação do nnvAdmin
+  // (env var ausente) também nunca derruba o turno, vira {erro} pro modelo.
+  async function executarToolPorNome(nome: string, input: unknown): Promise<string> {
+    try {
+      switch (nome) {
+        case "buscar_cartas":
+          return resultadoParaTool(await buscarCartas(supabase, (input ?? {}) as BuscarCartasInput));
+        case "buscar_planos":
+          return resultadoParaToolPlanos(await buscarPlanos((input ?? {}) as BuscarPlanosInput));
+        case "salvar_lead":
+          return resultadoParaToolSalvarLead(
+            await executarSalvarLead(nnvAdmin(), (input ?? {}) as SalvarLeadInput, {
+              telefone: interesseInfo?.telefone ?? "",
+              utm,
+            })
+          );
+        case "status_venda":
+          return resultadoParaToolStatusVenda(await statusVenda(nnvAdmin(), interesseInfo?.telefone ?? ""));
+        default:
+          return JSON.stringify({ erro: "tool desconhecida" });
+      }
+    } catch (e) {
+      console.error(`[atende] erro ao executar tool ${nome}:`, e);
+      return JSON.stringify({ erro: "erro ao executar a ferramenta." });
+    }
+  }
 
   let data: unknown;
   try {
@@ -636,7 +692,7 @@ export async function POST(req: Request) {
           max_tokens: 1024,
           system,
           messages: apiMensagens,
-          ...(usarTools ? { tools: [BUSCAR_CARTAS_TOOL] } : {}),
+          ...(usarTools ? { tools: toolsParaAgente(agenteAtual) } : {}),
         }),
       });
       if (!resp.ok) {
@@ -652,7 +708,7 @@ export async function POST(req: Request) {
       const toolUses = Array.isArray(content)
         ? (
             content as Array<{ type?: string; name?: string; id?: string; input?: unknown }>
-          ).filter((b) => b?.type === "tool_use" && b?.name === "buscar_cartas")
+          ).filter((b) => b?.type === "tool_use")
         : [];
 
       if (stopReason !== "tool_use" || !usarTools || !toolUses.length) break;
@@ -663,9 +719,7 @@ export async function POST(req: Request) {
         toolUses.map(async (tu) => ({
           type: "tool_result",
           tool_use_id: tu.id,
-          content: resultadoParaTool(
-            await buscarCartas(supabase, (tu.input ?? {}) as BuscarCartasInput)
-          ),
+          content: await executarToolPorNome(String(tu.name), tu.input),
         }))
       );
       apiMensagens.push({ role: "user", content: toolResults });

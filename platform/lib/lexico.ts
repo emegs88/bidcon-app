@@ -40,6 +40,11 @@ export const TERMOS_PROIBIDOS = [
   "cédula de crédito bancário",
   "estrutura de aquisicao",
   "estrutura de aquisição",
+  // FATIA 1 (venda nova) — espelho do ajuste em lib/ia.ts: consórcio não é
+  // aplicação financeira, nunca prometer retorno/rentabilidade.
+  "retorno",
+  "cdi",
+  "lucro",
 ] as const;
 
 const NEGACOES = ["nao ", "não ", "sem ", "nunca "];

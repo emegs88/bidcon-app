@@ -99,6 +99,12 @@ const TERMOS_PROIBIDOS = [
   "cédula de crédito bancário",
   "estrutura de aquisicao",
   "estrutura de aquisição",
+  // FATIA 1 (venda nova) — o COMPLIANCE de _prompt.ts já promete bloquear
+  // estes termos; a régua real (esta lista) não os continha. Consórcio não
+  // é aplicação financeira: nunca prometer retorno/rentabilidade.
+  "retorno",
+  "cdi",
+  "lucro",
 ];
 
 const NEGACOES = ["nao ", "não ", "sem ", "nunca "];

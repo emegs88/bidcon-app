@@ -43,6 +43,7 @@
 // valor comprovado em vez de introduzir uma env nova ainda sem uso real.
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { sanitizarCompliance } from "@/lib/ia";
 import {
   montarSystem,
@@ -54,11 +55,22 @@ import {
   type AgenteId,
 } from "@/app/api/atende/_prompt";
 import {
-  BUSCAR_CARTAS_TOOL,
   buscarCartas,
   resultadoParaTool,
   type BuscarCartasInput,
 } from "@/lib/buscar-cartas-tool";
+import { toolsParaAgente } from "@/lib/tools-por-agente";
+import {
+  buscarPlanos,
+  resultadoParaToolPlanos,
+  type BuscarPlanosInput,
+} from "@/lib/venda-nova/buscar-planos-tool";
+import {
+  executarSalvarLead,
+  resultadoParaToolSalvarLead,
+  type SalvarLeadInput,
+} from "@/lib/venda-nova/salvar-lead-tool";
+import { statusVenda, resultadoParaToolStatusVenda } from "@/lib/venda-nova/status-venda-tool";
 
 const FALLBACK_WA =
   "Posso te ajudar a entender como funciona o processo e os próximos passos. " +
@@ -211,7 +223,8 @@ export type ResultadoCerebro = {
 export async function gerarRespostaWhatsApp(
   db: ReturnType<typeof createXtvClient>,
   conversaId: string,
-  agenteAtivo: AgenteId
+  agenteAtivo: AgenteId,
+  telefone: string
 ): Promise<ResultadoCerebro | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
@@ -230,13 +243,45 @@ export async function gerarRespostaWhatsApp(
   const cartas = await blocoCartas(db);
   if (cartas) system += "\n\n" + cartas;
 
-  // Loop de tool-use (buscar_cartas) — no máximo 2 rodadas de tool_use por
-  // turno (F4-TOOL; ver header de lib/buscar-cartas-tool.ts). Na rodada
-  // seguinte ao teto, omitimos `tools` do body pra forçar o modelo a
-  // fechar com texto, mesmo que "quisesse" mais uma busca.
+  // Loop de tool-use — no máximo 2 rodadas de tool_use por turno (F4-TOOL;
+  // ver header de lib/buscar-cartas-tool.ts). Na rodada seguinte ao teto,
+  // omitimos `tools` do body pra forçar o modelo a fechar com texto, mesmo
+  // que "quisesse" mais uma busca. toolsParaAgente(agenteAtivo) devolve
+  // [BUSCAR_CARTAS_TOOL] pras 7 personas pré-existentes (idêntico ao
+  // hardcode anterior) e as 3 tools de venda nova só pra `vendanova`.
   const MAX_RODADAS_TOOL = 2;
   type MsgApi = { role: "user" | "assistant"; content: unknown };
   const apiMensagens: MsgApi[] = mensagens.map((m) => ({ role: m.role, content: m.content }));
+
+  // nnvAdmin só é instanciado se uma tool de venda nova for de fato chamada
+  // — as 7 personas pré-existentes (só buscar_cartas) nunca tocam nele.
+  let _nnvAdmin: ReturnType<typeof createAdminClient> | null = null;
+  const nnvAdmin = () => (_nnvAdmin ??= createAdminClient());
+
+  async function executarToolPorNome(nome: string, input: unknown): Promise<string> {
+    try {
+      switch (nome) {
+        case "buscar_cartas":
+          return resultadoParaTool(await buscarCartas(db, (input ?? {}) as BuscarCartasInput));
+        case "buscar_planos":
+          return resultadoParaToolPlanos(await buscarPlanos((input ?? {}) as BuscarPlanosInput));
+        case "salvar_lead":
+          return resultadoParaToolSalvarLead(
+            await executarSalvarLead(nnvAdmin(), (input ?? {}) as SalvarLeadInput, {
+              telefone,
+              utm: null,
+            })
+          );
+        case "status_venda":
+          return resultadoParaToolStatusVenda(await statusVenda(nnvAdmin(), telefone));
+        default:
+          return JSON.stringify({ erro: "tool desconhecida" });
+      }
+    } catch (e) {
+      console.error(`[cerebro] erro ao executar tool ${nome}:`, e);
+      return JSON.stringify({ erro: "erro ao executar a ferramenta." });
+    }
+  }
 
   let data: unknown;
   try {
@@ -255,7 +300,7 @@ export async function gerarRespostaWhatsApp(
           max_tokens: 1024,
           system,
           messages: apiMensagens,
-          ...(usarTools ? { tools: [BUSCAR_CARTAS_TOOL] } : {}),
+          ...(usarTools ? { tools: toolsParaAgente(agenteAtivo) } : {}),
         }),
       });
       if (!resp.ok) return null;
@@ -266,7 +311,7 @@ export async function gerarRespostaWhatsApp(
       const toolUses = Array.isArray(content)
         ? (
             content as Array<{ type?: string; name?: string; id?: string; input?: unknown }>
-          ).filter((b) => b?.type === "tool_use" && b?.name === "buscar_cartas")
+          ).filter((b) => b?.type === "tool_use")
         : [];
 
       if (stopReason !== "tool_use" || !usarTools || !toolUses.length) break;
@@ -277,9 +322,7 @@ export async function gerarRespostaWhatsApp(
         toolUses.map(async (tu) => ({
           type: "tool_result",
           tool_use_id: tu.id,
-          content: resultadoParaTool(
-            await buscarCartas(db, (tu.input ?? {}) as BuscarCartasInput)
-          ),
+          content: await executarToolPorNome(String(tu.name), tu.input),
         }))
       );
       apiMensagens.push({ role: "user", content: toolResults });

@@ -31,6 +31,49 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify({ interesseId: state.interesseId, nome: state.nome })); } catch (e) {}
   }
 
+  /* ---------------- UTM (FATIA 1: venda nova) ----------------
+   * Captura FIRST-TOUCH: grava no cookie bidcon_utm só na primeira visita
+   * com parâmetro de campanha na URL — visitas seguintes NUNCA sobrescrevem
+   * (mesmo princípio do referral CTWA capturado no webhook do WhatsApp).
+   * Allowlist idêntica à do servidor (platform/lib/utm.ts) — o back-end
+   * também filtra, então nenhuma chave fora dela chega em vendas_novas.utm
+   * mesmo que este código mude no futuro. */
+  var UTM_CHAVES = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'];
+  var UTM_COOKIE = 'bidcon_utm';
+
+  function pwLerCookie(nome) {
+    try {
+      var partes = document.cookie ? document.cookie.split('; ') : [];
+      for (var i = 0; i < partes.length; i++) {
+        var idx = partes[i].indexOf('=');
+        if (idx === -1) continue;
+        if (partes[i].slice(0, idx) === nome) return decodeURIComponent(partes[i].slice(idx + 1));
+      }
+    } catch (e) {}
+    return null;
+  }
+  function pwGravarCookie(nome, valor) {
+    try {
+      var expira = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toUTCString();
+      document.cookie = nome + '=' + encodeURIComponent(valor) + '; expires=' + expira + '; path=/; SameSite=Lax';
+    } catch (e) {}
+  }
+  function pwCapturarUtm() {
+    var existente = pwLerCookie(UTM_COOKIE);
+    if (existente) { try { return JSON.parse(existente); } catch (e) { return null; } }
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var obj = {}, achou = false;
+      for (var i = 0; i < UTM_CHAVES.length; i++) {
+        var v = params.get(UTM_CHAVES[i]);
+        if (v) { obj[UTM_CHAVES[i]] = String(v).trim().slice(0, 200); achou = true; }
+      }
+      if (achou) { pwGravarCookie(UTM_COOKIE, JSON.stringify(obj)); return obj; }
+    } catch (e) {}
+    return null;
+  }
+  var utmAtual = pwCapturarUtm();
+
   /* ---------------- CSS ---------------- */
   var css = ''
   + '.pw-launcher{position:fixed;right:20px;bottom:20px;z-index:99998;display:flex;align-items:center;gap:10px;cursor:pointer;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}'
@@ -197,11 +240,12 @@
     addMsg('cl', texto);
     txt.value = ''; txt.style.height = 'auto';
     typingOn();
+    var corpo = { canal: CANAL, interesse_id: state.interesseId, texto: texto };
+    if (cartaFocoAtual) corpo.carta_foco = cartaFocoAtual;
+    if (utmAtual) corpo.utm = utmAtual;
     fetch(API_BASE + '/api/atende', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(cartaFocoAtual
-        ? { canal: CANAL, interesse_id: state.interesseId, texto: texto, carta_foco: cartaFocoAtual }
-        : { canal: CANAL, interesse_id: state.interesseId, texto: texto })
+      body: JSON.stringify(corpo)
     }).then(function (r) {
       typingOff();
       if (r.status === 400) { // interesse sumiu (ex.: limpeza) -> recomeça

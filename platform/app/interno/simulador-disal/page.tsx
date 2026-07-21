@@ -5,10 +5,15 @@
 // /interno/simulador-porto — mas SEM motor/API: dados 100% estáticos do
 // boletim (lib/disal/atual.ts), zero chamada de rede.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { linkWhatsApp } from "@/lib/format";
 import { BOLETIM_DISAL_ATUAL } from "@/lib/disal/atual";
-import type { LinhaAuto, LinhaImovel } from "@/lib/disal/types";
+import type { LinhaImovel } from "@/lib/disal/types";
+import {
+  linhaAutoMaisProxima,
+  totalAuto as calcTotalAuto,
+  totalImovel as calcTotalImovel,
+} from "@/lib/disal/calculo";
 import { SimuladorTabNav } from "../SimuladorTabNav";
 
 type Segmento = "veiculo" | "imovel";
@@ -52,41 +57,30 @@ export default function SimuladorDisal() {
   const [nomeCliente, setNomeCliente] = useState("");
   const [copiado, setCopiado] = useState(false);
 
-  // créditos válidos combinados (Faixa II + Faixa III) — usado pro snap do slider,
-  // já que existe um furo real nos dados entre 180.000 e 190.000.
-  const creditosAutoValidos = useMemo(
-    () => [...autosFaixaII.linhas, ...autosFaixaIII.linhas].map((l) => l[0]).sort((a, b) => a - b),
-    [autosFaixaII, autosFaixaIII],
-  );
-
+  // Snap do slider pro crédito válido mais próximo — mesma lógica de
+  // nearest-neighbor, agora em lib/disal/calculo.ts (reaproveitada pela tool
+  // buscar_planos). Existe um furo real nos dados entre 180.000 e 190.000.
   function snapCreditoAuto(bruto: number) {
-    let maisProximo = creditosAutoValidos[0];
-    let menorDist = Math.abs(bruto - maisProximo);
-    for (const c of creditosAutoValidos) {
-      const d = Math.abs(bruto - c);
-      if (d < menorDist) {
-        menorDist = d;
-        maisProximo = c;
-      }
-    }
-    setCreditoAuto(maisProximo);
+    const { linha } = linhaAutoMaisProxima(bruto, autosFaixaII, autosFaixaIII);
+    setCreditoAuto(linha[0]);
   }
 
-  const faixaAuto = creditoAuto <= 180000 ? autosFaixaII : autosFaixaIII;
-  const rotuloFaixa = creditoAuto <= 180000 ? "Faixa II" : "Faixa III";
-  const linhaAuto: LinhaAuto =
-    faixaAuto.linhas.find((l) => l[0] === creditoAuto) ?? faixaAuto.linhas[0];
+  const { linha: linhaAuto, faixa: faixaAuto, rotuloFaixa } = linhaAutoMaisProxima(
+    creditoAuto,
+    autosFaixaII,
+    autosFaixaIII,
+  );
   const [, codAuto, parcelaAuto100, parcelaAuto75] = linhaAuto;
   const parcelaAuto = base === "100" ? parcelaAuto100 : parcelaAuto75;
   const parcelaAutoAlt = base === "100" ? parcelaAuto75 : parcelaAuto100;
-  const totalAuto = faixaAuto.prazo * parcelaAuto;
+  const totalAuto = calcTotalAuto(faixaAuto, parcelaAuto);
   const custoAlemAuto = totalAuto - creditoAuto;
   const custoAlemAutoPct = (custoAlemAuto / creditoAuto) * 100;
 
   const linhaImovel: LinhaImovel = imoveis220.linhas[imovelIdx];
   const fasesImovel = base === "100" ? linhaImovel.b100 : linhaImovel.b75;
   const fasesImovelAlt = base === "100" ? linhaImovel.b75 : linhaImovel.b100;
-  const totalImovel = 12 * fasesImovel[0] + 207 * fasesImovel[1] + 1 * fasesImovel[2];
+  const totalImovel = calcTotalImovel(fasesImovel);
   const custoAlemImovel = totalImovel - linhaImovel.credito;
   const custoAlemImovelPct = (custoAlemImovel / linhaImovel.credito) * 100;
 

@@ -29,6 +29,7 @@
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { sendTemplate } from "@/lib/whatsapp/graph";
+import { normalizarTelefoneBR } from "@/lib/telefone";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,20 +42,6 @@ function autorizado(req: Request): boolean {
   const secret = process.env.DISPARO_SECRET;
   if (!secret) return false; // sem secret configurado => não roda
   return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
-// Aceita telefone com ou sem DDI 55, extrai só dígitos. Formato final igual
-// ao que o Meta manda no webhook (DDI+DDD+número, sem "+") — E.164 sem o
-// prefixo "+", mesmo padrão já usado em wa_conversas.telefone.
-function normalizarTelefoneBR(raw: unknown): string | null {
-  const digitos = String(raw ?? "").replace(/\D/g, "");
-  if (digitos.length === 12 || digitos.length === 13) {
-    return digitos.startsWith("55") ? digitos : null;
-  }
-  if (digitos.length === 10 || digitos.length === 11) {
-    return "55" + digitos;
-  }
-  return null;
 }
 
 type ResultadoTelefone = {

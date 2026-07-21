@@ -239,6 +239,24 @@ type MensagemMeta = {
   // API, baixado depois via lib/whatsapp/media.ts.
   document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   image?: { id?: string; caption?: string; mime_type?: string };
+  // FATIA 1 (venda nova) — presente só quando a conversa nasce de um anúncio
+  // Click-to-WhatsApp (CTWA); a Meta manda esse objeto na PRIMEIRA mensagem
+  // do clique. Persistido first-touch-only em wa_conversas.referral (ver
+  // captura logo após o upsert da conversa, abaixo) — alimenta atribuição
+  // do FAROL. Shape espelha o payload real da Meta; todos os campos são
+  // opcionais por completude (nem todo referral traz todos).
+  referral?: {
+    source_type?: string;
+    source_id?: string;
+    source_url?: string;
+    headline?: string;
+    body?: string;
+    media_type?: string;
+    image_url?: string;
+    video_url?: string;
+    thumbnail_url?: string;
+    ctwa_clid?: string;
+  };
 };
 
 // --- POST: recebe eventos; F1 só grava (sem Claude, sem resposta) ----------
@@ -325,9 +343,17 @@ export async function POST(req: Request) {
     const { data: conversa, error: errConversa } = await db
       .from("wa_conversas")
       .upsert({ telefone }, { onConflict: "telefone", ignoreDuplicates: false })
-      .select("id, status, agente_ativo, opt_out")
+      .select("id, status, agente_ativo, opt_out, referral")
       .single();
     if (errConversa || !conversa) continue;
+
+    // FATIA 1 (venda nova) — referral CTWA first-touch: só grava se esta
+    // mensagem trouxe `referral` E a conversa ainda não tinha nenhum
+    // capturado. Nunca sobrescreve (mesma conversa pode vir de mais de um
+    // clique/anúncio ao longo do tempo — vale o primeiro).
+    if (m.referral && !conversa.referral) {
+      await db.from("wa_conversas").update({ referral: m.referral }).eq("id", conversa.id);
+    }
 
     const { data: msgInserida, error: errMsg } = await db
       .from("wa_mensagens")
@@ -464,7 +490,8 @@ export async function POST(req: Request) {
               const resultado = await gerarRespostaWhatsApp(
                 db,
                 conversa.id,
-                agenteValido(conversa.agente_ativo)
+                agenteValido(conversa.agente_ativo),
+                telefone
               );
               if (resultado) {
                 await sendText({
