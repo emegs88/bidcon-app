@@ -204,10 +204,29 @@ export function violaCompliance(texto: string): boolean {
 // Última barreira de saída. Devolve a frase só se passar em TODAS as frentes de
 // compliance; senão, um fallback neutro seguro. Use isto para envolver QUALQUER
 // texto gerado por IA antes de exibir/transmitir ao cliente (Níveis 3/4/5+).
+//
+// Observabilidade: quando esta função troca a resposta do modelo pelo fallback,
+// ela é a ÚLTIMA barreira antes do cliente — se não logar, a troca é invisível
+// (nenhuma exceção, nenhum erro de runtime; só um fallback genérico saindo no
+// lugar de uma resposta correta). Por isso todo disparo loga QUAL frente pegou
+// (termo proibido / promessa de data) + um trecho da frase engolida, sem mudar
+// o valor devolvido em nenhum caso.
 export function sanitizarCompliance(frase: string, fallback: string): string {
   const limpa = frase.trim();
   if (!limpa) return fallback;
-  if (violaCompliance(limpa)) return fallback;
+  const base = semAcento(limpa.toLowerCase());
+  if (violaTermo(base)) {
+    console.warn(
+      `[sanitizarCompliance] termo proibido — trecho engolido: ${limpa.slice(0, 120)}`
+    );
+    return fallback;
+  }
+  if (prometeDataContemplacao(base)) {
+    console.warn(
+      `[sanitizarCompliance] promessa de data de contemplação — trecho engolido: ${limpa.slice(0, 120)}`
+    );
+    return fallback;
+  }
   return limpa;
 }
 
