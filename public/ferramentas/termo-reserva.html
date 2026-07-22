@@ -58,17 +58,6 @@ main{padding:20px 0 60px}
 .hint.ok{color:var(--verde-l)}
 .hint.bad{color:var(--ambar-l)}
 
-/* toggle de modalidade */
-.modtabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
-.modtab{cursor:pointer;border:1px solid var(--linha2);border-radius:11px;padding:12px 10px;background:var(--carvao);transition:.15s;text-align:left}
-.modtab input{position:absolute;opacity:0;pointer-events:none}
-.modtab b{display:block;font-family:var(--f-display);font-size:13.5px;font-weight:700;color:#fff;margin-bottom:3px}
-.modtab small{display:block;font-size:11px;color:var(--cinza);line-height:1.35}
-.modtab.on{border-color:var(--azul);background:rgba(46,123,240,.12);box-shadow:0 0 0 2px rgba(46,123,240,.2) inset}
-.modtab.on.direta{border-color:var(--verde);background:rgba(31,170,89,.12);box-shadow:0 0 0 2px rgba(31,170,89,.22) inset}
-.modtab.travado{opacity:.5;cursor:not-allowed;filter:grayscale(.4)}
-.modtab.travado b::after{content:" · travado";font-weight:600;color:var(--ambar-l);font-size:11px}
-
 /* cotas repetidor */
 .cota{border:1px dashed var(--linha2);border-radius:11px;padding:12px 12px 2px;margin-bottom:10px;position:relative}
 .cota .del{position:absolute;top:8px;right:8px;background:none;border:1px solid var(--linha2);color:var(--cinza);border-radius:8px;width:24px;height:24px;font-size:15px;cursor:pointer;line-height:1}
@@ -126,8 +115,6 @@ main{padding:20px 0 60px}
 .doc .minuta-mark.oculta{display:none}
 .doc .parecer{margin-top:26px;background:#fff7ed;border:1px solid #f0d9b5;border-left:3px solid #d99c1c;border-radius:8px;padding:12px 14px;font-family:var(--f-body);font-size:11px;color:#6b4e12;line-height:1.6}
 .doc .parecer b{color:#8a5a00}
-.doc .custodia-flag{margin-top:14px;background:#fbe9ec;border:1px solid #e6b3bd;border-left:3px solid #c0344c;border-radius:8px;padding:12px 14px;font-family:var(--f-body);font-size:11px;color:#7a2233;line-height:1.6}
-.doc .custodia-flag b{color:#a5283c}
 .doc .anexo-title{font-family:var(--f-display);font-size:13px;color:#0c1330;margin:22px 0 6px}
 
 /* ── Impressão: só o contrato ── */
@@ -139,7 +126,7 @@ main{padding:20px 0 60px}
   .wrap{max-width:none;padding:0}
   main{padding:0}
   .doc{box-shadow:none;border-radius:0;padding:0;font-size:11.5pt}
-  .doc .parecer,.doc .custodia-flag{page-break-inside:avoid}
+  .doc .parecer{page-break-inside:avoid}
 }
 </style>
 </head>
@@ -168,6 +155,7 @@ main{padding:20px 0 60px}
           <button type="button" class="btn sec" id="btnCopiar">Copiar operação</button>
         </div>
         <p class="io-msg" id="jsonMsg"></p>
+        <p class="hint" style="margin-top:8px">v2 — modelo único (Conta Notarial, 5º Tabelionato de Campinas). A modalidade "Compra Direta" (Pix/boleto direto) foi descontinuada: não há entrada antecipada nem trilho alternativo de pagamento nesta minuta.</p>
 
         <!-- Verificador IA (progressivo): só aparece quando a ferramenta é
              servida por http(s) na plataforma logada. Aberto por duplo-clique
@@ -183,22 +171,6 @@ main{padding:20px 0 60px}
             <button type="button" class="btn sec" id="btnExtrair">Extrair e preencher</button>
           </div>
           <p class="io-msg" id="iaMsg"></p>
-        </div>
-      </fieldset>
-
-      <fieldset class="grp" style="border-color:var(--linha2)">
-        <legend>Modalidade da operação</legend>
-        <div class="modtabs">
-          <label class="modtab" id="tab-notarial">
-            <input type="radio" name="modalidade" value="NOTARIAL" checked>
-            <b>🛡️ Reserva Notarial</b>
-            <small>Cartório custodia o sinal (conta de afetação). Máxima segurança.</small>
-          </label>
-          <label class="modtab direta" id="tab-direta">
-            <input type="radio" name="modalidade" value="PAYMENT_INSTITUTION">
-            <b>⚡ Compra Direta</b>
-            <small>Comprar já: a reserva confirma com o pagamento. Repasse D+2.</small>
-          </label>
         </div>
       </fieldset>
 
@@ -222,23 +194,28 @@ main{padding:20px 0 60px}
       </fieldset>
 
       <fieldset class="grp">
-        <legend>Sinal e prazos</legend>
-        <div class="fld money"><label>Sinal (R$)</label><span>R$</span><input id="sinal" inputmode="numeric" placeholder="0,00"></div>
-        <p class="hint" id="sinalHint">Faixa permitida do sinal: 10–20% do ágio total.</p>
-        <div class="fld row2">
-          <div><label>Validade da reserva (dias)</label><input id="validade" inputmode="numeric" value="45"></div>
-          <div><label>Extrato — no máx. (dias)</label><input id="corte" inputmode="numeric" value="7"></div>
+        <legend>Modelo de remuneração</legend>
+        <p class="hint" style="margin-bottom:8px">Escolha obrigatória — não há modelo padrão. Selecione conforme a origem da operação.</p>
+        <div class="fld">
+          <label style="display:flex;align-items:flex-start;gap:8px;text-transform:none;font-size:12px;color:#cfcfd4;letter-spacing:normal;cursor:pointer">
+            <input type="radio" name="modelo" value="A" style="margin-top:3px;width:auto">
+            <span><b>Modelo A</b> — Carta de vitrine/fornecedor · 7% do crédito total, liberado pelo Tabelionato diretamente à Bidcon.</span>
+          </label>
+        </div>
+        <div class="fld">
+          <label style="display:flex;align-items:flex-start;gap:8px;text-transform:none;font-size:12px;color:#cfcfd4;letter-spacing:normal;cursor:pointer">
+            <input type="radio" name="modelo" value="B" style="margin-top:3px;width:auto">
+            <span><b>Modelo B</b> — Captação direta · 10% do ágio (6% se cancelada), mínimo R$ 2.500,00.</span>
+          </label>
         </div>
       </fieldset>
 
-      <fieldset class="grp" id="grpDireta" style="display:none">
-        <legend>Parâmetros — Compra Direta (defaults do EDITAL)</legend>
-        <div class="fld money"><label>Teto do ágio (R$)</label><span>R$</span><input id="teto" inputmode="numeric" value="50.000"></div>
+      <fieldset class="grp">
+        <legend>Prazos</legend>
         <div class="fld row2">
-          <div><label>Repasse (D+N úteis)</label><input id="dn" inputmode="numeric" value="2"></div>
-          <div><label>Multa por atraso (%/dia)</label><input id="multa" inputmode="text" value="0,5"></div>
+          <div><label>Validade da reserva (dias úteis)</label><input id="validade" inputmode="numeric" value="3"></div>
+          <div><label>Extrato — no máx. (dias)</label><input id="corte" inputmode="numeric" value="7"></div>
         </div>
-        <p class="hint" id="tetoHint"></p>
       </fieldset>
 
       <fieldset class="grp">
@@ -272,22 +249,43 @@ main{padding:20px 0 60px}
 /* ════════════════════════════════════════════════════════════════════════════
    CONFIG — aprovação jurídica (fonte única).
    ----------------------------------------------------------------------------
-   2026-07-02 — o jurídico aprovou o Termo de Reserva e o Edital das DUAS
-   modalidades, incluindo a Modalidade 2 (Compra Direta via mandato).
+   v2 (modelo único, sem entrada antecipada, 4 partes qualificadas —
+   Contrato-Cessao-BIDCON-v2) substituiu a v1 (duas modalidades, com sinal).
+   Fix-pack de 21/07: Cláusulas 2ª/4ª/5ª/6ª reestruturadas + seletor de modelo
+   de remuneração (A/B). A minuta v2 AINDA NÃO foi
+   formalmente aprovada pelo jurídico nesta nova redação — por isso
+   LEGAL_APPROVED = false até confirmação explícita do Emerson.
    Com LEGAL_APPROVED = true:
      • a tarja vermelha "MINUTA" sai do padrão do documento gerado;
-     • o aviso "sujeita à validação jurídica" da Modalidade 2 é removido;
-     • as duas modalidades passam a ter tratamento visual igual.
-   Para reverter a peça a "minuta", basta trocar para false — é a única chave.
-   Permanecem inalterados (independem desta flag): teto de R$50.000 da Direta
-   (acima → só Notarial), D+2, multa 0,5%/dia, léxico de compliance, e a regra
-   de que o app NÃO movimenta dinheiro (só gera instrução de pagamento).
+     • o bloco .parecer troca de "pendente" para "aprovado" (com data).
+   Permanecem inalterados (independem desta flag): léxico de compliance e a
+   regra de que o app NÃO movimenta dinheiro (só gera instrução/documentação).
    ════════════════════════════════════════════════════════════════════════════ */
-const LEGAL_APPROVED = true;
+const LEGAL_APPROVED = false;
+const LEGAL_APPROVED_DATE = "";
+
+/* Qualificação fixa das partes intervenientes (não são inputs de formulário —
+   mesmos valores de platform/lib/contratos.ts::CONTRATADA, copiados aqui pois
+   são módulos/produtos diferentes). */
+const BIDCON = {
+  razaoSocial: "EGS Capital Participações Ltda",
+  cnpj: "67.709.975/0001-64",
+  nire: "35.250.408.073",
+  endereco: "Av. Brigadeiro Faria Lima, nº 1.572, Sala 1022, Jardim Paulistano, São Paulo/SP, CEP 01.451-917",
+  representante: "Emerson Gomes dos Santos",
+};
+const TABELIONATO = {
+  nome: "5º Tabelionato de Notas da Comarca de Campinas",
+  cnpj: "27.216.121/0001-21",
+  provimento: "197/2025",
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
-   MATEMÁTICA — porta VERBATIM de platform/lib/reserve/fee-plan.ts.
-   Qualquer divergência aqui é bug: a fonte de verdade é o arquivo .ts.
+   MATEMÁTICA — Modelo B (captação direta, 10%/6% do ágio) é porta VERBATIM de
+   platform/lib/reserve/fee-plan.ts; qualquer divergência nesse trecho é bug,
+   a fonte de verdade é o arquivo .ts. Modelo A (7% do crédito, ver bloco mais
+   abaixo) é regra comercial nova de 21/07 — AINDA NÃO existe no .ts real, não
+   é porta de nada, é especificação pendente de espelhamento no backend.
    ════════════════════════════════════════════════════════════════════════════ */
 function round2(v){ return Math.round((v + Number.EPSILON) * 100) / 100; }        // centavosLit
 const FEE_PCT_CONTEMPLADA = 0.10;
@@ -317,6 +315,19 @@ function calcularFee(agio, natureza){
   const bruto = agio > 0 ? agio * pct : 0;
   return round2(Math.max(bruto, FEE_MINIMO));
 }
+
+/* Modelo A (carta de vitrine/fornecedor) — remuneração de 7% sobre o CRÉDITO
+   total, sem piso mínimo. Decisão comercial de 21/07 (Emerson): dois modelos
+   de remuneração coexistem, escolha explícita por operação (sem default
+   silencioso). ATENÇÃO: este modelo AINDA NÃO existe em
+   platform/lib/reserve/fee-plan.ts (que só implementa o que aqui é o Modelo
+   B) — ou seja, para o Modelo A este arquivo NÃO é porta verbatim de nada;
+   é a especificação nova, pendente de espelhamento no backend real quando
+   o fluxo Modelo A for implementado em produção. */
+const FEE_PCT_MODELO_A = 0.07;
+function calcularFeeModeloA(creditoTotal){
+  return round2(creditoTotal > 0 ? creditoTotal * FEE_PCT_MODELO_A : 0);
+}
 function tarifaNotarial(valorOperacao){
   if (valorOperacao <= 0) return FAIXAS_TARIFA_NOTARIAL[0].min;
   for (const f of FAIXAS_TARIFA_NOTARIAL){
@@ -337,8 +348,28 @@ function repartirTarifaNotarial(tarifa, alocacao){
   return { buyer, seller };
 }
 function montarLegs(input){
-  const { agio, natureza, partes } = input;
+  const { agio, natureza, partes, modelo, creditoTotal } = input;
   const alocacaoNotarial = input.alocacaoNotarial || ALOCACAO_NOTARIAL_DEFAULT;
+  // NOTARY_COSTS é sempre incluído, nos dois modelos (modelo único de Conta Notarial).
+  const tarifa = tarifaNotarial(agio);
+  const rateio = repartirTarifaNotarial(tarifa, alocacaoNotarial);
+
+  if (modelo === "A"){
+    // Modelo A (carta de vitrine/fornecedor): 7% do crédito total, sem split
+    // de parceiros — liberado pelo Tabelionato diretamente à Bidcon.
+    const fee = calcularFeeModeloA(creditoTotal);
+    const aoVendedor = round2(Math.max(0, agio - fee - tarifa));
+    const legs = [
+      { beneficiary_type:"SELLER",   beneficiary_id:partes.seller_id, amount:aoVendedor },
+      { beneficiary_type:"PLATFORM", beneficiary_id:null,             amount:fee },
+    ];
+    legs.push({ beneficiary_type:"NOTARY_COSTS", beneficiary_id:null, amount:tarifa,
+      notary_alloc:{ alocacao:alocacaoNotarial, buyer:rateio.buyer, seller:rateio.seller } });
+    return legs;
+  }
+
+  // Modelo B (captação direta): 10%/6% do ágio, com split de parceiros
+  // sourcing/selling. Porta verbatim de fee-plan.ts.
   const fee = calcularFee(agio, natureza);
   const aoVendedor = round2(Math.max(0, agio - fee));
   let sourcing = round2(fee * SPLIT_DEFAULT.SOURCING_PARTNER);
@@ -352,17 +383,10 @@ function montarLegs(input){
   ];
   if (sourcing > 0) legs.push({ beneficiary_type:"SOURCING_PARTNER", beneficiary_id:partes.sourcing_partner_id, amount:sourcing });
   if (selling  > 0) legs.push({ beneficiary_type:"SELLING_PARTNER",  beneficiary_id:partes.selling_partner_id,  amount:selling });
-  // NOTARY_COSTS só faz sentido na Modalidade Notarial; o chamador decide se inclui.
-  if (input.incluiNotarial){
-    const tarifa = tarifaNotarial(agio);
-    const rateio = repartirTarifaNotarial(tarifa, alocacaoNotarial);
-    legs.push({ beneficiary_type:"NOTARY_COSTS", beneficiary_id:null, amount:tarifa,
-      notary_alloc:{ alocacao:alocacaoNotarial, buyer:rateio.buyer, seller:rateio.seller } });
-  }
+  legs.push({ beneficiary_type:"NOTARY_COSTS", beneficiary_id:null, amount:tarifa,
+    notary_alloc:{ alocacao:alocacaoNotarial, buyer:rateio.buyer, seller:rateio.seller } });
   return legs;
 }
-function faixaSinal(agio){ return { min: round2(agio*0.10), max: round2(agio*0.20) }; }
-function sinalValido(agio, sinal){ const f = faixaSinal(agio); return sinal >= f.min && sinal <= f.max; }
 
 /* ── formatação ── */
 function brl(v){ return (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
@@ -426,7 +450,7 @@ function extenso(v){
 const $ = (id)=>document.getElementById(id);
 const cotasBox = $("cotas");
 let cotaSeq = 0;
-const LEXICO_PROIBIDO = ["investimento","rendimento","rendimentos","rendendo","render","retorno","lucro garantido","juros"];
+const LEXICO_PROIBIDO = ["investimento","rendimento","rendimentos","rendendo","render","retorno","lucro garantido","juros","pix","sinal"];
 
 function novaCotaHTML(id){
   return `<div class="cota" data-id="${id}">
@@ -461,8 +485,6 @@ function lerCotas(){
     agio:   parseNum(c.querySelector(".k-agio").value),
   }));
 }
-function modalidade(){ return document.querySelector('input[name="modalidade"]:checked').value; }
-
 /* guarda de junção: mesma administradora + mesmo tipo */
 function checarJuncao(cotas){
   if (cotas.length <= 1) return { ok:true, msg:"" };
@@ -480,95 +502,44 @@ function checarLexico(){
   return { ok: achados.length === 0, achados };
 }
 
-/* teto da Compra Direta (default do EDITAL) — lido do campo, com piso factual */
-function tetoDireta(){ const t = parseNum($("teto").value); return t>0 ? t : 50000; }
-
-/* ── toggles de modalidade ──
-   Regra do EDITAL: ágio acima do teto → só Modalidade 1. O seletor da Compra
-   Direta TRAVA (desabilita o rádio) e explica, roteando a operação p/ Notarial. */
-function syncModTabs(agioTotal){
-  const teto = tetoDireta();
-  const travaDireta = agioTotal > teto;   // acima do teto: Compra Direta indisponível
-  const radioDireta = $("tab-direta").querySelector('input');
-  const radioNotar  = $("tab-notarial").querySelector('input');
-
-  // se estava em Compra Direta e o ágio estourou o teto, força Notarial
-  if (travaDireta && radioDireta.checked){ radioNotar.checked = true; }
-  radioDireta.disabled = travaDireta;
-  $("tab-direta").classList.toggle("travado", travaDireta);
-  $("tab-direta").setAttribute("title", travaDireta
-    ? `Indisponível: ágio acima do teto de ${brl(teto)}. Use a Reserva Notarial.` : "");
-
-  const m = modalidade();
-  $("tab-notarial").classList.toggle("on", m === "NOTARIAL");
-  $("tab-direta").classList.toggle("on", m === "PAYMENT_INSTITUTION");
-  $("grpDireta").style.display = (m === "PAYMENT_INSTITUTION") ? "" : "none";
-  return { m, teto, travaDireta };
-}
-
 /* ════════════════════════════════════════════════════════════════════════════
    RENDER do contrato
    ════════════════════════════════════════════════════════════════════════════ */
+function modeloAtual(){
+  const el = document.querySelector('input[name="modelo"]:checked');
+  return el ? el.value : "";
+}
+
 function render(){
   const cotas = lerCotas();
   const jun = checarJuncao(cotas);
-  const agioTotalPrev = round2(cotas.reduce((s,c)=>s+c.agio,0));
-  const modState = syncModTabs(agioTotalPrev);   // pode forçar Notarial se estourar o teto
-  const m = modState.m;
-  const isNotarial = m === "NOTARIAL";
+  const modeloRem = modeloAtual();
+  const modeloOk = modeloRem === "A" || modeloRem === "B";
 
   const vNome=$("v-nome").value.trim()||"__________", vDoc=$("v-doc").value.trim()||"__________";
   const cNome=$("c-nome").value.trim()||"__________", cDoc=$("c-doc").value.trim()||"__________";
   const pSourcing=$("p-sourcing").value.trim(), pSelling=$("p-selling").value.trim();
   const foro=$("foro").value.trim()||"__________", mediador=$("mediador").value.trim();
-  const validade=$("validade").value.trim()||"45", corte=$("corte").value.trim()||"7";
+  const validade=$("validade").value.trim()||"3", corte=$("corte").value.trim()||"7";
 
   // agregados (junção soma; natureza = do 1º item, já garantida igual pela guarda)
   const agioTotal = round2(cotas.reduce((s,c)=>s+c.agio,0));
   const creditoTotal = round2(cotas.reduce((s,c)=>s+c.credito,0));
   const natureza = cotas.length ? cotas[0].tipo : "contemplada";
-  const fee = calcularFee(agioTotal, natureza);
-  const feePct = feePercentual(natureza);
   const tarifa = tarifaNotarial(agioTotal);
-  const legs = montarLegs({
-    agio: agioTotal, natureza,
+  const feeAtual = modeloRem === "A" ? calcularFeeModeloA(creditoTotal)
+                 : modeloRem === "B" ? calcularFee(agioTotal, natureza)
+                 : 0;
+  const legs = modeloOk ? montarLegs({
+    agio: agioTotal, natureza, creditoTotal, modelo: modeloRem,
     partes:{ seller_id: vNome, sourcing_partner_id: pSourcing||null, selling_partner_id: pSelling||null },
-    incluiNotarial: isNotarial, alocacaoNotarial: ALOCACAO_NOTARIAL_DEFAULT,
-  });
-
-  // sinal
-  const sinal = parseNum($("sinal").value);
-  const fx = faixaSinal(agioTotal);
-  const sinalOk = agioTotal>0 && sinalValido(agioTotal, sinal);
-  const shEl = $("sinalHint");
-  if (agioTotal>0){
-    shEl.textContent = `Sinal válido entre ${brl(fx.min)} e ${brl(fx.max)} (10–20% do ágio ${brl(agioTotal)}). Atual: ${brl(sinal)} ${sinalOk?"✓":"— fora da faixa"}.`;
-    shEl.className = "hint " + (sinalOk?"ok":"bad");
-  } else { shEl.textContent = "Informe o ágio para calcular a faixa do sinal (10–20%)."; shEl.className="hint"; }
+    alocacaoNotarial: ALOCACAO_NOTARIAL_DEFAULT,
+  }) : [];
 
   // junção hint
   const jhEl = $("juncaoHint");
   jhEl.textContent = jun.msg;
   jhEl.className = "hint " + (jun.ok ? (cotas.length>1?"ok":"") : "bad");
-
-  // teto M2 — na Compra Direta o seletor já trava acima do teto (roteia p/ Notarial),
-  // então aqui só informamos o estado dentro do teto. O aviso de "estourou" aparece
-  // na aba travada (via syncModTabs) e no bloco abaixo.
-  if (!isNotarial){
-    const teto = modState.teto;
-    const thEl = $("tetoHint");
-    thEl.textContent = `Ágio ${brl(agioTotal)} dentro do teto de ${brl(teto)} da Compra Direta.`;
-    thEl.className = "hint ok";
-  }
-  // aviso factual quando o ágio força a rota Notarial
-  const tetoForcouNotarial = modState.travaDireta;
-
-  // ── monta o documento ──
-  const modNome = isNotarial ? "Reserva Notarial" : "Compra Direta Bidcon";
-  const railTxt = isNotarial ? "NOTARIAL" : "PAYMENT_INSTITUTION";
-  const custodiaTxt = isNotarial
-    ? "custodiado em conta notarial de afetação (cartório), nos termos do Provimento CNJ nº 197/2025"
-    : "recebido pela Bidcon, na qualidade de mandatária do vendedor (CC arts. 653, 661, 665 e 668), em conta exclusiva de repasses, segregada do seu caixa próprio";
 
   const linhaCotas = cotas.map((c,i)=>`<tr>
       <td>${i+1}</td><td>${c.admin||"—"}</td><td>${c.grupo||"—"}</td><td>${c.tipo}</td>
@@ -577,142 +548,160 @@ function render(){
 
   const nomeLeg = { SELLER:"Vendedor", PLATFORM:"Bidcon (plataforma)", SOURCING_PARTNER:"Parceiro (sourcing)",
     SELLING_PARTNER:"Parceiro (selling)", NOTARY_COSTS:"Cartório (tarifa notarial)", REFUND_BUYER:"Comprador (devolução)" };
-  const linhaLegs = legs.map(l=>`<tr>
+  const linhaLegs = legs.length ? legs.map(l=>`<tr>
       <td>${nomeLeg[l.beneficiary_type]||l.beneficiary_type}</td>
       <td><code>${l.beneficiary_type}</code></td>
       <td class="num">${brl(l.amount)}</td>
-    </tr>`).join("");
-
-  const dn=$("dn")?$("dn").value.trim():"2", multa=$("multa")?$("multa").value.trim():"0,5";
+    </tr>`).join("") : `<tr><td colspan="3" style="text-align:center;color:#889">— selecione o modelo de remuneração (A ou B) para calcular —</td></tr>`;
 
   const html = `
   <div class="minuta-mark${LEGAL_APPROVED?" oculta":""}">MINUTA — modelo para validação do jurídico</div>
   <h1>Termo de Reserva e Promessa de Cessão</h1>
-  <div class="subttl">Modalidade: ${modNome} · settlement_rail: ${railTxt}</div>
+  <div class="subttl">Modalidade única: Conta Notarial · settlement_rail: NOTARIAL · Remuneração: Modelo ${modeloRem || "—"}</div>
 
   <h2>Cláusula 1ª — Das partes e do objeto</h2>
-  <p class="clausula"><b>VENDEDOR (cedente):</b> ${vNome}, inscrito no CPF/CNPJ sob nº ${vDoc}.
-  <b>COMPRADOR (cessionário):</b> ${cNome}, inscrito no CPF/CNPJ sob nº ${cDoc}. Objeto:
-  a promessa de cessão de direitos sobre a(s) cota(s) de consórcio abaixo descrita(s), com crédito
-  total de ${brl(creditoTotal)} (${extenso(creditoTotal)}).</p>
+  <p class="clausula"><b>CEDENTE:</b> ${vNome}, inscrito no CPF/CNPJ sob nº ${vDoc}.
+  <b>CESSIONÁRIO:</b> ${cNome}, inscrito no CPF/CNPJ sob nº ${cDoc}.
+  <b>INTERVENIENTE-INTERMEDIADORA:</b> ${BIDCON.razaoSocial}, inscrita no CNPJ sob nº ${BIDCON.cnpj} e
+  NIRE ${BIDCON.nire}, com sede em ${BIDCON.endereco}, neste ato representada por ${BIDCON.representante},
+  operadora da plataforma Bidcon.
+  <b>INTERVENIENTE-DEPOSITÁRIO:</b> ${TABELIONATO.nome}, inscrito no CNPJ sob nº ${TABELIONATO.cnpj},
+  na qualidade de depositário e custodiante da conta notarial de afetação desta operação, nos termos do
+  Provimento CNJ nº ${TABELIONATO.provimento}. Objeto: a promessa de cessão de direitos sobre a(s)
+  cota(s) de consórcio abaixo descrita(s), com crédito total de ${brl(creditoTotal)}
+  (${extenso(creditoTotal)}).</p>
   <table class="resumo">
     <tr><th>#</th><th>Administradora</th><th>Grupo/Cota</th><th>Tipo</th><th>Crédito</th><th>Saldo devedor</th><th>Ágio</th></tr>
     ${linhaCotas || '<tr><td colspan="7" style="text-align:center;color:#889">— sem cotas informadas —</td></tr>'}
     <tr><td colspan="6" style="text-align:right;font-weight:700">Ágio total</td><td class="num" style="font-weight:700">${brl(agioTotal)}</td></tr>
   </table>
 
-  <h2>Cláusula 2ª — Do preço, do sinal e da custódia</h2>
-  <p class="clausula">O ágio total ajustado é de <b>${brl(agioTotal)}</b> <span class="extenso">(${extenso(agioTotal)})</span>.
-  A título de sinal e princípio de pagamento, o COMPRADOR deposita <b>${brl(sinal)}</b>
-  (equivalente a 10–20% do ágio), valor ${custodiaTxt}. O saldo é liberado após a verificação das
-  condições da Cláusula 3ª.</p>
+  <h2>Cláusula 2ª — Do extrato e das condições suspensivas</h2>
+  <p class="clausula">A emissão do boleto único pelo Tabelionato (Cláusula 4ª) fica condicionada,
+  cumulativamente, à: (i) apresentação de extrato da administradora emitido há no máximo <b>${corte}
+  dias</b> comprovando a titularidade e a quitação/regularidade da cota; e (ii) inexistência de gravame ou
+  disputa sobre a cota. A anuência formal da administradora à transferência de titularidade é tratada
+  separadamente, como condição exclusiva de liberação do valor ao CEDENTE (Cláusula 4ª). A contemplação,
+  quando aplicável, ocorre <b>por sorteio ou lance, sem promessa de data</b>; eventual parcela
+  pós-contemplação é <b>estimada, a confirmar</b> junto à administradora.</p>
 
-  <h2>Cláusula 3ª — Das condições suspensivas (verificação)</h2>
-  <p class="clausula">A eficácia plena desta cessão fica condicionada, cumulativamente, à: (i) apresentação
-  de extrato da administradora emitido há no máximo <b>${corte} dias</b> comprovando a titularidade e a
-  quitação/regularidade da cota; (ii) anuência formal da administradora do consórcio à transferência de
-  titularidade; e (iii) inexistência de gravame ou disputa sobre a cota. A contemplação, quando aplicável,
-  ocorre <b>por sorteio ou lance, sem promessa de data</b>; eventual parcela pós-contemplação é
-  <b>estimada, a confirmar</b> junto à administradora.</p>
+  <h2>Cláusula 3ª — Do prazo de validade da reserva</h2>
+  <p class="clausula">Esta reserva é válida por <b>${validade} dias úteis</b> a contar da assinatura deste
+  Termo, <b>sem exigência de entrada antecipada ou de qualquer pagamento fracionado</b> — a reserva se
+  aperfeiçoa com a assinatura e a apresentação da documentação completa. A conta notarial de afetação
+  desta operação é aberta pelo Tabelionato a partir da assinatura deste Termo, em prazo estimado de até
+  20 (vinte) minutos.</p>
 
-  <h2>Cláusula 4ª — Dos prazos e da validade da reserva</h2>
-  <p class="clausula">Esta reserva é válida por <b>${validade} dias</b> a contar da assinatura.
-  ${isNotarial
-    ? "Cumpridas as condições suspensivas, procede-se à liberação notarial conforme o rito da conta de afetação."
-    : `Na Compra Direta, verificado o cumprimento das condições, a Bidcon efetua o repasse ao VENDEDOR em <b>até D+${dn} dias úteis</b>.`}</p>
+  <h2>Cláusula 4ª — Do preço e da forma de pagamento (Conta Notarial)</h2>
+  <p class="clausula">O ágio total ajustado é de <b>${brl(agioTotal)}</b> <span class="extenso">(${extenso(agioTotal)})</span>,
+  correspondente ao preço da cessão. Cumpridas as condições da Cláusula 2ª, o Tabelionato emite
+  <b>boleto único e integral</b> do valor total, a ser pago pelo CESSIONÁRIO diretamente na conta
+  notarial de afetação — <b>sem entrada antecipada e sem fracionamento — não há meio de pagamento
+  alternativo ao boleto único do cartório</b>. Confirmado o depósito, o Tabelionato protocola a
+  transferência junto à administradora. Obtida a anuência formal da administradora, o valor é liberado
+  ao CEDENTE em um único ato. Não obtida a anuência (transferência reprovada) ou não cumprida condição
+  suspensiva por fato não imputável ao CESSIONÁRIO, aplica-se a Cláusula 6ª. O extrato da movimentação
+  é disponibilizado às partes em até <b>7 (sete) dias</b>.</p>
 
-  <h2>Cláusula 5ª — Da cláusula penal e da devolução do sinal</h2>
-  <p class="clausula">Negada a anuência da administradora ou não cumprida condição suspensiva por fato não
-  imputável ao COMPRADOR, o <b>sinal é devolvido integralmente</b> ao COMPRADOR. A tarifa notarial
-  eventualmente já paga <b>não é reembolsável</b>. Descumprimento imotivado por qualquer das partes
-  sujeita a parte inadimplente à cláusula penal ora ajustada.${
-    isNotarial ? "" : ` Em caso de atraso no repasse por culpa da Bidcon, aplica-se multa de <b>${multa}%/dia</b> sobre o valor retido.`}</p>
+  <h2>Cláusula 5ª — Da comissão da Bidcon</h2>
+  ${modeloRem === "A" ? `
+  <p class="clausula"><b>Modelo A — Carta de vitrine/fornecedor:</b> A remuneração da Bidcon pela
+  intermediação corresponde a <b>7% (sete por cento) do crédito total</b>, já incluída no valor total da
+  entrada (Cláusula 4ª). Torna-se devida com a aprovação da transferência pela administradora e é
+  liberada pelo Tabelionato diretamente à Bidcon, no mesmo ato de liquidação. Não havendo liberação
+  (Cláusula 6ª), nenhuma remuneração é devida. Valor calculado nesta operação: <b>${brl(feeAtual)}</b>
+  (7% de ${brl(creditoTotal)}). O custo efetivo da operação está detalhado no Anexo III.</p>`
+  : modeloRem === "B" ? `
+  <p class="clausula"><b>Modelo B — Captação direta:</b> Aprovada a transferência e liberado o pagamento
+  na forma da Cláusula 4ª, é devida à Bidcon, pela intermediação, comissão de
+  <b>${(feePercentual(natureza)*100).toFixed(0)}%</b> sobre o ágio (mínimo de ${brl(FEE_MINIMO)}),
+  correspondendo a <b>${brl(feeAtual)}</b>. Trata-se de repartição de ágio já acordado entre as partes —
+  <b>não constitui</b> promessa de resultado. Não havendo liberação (Cláusula 6ª), <b>nenhuma comissão é
+  devida</b>. O custo efetivo da operação está detalhado no Anexo III.</p>`
+  : `
+  <p class="clausula">⚠ <b>Modelo de remuneração não selecionado.</b> Escolha o Modelo A (carta de
+  vitrine/fornecedor · 7% do crédito) ou o Modelo B (captação direta · 10%/6% do ágio) no formulário para
+  que esta cláusula e o Anexo III sejam calculados. A geração do PDF permanece bloqueada até a seleção.</p>`}
 
-  <h2>Cláusula 6ª — Da retenção de garantia</h2>
-  <p class="clausula">Parte do preço poderá ficar retida em garantia até a conclusão da transferência de
-  titularidade junto à administradora, liberada mediante comprovação do registro do novo titular.</p>
+  <h2>Cláusula 6ª — Da cláusula penal e da restituição</h2>
+  <p class="clausula">Reprovada a transferência pela administradora ou não cumprida condição suspensiva por
+  fato não imputável ao CESSIONÁRIO, o valor pago é <b>restituído integralmente (100%)</b> ao CESSIONÁRIO
+  pelo Tabelionato, em até <b>5 (cinco) dias úteis</b> da reprovação, <b>sem qualquer remuneração ou desconto
+  em favor da Bidcon</b>. A tarifa notarial eventualmente já paga <b>não é reembolsável</b>. Descumprimento
+  imotivado por qualquer das partes sujeita a parte inadimplente às penalidades previstas no contrato de
+  cessão definitivo firmado entre as partes.</p>
 
-  <h2>Cláusula 7ª — Da comissão da Bidcon</h2>
-  <p class="clausula">Pela intermediação, é devida à Bidcon comissão de <b>${(feePct*100).toFixed(0)}%</b>
-  sobre o ágio (mínimo de ${brl(FEE_MINIMO)}), correspondendo a <b>${brl(fee)}</b>. Trata-se de
-  repartição de ágio já acordado entre as partes — <b>não constitui</b> promessa de resultado. O
-  <b>custo efetivo</b> da operação para o COMPRADOR está detalhado no Anexo III.</p>
+  <h2>Cláusula 7ª — Da finalidade exclusiva e da segregação</h2>
+  <p class="clausula">Os valores permanecem em conta notarial de afetação, com finalidade exclusiva desta
+  operação e segregação patrimonial por força de lei, nos termos do Provimento CNJ nº ${TABELIONATO.provimento}.</p>
 
-  <h2>Cláusula 8ª — Da finalidade exclusiva e da segregação</h2>
-  <p class="clausula">${isNotarial
-    ? "Os valores permanecem em conta notarial de afetação, com finalidade exclusiva desta operação e segregação patrimonial por força de lei."
-    : "Os valores recebidos pela Bidcon têm finalidade exclusiva de repasse desta operação, mantidos em conta segregada do caixa próprio, com prestação de contas ao VENDEDOR (mandante), nos termos do mandato."}</p>
-
-  <h2>Cláusula 9ª — Da proteção de dados (LGPD)</h2>
+  <h2>Cláusula 8ª — Da proteção de dados (LGPD)</h2>
   <p class="clausula">As partes tratam dados pessoais estritamente para a execução desta operação, observada
   a Lei nº 13.709/2018 (LGPD), vedado o uso para finalidade diversa.</p>
 
-  <h2>Cláusula 10ª — Do foro e da mediação</h2>
+  <h2>Cláusula 9ª — Do foro e da mediação</h2>
   <p class="clausula">${mediador ? `As partes elegem a mediação por <b>${mediador}</b> como via prévia de solução de conflitos. ` : ""}Fica eleito o foro da <b>${foro}</b> para dirimir controvérsias não compostas amigavelmente.</p>
 
+  <div class="assinatura no-print-break" style="grid-template-columns:1fr">
+    <div class="lin">${vNome}<br><small>CEDENTE · ${vDoc}</small></div>
+  </div>
   <div class="assinatura no-print-break">
-    <div class="lin">${vNome}<br><small>VENDEDOR · ${vDoc}</small></div>
-    <div class="lin">${cNome}<br><small>COMPRADOR · ${cDoc}</small></div>
+    <div class="lin">${cNome}<br><small>CESSIONÁRIO · ${cDoc}</small></div>
+    <div class="lin">${BIDCON.razaoSocial}<br><small>INTERVENIENTE-INTERMEDIADORA · ${BIDCON.cnpj}</small></div>
+  </div>
+  <div class="assinatura no-print-break">
+    <div class="lin">Testemunha 1<br><small>Nome · CPF</small></div>
+    <div class="lin">Testemunha 2<br><small>Nome · CPF</small></div>
   </div>
 
   <div class="anexo-title">ANEXO I — Checklist de habilitação</div>
-  <p class="clausula">☐ Extrato da administradora emitido há no máximo ${corte} dias <b>OU</b> procuração específica com poderes bastantes.
-  ☐ Documento de identidade e CPF/CNPJ das partes. ☐ Comprovante de quitação/regularidade da cota.</p>
+  <p class="clausula">☐ Extrato da administradora emitido há no máximo ${corte} dias (obrigatório, todas as
+  operações). ☐ Procuração específica com poderes bastantes (obrigatório apenas quando a parte for
+  representada por terceiro). ☐ Documento de identidade e CPF/CNPJ das partes. ☐ Comprovante de
+  quitação/regularidade da cota.</p>
+
+  <div class="anexo-title">ANEXO II — Requerimento de abertura da conta notarial</div>
+  <p class="clausula">As partes requerem ao ${TABELIONATO.nome} a abertura de conta notarial de afetação
+  vinculada a esta operação, nos termos do Provimento CNJ nº ${TABELIONATO.provimento}, autorizando a
+  emissão do boleto único referido na Cláusula 4ª e a movimentação dos valores exclusivamente conforme as
+  condições deste Termo.</p>
 
   <div class="anexo-title">ANEXO III — Planilha de repasses (custo efetivo)</div>
   <table>
     <tr><th>Beneficiário</th><th>Tipo (leg)</th><th>Valor</th></tr>
     ${linhaLegs}
-    ${isNotarial ? `<tr><td colspan="2" style="color:#556">Tarifa notarial (vigência ${TARIFA_NOTARIAL_VIGENCIA}; base = ágio)</td><td class="num">${brl(tarifa)}</td></tr>` : ""}
+    <tr><td colspan="2" style="color:#556">Tarifa notarial (vigência ${TARIFA_NOTARIAL_VIGENCIA}; base = ágio)</td><td class="num">${brl(tarifa)}</td></tr>
   </table>
-  ${isNotarial ? `<p class="clausula" style="font-size:11px;color:#667">Rateio da tarifa notarial (SPLIT 50/50): comprador ${brl(repartirTarifaNotarial(tarifa).buyer)} · vendedor ${brl(repartirTarifaNotarial(tarifa).seller)}. Não-reembolsável. Fonte: CNB-CF.</p>` : ""}
-
-  ${!isNotarial ? `
-  <div class="anexo-title">ANEXO IV — Instrução de pagamento do sinal (Compra Direta)</div>
-  <p class="clausula">O sinal de <b>${brl(sinal)}</b> é pago pelo COMPRADOR diretamente à <b>conta exclusiva
-  de repasses</b> da Bidcon (segregada do caixa próprio), identificado pelo <b>número da operação</b>
-  como referência. <b>A plataforma não movimenta o dinheiro</b>: ela apenas emite a instrução de
-  pagamento (Pix copia-e-cola ou boleto) e registra a confirmação.</p>
-  <table>
-    <tr><th>Meio</th><th>Dados</th></tr>
-    <tr><td>Pix (copia-e-cola)</td><td><code>[gerado na operação · chave da conta de repasses]</code></td></tr>
-    <tr><td>Boleto</td><td><code>[gerado na operação · vencimento = validade da reserva]</code></td></tr>
-    <tr><td>Identificador</td><td><code>Nº da operação: [OP-________]</code></td></tr>
-  </table>
-  <p class="clausula" style="font-size:11px;color:#667">Confirmação: o comprovante é anexado e validado
-  <b>manualmente pelo console de operações</b> da Bidcon, gerando um evento na cadeia da reserva.
-  A reserva só se confirma com o pagamento identificado — não há reserva sem sinal.</p>
-  ${LEGAL_APPROVED ? "" : `<div class="custodia-flag"><b>Sujeita à validação jurídica:</b> modalidade em minuta até liberação do jurídico e configuração de conta de pagamento segregada/parceira. Enquanto isso, tratar como modelo, não como contrato final.</div>`}
-  ` : ""}
+  <p class="clausula" style="font-size:11px;color:#667">Rateio da tarifa notarial (SPLIT 50/50): comprador ${brl(repartirTarifaNotarial(tarifa).buyer)} · vendedor ${brl(repartirTarifaNotarial(tarifa).seller)}. Não-reembolsável. Fonte: CNB-CF.</p>
 
   <div class="parecer">
     ${LEGAL_APPROVED
-      ? `<b>Parecer (EDITAL v1 · aprovado pelo jurídico em 2026-07-02):</b> o Termo e as duas modalidades
-         estão liberados. Os parâmetros comerciais (percentuais, faixas, teto, prazos) permanecem
-         configuráveis e devem ser confirmados na operação real (o boleto do cartório, no caso notarial,
-         é a validação de verdade da tarifa).`
-      : `<b>Parecer de verificação (EDITAL v1 · minuta):</b> este modelo reflete a minuta de operações
-         da Bidcon, ainda pendente de validação do jurídico. Os parâmetros comerciais (percentuais, faixas,
-         teto, prazos) são configuráveis e devem ser confirmados na operação real (o boleto do cartório, no
-         caso notarial, é a validação de verdade da tarifa).`}
-    settlement_rail desta peça: <code>${railTxt}</code>.
+      ? `<b>Parecer (TERMO-RESERVA v2 · aprovado pelo jurídico${LEGAL_APPROVED_DATE?` em ${LEGAL_APPROVED_DATE}`:""}):</b> o
+         Termo, no modelo único de Conta Notarial, está liberado. Os parâmetros comerciais (percentuais,
+         faixas, prazos) permanecem configuráveis e devem ser confirmados na operação real (o boleto do
+         cartório é a validação de verdade da tarifa).`
+      : `<b>Parecer de verificação (TERMO-RESERVA v2 · base aprovada pelo jurídico · alterações de 21/07 em
+         ratificação):</b> este modelo reflete a minuta v2 (modelo único de Conta Notarial, sem entrada
+         antecipada, 4 partes qualificadas), com o fix-pack de 21/07 (Cláusulas 2ª/4ª/5ª/6ª e Anexos I/II)
+         ainda pendente de ratificação formal do jurídico nesta redação. Os parâmetros comerciais
+         (percentuais, faixas, prazos) são configuráveis e devem ser confirmados na operação real (o
+         boleto do cartório é a validação de verdade da tarifa).`}
+    settlement_rail desta peça: <code>NOTARIAL</code>.
   </div>`;
 
   $("doc").innerHTML = html;
 
-  // habilita/desabilita PDF conforme guardas (léxico e junção bloqueiam; teto NÃO
-  // bloqueia — ele apenas roteia para a Reserva Notarial, que segue válida).
+  // habilita/desabilita PDF conforme guardas (léxico e junção bloqueiam a geração)
   const lex = checarLexico();
   const av = $("avisoLex");
-  const bloqueado = !jun.ok || !lex.ok;
+  const bloqueado = !jun.ok || !lex.ok || !modeloOk;
   if (!lex.ok){
     av.classList.add("show","bloq");
     av.textContent = "PDF bloqueado — o texto contém termo(s) de léxico proibido: " + lex.achados.join(", ") + ". Ajuste antes de gerar.";
   } else if (!jun.ok){
     av.classList.add("show","bloq"); av.textContent = "PDF bloqueado — " + jun.msg;
-  } else if (tetoForcouNotarial){
-    av.classList.add("show"); av.classList.remove("bloq");
-    av.textContent = `Roteado para Reserva Notarial: o ágio ${brl(agioTotal)} excede o teto de ${brl(modState.teto)} da Compra Direta. O documento continua válido nesta modalidade.`;
+  } else if (!modeloOk){
+    av.classList.add("show","bloq"); av.textContent = "PDF bloqueado — selecione o modelo de remuneração (A ou B) antes de gerar.";
   } else { av.classList.remove("show","bloq"); av.textContent=""; }
   $("btnPdf").disabled = bloqueado;
 
@@ -723,10 +712,10 @@ function render(){
   const gov = $("govLine"), govTxt = $("govTxt"), govIcon = $("govIcon");
   if (LEGAL_APPROVED){
     gov.className = "chk ok"; govIcon.textContent = "✓";
-    govTxt.innerHTML = "<b>Versão aprovada pelo jurídico</b> (2026-07-02): o Termo e as duas modalidades do Edital estão liberados. A tarja de minuta não consta do documento gerado.";
+    govTxt.innerHTML = `<b>Versão aprovada pelo jurídico</b>${LEGAL_APPROVED_DATE?` (${LEGAL_APPROVED_DATE})`:""}: o Termo v2 (modelo único, Conta Notarial) está liberado. A tarja de minuta não consta do documento gerado.`;
   } else {
     gov.className = "chk minuta"; govIcon.textContent = "⚠";
-    govTxt.innerHTML = "<b>MINUTA</b>: peça pendente de validação do jurídico. Ajuste <code>LEGAL_APPROVED</code> no topo do script para liberar.";
+    govTxt.innerHTML = "<b>MINUTA</b>: peça v2 com fix-pack de 21/07 em ratificação jurídica. Ajuste <code>LEGAL_APPROVED</code> no topo do script para liberar.";
   }
 }
 
@@ -737,9 +726,11 @@ function render(){
      { cedente:{nome,doc}, cessionario:{nome,doc},
        parceiros?:{sourcing?,selling?}, adm?:string,
        cotas:[ {admin?,grupo,tipo,credito,saldo,agio} ],
-       sinal?, validade?, corte?, foro?, mediador? }
+       validade?, corte?, foro?, mediador? }
    "adm" é a administradora da operação; quando uma cota não traz "admin"
    próprio, herda "adm". A ferramenta NÃO chama IA nem rede: só lê/escreve texto.
+   Compat: JSON antigo (v1) pode trazer uma chave "sinal" residual — é
+   ignorada silenciosamente na leitura (não há mais campo de sinal no v2).
    ════════════════════════════════════════════════════════════════════════════ */
 function ioMsg(txt, cls){ const el=$("jsonMsg"); el.textContent=txt||""; el.className="io-msg"+(cls?" "+cls:""); }
 
@@ -756,7 +747,7 @@ function coletarOperacao(){
     parceiros:{ sourcing:$("p-sourcing").value.trim(), selling:$("p-selling").value.trim() },
     adm: admOper,
     cotas,
-    sinal: parseNum($("sinal").value),
+    modelo_remuneracao: modeloAtual(),
     validade: $("validade").value.trim(),
     corte: $("corte").value.trim(),
     foro: $("foro").value.trim(),
@@ -796,8 +787,14 @@ function carregarCadastro(obj){
   if ("nome" in ces || "doc" in ces){ $("c-nome").value=_s(ces.nome); $("c-doc").value=_s(ces.doc); }
   if (par.sourcing!=null) $("p-sourcing").value=_s(par.sourcing);
   if (par.selling!=null)  $("p-selling").value=_s(par.selling);
-  if (obj.sinal!=null)    $("sinal").value=_s(obj.sinal);
-  if (obj.validade!=null) $("validade").value=_s(obj.validade)||"45";
+  // obj.sinal (v1) é ignorado silenciosamente — não há mais campo de sinal no v2.
+  // modelo_remuneracao: só aplica se vier "A" ou "B" explícito; ausente/inválido
+  // NÃO seleciona nada — sem default silencioso (operador escolhe).
+  if (obj.modelo_remuneracao === "A" || obj.modelo_remuneracao === "B"){
+    const r = document.querySelector(`input[name="modelo"][value="${obj.modelo_remuneracao}"]`);
+    if (r) r.checked = true;
+  }
+  if (obj.validade!=null) $("validade").value=_s(obj.validade)||"3";
   if (obj.corte!=null)    $("corte").value=_s(obj.corte)||"7";
   if (obj.foro!=null)     $("foro").value=_s(obj.foro);
   if (obj.mediador!=null) $("mediador").value=_s(obj.mediador);

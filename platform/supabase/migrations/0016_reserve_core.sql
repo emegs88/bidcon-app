@@ -1,9 +1,16 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0016 · Bidcon Reserve · Slice 1 (core)
 -- ----------------------------------------------------------------------------
--- PROPOSTA para revisão. NÃO foi aplicada em nenhum projeto Supabase. O agente
--- NÃO executa: aqui só validamos a intenção/idempotência localmente. Aplicação
--- (DEV e, depois, PROD) só sob "autorizo" nominal do Emerson.
+-- APLICADA EM PRODUÇÃO (nnv). Verificado por levantamento em 21/07/2026: as
+-- tabelas/RPCs abaixo existem no banco `nnv` (nnvjeijsrwpzsggwqpcu). Único
+-- registro em `reservas` é um smoke-test sintético da própria aplicação desta
+-- migration — carta_id/buyer_id/seller_id nulos, settlement_rail 'NOTARIAL',
+-- state 'DRAFT' (nunca avançou), actor 'validacao-0016', 2 eventos
+-- (VERIFICATION_STARTED/VERIFICATION_COMPLETED, payload fonte:
+-- "validacao-producao"). `reserva_legs`, `reserva_conditions`,
+-- `pagamentos_sinal` e `contratos` estão vazias — zero operação real (de
+-- qualquer trilho, incl. PAYMENT_INSTITUTION) processada por este schema até
+-- o momento deste levantamento.
 --
 -- O que entrega (Build Order §10, Slice 1 — camada de dados do escrow):
 --   - `reservas`        : reserva-mãe (pendura em carta + partes diretas).
