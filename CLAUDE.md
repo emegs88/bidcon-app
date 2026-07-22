@@ -28,6 +28,39 @@
   presumir que os dois estão sincronizados; conferir schema real
   (information_schema) antes de portar SQL de um pro outro.
 
+## Migrations — regras (pós-incidente 0063/0064, 22/07)
+
+**Regra 1 — rodapé obrigatório de toda função/RPC em `public` (nnv E xtv):**
+```sql
+revoke all on function public.<fn>(<args>) from public, anon;
+grant execute on function public.<fn>(<args>) to authenticated;
+```
+Motivo: os *default privileges* do schema `public` (donos `postgres`/
+`supabase_admin`) dão EXECUTE direto ao `anon` em TODA função nova;
+`revoke ... from public` sozinho NÃO remove esse grant direto ao `anon`.
+(Origem: incidente 0063/0064, 22/07 — `reserva_atualizar_cartorio` ficou
+anon-executável mesmo com `revoke from public`.)
+
+**Exceção**: função intencionalmente pública (ex.: busca da vitrine via
+chave anon) mantém o grant ao `anon` EXPLÍCITO + justificado em comentário
+na própria migration — nunca por omissão do rodapé.
+
+**Pós-apply obrigatório**: rodar `get_advisors` (security) e confirmar
+ausência da função em `anon_security_definer_function_executable` (a menos
+que seja a exceção acima, documentada).
+
+**Regra 2 — pasta e numeração de migration saem SEMPRE do projeto-alvo:**
+- nnv → `platform/supabase/migrations-nnv/`
+- xtv → `platform/supabase/migrations/`
+
+Antes de criar arquivo local: confirmar o projeto-alvo, listar o folder
+correto DESSE projeto E o histórico remoto do próprio projeto
+(`list_migrations`) pra derivar o próximo número. Nunca derivar numeração
+da pasta do projeto irmão.
+
+Próxima migration nnv = **0065** (gap 0022→0063 documentado nos
+cabeçalhos dos arquivos 0063/0064 — ver `migrations-nnv/`).
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
@@ -40,7 +73,9 @@
   pagamentos_sinal, checklist, KYC). Usado por `createClient()`
   (`lib/supabase-server.ts`, RLS/cookie) em `/meu-processo`, `/cartas`,
   `/admin/processos`, `/auth/*`. Migrations em
-  `platform/supabase/migrations-nnv/` (numeração própria, hoje até 0019).
+  `platform/supabase/migrations-nnv/` (numeração própria, hoje até 0064 —
+  gap 0022→0063 documentado nos cabeçalhos; próxima = 0065; ver regra
+  de migrations acima).
   **Gap de produto conhecido**: não existe pipeline automático que leve
   uma carta do catálogo xtv pro `nnv.cartas` — hoje é inserção manual (ver
   DIARIO-BORDO, fatia futura PONTE-01).
