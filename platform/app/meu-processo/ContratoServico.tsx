@@ -2,7 +2,8 @@
 // Contrato de prestação de serviço (contrato 1). Exibe o corpo já sanitizado
 // (montado no servidor por lib/contratos) e registra o aceite/assinatura.
 //
-// Ordem jurídica: SERVIÇO → PIX → COTA. Este é o primeiro passo do cliente.
+// Ordem jurídica: SERVIÇO → Termo de Reserva → documentação → COTA. Este é o
+// primeiro passo do cliente.
 // Sem ESIGN_PROVIDER, o aceite é registrado server-side (fallback manual);
 // com provedor, o POST inicia a assinatura eletrônica.
 //

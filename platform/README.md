@@ -1,9 +1,11 @@
 # Bidcon — Plataforma logada
 
-> **Status:** código-fonte para revisão. **Nada foi executado pelo agente** —
-> nenhum projeto Supabase/Vercel criado, nenhuma credencial usada, nenhuma chave
-> no repositório. Ver `docs/plataforma-arquitetura.md` (decisões) e
-> `docs/privacidade-rascunho-adicoes.md` (privacidade).
+> **Status:** código em evolução contínua, sob revisão do Emerson. Mudanças de
+> schema/DB (migrations) só são aplicadas pelo Emerson, mediante autorização
+> nominal ("AUTORIZO...") — nunca pelo agente por conta própria; pushes ao
+> repositório remoto seguem a mesma regra ("PUBLICA #N"). Nenhuma credencial
+> ou chave fica no repositório. Ver `docs/plataforma-arquitetura.md` (decisões)
+> e `docs/privacidade-rascunho-adicoes.md` (privacidade).
 
 Projeto **separado** do site estático. O site de marketing (`bidcon.com.br`,
 pasta `/public`) continua intocado. Esta pasta vira o projeto Vercel de
@@ -40,14 +42,12 @@ servidor.
 
 Checagens: `npx tsc --noEmit` e `npm run build`.
 
-## Migrations (ordem) — aplicadas pelo Emerson, não pelo agente
-No SQL Editor do Supabase ou `supabase db push`, nesta ordem:
-1. `0001_schema.sql` — schema (tabelas, enums).
-2. `0002_rls.sql` — RLS estrito + `is_admin()`.
-3. `0003_processo_eventos.sql` — trilha de status do processo.
-4. `0004_cartas_sync.sql` — sync de cotas (RPC atômico) + `indisponivel`.
-5. `0005_cartas_vitrine.sql` — leitura pública das cartas `disponivel`.
-6. `0006_status_rpc.sql` — RPCs de mudança de status (processo/carta/comissão).
+## Migrations — aplicadas pelo Emerson, não pelo agente
+Fonte da verdade: arquivos em `supabase/migrations-nnv/` + `list_migrations` do
+projeto (nnv). Ver `CLAUDE.md` Regra 2 — este README não mantém mais uma lista
+numerada em paralelo (ela ficava obsoleta a cada nova migration). Toda migration
+é aplicada pelo Emerson mediante autorização nominal ("AUTORIZO..."), nunca pelo
+agente por conta própria.
 
 `supabase/seed_dev.sql` **não é migration**: é massa de teste para um projeto de
 desenvolvimento (admin, parceiros, clientes, cartas, processos, comissão). **Não

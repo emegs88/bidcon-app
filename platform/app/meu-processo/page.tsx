@@ -18,7 +18,6 @@ import {
   type StatusProcesso,
   type SubetapaProcesso,
   type StatusContrato,
-  type StatusPagamento,
   type StatusDocumento,
 } from "@/lib/status";
 import { brl, dataBR } from "@/lib/format";
@@ -32,8 +31,7 @@ import {
 } from "@/lib/contratos";
 import { ChecklistDocs, type ItemChecklist } from "./ChecklistDocs";
 import { ContratoServico } from "./ContratoServico";
-import { PagamentoSinal } from "./PagamentoSinal";
-import { ContratoCota } from "./ContratoCota";
+import { ContratoCota, type EstadoGateCota } from "./ContratoCota";
 import { AgenteChat } from "./AgenteChat";
 import styles from "./processo.module.css";
 import fluxo from "./fluxo.module.css";
@@ -143,18 +141,41 @@ export default async function MeuProcesso() {
     (contratosRows?.find((c) => (c as { tipo: string }).tipo === "cota")?.status ??
       null) as StatusContrato | null;
 
-  // pagamento do sinal (rastreio; sem dado bancário do cliente).
-  const { data: sinalRow } = await supabase
-    .from("pagamentos_sinal")
-    .select("status, qr_payload")
+  // reserva vinculada ao processo (migration 0067: reservar_carta grava a
+  // linha DRAFT na mesma transação). O contrato da cota (gerar_contrato,
+  // 0066) exige: reserva existente + Termo de Reserva assinado (state fora de
+  // DRAFT/ANUENCIA_DENIED/REFUNDED/CLOSED/DISPUTED) + documentação completa.
+  // Esta é uma leitura de EXIBIÇÃO — o gate real é sempre revalidado
+  // server-side pela RPC em /api/processo/contrato.
+  const { data: reservaRow } = await supabase
+    .from("reservas")
+    .select("state, created_at")
     .eq("processo_id", processo.id)
-    .order("criado_em", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const sinalStatus =
-    ((sinalRow as { status: string } | null)?.status ?? null) as StatusPagamento | null;
-  const sinalPago = sinalStatus === "pago";
-  const qrPayload = (sinalRow as { qr_payload: string | null } | null)?.qr_payload ?? null;
+  const TERMO_PENDENTE_STATES = new Set([
+    "DRAFT",
+    "ANUENCIA_DENIED",
+    "REFUNDED",
+    "CLOSED",
+    "DISPUTED",
+  ]);
+  const itensObrigatorios = itensChecklist.filter((i) => i.obrigatorio);
+  // Nota: se não houver checklist (nenhum item obrigatório resolvido), trata
+  // como documentação incompleta — mais conservador que a RPC docs_completas
+  // no caso extremo de um modelo sem nenhum item obrigatório, mas alinhado ao
+  // caso real (nenhum modelo ativo) e sem risco de liberar contrato indevido.
+  const docsCompletas =
+    itensObrigatorios.length > 0 &&
+    itensObrigatorios.every((i) => i.docStatus === "aprovado");
+  const estadoGateCota: EstadoGateCota = !reservaRow
+    ? "reserva_inexistente"
+    : TERMO_PENDENTE_STATES.has(reservaRow.state as string)
+      ? "termo_nao_assinado"
+      : !docsCompletas
+        ? "docs_incompletas"
+        : "liberado";
 
   // qualificação completa do CONTRATANTE (nome + CPF + e-mail), fonte única
   // em `profiles`. Enquanto nome/CPF não estiverem preenchidos e válidos, o
@@ -165,8 +186,9 @@ export default async function MeuProcesso() {
   const clienteEmail = profile?.email ?? user.email ?? "";
   const precisaQualificacao = !clienteNome || !cpfValido(clienteCpf);
 
-  // valores factuais do sinal/entrada (2% do crédito; residual da entrada).
-  const { sinal: valorSinal, residualEntrada } = resumoSinal({
+  // valor factual usado no snapshot dos contratos (campo legado do modelo;
+  // sem exibição de sinal/PIX na tela — ver SINAL-CLEANUP-01 no backlog).
+  const { sinal: valorSinal } = resumoSinal({
     valor_credito: carta?.valor_credito ?? null,
     valor_entrada: carta?.valor_entrada ?? processo.valor_entrada ?? null,
   });
@@ -176,10 +198,10 @@ export default async function MeuProcesso() {
     dadosContratoServico({ clienteNome, clienteCpf, clienteEmail, valorSinal })
   );
 
-  // corpo do contrato da COTA — só montado quando o sinal está pago (gate real
-  // é a RPC gerar_contrato; aqui é só exibição).
+  // corpo do contrato da COTA — só montado quando o gate de exibição libera
+  // (gate real é sempre a RPC gerar_contrato; aqui é só exibição).
   const corpoCota =
-    sinalPago && carta
+    estadoGateCota === "liberado" && carta
       ? corpoContratoCota(
           dadosContratoCota({
             clienteNome,
@@ -236,7 +258,8 @@ export default async function MeuProcesso() {
               {/* 1) Documentos do check-list da administradora (só rótulos) */}
               <ChecklistDocs processoId={processo.id} itens={itensChecklist} />
 
-              {/* 2) Contrato de serviço (ordem jurídica: serviço → PIX → cota) */}
+              {/* 2) Contrato de serviço (ordem jurídica: serviço → Termo de */}
+              {/*    Reserva → documentação → cota) */}
               <ContratoServico
                 processoId={processo.id}
                 corpo={corpoServico}
@@ -246,21 +269,13 @@ export default async function MeuProcesso() {
                 cpfAtual={clienteCpf ?? ""}
               />
 
-              {/* 3) Sinal via PIX (2% do crédito) */}
-              <PagamentoSinal
-                processoId={processo.id}
-                valorSinal={valorSinal}
-                residualEntrada={residualEntrada}
-                status={sinalStatus}
-                qrPayload={qrPayload}
-              />
-
-              {/* 4) Contrato de compra e venda da cota (só após sinal pago) */}
+              {/* 3) Contrato de compra e venda da cota — libera após reserva
+                  existente + Termo de Reserva assinado + docs completas. */}
               <ContratoCota
                 processoId={processo.id}
                 corpo={corpoCota}
                 status={contratoCotaStatus}
-                liberado={sinalPago}
+                estado={estadoGateCota}
               />
             </div>
           </Card>

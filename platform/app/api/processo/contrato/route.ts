@@ -1,7 +1,8 @@
 // POST /api/processo/contrato — cliente gera/aceita um contrato do processo.
-// Ordem jurídica: SERVIÇO → PIX → COTA.
 //   tipo 'servico', acao 'aceitar'  → gera (se preciso) e registra o aceite.
-//   tipo 'cota',    acao 'gerar'    → RPC gerar_contrato (gate: sinal 'pago').
+//   tipo 'cota',    acao 'gerar'    → RPC gerar_contrato (gate: Termo de
+//                                     Reserva assinado + documentação
+//                                     completa — migrations 0066/0067).
 //   tipo 'cota',    acao 'aceitar'  → registra o aceite do contrato da cota.
 //
 // Sem ESIGN_PROVIDER, o aceite é registrado server-side (fallback manual):
@@ -10,7 +11,7 @@
 //
 // COMPLIANCE: o snapshot `dados` (jsonb) é montado por lib/contratos, que NÃO
 // inclui administradora/taxa/comissão. A geração via RPC gerar_contrato já
-// aplica o gate do sinal para a cota.
+// aplica o gate de termo assinado + docs completas para a cota (0066/0067).
 //
 // QUALIFICAÇÃO COMPLETA (v4/FINAL): nome/CPF/e-mail vêm de `profiles` (não
 // mais de kyc_perfis — o KYC de documento/selfie é verificação à parte e não
@@ -126,7 +127,11 @@ export async function POST(req: Request) {
       valorSinal: sinal,
     });
 
-    // a RPC aplica o gate: cota exige pagamentos_sinal.status='pago'.
+    // a RPC aplica o gate: reserva existente + Termo de Reserva assinado +
+    // documentação completa (migrations 0066/0067). Mapeamento por nome
+    // (error.message) primeiro — a RPC usa `raise exception '<nome>' using
+    // errcode = '<code>'`, então message === nome; errcode fica como
+    // fallback secundário.
     const { error } = await supabase.rpc("gerar_contrato", {
       p_processo: processoId,
       p_tipo: "cota",
@@ -134,10 +139,14 @@ export async function POST(req: Request) {
       p_versao: "v1",
     });
     if (error) {
-      const msg =
-        error.message?.includes("sinal_nao_pago")
-          ? "O contrato da cota é liberado após a confirmação do sinal."
-          : "Não foi possível gerar o contrato da cota.";
+      let msg = "Não foi possível gerar o contrato da cota.";
+      if (error.message === "reserva_inexistente" || error.code === "P0003") {
+        msg = "Reserva ainda não iniciada para este processo.";
+      } else if (error.message === "termo_nao_assinado" || error.code === "P0004") {
+        msg = "Termo de Reserva em andamento — nossa equipe conduz a assinatura com você.";
+      } else if (error.message === "docs_incompletas" || error.code === "P0005") {
+        msg = "Finalize o envio da documentação para liberar o contrato da cota.";
+      }
       return NextResponse.json({ erro: msg }, { status: 400 });
     }
     return NextResponse.json({ ok: true });

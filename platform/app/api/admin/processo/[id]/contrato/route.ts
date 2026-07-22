@@ -1,8 +1,9 @@
 // POST /api/admin/processo/[id]/contrato — admin gera um contrato (serviço/cota)
 // do processo. O snapshot factual (qualificação completa do CONTRATANTE —
 // nome/CPF/e-mail de `profiles` — + valores; sem administradora/comissão) é
-// montado por lib/contratos. A RPC gerar_contrato (0014, security definer)
-// aplica o gate: contrato 'cota' exige sinal 'pago'.
+// montado por lib/contratos. A RPC gerar_contrato (security definer) aplica
+// o gate: contrato 'cota' exige reserva existente + Termo de Reserva assinado
+// + documentação completa (migrations 0066/0067).
 //
 // Observação: este endpoint (admin) não bloqueia a geração por qualificação
 // incompleta — quem exige nome/CPF válidos antes do ACEITE é o cliente, na
@@ -109,15 +110,23 @@ export async function POST(
   });
 
   if (error) {
-    if (error.code === "42501") {
+    // Mapeamento por nome (error.message) primeiro — a RPC usa
+    // `raise exception '<nome>' using errcode = '<code>'`, então
+    // message === nome; errcode fica como fallback secundário.
+    if (error.message === "sem_permissao" || error.code === "42501") {
       return NextResponse.json({ erro: "Sem permissão." }, { status: 403 });
     }
-    if (error.code === "P0002") {
+    if (error.message === "processo_inexistente" || error.code === "P0002") {
       return NextResponse.json({ erro: "Processo não encontrado." }, { status: 404 });
     }
-    const msg = error.message?.includes("sinal_nao_pago")
-      ? "O contrato da cota é liberado após a confirmação do sinal."
-      : "Não foi possível gerar o contrato.";
+    let msg = "Não foi possível gerar o contrato.";
+    if (error.message === "reserva_inexistente" || error.code === "P0003") {
+      msg = "Reserva ainda não iniciada para este processo.";
+    } else if (error.message === "termo_nao_assinado" || error.code === "P0004") {
+      msg = "Termo de Reserva ainda não assinado.";
+    } else if (error.message === "docs_incompletas" || error.code === "P0005") {
+      msg = "Documentação do processo ainda incompleta.";
+    }
     return NextResponse.json({ erro: msg }, { status: 400 });
   }
 

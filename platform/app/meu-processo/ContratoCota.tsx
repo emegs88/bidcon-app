@@ -1,7 +1,10 @@
 "use client";
-// Contrato de compra e venda da cota (contrato 2). Só habilita DEPOIS do sinal
-// confirmado (`pago`) — o gate real está na RPC `gerar_contrato` (0014); aqui a
-// UI só reflete o estado. Descreve o bem de forma factual (tipo/crédito/entrada).
+// Contrato de compra e venda da cota (contrato 2). O gate real está na RPC
+// `gerar_contrato` (migrations 0066/0067): reserva existente + Termo de
+// Reserva assinado + documentação completa. Esta UI só reflete, em 4 estados,
+// o que a página server-side (`meu-processo/page.tsx`) já calculou a partir
+// da leitura de `reservas` + checklist — nenhuma lógica de gate é decidida
+// aqui. Descreve o bem de forma factual (tipo/crédito/entrada).
 //
 // COMPLIANCE: não cita administradora/taxa/comissão; parágrafos já sanitizados
 // no servidor. CPF vem MASCARADO. Sem promessa de contemplação/prazo/rendimento.
@@ -17,18 +20,27 @@ import {
 import styles from "./fluxo.module.css";
 import type { CorpoContratoView } from "./ContratoServico";
 
+// Espelha os 4 estados possíveis do gate (reserva inexistente / termo não
+// assinado / docs incompletas / liberado), calculados em page.tsx a partir de
+// `reservas.state` + checklist. Sem valor "sinal" — o fluxo de sinal/PIX foi
+// removido desta etapa (F7a).
+export type EstadoGateCota =
+  | "reserva_inexistente"
+  | "termo_nao_assinado"
+  | "docs_incompletas"
+  | "liberado";
+
 export function ContratoCota({
   processoId,
   corpo,
   status,
-  liberado,
+  estado,
 }: {
   processoId: string;
-  // corpo é null enquanto o contrato não pôde ser montado (sem sinal pago)
+  // corpo é null enquanto o contrato não pôde ser montado (estado !== "liberado")
   corpo: CorpoContratoView | null;
   status: StatusContrato | null;
-  // true quando o sinal está pago (habilita geração/assinatura)
-  liberado: boolean;
+  estado: EstadoGateCota;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState(false);
@@ -58,11 +70,28 @@ export function ContratoCota({
     }
   }
 
-  if (!liberado) {
+  if (estado === "reserva_inexistente") {
     return (
       <p className={styles.aviso}>
-        O contrato de compra e venda da cota fica disponível após a confirmação
-        do sinal. Assim que o pagamento for confirmado, esta etapa é liberada.
+        A reserva desta cota ainda não foi iniciada para este processo.
+      </p>
+    );
+  }
+
+  if (estado === "termo_nao_assinado") {
+    return (
+      <p className={styles.aviso}>
+        Termo de Reserva em andamento — nossa equipe conduz a assinatura com
+        você.
+      </p>
+    );
+  }
+
+  if (estado === "docs_incompletas") {
+    return (
+      <p className={styles.aviso}>
+        Finalize o envio da documentação do check-list para liberar o
+        contrato de compra e venda da cota.
       </p>
     );
   }
@@ -71,8 +100,8 @@ export function ContratoCota({
     return (
       <div className={styles.contrato}>
         <p className={styles.aviso}>
-          O sinal está confirmado. Gere o contrato de compra e venda da cota para
-          revisar e assinar.
+          Termo assinado e documentação completa. Gere o contrato de compra e
+          venda da cota para revisar e assinar.
         </p>
         <Button size="sm" onClick={() => acao("gerar")} disabled={enviando}>
           {enviando ? "Gerando…" : "Gerar contrato da cota"}

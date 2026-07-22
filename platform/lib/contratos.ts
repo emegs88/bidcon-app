@@ -1,12 +1,16 @@
 // ============================================================================
 // Contratos do fluxo pós-reserva — snapshot factual (jsonb) + texto de modelo.
 // ----------------------------------------------------------------------------
-// Dois contratos, na ordem jurídica confirmada (SERVIÇO → PIX → COTA):
+// Dois contratos, na ordem jurídica confirmada (SERVIÇO → TERMO DE RESERVA →
+// DOCUMENTAÇÃO → COTA):
 //   1) 'servico'  — prestação de serviço de intermediação. Modelo FIXO + dados
-//                   do cliente (nome/CPF/e-mail do profile + valor do sinal).
+//                   do cliente (nome/CPF/e-mail do profile + valor do sinal,
+//                   campo legado do modelo — ver SINAL-CLEANUP-01).
 //                   NÃO cita administradora, taxa, fundo nem comissão.
-//   2) 'cota'     — compra e venda da cota, gerado só APÓS o sinal pago. Descreve
-//                   o bem de forma factual (tipo, crédito, entrada). Também NÃO
+//   2) 'cota'     — compra e venda da cota, gerado só após o Termo de Reserva
+//                   assinado e a documentação do checklist completa (gate real
+//                   na RPC gerar_contrato, migrations 0066/0067). Descreve o
+//                   bem de forma factual (tipo, crédito, entrada). Também NÃO
 //                   cita administradora/taxa/comissão ao cliente.
 //
 // COMPLIANCE (inviolável): nenhum texto promete contemplação/prazo/rendimento/
@@ -143,7 +147,6 @@ export function dadosContratoCota(input: {
 export type CorpoContrato = { titulo: string; paragrafos: string[] };
 
 export function corpoContratoServico(d: DadosContratoServico): CorpoContrato {
-  const sinal = d.valor_sinal != null ? brl(d.valor_sinal) : "a definir";
   const paragrafos = [
     `CONTRATANTE: ${d.cliente_nome}, CPF ${d.cliente_cpf}, e-mail ${d.cliente_email}.`,
     linhaContratada(),
@@ -153,21 +156,17 @@ export function corpoContratoServico(d: DadosContratoServico): CorpoContrato {
     `A ${CONTRATADA.marca} não é instituição financeira e não aprova crédito. A ` +
       `transferência da cota é sempre formalizada e validada pela administradora ` +
       `do consórcio.`,
-    `SINAL DA RESERVA: para reservar a cota, o CONTRATANTE pagará, via PIX, o ` +
-      `valor de ${sinal}, que segura a cota pelo prazo informado na plataforma. O ` +
-      `valor pago a título de sinal é abatido da entrada da cota.`,
     `ENTRADA E FECHAMENTO PROTEGIDO: o valor principal da entrada é depositado ` +
-      `em conta vinculada aberta EM NOME DO CONTRATANTE em instituição financeira ` +
-      `conveniada ao 5º Tabelionato de Notas de Campinas (Conta Notarial), e sua ` +
+      `em conta vinculada da operação, administrada pelo 5º Tabelionato de Notas ` +
+      `de Campinas (conta notarial), em instituição financeira conveniada, e sua ` +
       `liberação é comandada pelo tabelião somente após a formalização da ` +
-      `transferência junto à administradora. O sinal da reserva é pago via PIX e ` +
-      `abatido da entrada.`,
+      `transferência junto à administradora.`,
     `Os valores exibidos na plataforma (crédito, entrada, parcela, prazo) são ` +
       `estimativas e ficam sujeitos à análise e à transferência pela administradora ` +
       `do consórcio.`,
     `Este contrato de prestação de serviço é a etapa anterior à assinatura do ` +
-      `contrato de compra e venda da cota, que só é gerado após a confirmação do ` +
-      `sinal.`,
+      `contrato de compra e venda da cota, que só é gerado após a assinatura do ` +
+      `Termo de Reserva e a conferência da documentação.`,
   ].map(linhaSegura);
 
   return { titulo: "Contrato de prestação de serviço de intermediação", paragrafos };
@@ -177,15 +176,13 @@ export function corpoContratoCota(d: DadosContratoCota): CorpoContrato {
   const bem = LABEL_TIPO_BEM[d.bem_tipo] ?? d.bem_tipo;
   const credito = d.valor_credito != null ? brl(d.valor_credito) : "a definir";
   const entrada = d.valor_entrada != null ? brl(d.valor_entrada) : "a definir";
-  const sinal = d.valor_sinal != null ? brl(d.valor_sinal) : "—";
 
   const paragrafos = [
     `COMPRADOR: ${d.cliente_nome}, CPF ${d.cliente_cpf}, e-mail ${d.cliente_email}.`,
     linhaContratada(),
     `OBJETO: aquisição de uma cota de consórcio já contemplada, destinada a ${bem}, ` +
       `com crédito de ${credito}.`,
-    `ENTRADA: ${entrada}. Do valor da entrada é abatido o sinal já pago (${sinal}); ` +
-      `o COMPRADOR paga apenas o residual.`,
+    `ENTRADA: ${entrada}.`,
     `A transferência de titularidade da cota é formalizada e validada pela ` +
       `administradora do consórcio. A ${CONTRATADA.marca} organiza a documentação e ` +
       `acompanha o processo; não é instituição financeira e não aprova crédito.`,

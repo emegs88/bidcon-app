@@ -17,9 +17,26 @@ export const dynamic = "force-dynamic";
 
 type Body = { carta_id?: unknown };
 
-// Mapeia o errcode da RPC para mensagem neutra + status HTTP adequado.
-function mapErro(code: string | undefined): { erro: string; status: number } {
-  switch (code) {
+// Mapeia o erro da RPC para mensagem neutra + status HTTP adequado.
+// Nome (error.message) primeiro, errcode como fallback secundário — mesmo
+// padrão usado em /api/processo/contrato (migration 0066/0067: as exceptions
+// da RPC usam `raise exception '<nome>' using errcode = '<code>'`, então
+// message === nome sempre que a RPC segue essa convenção).
+function mapErro(err: {
+  message?: string;
+  code?: string;
+}): { erro: string; status: number } {
+  if (err.message === "carta_sem_entrada" || err.code === "P0006") {
+    // 0067: cadastro da carta sem valor_entrada válido (>0) — dado inválido,
+    // não erro do cliente.
+    return {
+      erro:
+        "Esta carta está com o cadastro em revisão — fale com o atendimento pra concluir a reserva.",
+      status: 409,
+    };
+  }
+
+  switch (err.code) {
     case "42501":
       return { erro: "Não autenticado.", status: 401 };
     case "P0002":
@@ -55,7 +72,7 @@ export async function POST(req: Request) {
   });
 
   if (error) {
-    const { erro, status } = mapErro(error.code);
+    const { erro, status } = mapErro(error);
     return NextResponse.json({ erro }, { status });
   }
 

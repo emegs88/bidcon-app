@@ -16,7 +16,7 @@ export function AgenteChat({ processoId }: { processoId: string }) {
     {
       autor: "bot",
       texto:
-        "Posso ajudar com as etapas do seu processo: documentos, sinal e contratos. Não informo prazo de contemplação — isso depende da administradora.",
+        "Posso ajudar com as etapas do seu processo: documentos, reserva e contratos. Não informo prazo de contemplação — isso depende da administradora.",
     },
   ]);
   const [entrada, setEntrada] = useState("");
