@@ -1,0 +1,272 @@
+/* Simulador Conta Notarial (SIM-PARCEIRO-01) — usa as mesmas CSS vars de tema
+   da área logada (app/globals.css: --bg/--surface/--text/--brand/... conforme
+   data-theme). Nada de cor hardcoded fora do gradiente de marca (--grad-brand). */
+
+.wrap {
+  display: grid;
+  gap: 22px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Indicador de passos                                                 */
+/* ------------------------------------------------------------------ */
+.steps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.stepPill {
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+.stepPillActive {
+  border-color: var(--brand-deep);
+  color: var(--text);
+  background: var(--surface-2);
+  font-weight: 700;
+}
+.stepPillDone {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+/* ------------------------------------------------------------------ */
+/* Passo 1 — administradoras                                          */
+/* ------------------------------------------------------------------ */
+.gridAdm {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.admCard {
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: 16px;
+  color: var(--text);
+  transition: border-color 0.15s ease;
+}
+.admCard:hover {
+  border-color: var(--brand-deep);
+}
+.admCardActive {
+  border-color: var(--brand-deep);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+.admNome {
+  font-weight: 700;
+  font-size: 15px;
+}
+.admHint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Passo 2 — cesta                                                    */
+/* ------------------------------------------------------------------ */
+.tableWrap,
+.escalaTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600;
+}
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.table tr:last-child td {
+  border-bottom: none;
+}
+.rowSelected td {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+.badgeExclusiva {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  background: var(--grad-brand);
+  color: #06121f;
+  font-weight: 700;
+}
+
+.totaisBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.totalItem {
+  display: grid;
+  gap: 2px;
+}
+.totalLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.totalValor {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ */
+/* Passo 3 — demonstrativo                                            */
+/* ------------------------------------------------------------------ */
+.objetivoToggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 3px;
+  gap: 3px;
+  background: var(--surface);
+}
+.objetivoBtn {
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+}
+.objetivoBtnActive {
+  background: var(--grad-brand);
+  color: #06121f;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+}
+.field label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.field input,
+.field select {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.statLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.statValor {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.statValorDestaque {
+  color: var(--brand);
+}
+
+.secaoTitulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.avisoTir {
+  font-size: 12px;
+  color: var(--warn);
+  margin-top: 4px;
+}
+
+.footerCompliance {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.actionsBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.erro {
+  color: #f87171;
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Impressão / Salvar como PDF — segue o padrão de app/globals.css:    */
+/* [data-print="hide"] some; o demonstrativo assume a folha (fundo     */
+/* branco herdado do @media print global).                            */
+/* ------------------------------------------------------------------ */
+@media print {
+  .steps,
+  .actionsBar,
+  .gridAdm,
+  .tableWrap,
+  .objetivoToggle {
+    display: none !important;
+  }
+}
