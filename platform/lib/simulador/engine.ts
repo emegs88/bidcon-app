@@ -27,6 +27,9 @@ export interface CotaSim {
   parcela: number; // valor_parcela
   custoAmEstoque: number | null; // bidcon_custo_am (referência, não recalculado)
   exclusiva: boolean;
+  tipo: "imovel" | "veiculo"; // cartas.tipo — passthrough puro (SIM-PARCEIRO-01.1);
+  // NENHUMA função de cálculo neste arquivo lê este campo — segmento não afeta
+  // parcela/TIR/saldo devedor, é só rótulo de exibição/filtro na UI.
 }
 
 export interface FaixaEscala {

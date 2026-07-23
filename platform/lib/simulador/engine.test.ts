@@ -42,6 +42,7 @@ function cotasDataset(): CotaSim[] {
     administradoraNome: "Administradora Teste",
     custoAmEstoque: null,
     exclusiva: false,
+    tipo: "imovel" as const,
   };
   return [
     { ...base, id: "1", ref: "#1", credito: 538428.0, entrada: 0, prazo: 205, parcela: 3374.0 },
@@ -121,6 +122,7 @@ test("sanity: tirMensal de uma única cota se aproxima do bidcon_custo_am de est
     parcela: 1542.0,
     custoAmEstoque: null,
     exclusiva: false,
+    tipo: "veiculo",
   };
   const tirSolo = tirMensal([cota], cota.entrada);
   assert.ok(tirSolo !== null, "tir da cota isolada não deve ser null");

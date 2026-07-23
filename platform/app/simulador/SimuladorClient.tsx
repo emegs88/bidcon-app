@@ -19,7 +19,9 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { brl, linkWhatsApp } from "@/lib/format";
+import { LABEL_TIPO_BEM } from "@/lib/status";
 import {
   type CotaSim,
   type ParamsFundo,
@@ -31,11 +33,26 @@ import {
   custosFundo,
   liquidoCliente,
 } from "@/lib/simulador/engine";
+import {
+  type CandidatoCesta,
+  type ObjetivoOtimizador,
+  type RestricoesOtimizador,
+  sugerirMelhorCesta,
+} from "@/lib/simulador/otimizador";
 import type { AdministradoraElegivel } from "@/lib/simulador/data";
 import styles from "./SimuladorClient.module.css";
 
 type Passo = "administradora" | "cesta" | "demonstrativo";
 type Objetivo = "aquisicao" | "levantamento";
+type FiltroSegmento = "todos" | "imovel" | "veiculo";
+
+/** Segmento único da cesta (SIM-PARCEIRO-01.1) — null quando vazia ou mista.
+ * Usado só pra nomear título/texto; nunca entra em cálculo (engine.ts). */
+function segmentoUnicoCesta(cotas: CotaSim[]): "imovel" | "veiculo" | null {
+  if (cotas.length === 0) return null;
+  const tipos = new Set(cotas.map((c) => c.tipo));
+  return tipos.size === 1 ? cotas[0].tipo : null;
+}
 
 const PARAMS_FUNDO_PADRAO: ParamsFundo = {
   fundoPct: 11,
@@ -69,11 +86,27 @@ export function SimuladorClient({
   const [erroEstoque, setErroEstoque] = useState("");
 
   const [cestaIds, setCestaIds] = useState<Set<string>>(new Set());
+  const [filtroSegmento, setFiltroSegmento] = useState<FiltroSegmento>("todos");
 
   const [objetivo, setObjetivo] = useState<Objetivo>("aquisicao");
   const [taxaTransferencia, setTaxaTransferencia] = useState(0);
   const [paramsFundo, setParamsFundo] = useState<ParamsFundo>(PARAMS_FUNDO_PADRAO);
   const [whatsCliente, setWhatsCliente] = useState("");
+
+  // ---- otimizador de cesta (SIM-PARCEIRO-01.2, FASE 1 — "melhor cesta") ----
+  // Só faz sentido no objetivo "levantamento" (líquido em conta). O motor é
+  // puro (lib/simulador/otimizador.ts) — este componente só coleta os
+  // parâmetros, chama a função e apresenta o resultado; nunca recalcula nada.
+  const [mostrarOtimizador, setMostrarOtimizador] = useState(false);
+  const [otimizadorTipo, setOtimizadorTipo] = useState<"liquido_maximo" | "liquido_minimo">(
+    "liquido_maximo",
+  );
+  const [otimizadorLiquidoMinimo, setOtimizadorLiquidoMinimo] = useState(0);
+  const [otimizadorParcelaMax, setOtimizadorParcelaMax] = useState<number | "">("");
+  const [otimizadorPrazoMax, setOtimizadorPrazoMax] = useState<number | "">("");
+  const [otimizadorMaxCartas, setOtimizadorMaxCartas] = useState<number | "">("");
+  const [resultadoOtimizador, setResultadoOtimizador] = useState<CandidatoCesta[]>([]);
+  const [otimizadorBuscou, setOtimizadorBuscou] = useState(false);
 
   const administradoraAtual = useMemo(
     () => administradoras.find((a) => a.id === administradoraId) ?? null,
@@ -85,9 +118,36 @@ export function SimuladorClient({
     [cotasEstoque, cestaIds],
   );
 
+  // ---- filtro de segmento (SIM-PARCEIRO-01.1) — client-side, só afeta o que
+  // aparece na tabela do passo 2; nunca desmarca uma cota já na cesta. ----
+  const contagemSegmento = useMemo(
+    () => ({
+      todos: cotasEstoque.length,
+      imovel: cotasEstoque.filter((c) => c.tipo === "imovel").length,
+      veiculo: cotasEstoque.filter((c) => c.tipo === "veiculo").length,
+    }),
+    [cotasEstoque],
+  );
+  const cotasVisiveis = useMemo(
+    () =>
+      filtroSegmento === "todos"
+        ? cotasEstoque
+        : cotasEstoque.filter((c) => c.tipo === filtroSegmento),
+    [cotasEstoque, filtroSegmento],
+  );
+
+  // Segmento único da cesta atual (null se vazia ou mista) — nomeia título/texto.
+  const segmentoUnico = segmentoUnicoCesta(cesta);
+  const prefixoSegmento = segmentoUnico ? `${LABEL_TIPO_BEM[segmentoUnico]} · ` : "";
+  const cestaMista = new Set(cesta.map((c) => c.tipo)).size > 1;
+  // Aviso não-bloqueante: junção via Conta Notarial pra aquisição de UM bem
+  // usa cartas do mesmo segmento; levantamento não tem essa restrição.
+  const mostrarAvisoCestaMista = objetivo === "aquisicao" && cestaMista;
+
   async function escolherAdministradora(id: string) {
     setAdministradoraId(id);
     setCestaIds(new Set());
+    setFiltroSegmento("todos");
     setErroEstoque("");
     setCarregandoCotas(true);
     setPasso("cesta");
@@ -113,6 +173,38 @@ export function SimuladorClient({
     });
   }
 
+  // Roda o otimizador (lib/simulador/otimizador.ts) sobre o estoque VISÍVEL
+  // (respeitando o chip de filtro por segmento do passo 2 — SIM-PARCEIRO-01.1
+  // ponto 7) e guarda o top-3 de cestas candidatas pra revisão do parceiro.
+  function calcularSugestoesOtimizador() {
+    const objetivoOtimizador: ObjetivoOtimizador =
+      otimizadorTipo === "liquido_minimo"
+        ? { tipo: "liquido_minimo", liquidoMinimo: otimizadorLiquidoMinimo }
+        : { tipo: "liquido_maximo" };
+    const restricoes: RestricoesOtimizador = {};
+    if (otimizadorParcelaMax !== "") restricoes.parcelaMaxMes1 = otimizadorParcelaMax;
+    if (otimizadorPrazoMax !== "") restricoes.prazoMax = otimizadorPrazoMax;
+    if (otimizadorMaxCartas !== "") restricoes.maxCartas = otimizadorMaxCartas;
+
+    const resultado = sugerirMelhorCesta({
+      cotas: cotasVisiveis,
+      taxaTransferencia,
+      paramsFundo,
+      objetivo: objetivoOtimizador,
+      restricoes: Object.keys(restricoes).length > 0 ? restricoes : undefined,
+    });
+    setResultadoOtimizador(resultado);
+    setOtimizadorBuscou(true);
+  }
+
+  // "Aplicar": substitui a cesta atual pela cesta sugerida (não faz merge).
+  function aplicarSugestaoOtimizador(candidato: CandidatoCesta) {
+    setCestaIds(new Set(candidato.cotas.map((c) => c.id)));
+    setResultadoOtimizador([]);
+    setOtimizadorBuscou(false);
+    setMostrarOtimizador(false);
+  }
+
   // ---- derivados do demonstrativo (motor puro, lib/simulador/engine.ts) ----
   const poderCompra = somaCredito(cesta);
   const entradaTotal = somaEntrada(cesta);
@@ -136,10 +228,14 @@ export function SimuladorClient({
 
   function textoWhatsApp(): string {
     const linhas: string[] = [];
-    linhas.push(`*Planejamento — carta(s) de crédito ${administradoraAtual?.nome ?? ""}*`);
+    linhas.push(
+      `*Planejamento — ${prefixoSegmento}carta(s) de crédito ${administradoraAtual?.nome ?? ""}*`,
+    );
     linhas.push("");
     cesta.forEach((c) => {
-      linhas.push(`• ${c.ref} — crédito ${brl(c.credito)} · ${c.prazo}x ${brl(c.parcela)}`);
+      linhas.push(
+        `• ${LABEL_TIPO_BEM[c.tipo]} · ${administradoraAtual?.nome ?? ""} · ${c.ref} — crédito ${brl(c.credito)} · ${c.prazo}x ${brl(c.parcela)}`,
+      );
     });
     linhas.push("");
     linhas.push(`Poder de compra total: ${brl(poderCompra)}`);
@@ -223,12 +319,37 @@ export function SimuladorClient({
 
           {!carregandoCotas && !erroEstoque && (
             <>
+              <div className={styles.filtroChips} data-print="hide">
+                <button
+                  type="button"
+                  className={`${styles.filtroChip} ${filtroSegmento === "todos" ? styles.filtroChipActive : ""}`}
+                  onClick={() => setFiltroSegmento("todos")}
+                >
+                  Todos ({contagemSegmento.todos})
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filtroChip} ${filtroSegmento === "imovel" ? styles.filtroChipActive : ""}`}
+                  onClick={() => setFiltroSegmento("imovel")}
+                >
+                  {LABEL_TIPO_BEM.imovel} ({contagemSegmento.imovel})
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filtroChip} ${filtroSegmento === "veiculo" ? styles.filtroChipActive : ""}`}
+                  onClick={() => setFiltroSegmento("veiculo")}
+                >
+                  {LABEL_TIPO_BEM.veiculo} ({contagemSegmento.veiculo})
+                </button>
+              </div>
+
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
                       <th></th>
                       <th>Carta</th>
+                      <th>Segmento</th>
                       <th>Crédito</th>
                       <th>Entrada</th>
                       <th>Prazo</th>
@@ -238,10 +359,15 @@ export function SimuladorClient({
                   <tbody>
                     {cotasEstoque.length === 0 && (
                       <tr>
-                        <td colSpan={6}>Nenhuma cota disponível nesta administradora agora.</td>
+                        <td colSpan={7}>Nenhuma cota disponível nesta administradora agora.</td>
                       </tr>
                     )}
-                    {cotasEstoque.map((c) => (
+                    {cotasEstoque.length > 0 && cotasVisiveis.length === 0 && (
+                      <tr>
+                        <td colSpan={7}>Nenhuma cota neste segmento — ajuste o filtro acima.</td>
+                      </tr>
+                    )}
+                    {cotasVisiveis.map((c) => (
                       <tr
                         key={c.id}
                         className={cestaIds.has(c.id) ? styles.rowSelected : ""}
@@ -257,6 +383,11 @@ export function SimuladorClient({
                           {c.ref}
                           {c.exclusiva && <span className={styles.badgeExclusiva}>exclusiva</span>}
                         </td>
+                        <td>
+                          <Badge tone={c.tipo === "imovel" ? "info" : "amber"}>
+                            {LABEL_TIPO_BEM[c.tipo]}
+                          </Badge>
+                        </td>
                         <td className={styles.mono}>{brl(c.credito)}</td>
                         <td className={styles.mono}>{brl(c.entrada)}</td>
                         <td className={styles.mono}>{c.prazo}x</td>
@@ -266,6 +397,13 @@ export function SimuladorClient({
                   </tbody>
                 </table>
               </div>
+
+              {mostrarAvisoCestaMista && (
+                <p className={styles.avisoCestaMista}>
+                  Cesta com imóvel e veículo: para aquisição de um único bem, a junção usa cartas
+                  do mesmo segmento. Confirme o objetivo do cliente.
+                </p>
+              )}
 
               <div className={styles.totaisBar}>
                 <div className={styles.totalItem}>
@@ -378,10 +516,174 @@ export function SimuladorClient({
             )}
           </div>
 
+          {objetivo === "levantamento" && (
+            <div className={styles.otimizadorBox} data-print="hide">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMostrarOtimizador((v) => !v)}
+              >
+                {mostrarOtimizador ? "Ocultar sugestão de cesta" : "Sugerir melhor cesta"}
+              </Button>
+
+              {mostrarOtimizador && (
+                <div className={styles.otimizadorPainel}>
+                  <div className={styles.formGrid}>
+                    <div className={styles.field}>
+                      <label>Objetivo do cálculo</label>
+                      <select
+                        value={otimizadorTipo}
+                        onChange={(e) =>
+                          setOtimizadorTipo(e.target.value as "liquido_maximo" | "liquido_minimo")
+                        }
+                      >
+                        <option value="liquido_maximo">Máximo líquido possível</option>
+                        <option value="liquido_minimo">Líquido mínimo desejado</option>
+                      </select>
+                    </div>
+                    {otimizadorTipo === "liquido_minimo" && (
+                      <div className={styles.field}>
+                        <label>Líquido mínimo (R$)</label>
+                        <input
+                          type="number"
+                          value={otimizadorLiquidoMinimo}
+                          onChange={(e) => setOtimizadorLiquidoMinimo(Number(e.target.value) || 0)}
+                        />
+                      </div>
+                    )}
+                    <div className={styles.field}>
+                      <label>Parcela máx. no mês 1 (opcional)</label>
+                      <input
+                        type="number"
+                        value={otimizadorParcelaMax}
+                        onChange={(e) =>
+                          setOtimizadorParcelaMax(e.target.value === "" ? "" : Number(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Prazo máx. em meses (opcional)</label>
+                      <input
+                        type="number"
+                        value={otimizadorPrazoMax}
+                        onChange={(e) =>
+                          setOtimizadorPrazoMax(e.target.value === "" ? "" : Number(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Máx. de cartas (opcional, teto 5)</label>
+                      <input
+                        type="number"
+                        max={5}
+                        value={otimizadorMaxCartas}
+                        onChange={(e) =>
+                          setOtimizadorMaxCartas(e.target.value === "" ? "" : Number(e.target.value))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.actionsBar}>
+                    <Button variant="primary" size="sm" onClick={calcularSugestoesOtimizador}>
+                      Calcular sugestões
+                    </Button>
+                  </div>
+
+                  {otimizadorBuscou && resultadoOtimizador.length === 0 && (
+                    <p className={styles.avisoCestaMista}>
+                      Nenhuma cesta do estoque atual (considerando o filtro de segmento ativo)
+                      atende esse objetivo e essas restrições — ajuste os critérios.
+                    </p>
+                  )}
+
+                  {resultadoOtimizador.length > 0 && (
+                    <>
+                      <p className={styles.avisoTir}>
+                        Sugestão calculada pelo motor (TIR). Revise antes de enviar.
+                      </p>
+                      <div className={styles.sugestaoGrid}>
+                        {resultadoOtimizador.map((cand, i) => (
+                          <div key={i} className={styles.sugestaoCard}>
+                            <div className={styles.sugestaoTitulo}>Opção {i + 1}</div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>Líquido</span>
+                              <strong>{brl(cand.liquido)}</strong>
+                            </div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>Entrada</span>
+                              <strong>{brl(cand.entrada)}</strong>
+                            </div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>TIR a.m.</span>
+                              <strong>{tirParaTexto(cand.tir)}</strong>
+                            </div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>Parcela mês 1</span>
+                              <strong>{brl(cand.parcelaMes1)}</strong>
+                            </div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>Prazo máx.</span>
+                              <strong>{cand.prazoMax}x</strong>
+                            </div>
+                            <div className={styles.sugestaoLinha}>
+                              <span>Nº cartas</span>
+                              <strong>{cand.nCartas}</strong>
+                            </div>
+                            <ul className={styles.sugestaoLista}>
+                              {cand.cotas.map((c) => (
+                                <li key={c.id}>
+                                  <Badge tone={c.tipo === "imovel" ? "info" : "amber"}>
+                                    {LABEL_TIPO_BEM[c.tipo]}
+                                  </Badge>{" "}
+                                  {c.ref}
+                                </li>
+                              ))}
+                            </ul>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => aplicarSugestaoOtimizador(cand)}
+                            >
+                              Aplicar esta cesta
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <h2 className={styles.secaoTitulo}>
-            Cesta — {administradoraAtual?.nome} ({cesta.length}{" "}
+            Cesta — {prefixoSegmento}
+            {administradoraAtual?.nome} ({cesta.length}{" "}
             {cesta.length === 1 ? "carta" : "cartas"})
           </h2>
+
+          {mostrarAvisoCestaMista && (
+            <p className={styles.avisoCestaMista}>
+              Cesta com imóvel e veículo: para aquisição de um único bem, a junção usa cartas do
+              mesmo segmento. Confirme o objetivo do cliente.
+            </p>
+          )}
+
+          <ul className={styles.cestaListaResumo}>
+            {cesta.map((c) => (
+              <li key={c.id} className={styles.cestaListaItem}>
+                <Badge tone={c.tipo === "imovel" ? "info" : "amber"}>
+                  {LABEL_TIPO_BEM[c.tipo]}
+                </Badge>
+                <span>
+                  {administradoraAtual?.nome} · {c.ref} — crédito {brl(c.credito)} · {c.prazo}x{" "}
+                  {brl(c.parcela)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
           <div className={styles.statGrid}>
             <div className={styles.statCard}>
               <div className={styles.statLabel}>Poder de compra</div>

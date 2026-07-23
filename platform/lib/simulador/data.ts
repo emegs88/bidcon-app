@@ -71,6 +71,7 @@ type LinhaCarta = {
   valor_parcela: number | null;
   bidcon_custo_am: number | null;
   fonte: string | null;
+  tipo: string | null;
 };
 
 type LinhaReserva = { carta_id: string | null };
@@ -108,7 +109,7 @@ export async function listarCotasDisponiveis(
   const { data: cartasData, error: erroCartas } = await supabase
     .from("cartas")
     .select(
-      "id, numero_externo, administradora_id, valor_credito, valor_entrada, qtd_parcelas, valor_parcela, bidcon_custo_am, fonte",
+      "id, numero_externo, administradora_id, valor_credito, valor_entrada, qtd_parcelas, valor_parcela, bidcon_custo_am, fonte, tipo",
     )
     .eq("administradora_id", administradoraId)
     .eq("status", "disponivel")
@@ -144,5 +145,10 @@ export async function listarCotasDisponiveis(
       parcela: c.valor_parcela ?? 0,
       custoAmEstoque: c.bidcon_custo_am,
       exclusiva: c.fonte === "cliente_direto",
+      // Defesa contra valor inesperado no enum de origem (xtv): trata
+      // qualquer coisa != "veiculo" como "imovel" em vez de quebrar a UI —
+      // não deve ocorrer na prática (coluna é enum no banco), mas o shape
+      // TS de CotaSim não é opcional aqui.
+      tipo: c.tipo === "veiculo" ? "veiculo" : "imovel",
     }));
 }
