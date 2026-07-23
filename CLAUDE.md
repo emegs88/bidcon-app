@@ -58,8 +58,15 @@ correto DESSE projeto E o histórico remoto do próprio projeto
 (`list_migrations`) pra derivar o próximo número. Nunca derivar numeração
 da pasta do projeto irmão.
 
-Próxima migration nnv = **0065** (gap 0022→0063 documentado nos
-cabeçalhos dos arquivos 0063/0064 — ver `migrations-nnv/`).
+Ordem obrigatória do apply: (1) escrever o arquivo em `migrations-nnv/`
+(nnv) ou `migrations/` (xtv); (2) aplicar lendo DESSE arquivo; (3) advisor.
+Nunca aplicar SQL que existe só no chat. Migration aplicada sem arquivo
+local: recuperar o SQL VERBATIM de `supabase_migrations.schema_migrations`
+— nunca reconstruir de memória/functiondef.
+
+Próxima: derivar de `list_migrations` + pasta no momento (referência: 0068
+aplicada → próxima = 0069; gap 0022→0063 documentado nos cabeçalhos dos
+arquivos 0063/0064 — ver `migrations-nnv/`).
 
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
