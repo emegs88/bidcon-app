@@ -64,8 +64,9 @@ Nunca aplicar SQL que existe só no chat. Migration aplicada sem arquivo
 local: recuperar o SQL VERBATIM de `supabase_migrations.schema_migrations`
 — nunca reconstruir de memória/functiondef.
 
-Próxima migration nnv = **0065** (gap 0022→0063 documentado nos
-cabeçalhos dos arquivos 0063/0064 — ver `migrations-nnv/`).
+Próxima: derivar de `list_migrations` + pasta no momento (referência: 0068
+aplicada → próxima = 0069; gap 0022→0063 documentado nos cabeçalhos dos
+arquivos 0063/0064 — ver `migrations-nnv/`).
 
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full

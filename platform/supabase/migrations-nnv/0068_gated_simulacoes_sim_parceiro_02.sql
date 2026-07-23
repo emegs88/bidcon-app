@@ -1,7 +1,22 @@
 -- ============================================================================
+-- POSTSCRIPT (23/07) — LER ANTES DO CABEÇALHO ABAIXO:
+-- STATUS 23/07: APLICADA em produção com AUTORIZO nominal (22/07 23:35 UTC,
+-- version 20260722233505 em supabase_migrations.schema_migrations — conferido
+-- verbatim contra o corpo deste arquivo, idêntico). O cabeçalho "GATED,
+-- ARQUIVO-ONLY" logo abaixo é HISTÓRICO DO DESENHO (texto de antes do apply,
+-- mantido intacto por rastreabilidade) — não reflete mais o estado atual.
+-- Condições pré-apply que o próprio cabeçalho abaixo listava como pendentes
+-- (trigger de imutabilidade dedicado pra cesta/resultado + revisão do grant
+-- anon/PII em cliente_nome/cliente_whatsapp) NÃO foram satisfeitas antes do
+-- apply — endereçadas na 0069_hardening_simulacoes, que é PRÉ-CONDIÇÃO da
+-- fatia SIM-PARCEIRO-02 (ver corpo do PR fatia/sim-parceiro-01).
+-- ============================================================================
+
+-- ============================================================================
 -- Bidcon Reserve — 0068 (GATED, ARQUIVO-ONLY): sub-fatia SIM-PARCEIRO-02
 -- (persistência + link compartilhável do demonstrativo do simulador).
 -- ----------------------------------------------------------------------------
+-- [HISTÓRICO — texto original de antes do apply, ver POSTSCRIPT acima]
 -- NÃO EXECUTAR VIA apply_migration sem AUTORIZO nominal e digitado do Emerson
 -- pra esta fatia especificamente. Este arquivo existe SÓ pra deixar o design
 -- proposto revisável em diff — zero escrita em banco, zero aplicação, zero
