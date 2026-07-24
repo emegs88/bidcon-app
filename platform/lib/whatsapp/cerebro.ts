@@ -3,8 +3,13 @@
 // ----------------------------------------------------------------------------
 // REAPROVEITA de verdade (import, não cópia) as peças já provadas em
 // produção pelo /api/atende (site): persona/system prompt (montarSystem,
-// AGENTES) e compliance de léxico (sanitizarCompliance) de ./_prompt e
-// ./ia — mesmo cérebro, canal diferente, exatamente como pedido.
+// AGENTES) de ./_prompt — mesmo cérebro, canal diferente, exatamente como
+// pedido. Compliance de léxico: o WhatsApp usa avaliarComplianceGradual
+// (lib/ia.ts), que reaproveita as MESMAS peças internas corrigidas de
+// detecção (termoViolado/prometeDataContemplacao) da sanitizarCompliance()
+// usada pelo site — só a AÇÃO sobre o resultado é diferente por canal (ver
+// FATIA 2 · SEGURANCA-01 · F3.1, barreira de compliance no fim de
+// gerarRespostaWhatsApp).
 //
 // O que É reimplementado aqui (mecânico, não copiado de atende/route.ts —
 // aquele arquivo é produção crítica do site e não é tocado por esta fatia):
@@ -44,7 +49,7 @@
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { sanitizarCompliance } from "@/lib/ia";
+import { avaliarComplianceGradual } from "@/lib/ia";
 import {
   montarSystem,
   MARCADOR_BASTAO,
@@ -71,10 +76,48 @@ import {
   type SalvarLeadInput,
 } from "@/lib/venda-nova/salvar-lead-tool";
 import { statusVenda, resultadoParaToolStatusVenda } from "@/lib/venda-nova/status-venda-tool";
+import { enviarEmail } from "@/lib/mail";
 
-const FALLBACK_WA =
+// FATIA 2 (SEGURANCA-01 · F3.1 — Guardrail Prosperito v2), ITEM 2/3: o antigo
+// FALLBACK_WA (frase única) virou um pool de variantes — o Nível 3 da ação
+// gradual (ver avaliarComplianceGradual em lib/ia.ts) roda em rotação
+// (índice = qtd. de fallbacks recentes na mesma conversa) pra nunca repetir
+// literalmente a mesma frase em loop, que era o próprio sintoma do bug de
+// produção de 2026-07-23 (fallback genérico repetido em rajada).
+export const FALLBACK_VARIANTES_WA = [
   "Posso te ajudar a entender como funciona o processo e os próximos passos. " +
-  "Se preferir, nossa equipe continua com você por aqui mesmo. Como posso ajudar?";
+    "Se preferir, nossa equipe continua com você por aqui mesmo. Como posso ajudar?",
+  "Deixa eu confirmar essa informação com cuidado antes de te responder, pra não " +
+    "te passar nada incorreto — nossa equipe já vai continuar essa conversa com " +
+    "você por aqui mesmo. Pode me contar de novo o que você precisa?",
+  "Essa é uma pergunta que prefiro confirmar com nossa equipe, pra te dar uma " +
+    "resposta certa. Posso já sinalizar pra alguém falar com você por aqui?",
+];
+
+// Nível 3 puro (sem I/O): escolhe a variante de fallback por rotação, pra
+// nunca repetir literalmente a mesma frase na mesma conversa em rajada —
+// extraído em função própria (exportada) só pra ser testável isoladamente
+// sem precisar mockar Supabase/Anthropic (ver cerebro.test.ts, ITEM
+// "suíte de testes DoD" da FATIA 2). Zero mudança de comportamento: mesma
+// expressão que já rodava inline.
+export function escolherFallbackWa(qtdFallbacksRecentes: number): string {
+  return FALLBACK_VARIANTES_WA[qtdFallbacksRecentes % FALLBACK_VARIANTES_WA.length];
+}
+
+// ITEM 3 (anti-loop): janela deslizante, em minutos, usada tanto pra contar
+// fallbacks recentes na mesma conversa quanto no texto do alerta ao admin.
+const ANTI_LOOP_JANELA_MIN = 15;
+
+// ITEM 3 (anti-loop) — decisão pura (sem I/O): dado quantos Nível 3 essa
+// conversa já teve na janela de ANTI_LOOP_JANELA_MIN minutos (ANTES deste
+// que está sendo enviado agora), decide se este disparo (o +1 de agora)
+// já é o 2º (ou mais) da janela — e portanto deve escalar pra humano.
+// Extraída em função própria (exportada) pelo mesmo motivo de
+// escolherFallbackWa acima: testável sem mockar banco. Zero mudança de
+// comportamento: mesma expressão que já rodava inline.
+export function deveEscalarAntiLoop(qtdFallbacksRecentesAntes: number): boolean {
+  return qtdFallbacksRecentesAntes + 1 >= 2;
+}
 
 const FRASE_RESERVA_WA =
   "Entendido! Pra travar essa carta com segurança, vou te conectar agora com " +
@@ -211,6 +254,158 @@ export type ResultadoCerebro = {
   tokensOut: number | null;
   escalarHumano: boolean;
 };
+
+// ----------------------------------------------------------------------------
+// FATIA 2 (SEGURANCA-01 · F3.1 — Guardrail Prosperito v2), ITEM 4 (log
+// persistente) — insert fire-and-forget em wa_guardrail_log (tabela já
+// existe no projeto xtv, zero migration nesta fatia — ver checkpoint).
+// `motivo` segue o formato "regra[,regra2,...]|acao" pedido (ex.:
+// "promessa_prazo|removido", "lexico:CDI|regenerado", "anti_loop|
+// escalado_humano"). Falha no log NUNCA bloqueia o envio da resposta —
+// por isso o try/catch engole qualquer erro e só loga um warning.
+async function logGuardrail(
+  db: ReturnType<typeof createXtvClient>,
+  conversaId: string,
+  motivos: string[],
+  acao: "removido" | "regenerado" | "fallback_n3" | "escalado_humano",
+  conteudoBloqueado: string
+): Promise<void> {
+  try {
+    await db.from("wa_guardrail_log").insert({
+      conversa_id: conversaId,
+      motivo: `${motivos.join(",")}|${acao}`,
+      conteudo_bloqueado: conteudoBloqueado.slice(0, 4000),
+    });
+  } catch (e) {
+    console.error("[cerebro][guardrail] falha ao gravar log (não bloqueia envio):", e);
+  }
+}
+
+// ITEM 3 (anti-loop) — reaproveita wa_guardrail_log como o próprio contador:
+// nenhuma tabela nova. Conta quantas vezes ESTA conversa já caiu no Nível 3
+// (fallback) nos últimos ANTI_LOOP_JANELA_MIN minutos. Falha de leitura
+// devolve 0 (modo mais conservador: não dispara escalonamento por engano
+// só porque a consulta falhou).
+async function contarFallbacksRecentes(
+  db: ReturnType<typeof createXtvClient>,
+  conversaId: string
+): Promise<number> {
+  try {
+    const limiteIso = new Date(Date.now() - ANTI_LOOP_JANELA_MIN * 60_000).toISOString();
+    const { count } = await db
+      .from("wa_guardrail_log")
+      .select("id", { count: "exact", head: true })
+      .eq("conversa_id", conversaId)
+      .like("motivo", "%|fallback_n3")
+      .gte("criado_em", limiteIso);
+    return count ?? 0;
+  } catch (e) {
+    console.error("[cerebro][guardrail] falha ao contar fallbacks recentes:", e);
+    return 0;
+  }
+}
+
+// ITEM 3 (anti-loop) — alerta ao admin. GAP DE INFRAESTRUTURA (documentado
+// no checkpoint pro Emerson): não existe hoje canal de WhatsApp pra avisar
+// o admin — sendText/sendTemplate (./graph.ts) exigem uma wa_conversas já
+// existente pro NÚMERO DO CLIENTE, e não há env var de telefone-admin nem
+// template aprovado pela Meta pra isso. Reaproveita enviarEmail (lib/mail.ts,
+// já usada por hooks/novo-cadastro) pra process.env.MAIL_ADMIN. Falha
+// "suave": se MAIL_ADMIN não estiver configurada, só loga um warning — o
+// escalonamento pra humano (status='humano') acontece de qualquer forma,
+// só o AVISO extra por e-mail é que fica pendente até a env existir.
+async function alertarAdminAntiLoop(
+  telefone: string,
+  hist: MensagemHist[] | null
+): Promise<void> {
+  const destino = process.env.MAIL_ADMIN;
+  if (!destino) {
+    console.warn("[cerebro][guardrail] MAIL_ADMIN ausente — alerta anti-loop não enviado.");
+    return;
+  }
+  const ultimaPergunta =
+    [...(hist ?? [])].reverse().find((m) => m.papel === "cliente")?.conteudo ??
+    "(não encontrada)";
+  await enviarEmail({
+    to: destino,
+    subject: `[Bidcon][WhatsApp] Guardrail: 2 fallbacks em ${ANTI_LOOP_JANELA_MIN}min — ${telefone}`,
+    text:
+      "Conversa do WhatsApp entrou no modo de escalonamento humano (ITEM 3, F3.1 — " +
+      "guardrail de compliance disparou 2x em pouco tempo).\n\n" +
+      `Telefone: ${telefone}\n` +
+      `Última pergunta do cliente: ${ultimaPergunta}\n\n` +
+      "O bot foi silenciado nesta conversa (wa_conversas.status='humano') — um " +
+      "humano precisa assumir.",
+  });
+}
+
+// ITEM 2 (ação gradual), Nível 2 — UMA tentativa extra de regeneração,
+// reaproveitando o mesmo endpoint/modelo/timeout já usado no loop principal
+// (ver gerarRespostaWhatsApp). Injeta uma nota de compliance reforçada no
+// system e anexa a resposta anterior + uma instrução de reescrita como mais
+// um turno da conversa — SEM `tools`, pra forçar o modelo a fechar em texto
+// nesta única rodada extra (nunca outro tool_use). Devolve o texto
+// reescrito, ou null em qualquer falha (rede, timeout, HTTP não-ok, texto
+// vazio) — o chamador trata null exatamente como "regeneração não ajudou" e
+// cai pro Nível 3.
+async function tentarRegenerarCompliance(
+  apiKey: string,
+  systemBase: string,
+  apiMensagensBase: Array<{ role: "user" | "assistant"; content: unknown }>,
+  respostaAnterior: string,
+  motivos: string[],
+  timeoutMs: number
+): Promise<string | null> {
+  const systemReforcado =
+    systemBase +
+    "\n\n[REFORÇO DE COMPLIANCE — INTERNO, NÃO MENCIONE ISSO AO CLIENTE]\n" +
+    "Sua última resposta violou regras de compliance de consórcio e foi descartada " +
+    `(motivo: ${motivos.join(", ")}). Consórcio NÃO é aplicação financeira: nunca prometa ` +
+    "retorno, rentabilidade, lucro ou CDI, e nunca prometa data/prazo/garantia de " +
+    "contemplação (contemplação depende de sorteio ou lance, sem data previsível). " +
+    "Reescreva a resposta cobrindo a mesma intenção do cliente, sem nenhum desses " +
+    "termos/promessas.";
+
+  const mensagens = [
+    ...apiMensagensBase,
+    { role: "assistant" as const, content: respostaAnterior },
+    {
+      role: "user" as const,
+      content:
+        "Essa resposta não pode ser enviada por violar compliance. Reescreva sem os " +
+        "termos proibidos e sem prometer data/garantia de contemplação, mantendo a " +
+        "mesma intenção.",
+    },
+  ];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-fable-5",
+        max_tokens: 1024,
+        system: systemReforcado,
+        messages: mensagens,
+      }),
+      signal: controller.signal,
+    });
+    if (!resp.ok) return null;
+    const data: unknown = await resp.json();
+    const texto = extrairTexto((data as { content?: unknown }).content).trim();
+    return texto || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Gera a resposta do Time Prosperito pra uma conversa de WhatsApp: monta
  *  histórico + system prompt (persona ativa + estoque real), chama a
@@ -414,8 +609,59 @@ export async function gerarRespostaWhatsApp(
   // Marcador de UI (site-only) -> texto puro pro WhatsApp.
   limpo = converterOpcoesParaTexto(limpo);
 
-  // Barreira de compliance (fallback neutro obrigatório).
-  limpo = sanitizarCompliance(limpo, FALLBACK_WA);
+  // ------------------------------------------------------------------------
+  // Barreira de compliance — FATIA 2 (SEGURANCA-01 · F3.1), ITENS 2+3+4.
+  // Nível 0: passa limpo, sem log. Nível 1: frase(s) ofensora(s) removida(s),
+  // resto (se ainda útil) é enviado — loga "removido". Nível 2: nada sobrou
+  // (ou a ofensa toma o texto todo) — tenta UMA regeneração com nota de
+  // compliance reforçada; se vier limpa, usa e loga "regenerado"; senão cai
+  // pro Nível 3 (fallback variado — nunca repete a mesma frase, ao contrário
+  // do bug de produção original) e loga "fallback_n3". Anti-loop: conta
+  // quantos Nível 3 esta MESMA conversa já teve em ANTI_LOOP_JANELA_MIN
+  // minutos (via wa_guardrail_log, sem tabela nova); na 2ª ocorrência,
+  // escala pra humano (reaproveita o mesmo `escalarHumano` que
+  // processar-background.ts já usa pra setar wa_conversas.status='humano' —
+  // nenhuma escrita de status duplicada aqui) e avisa o admin por e-mail.
+  const candidatoOriginal = limpo; // intacto, antes da barreira — vai pro log
+  const avaliacao = avaliarComplianceGradual(limpo);
+
+  if (avaliacao.nivel === 0) {
+    limpo = avaliacao.texto;
+  } else if (avaliacao.nivel === 1) {
+    limpo = avaliacao.texto;
+    await logGuardrail(db, conversaId, avaliacao.motivos, "removido", candidatoOriginal);
+  } else {
+    let textoFinal: string | null = null;
+    const regenerado = await tentarRegenerarCompliance(
+      apiKey,
+      system,
+      apiMensagens,
+      candidatoOriginal,
+      avaliacao.motivos,
+      TIMEOUT_ANTHROPIC_MS
+    );
+    if (regenerado) {
+      const reavaliacao = avaliarComplianceGradual(regenerado);
+      if (reavaliacao.nivel !== 2 && reavaliacao.texto.trim()) {
+        textoFinal = reavaliacao.texto;
+      }
+    }
+
+    if (textoFinal) {
+      limpo = textoFinal;
+      await logGuardrail(db, conversaId, avaliacao.motivos, "regenerado", candidatoOriginal);
+    } else {
+      const qtdRecentes = await contarFallbacksRecentes(db, conversaId);
+      limpo = escolherFallbackWa(qtdRecentes);
+      await logGuardrail(db, conversaId, avaliacao.motivos, "fallback_n3", candidatoOriginal);
+
+      if (deveEscalarAntiLoop(qtdRecentes)) {
+        escalarHumano = true;
+        await logGuardrail(db, conversaId, ["anti_loop"], "escalado_humano", candidatoOriginal);
+        await alertarAdminAntiLoop(telefone, hist as MensagemHist[] | null);
+      }
+    }
+  }
 
   return {
     texto: limpo,

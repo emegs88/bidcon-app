@@ -78,7 +78,11 @@ const TERMOS_PROIBIDOS = [
   // régua regulatória de consórcio
   "investimento",
   "investidor",
+  "investidora",
+  "investidores",
+  "investidoras",
   "rendimento",
+  "rentabilidade",
   "garantido",
   "garantida",
   "desconto",
@@ -86,8 +90,6 @@ const TERMOS_PROIBIDOS = [
   "aprovação de crédito",
   "limite de credito",
   "limite de crédito",
-  "contemplacao garantida",
-  "contemplação garantida",
   // mecânica interna (sigilo) — nunca verbalizar ao cliente
   "ccb",
   "fidc",
@@ -99,12 +101,17 @@ const TERMOS_PROIBIDOS = [
   "cédula de crédito bancário",
   "estrutura de aquisicao",
   "estrutura de aquisição",
-  // FATIA 1 (venda nova) — o COMPLIANCE de _prompt.ts já promete bloquear
-  // estes termos; a régua real (esta lista) não os continha. Consórcio não
-  // é aplicação financeira: nunca prometer retorno/rentabilidade.
-  "retorno",
+  // FATIA 1 (venda nova) / FATIA 2 (F3.1 — Guardrail Prosperito v2): consórcio
+  // não é aplicação financeira — nunca prometer retorno/rentabilidade/lucro.
+  // "retorno" SOZINHO NÃO entra aqui de propósito (bloquearia "Aguardo seu
+  // retorno", um uso institucional legítimo e frequente); a forma composta
+  // ("retorno financeiro/garantido/sobre/de X%") é pega por
+  // RETORNO_FINANCEIRO_RE dentro de termoViolado, não por esta lista.
   "cdi",
   "lucro",
+  "lucrar",
+  "lucratividade",
+  "taxa interna de retorno",
 ];
 
 const NEGACOES = ["nao ", "não ", "sem ", "nunca "];
@@ -113,11 +120,35 @@ function semAcento(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// (A) true se há termo proibido em LIMITE DE PALAVRA e NÃO negado.
-//     A fronteira de palavra evita que siglas curtas (ccb/fidc) casem dentro de
-//     outra palavra (ex.: "fundinG" em "profundamente" não dispara).
-function violaTermo(base: string): boolean {
-  return TERMOS_PROIBIDOS.some((termoRaw) => {
+// "retorno" sozinho é institucional e legítimo ("Aguardo seu retorno") — só a
+// forma COMPOSTA (financeiro/garantido/percentual/"sobre" + complemento
+// FINANCEIRO explícito) é violação. Fora do mecanismo de lista de
+// TERMOS_PROIBIDOS porque a cauda é uma alternação, não uma frase fixa.
+//
+// FATIA 2 · SEGURANCA-01 · F3.1-b (ajuste Emerson): a versão anterior
+// (`/\bretorno (financeiro|sobre|garantido|de \d)/`) casava QUALQUER "retorno
+// sobre X" — inclusive uso institucional legítimo ("aguardo seu retorno
+// sobre a proposta"). Agora "retorno sobre" só viola quando o complemento é
+// explicitamente financeiro (investimento/capital/aplicação/patrimônio);
+// "retorno sobre o investimento" continua bloqueado — e tem rede dupla,
+// porque "investimento" já está em TERMOS_PROIBIDOS por conta própria.
+//
+// FATIA 2 · SEGURANCA-01 · F3.1-c (ajuste Emerson, nit): flag /i acrescentada
+// — o pipeline atual sempre chama isto sobre `base` já em lowercase (via
+// semAcento(texto.toLowerCase())), então na prática não muda nenhum teste
+// existente, mas deixa a constante robusta por conta própria para qualquer
+// chamador futuro que não normalize antes.
+const RETORNO_FINANCEIRO_RE =
+  /\bretorno\s+(financeiro|garantido|de\s+\d|sobre\s+(o\s+)?(investimento|capital|aplica\w+|patrim[ôo]nio))\b/i;
+
+// (A) devolve o termo proibido casado (em LIMITE DE PALAVRA e NÃO negado), ou
+//     null se a frase estiver limpa nesta frente. A fronteira de palavra evita
+//     que siglas curtas (ccb/fidc) casem dentro de outra palavra (ex.:
+//     "fundinG" em "profundamente" não dispara). Devolver QUAL termo casou
+//     (em vez de só true/false) é o que permite o log granular do ITEM 4
+//     (`motivo = "lexico:CDI"` etc.) sem duplicar a varredura.
+function termoViolado(base: string): string | null {
+  for (const termoRaw of TERMOS_PROIBIDOS) {
     const termo = semAcento(termoRaw.toLowerCase());
     let idx = base.indexOf(termo);
     while (idx !== -1) {
@@ -127,69 +158,132 @@ function violaTermo(base: string): boolean {
       if (fronteira) {
         const antes = base.slice(Math.max(0, idx - 8), idx);
         const negado = NEGACOES.some((n) => antes.includes(semAcento(n)));
-        if (!negado) return true; // ocorrência não-negada em fronteira → viola
+        if (!negado) return termoRaw; // ocorrência não-negada em fronteira → viola
       }
       idx = base.indexOf(termo, idx + termo.length);
     }
-    return false;
+  }
+  if (RETORNO_FINANCEIRO_RE.test(base)) return "retorno (financeiro/garantido)";
+  return null;
+}
+
+// true se há termo proibido em LIMITE DE PALAVRA e NÃO negado. Mantido como
+// wrapper booleano de termoViolado — assinatura/nome preservados porque
+// violaCompliance/sanitizarCompliance (chamadas pelo site) dependem dele.
+function violaTermo(base: string): boolean {
+  return termoViolado(base) !== null;
+}
+
+// (B) Promessa de DATA/PRAZO/GARANTIA de contemplação — matcher F3.1 (FATIA 2
+//     · SEGURANCA-01, ver checkpoint). Substitui a antiga estratégia genérica
+//     de "âncora + janela de 40 chars com lista de palavras temporais soltas"
+//     (causa raiz confirmada do falso-positivo de produção 2026-07-23: a
+//     janela genérica casava "contemplada" só por proximidade de caractere
+//     com qualquer palavra temporal, sem checar se havia de fato um VERBO de
+//     futuro/prazo/garantia). Os 5 padrões abaixo só casam a PROMESSA real —
+//     "carta já contemplada"/"cota contemplada"/"foi contemplada por
+//     sorteio" (ESTADO do produto, sem futuro/prazo/garantia por perto) NUNCA
+//     casam aqui por construção, sem precisar de allowlist em runtime.
+const PROMESSA_PRAZO_PATTERNS: RegExp[] = [
+  /\bsera contemplad[oa]?\b/, // "você SERÁ contemplado"
+  /\bvai contemplar\b/, // "isso VAI CONTEMPLAR você"
+  /\bcontemplacao (garantida|rapida|certa|imediata)\b/, // "contemplação GARANTIDA/RÁPIDA/..."
+  /\bcontempla(cao|do|da)?\s+em\s+(ate\s+)?\d+\s*(dias?|meses|semanas?)\b/, // "contemplado EM até 3 MESES"
+  /\bgarant\w*[\s\S]{0,20}contempl\w*/, // "GARANTIMOS ... CONTEMPLAção" (qualquer ordem/distância curta)
+];
+
+// Negações que LIBERAM a promessa ("não há data", "sem prazo de contemplação",
+// "ninguém pode garantir que você será contemplado em X meses").
+const NEGA_PROMESSA = [
+  "nao prom", "sem prom", "nunca prom", "nao garant", "sem garant",
+  "nao prevemos", "nao ha data", "sem data", "nao tem data", "nao pode garantir",
+  "ninguem pode",
+];
+
+// FATIA 2 · SEGURANCA-01 · F3.1-b (ajuste Emerson) — negação de GARANTIA
+// "colada" no verbo (sem material entre a negação e o verbo de garantir).
+// Existe porque o padrão 5 de PROMESSA_PRAZO_PATTERNS
+// (/\bgarant\w*[\s\S]{0,20}contempl\w*/) começa o match exatamente em
+// "garant" — a janela "antes" (20 chars) do laço abaixo NUNCA pode conter a
+// negação nesses casos, pois o match já consumiu esses caracteres. Avaliada
+// ANTES do loop de PROMESSA_PRAZO_PATTERNS: se casar, pula SÓ a checagem de
+// promessa para esta base/frase (o léxico proibido, em termoViolado, não é
+// afetado — continua valendo normalmente).
+//
+// A negação é colada de propósito: "não SE PREOCUPE, garantimos contemplação
+// em 3 meses" tem material entre "não" e "garantimos" → NÃO casa aqui → a
+// promessa continua sendo bloqueada normalmente pelo loop abaixo. O guardrail
+// protege a SAÍDA do modelo, não tenta blindar contra todo input adversarial
+// de usuário — se um cliente escrever frases separadas testando o limite, a
+// frase com a promessa real ainda bloqueia normalmente (ver teste "aceito"
+// em ia.guardrail.test.ts).
+// NOTA: `base` sempre chega aqui já passado por semAcento() — por isso o
+// trecho "é possível" da regra original (com "é" acentuado) é normalizado
+// para "e" aqui embaixo (senão nunca casaria contra "e possivel", já que a
+// base nunca tem acento). Semântica preservada, só a codificação ajustada
+// pra bater com o pipeline de normalização já existente no arquivo.
+const NEGACAO_SEGURA_RE =
+  /\b(n[ãa]o\s+(garantimos|garante|garanto|garantem|posso\s+garantir|podemos\s+garantir|e\s+poss[íi]vel\s+garantir|h[áa]\s+como\s+garantir|d[áa]\s+para\s+garantir)|ningu[ée]m\s+(pode|consegue)\s+garantir|imposs[íi]vel\s+garantir|sem\s+garantia\s+de)\b/i;
+
+// FATIA 2 · SEGURANCA-01 · F3.1-c (ajuste Emerson) — conjunções adversativas
+// que delimitam CLÁUSULAS dentro de uma frase. Existem porque NEGACAO_SEGURA_RE
+// aplicada à frase INTEIRA isentava indevidamente uma promessa real que
+// aparecesse numa cláusula seguinte ligada por "mas/porém/...": "não
+// garantimos datas, MAS você será contemplado em 3 meses" tinha a negação da
+// primeira cláusula isentando por engano a promessa real da segunda. Agora
+// cada cláusula é avaliada de forma independente (ver dividirEmClausulas e
+// prometeDataContemplacao abaixo).
+const ADVERSATIVAS_RE =
+  /\b(mas|por[ée]m|contudo|entretanto|no entanto|s[óo]\s+que|todavia)\b/;
+
+// Divide uma FRASE em cláusulas nas conjunções adversativas acima. Como
+// ADVERSATIVAS_RE tem um único grupo de captura, `.split()` intercala os
+// delimitadores casados nos índices ÍMPARES do array resultante — por isso
+// mantemos só os índices PARES (o texto de cada lado do conectivo).
+function dividirEmClausulas(frase: string): string[] {
+  return frase
+    .split(ADVERSATIVAS_RE)
+    .filter((_, i) => i % 2 === 0)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+// Núcleo da checagem de promessa/garantia, aplicado a um TRECHO já isolado
+// (uma cláusula). Extraído de prometeDataContemplacao para ser chamado por
+// cláusula, em vez de uma única vez sobre o texto inteiro.
+function trechoPrometeContemplacao(trecho: string): boolean {
+  if (NEGACAO_SEGURA_RE.test(trecho)) return false;
+  return PROMESSA_PRAZO_PATTERNS.some((re) => {
+    const m = re.exec(trecho);
+    if (!m) return false;
+    const antes = trecho.slice(Math.max(0, m.index - 20), m.index);
+    const negado = NEGA_PROMESSA.some((n) => antes.includes(semAcento(n)));
+    return !negado;
   });
 }
 
-// (B) Promessa de DATA/PRAZO de contemplação. Estratégia: achar uma ÂNCORA de
-//     contemplação e checar se há um token TEMPORAL numa janela curta DEPOIS dela
-//     ("contemplado EM março"). Exigir a âncora controla o falso-positivo: um
-//     calendário factual de OUTRO sujeito (assembleia/parcela/sorteio em tal data)
-//     não tem âncora de contemplação na janela e, portanto, não dispara.
-const CONTEMPLA_ANCORAS = [
-  "contempl", // contemplado/contemplada/contempla/contemplação/contemplar
-  "ser contempl",
-  "vai ser contempl",
-  "sera contempl",
-  "saida da carta", // gíria "quando a carta sai"
-];
-
-const TEMPORAIS = [
-  // meses
-  "janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto",
-  "setembro", "outubro", "novembro", "dezembro",
-  // relativos
-  "ano que vem", "mes que vem", "semana que vem", "proximo mes", "proximos meses",
-  "ate dezembro", "ate o fim do ano", "no fim do ano", "ainda este ano", "este ano",
-  // prazos por extenso
-  "dias", "dia ", "semanas", "meses", "mes ", "ano ", "anos",
-  // ordinais usados como prazo de contemplação
-  "1o mes", "2o mes", "3o mes", "primeiro mes", "segundo mes", "terceiro mes",
-];
-
-// Negações que LIBERAM a promessa ("não há data", "sem prazo de contemplação").
-const NEGA_PROMESSA = [
-  "nao prom", "sem prom", "nunca prom", "nao garant", "sem garant",
-  "nao prevemos", "nao ha data", "sem data", "nao tem data",
-];
-
-const JANELA_CONTEMPLA = 40; // caracteres após a âncora de contemplação
-
-function temTemporalNaJanela(janela: string): boolean {
-  if (/\b(19|20)\d{2}\b/.test(janela)) return true; // ano com 4 dígitos
-  // "90 dias", "3 meses", "1 ano" colados à contemplação
-  if (/\b\d{1,3}\s*(dias|dia|semanas|semana|meses|mes|anos|ano)\b/.test(janela)) {
-    return true;
-  }
-  return TEMPORAIS.some((t) => janela.includes(semAcento(t)));
-}
-
+// FATIA 2 · SEGURANCA-01 · F3.1-c (ajuste Emerson) — escopo por FRASE e por
+// CLÁUSULA. Antes, NEGACAO_SEGURA_RE (e o loop de PROMESSA_PRAZO_PATTERNS)
+// eram avaliados contra `base` INTEIRO, então uma negação em qualquer canto
+// do texto podia isentar por engano uma promessa real ligada por uma
+// adversativa ("não garantimos, MAS será contemplado em 3 meses"). Agora o
+// split acontece AQUI DENTRO (não no chamador): divide `base` em frases
+// (dividirEmFrases) e cada frase em cláusulas (dividirEmClausulas), avaliando
+// cada cláusula de forma independente — basta UMA cláusula sem negação segura
+// e com promessa real para bloquear, mesmo que outra cláusula da mesma frase
+// tenha negação legítima. Fazer o split dentro da função (em vez de exigir
+// que o chamador normalize antes) garante que TODO caller ganhe a mesma
+// granularidade automaticamente: sanitizarCompliance (site) passa o texto
+// inteiro sem pré-dividir, e avaliarComplianceGradual (WhatsApp) já pré-divide
+// em frases antes de chamar esta função — nesse segundo caso, dividir uma
+// string que já é uma única frase em "frases" é idempotente (dividirEmFrases
+// devolve a própria string como único elemento quando não há mais pontuação
+// terminal para splitar), então não há dupla-divisão nem mudança de
+// comportamento no caminho que já pré-divide.
 function prometeDataContemplacao(base: string): boolean {
-  for (const ancoraRaw of CONTEMPLA_ANCORAS) {
-    const ancora = semAcento(ancoraRaw);
-    let idx = base.indexOf(ancora);
-    while (idx !== -1) {
-      const janela = base.slice(idx, idx + ancora.length + JANELA_CONTEMPLA);
-      const antes = base.slice(Math.max(0, idx - 16), idx);
-      const negado = NEGA_PROMESSA.some(
-        (n) => antes.includes(semAcento(n)) || janela.includes(semAcento(n))
-      );
-      if (!negado && temTemporalNaJanela(janela)) return true;
-      idx = base.indexOf(ancora, idx + ancora.length);
+  for (const frase of dividirEmFrases(base)) {
+    for (const clausula of dividirEmClausulas(frase)) {
+      if (trechoPrometeContemplacao(clausula)) return true;
     }
   }
   return false;
@@ -228,6 +322,80 @@ export function sanitizarCompliance(frase: string, fallback: string): string {
     return fallback;
   }
   return limpa;
+}
+
+// ----------------------------------------------------------------------------
+// avaliarComplianceGradual — FATIA 2 (SEGURANCA-01 · F3.1), ITEM 2 (ação
+// gradual). Usada SÓ pelo canal WhatsApp (lib/whatsapp/cerebro.ts) — o site
+// (app/api/atende/route.ts) continua chamando sanitizarCompliance() acima,
+// sem NENHUMA mudança de assinatura/comportamento, porque essa função já é
+// contrato público consumido por um arquivo fora do escopo desta fatia.
+//
+// Em vez de engolir a resposta inteira ao primeiro termo/promessa encontrado
+// (o que causava o loop de fallback genérico reportado em produção), esta
+// função opera por FRASE: remove só a(s) frase(s) ofensora(s) e devolve o
+// que sobrar, se ainda for útil. O chamador decide o que fazer com cada
+// nível:
+//   nivel 0 — texto limpo, nada foi removido.
+//   nivel 1 — algo foi podado mas sobrou conteúdo útil (>= 6 chars não-espaço)
+//             — envia o restante.
+//   nivel 2 — nada de útil sobrou (resposta inteira era problemática, ou já
+//             veio vazia) — o chamador deve tentar UMA regeneração (Nível 2
+//             da spec) e, falhando, cair no fallback de Nível 3.
+// `motivos` é uma entrada por frase removida, no formato esperado pelo log de
+// wa_guardrail_log (ITEM 4): "lexico:<termo>" ou "promessa_prazo".
+export type ResultadoComplianceGradual = {
+  texto: string;
+  nivel: 0 | 1 | 2;
+  motivos: string[];
+};
+
+// Divide em frases por pontuação terminal (. ! ?), preservando o separador
+// como fronteira (lookbehind) — não perde o delimitador de cada frase.
+function dividirEmFrases(texto: string): string[] {
+  return texto
+    .split(/(?<=[.!?])\s+/)
+    .map((f) => f.trim())
+    .filter(Boolean);
+}
+
+export function avaliarComplianceGradual(texto: string): ResultadoComplianceGradual {
+  const limpa = texto.trim();
+  if (!limpa) return { texto: "", nivel: 2, motivos: ["vazio"] };
+
+  const frases = dividirEmFrases(limpa);
+  const mantidas: string[] = [];
+  const motivos: string[] = [];
+
+  for (const frase of frases) {
+    const base = semAcento(frase.toLowerCase());
+    const termo = termoViolado(base);
+    if (termo) {
+      motivos.push(`lexico:${termo}`);
+      console.warn(
+        `[avaliarComplianceGradual] termo proibido (${termo}) — frase removida: ${frase.slice(0, 120)}`
+      );
+      continue;
+    }
+    if (prometeDataContemplacao(base)) {
+      motivos.push("promessa_prazo");
+      console.warn(
+        `[avaliarComplianceGradual] promessa de prazo/garantia — frase removida: ${frase.slice(0, 120)}`
+      );
+      continue;
+    }
+    mantidas.push(frase);
+  }
+
+  if (motivos.length === 0) {
+    return { texto: limpa, nivel: 0, motivos: [] };
+  }
+
+  const restante = mantidas.join(" ").trim();
+  if (mantidas.length > 0 && restante.replace(/\s/g, "").length >= 6) {
+    return { texto: restante, nivel: 1, motivos };
+  }
+  return { texto: "", nivel: 2, motivos };
 }
 
 // ----------------------------------------------------------------------------

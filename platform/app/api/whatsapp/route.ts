@@ -84,6 +84,30 @@ export const runtime = "nodejs";
 // que o plano já comprovadamente suporta (sync-cotas usa 800).
 export const maxDuration = 180;
 
+// ITEM 5 (FATIA 2 · SEGURANCA-01 · F3.1) — kill_switch_raw / WHATSAPP_AGENT_ATIVO.
+// ----------------------------------------------------------------------------
+// Confirmado como flag FUNCIONAL real (não morta): controla, sozinha, se o
+// Time Prosperito chega a responder no WhatsApp. Lida em dois pontos:
+//   - aqui (podeResponder, mais abaixo) e em processar-background.ts (mesma
+//     checagem repetida antes de enviar o resumo do extrato) — ambos com
+//     `=== "true"` (comparação estrita de string; QUALQUER outro valor,
+//     incluindo ausente/undefined, mantém o agente CALADO — default seguro:
+//     falha fechada, não aberta).
+// Documentada em .env.example (default "false"). Não é usada em nenhum outro
+// lugar do código além desses dois pontos de leitura.
+// "kill_switch_raw" é só o NOME de uma chave dentro do log de diagnóstico
+// SONDA-DIAG (temporário, esforço F4a, ver mais abaixo no POST) — não é uma
+// flag separada, é só o valor cru (pré-comparação) desta mesma env var,
+// exposto por mensagem pra depurar o F4a. Este log abaixo é o log de BOOT
+// (module-scope, roda 1x por cold start do runtime Node) — complementar e
+// distinto do SONDA-DIAG per-mensagem, que continua existindo e não deve ser
+// removido nesta fatia (pertence à investigação F4a, ainda em aberto).
+console.log(
+  "[whatsapp/route][boot] kill-switch WHATSAPP_AGENT_ATIVO =",
+  JSON.stringify(process.env.WHATSAPP_AGENT_ATIVO ?? null),
+  "(agente responde somente quando === \"true\"; qualquer outro valor => agente mudo)"
+);
+
 // --- GET: handshake da Meta -------------------------------------------------
 export async function GET(req: Request) {
   const url = new URL(req.url);
