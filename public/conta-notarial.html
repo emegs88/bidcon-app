@@ -32,8 +32,32 @@
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap">
+<!-- Space Grotesk carregada SEM bloquear a renderização. Como <link rel=stylesheet>
+     comum, esta folha é de terceiro e trava o primeiro paint até responder — medimos
+     FCP de ~12,8 s quando fonts.googleapis.com fica inalcançável. Com media="print"
+     o navegador baixa em paralelo e só aplica no onload; o &display=swap já garante
+     que o texto apareça na fonte local e troque depois. <noscript> cobre quem não
+     executa JS. Inter e IBM Plex Mono continuam locais, em /fonts/fonts.css. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all';this.onload=null">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"></noscript>
 <link rel="stylesheet" href="/bidcon-brand.css">
+<style>
+/* Navegação global compartilhada — CSS idêntico ao das demais páginas do site.
+   Fica no <head> (e não solto dentro do <header>, como nas outras) porque
+   <style> é metadata content e não é permitido ali: html-validate acusa
+   element-permitted-content. Mesma regra, mesmo resultado visual. */
+.gnav{background:#1E2A47;border-bottom:1px solid #1E2A47;position:relative}
+.gnav-fade{position:absolute;top:0;right:0;bottom:0;width:30px;background:linear-gradient(90deg,transparent,#1E2A47 75%);pointer-events:none;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;color:#D9B36A;font-size:15px;font-weight:800}
+@media (min-width:901px){.gnav-fade{display:none}}
+.gnav-in{max-width:1120px;margin:0 auto;display:flex;gap:2px;align-items:center;padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.gnav-in::-webkit-scrollbar{display:none}
+.gnav-in a{color:#E8ECF5;text-decoration:none;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:14px 12px;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
+.gnav-in a:hover{color:#D9B36A;border-bottom-color:#D9B36A}
+.gnav-in a.on{color:#D9B36A;border-bottom-color:#D9B36A}
+.gnav-in a.gnav-cta{margin-left:auto;color:#1E2A47;background:#D9B36A;border-radius:8px;padding:9px 16px;border-bottom:none}
+.gnav-in a.gnav-cta:hover{color:#1E2A47;background:#E4C583;border-bottom:none}
+@media (max-width:640px){.gnav-in a.gnav-cta{margin-left:8px}}
+</style>
 <script>
 /* Arma a revelação no scroll ANTES do primeiro paint — e só quando há suporte
    real e o usuário não pediu movimento reduzido. Se este script não rodar, a
@@ -55,7 +79,11 @@
 :root{
   --navy:#0A0E1A; --sur:#0E1422; --sur2:#121A2B; --sur3:#162034;
   --rule:rgba(143,183,255,.11); --rule2:rgba(143,183,255,.22); --rule3:rgba(143,183,255,.34);
-  --ink:#E9EFFC; --mut:#93A1BD; --dim:#65718D;
+  --ink:#E9EFFC; --mut:#93A1BD;
+  /* --dim passou de #65718D (3.94:1, reprovado pelo axe) para #78849E, que
+     mantém a mesma matiz azul-acinzentada e atinge no mínimo 4.63:1 nos três
+     fundos usados na página — WCAG AA para texto normal. */
+  --dim:#78849E;
   --b1:#8FB7FF; --b2:#36C5F0; --b3:#1E6FE6;
   --grad:linear-gradient(100deg,#8FB7FF,#36C5F0 45%,#1E6FE6);
   --marg:#C9A227; --marg-l:#E8C766; --marg-w:rgba(201,162,39,.30); --marg-f:rgba(201,162,39,.055);
@@ -475,19 +503,6 @@ footer::before{content:"";position:absolute;top:-1px;left:0;width:180px;height:1
 </div>
 <span class="gnav-fade" aria-hidden="true">›</span>
 </nav>
-<style>
-.gnav{background:#1E2A47;border-bottom:1px solid #1E2A47;position:relative}
-.gnav-fade{position:absolute;top:0;right:0;bottom:0;width:30px;background:linear-gradient(90deg,transparent,#1E2A47 75%);pointer-events:none;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;color:#D9B36A;font-size:15px;font-weight:800}
-@media (min-width:901px){.gnav-fade{display:none}}
-.gnav-in{max-width:1120px;margin:0 auto;display:flex;gap:2px;align-items:center;padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.gnav-in::-webkit-scrollbar{display:none}
-.gnav-in a{color:#E8ECF5;text-decoration:none;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:14px 12px;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}
-.gnav-in a:hover{color:#D9B36A;border-bottom-color:#D9B36A}
-.gnav-in a.on{color:#D9B36A;border-bottom-color:#D9B36A}
-.gnav-in a.gnav-cta{margin-left:auto;color:#1E2A47;background:#D9B36A;border-radius:8px;padding:9px 16px;border-bottom:none}
-.gnav-in a.gnav-cta:hover{color:#1E2A47;background:#E4C583;border-bottom:none}
-@media (max-width:640px){.gnav-in a.gnav-cta{margin-left:8px}}
-</style>
 
   <div class="wrap top-in">
     <div class="mark" role="img" aria-label="bidcon Conta Notarial">bidco<span>n</span><small>Conta Notarial</small></div>
