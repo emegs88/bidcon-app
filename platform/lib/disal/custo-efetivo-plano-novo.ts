@@ -31,6 +31,7 @@
 // ============================================================================
 import { tirMensalMenorRaiz, anualEquivalente } from "@/lib/tir";
 import type { ChaveIndiceBcb } from "@/lib/indices-bcb";
+import { consolidarFases, totalMesesItem, type ItemCarteira } from "./carteira";
 
 export type FaseFluxo = { meses: number; valor: number };
 
@@ -158,6 +159,87 @@ export function custoEfetivoPlanoNovo(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Carteira multi-cota — MESMO modelo de fluxo acima, aplicado a N cotas.
+//
+// Não é média das TIRs individuais: média de TIR não é a TIR da carteira
+// (a taxa que zera a soma dos fluxos não é a média das taxas que zeram cada
+// fluxo). Aqui monta-se UM fluxo consolidado e resolve-se uma vez só.
+//
+// Saída (t=1..N): soma das parcelas ativas de todas as cotas em cada mês,
+//   via consolidarFases() — que já derruba a parcela em degraus quando uma
+//   cota curta termina antes das longas.
+// Entrada: cada item recebe seu crédito no SEU próprio mês de referência
+//   (24 veículo / 36 imóvel), corrigido pelo mesmo fator acumulado que o
+//   fluxoPlanoNovo aplica ao crédito de uma cota só. Duas cotas de tipos
+//   diferentes recebem em meses diferentes — é isso que a carteira mostra.
+// Sem lance: a tela Disal não tem entrada de lance (lancePct=0 no modelo de
+//   cota única também). Se um dia tiver, entra aqui pela mesma mecânica de
+//   abate de parcelas finais do fluxoPlanoNovo, não por atalho.
+// ---------------------------------------------------------------------------
+
+/** Mês de referência do recebimento da carta, por tipo de cota. Cenário
+ *  declarado, nunca promessa — mesmos valores do C_REF da página. */
+export type CenarioCarteira = { veiculo: number; imovel: number };
+
+export function fluxoCarteira(params: {
+  itens: ItemCarteira[];
+  C: CenarioCarteira;
+  comIndice?: boolean;
+  indiceAnualPct?: number;
+}): number[] {
+  const { itens, C, comIndice = false, indiceAnualPct } = params;
+  const ativos = itens.filter((i) => i.quantidade > 0 && i.fases.length > 0);
+  const fases = consolidarFases(ativos);
+  const n = totalMeses(fases);
+  if (n <= 0) return [];
+
+  const g = comIndice && indiceAnualPct != null ? indiceAnualPct / 100 : 0;
+
+  const fluxo: number[] = new Array(n + 1).fill(0); // t=0: sem desembolso na assinatura
+  for (let t = 1; t <= n; t++) {
+    const fator = g > 0 ? Math.pow(1 + g, Math.floor((t - 1) / 12)) : 1;
+    fluxo[t] = -(faseNoMes(fases, t).valor * fator);
+  }
+  for (const item of ativos) {
+    const cRef = Math.max(1, Math.min(C[item.tipo], totalMesesItem(item)));
+    const fator = g > 0 ? Math.pow(1 + g, Math.floor((cRef - 1) / 12)) : 1;
+    fluxo[cRef] += item.credito * item.quantidade * fator;
+  }
+  return fluxo;
+}
+
+/**
+ * Custo efetivo da carteira inteira. Devolve `null` em cada lado que não
+ * fecha numa taxa única — nunca um número aproximado no lugar.
+ *
+ * `indiceAnualPct`: um índice só para a carteira toda. Quem chama só deve
+ * passar valor quando TODAS as cotas seguem o mesmo índice; em carteira
+ * mista (veículo IPCA + imóvel INCC) o certo é passar null e a projeção sai
+ * como indisponível — misturar dois índices num fator único produziria um
+ * custo que não corresponde a nenhum contrato.
+ */
+export function custoEfetivoCarteira(params: {
+  itens: ItemCarteira[];
+  C: CenarioCarteira;
+  indiceAnualPct?: number | null;
+}): ResultadoCustoEfetivo {
+  const { itens, C, indiceAnualPct } = params;
+
+  const fluxoSem = fluxoCarteira({ itens, C, comIndice: false });
+  const tirSem = fluxoSem.length > 0 ? tirMensalMenorRaiz(fluxoSem) : null;
+  const semCorrecao = tirSem != null ? { mensal: tirSem, anual: anualEquivalente(tirSem) } : null;
+
+  let comIndice: ResultadoCustoEfetivo["comIndice"] = null;
+  if (indiceAnualPct != null) {
+    const fluxoCom = fluxoCarteira({ itens, C, comIndice: true, indiceAnualPct });
+    const tirCom = fluxoCom.length > 0 ? tirMensalMenorRaiz(fluxoCom) : null;
+    comIndice = tirCom != null ? { mensal: tirCom, anual: anualEquivalente(tirCom) } : null;
+  }
+
+  return { semCorrecao, comIndice };
+}
+
+// ---------------------------------------------------------------------------
 // Formatação de texto — o modelo (vendanova) cita esses textos VERBATIM,
 // nunca recompõe números/enumerações de cabeça (fix do bug de composição
 // observado em wa_mensagens id=48).
@@ -207,9 +289,14 @@ export function formatarCustoEfetivoTexto(params: {
   C: number;
   indiceNome?: string; // "INCC" | "IPCA" | "IGP-M"
   indiceAnualPct?: number | null;
+  /** Substitui a descrição do cenário — usado pela carteira multi-cota, onde
+   *  cotas de tipos diferentes recebem a carta em meses diferentes e um `C`
+   *  único mentiria. Ausente = texto de sempre, byte a byte. NUNCA usar
+   *  âncora de contemplação aqui: ver a nota do guardrail acima. */
+  cenario?: string;
 }): string {
-  const { resultado, C, indiceNome, indiceAnualPct } = params;
-  const prefixo = `custo efetivo (cenário: carta de crédito no mês ${C})`;
+  const { resultado, C, indiceNome, indiceAnualPct, cenario } = params;
+  const prefixo = `custo efetivo (cenário: ${cenario ?? `carta de crédito no mês ${C}`})`;
 
   if (resultado.semCorrecao == null) {
     return `${prefixo}: não fecha numa taxa única neste cenário`;

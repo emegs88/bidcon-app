@@ -16,14 +16,33 @@ import {
 } from "@/lib/disal/calculo";
 import {
   custoEfetivoPlanoNovo,
+  custoEfetivoCarteira,
   formatarCustoEfetivoTexto,
   chaveIndiceBcb,
   type FaseFluxo,
 } from "@/lib/disal/custo-efetivo-plano-novo";
+import {
+  resumirCarteira,
+  descreverFases,
+  QTD_MIN,
+  QTD_MAX,
+  type ItemCarteira,
+} from "@/lib/disal/carteira";
 import { SimuladorTabNav } from "../SimuladorTabNav";
 
 type Segmento = "veiculo" | "imovel";
 type Base = "100" | "75";
+
+// O item guarda TAMBÉM as fases da Base 100% além das da base escolhida.
+// Motivo: a exibição e a linha do tempo usam a base que o vendedor escolheu,
+// mas o custo efetivo continua saindo da Base 100%, como já é a convenção
+// desta tela e da tool buscar_planos. Rodar a TIR sobre parcelas de 75%
+// contra o crédito cheio produziria um custo menor do que o real — número
+// de custo errado é pior que ausência de número.
+type ItemCarteiraUI = ItemCarteira & { fasesBase100: FaseFluxo[] };
+
+// Acima deste volume a proposta deixa de ser rotina comercial.
+const COTAS_VOLUME_ALTO = 20;
 
 // Cenário de referência do mês de contemplação — mesmo default usado pela
 // tool buscar_planos (regra permanente "toda simulação termina em TIR").
@@ -68,6 +87,7 @@ export default function SimuladorDisal() {
   const [imovelIdx, setImovelIdx] = useState(0);
   const [nomeCliente, setNomeCliente] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [itens, setItens] = useState<ItemCarteiraUI[]>([]);
 
   // Índices BCB (INCC/IPCA) pro custo efetivo "com correção projetada" —
   // mesma fonte real (acumulado 12m) que a tool buscar_planos usa. Nunca
@@ -141,7 +161,157 @@ export default function SimuladorDisal() {
     indiceAnualPct: indiceAnualPctImovel,
   });
 
+  // ---------------------------------------------------------------------
+  // Carteira multi-cota
+  // ---------------------------------------------------------------------
+  // Identidade do item: tipo + código do bem + crédito + base. O MD pede
+  // "mesmo cod + base", mas o código do bem se repete entre créditos
+  // diferentes do boletim — incluir o crédito impede fundir duas cartas
+  // distintas numa linha só.
+  function itemAtual(): ItemCarteiraUI {
+    if (segmento === "veiculo") {
+      return {
+        id: `veiculo|${codAuto}|${creditoAuto}|${base}`,
+        tipo: "veiculo",
+        rotulo: `Veículo · ${fmtCredito(creditoAuto)} · ${rotuloFaixa}`,
+        cod: codAuto,
+        credito: creditoAuto,
+        quantidade: 1,
+        base,
+        prazo: faixaAuto.prazo,
+        taxa: faixaAuto.taxa,
+        indice: faixaAuto.indice,
+        fases: [{ meses: faixaAuto.prazo, valor: parcelaAuto }],
+        fasesBase100: fasesBase100Auto,
+      };
+    }
+    return {
+      id: `imovel|${linhaImovel.cod}|${linhaImovel.credito}|${base}`,
+      tipo: "imovel",
+      rotulo: `Imóvel · ${fmtCredito(linhaImovel.credito)}`,
+      cod: linhaImovel.cod,
+      credito: linhaImovel.credito,
+      quantidade: 1,
+      base,
+      prazo: imoveis220.prazo,
+      taxa: imoveis220.taxa,
+      indice: imoveis220.indice,
+      fases: FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: fasesImovel[i] })),
+      fasesBase100: fasesBase100Imovel,
+    };
+  }
+
+  function adicionarACarteira() {
+    const novo = itemAtual();
+    setItens((atual) => {
+      const i = atual.findIndex((x) => x.id === novo.id);
+      if (i < 0) return [...atual, novo];
+      const copia = [...atual];
+      copia[i] = { ...copia[i], quantidade: Math.min(QTD_MAX, copia[i].quantidade + 1) };
+      return copia;
+    });
+  }
+
+  function mudarQuantidade(id: string, valor: number) {
+    const q = Math.max(QTD_MIN, Math.min(QTD_MAX, Math.round(valor) || QTD_MIN));
+    setItens((atual) => atual.map((x) => (x.id === id ? { ...x, quantidade: q } : x)));
+  }
+
+  function removerItem(id: string) {
+    setItens((atual) => atual.filter((x) => x.id !== id));
+  }
+
+  const carteira = resumirCarteira(itens);
+  const temCarteira = itens.length > 0 && carteira.cotas > 0;
+  const linhasFases = descreverFases(carteira.fases, fmtValor);
+
+  // Um índice só vale para a carteira toda quando TODAS as cotas seguem o
+  // mesmo. Carteira mista (veículo IPCA + imóvel INCC) não tem fator único:
+  // passa null e a projeção sai como indisponível, em vez de um número que
+  // não corresponde a nenhum contrato.
+  const indicesDaCarteira = new Set(itens.filter((i) => i.quantidade > 0).map((i) => i.indice));
+  const indiceNomeCarteira = indicesDaCarteira.size === 1 ? [...indicesDaCarteira][0] : undefined;
+  const chaveIndiceCarteira = indiceNomeCarteira ? chaveIndiceBcb(indiceNomeCarteira) : null;
+  const indiceAnualPctCarteira = chaveIndiceCarteira
+    ? indicesBcb?.[chaveIndiceCarteira]?.acumulado12m ?? null
+    : null;
+
+  // Cenário declarado: cada tipo recebe a carta no seu próprio mês de
+  // referência, então numa carteira mista o texto precisa citar os dois.
+  const tiposNaCarteira = new Set(itens.filter((i) => i.quantidade > 0).map((i) => i.tipo));
+  const cenarioCarteira =
+    tiposNaCarteira.size > 1
+      ? `carta de crédito no mês ${C_REF.veiculo} no veículo e ${C_REF.imovel} no imóvel`
+      : tiposNaCarteira.has("imovel")
+        ? `carta de crédito no mês ${C_REF.imovel}`
+        : `carta de crédito no mês ${C_REF.veiculo}`;
+
+  const custoEfetivoTextoCarteira = temCarteira
+    ? formatarCustoEfetivoTexto({
+        resultado: custoEfetivoCarteira({
+          // TIR sempre sobre a Base 100% — ver nota em ItemCarteiraUI.
+          itens: itens.map((i) => ({ ...i, fases: i.fasesBase100 })),
+          C: C_REF,
+          indiceAnualPct: indiceAnualPctCarteira,
+        }),
+        C: C_REF.imovel,
+        cenario: cenarioCarteira,
+        indiceNome: indiceNomeCarteira,
+        indiceAnualPct: indiceAnualPctCarteira,
+      })
+    : "";
+
+  const avisosCarteira: string[] = [];
+  if (carteira.segmentosMisturados) {
+    avisosCarteira.push(
+      "Cotas de veículo e imóvel não podem ser juntadas para adquirir um mesmo bem — a soma acima é de cotas independentes.",
+    );
+  }
+  if (temCarteira) {
+    avisosCarteira.push("Junção só é permitida entre cartas da mesma administradora.");
+  }
+  if (carteira.cotas > COTAS_VOLUME_ALTO) {
+    avisosCarteira.push(
+      "Volume alto — confirmar disponibilidade de grupos e análise de crédito com a administradora antes de apresentar ao cliente.",
+    );
+  }
+
+  function gerarTextoCarteira(): string {
+    const nome = nomeCliente.trim() || "Olá";
+    const ativos = itens.filter((i) => i.quantidade > 0);
+    return [
+      `🧾 *Proposta de cotas — Disal*`,
+      `_Boletim de Crédito · ${mes}_`,
+      ``,
+      `${nome}, segue sua simulação 👇`,
+      ``,
+      `*Cotas selecionadas*`,
+      ...ativos.map(
+        (i) =>
+          `• ${i.quantidade}× ${i.tipo === "veiculo" ? "Veículo" : "Imóvel"} ${fmtCredito(i.credito)} — ${i.prazo} meses (Base ${i.base === "100" ? "100%" : "75% Light"})`,
+      ),
+      ``,
+      `💳 Crédito total: *${fmtCredito(carteira.creditoTotal)}*`,
+      `🛡️ Seguro prestamista incluso`,
+      ``,
+      `✅ *Parcela somada:*`,
+      ...linhasFases.map((l) => `   ${l}`),
+      ``,
+      `💰 Total do plano (sem reajustes): ${fmtValor(carteira.totalPlano)}`,
+      `📊 Custo além do crédito: ${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
+      `📈 ${custoEfetivoTextoCarteira}`,
+      ``,
+      ...avisosCarteira.map((a) => `⚠️ ${a}`),
+      ``,
+      `Compra programada para o seu patrimônio, sem juros de financiamento.`,
+      `Contemplação por sorteio ou lance mensal.`,
+      ``,
+      `*Prospere Consórcios* 🤝`,
+    ].join("\n");
+  }
+
   function gerarTexto(): string {
+    if (temCarteira) return gerarTextoCarteira();
     const nome = nomeCliente.trim() || "Olá";
     if (segmento === "veiculo") {
       return [
@@ -355,6 +525,232 @@ export default function SimuladorDisal() {
           </>
         )}
 
+        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={adicionarACarteira}
+            style={{
+              padding: "10px 20px",
+              borderRadius: 10,
+              border: 0,
+              cursor: "pointer",
+              background: "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)",
+              color: "#0A0E1A",
+              fontWeight: 800,
+            }}
+          >
+            + Adicionar à carteira
+          </button>
+          <span style={{ fontSize: 11, opacity: 0.55 }}>
+            Monte uma proposta com várias cotas ({QTD_MIN} a {QTD_MAX} por linha).
+          </span>
+        </div>
+
+        {temCarteira && (
+          <div
+            style={{
+              marginTop: 20,
+              background: "#0F1526",
+              padding: 16,
+              borderRadius: 14,
+              border: "1px solid #16213A",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#8FB7FF" }}>
+                Carteira · {carteira.cotas} {carteira.cotas === 1 ? "cota" : "cotas"} em {carteira.itens}{" "}
+                {carteira.itens === 1 ? "linha" : "linhas"}
+              </div>
+              <button
+                onClick={() => setItens([])}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  border: "1px solid #16213A",
+                  background: "transparent",
+                  color: "#a1a1aa",
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+              >
+                Limpar carteira
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ color: "#8FB7FF", textAlign: "left" }}>
+                    {["Cota", "Cód. bem", "Qtd.", "Crédito unit.", "Crédito × qtd.", "Parcela unit. (1ª)", "Parcela × qtd.", ""].map(
+                      (h) => (
+                        <th key={h} style={{ padding: "8px 10px", borderBottom: "1px solid #16213A", fontWeight: 700 }}>
+                          {h}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((i) => {
+                    const parcelaUnit = i.fases[0]?.valor ?? 0;
+                    return (
+                      <tr key={i.id} style={{ borderBottom: "1px solid #10182B" }}>
+                        <td style={{ padding: "8px 10px" }}>
+                          {i.rotulo}
+                          <div style={{ fontSize: 10, opacity: 0.5 }}>
+                            Base {i.base === "100" ? "100%" : "75% Light"} · {i.prazo} meses · {i.indice}
+                          </div>
+                        </td>
+                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", opacity: 0.7 }}>
+                          {i.cod}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <button
+                              onClick={() => mudarQuantidade(i.id, i.quantidade - 1)}
+                              disabled={i.quantidade <= QTD_MIN}
+                              aria-label="Diminuir quantidade"
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                border: "1px solid #1E6FE6",
+                                background: "transparent",
+                                color: "#8FB7FF",
+                                cursor: i.quantidade <= QTD_MIN ? "not-allowed" : "pointer",
+                                opacity: i.quantidade <= QTD_MIN ? 0.4 : 1,
+                              }}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              min={QTD_MIN}
+                              max={QTD_MAX}
+                              value={i.quantidade}
+                              onChange={(e) => mudarQuantidade(i.id, +e.target.value)}
+                              aria-label={`Quantidade de cotas — ${i.rotulo}`}
+                              style={{ ...S.input, width: 64, padding: "4px 6px", textAlign: "center" } as any}
+                            />
+                            <button
+                              onClick={() => mudarQuantidade(i.id, i.quantidade + 1)}
+                              disabled={i.quantidade >= QTD_MAX}
+                              aria-label="Aumentar quantidade"
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                border: "1px solid #1E6FE6",
+                                background: "transparent",
+                                color: "#8FB7FF",
+                                cursor: i.quantidade >= QTD_MAX ? "not-allowed" : "pointer",
+                                opacity: i.quantidade >= QTD_MAX ? 0.4 : 1,
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
+                          {fmtCredito(i.credito)}
+                        </td>
+                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
+                          {fmtCredito(i.credito * i.quantidade)}
+                        </td>
+                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
+                          {fmtValor(parcelaUnit)}
+                        </td>
+                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
+                          {fmtValor(parcelaUnit * i.quantidade)}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <button
+                            onClick={() => removerItem(i.id)}
+                            aria-label={`Remover ${i.rotulo}`}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #16213A",
+                              background: "transparent",
+                              color: "#F87171",
+                              cursor: "pointer",
+                              fontSize: 11,
+                            }}
+                          >
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {avisosCarteira.length > 0 && (
+              <div
+                style={{
+                  marginTop: 14,
+                  background: "#1a1207",
+                  border: "1px solid #3f2d0a",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                }}
+              >
+                {avisosCarteira.map((a) => (
+                  <p key={a} style={{ margin: "4px 0", fontSize: 12, color: "#FCD34D", lineHeight: 1.5 }}>
+                    ⚠️ {a}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 14,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+                gap: 10,
+              }}
+            >
+              {[
+                ["Cotas", String(carteira.cotas)],
+                ["Crédito total", fmtCredito(carteira.creditoTotal)],
+                ["Parcela inicial somada", `${fmtValor(carteira.parcelaInicial)}/mês`],
+                ["Total do plano (sem reajustes)", fmtValor(carteira.totalPlano)],
+                [
+                  "Custo além do crédito",
+                  `${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
+                ],
+              ].map(([k, v]) => (
+                <div key={k} style={S.card}>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{k}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: "#8FB7FF" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>
+                Custo efetivo da carteira (TIR sobre o fluxo consolidado, Base 100% de referência)
+              </div>
+              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#8FB7FF", marginTop: 2 }}>
+                {custoEfetivoTextoCarteira}
+              </div>
+            </div>
+
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>
+                Parcela somada ao longo do plano — cai em degraus conforme as cotas mais curtas terminam
+              </div>
+              {linhasFases.map((l) => (
+                <div key={l} style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#E5E9F0" }}>
+                  {l}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
           style={{
             marginTop: 28,
@@ -365,7 +761,7 @@ export default function SimuladorDisal() {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#8FB7FF" }}>
-            Gerador de proposta WhatsApp
+            Gerador de proposta WhatsApp {temCarteira ? `· carteira de ${carteira.cotas} cotas` : ""}
           </div>
           <label style={S.label}>Nome do cliente (opcional)</label>
           <input
