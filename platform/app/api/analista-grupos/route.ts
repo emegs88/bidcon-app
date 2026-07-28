@@ -5,6 +5,11 @@
 // e multi-junção de cartas (greedy) para créditos altos.
 // Espelha o motor validado nos simuladores Bidcon (jul/2026).
 //
+// Modalidade (v3): "venda_nova" (padrão) = cota NÃO contemplada — o cliente
+// não paga os 7% Bidcon, e a comissão da Prospere (receita, paga pela
+// administradora) vem junto só para o vendedor, fora do fluxo da TIR.
+// "contemplada" = marketplace Bidcon, mantém os 7% na entrada.
+//
 // Dados: schema `consorcios` vive no projeto Supabase "xtv" (mesmo projeto de
 // administradoras/fornecedores/vitrine — ver lib/supabase-xtv.ts), não no
 // projeto principal "nnv" (auth + profiles). Por isso usamos createXtvClient()
@@ -25,6 +30,7 @@ type Grupo = {
   codigo: string;
   segmento: string;
   administradora: string;
+  administradora_id: number | null;
   prazo_meses: number;
   assembleia_atual: number;
   restantes: number;
@@ -47,6 +53,96 @@ type Grupo = {
   fila_estimada: number | null;
   vazao_ass: number | null;
 };
+
+// Modalidade da simulação — decide QUEM paga o quê.
+// - "contemplada": marketplace Bidcon de cartas já contempladas. O cliente
+//   paga 7% do crédito à Bidcon, somados à entrada (regra canônica).
+// - "venda_nova": os grupos da tabela Porto são cotas NÃO contempladas —
+//   o cliente não paga os 7%. Cobrar aqui inflaria o fluxo e jogaria a TIR
+//   pra cima artificialmente. Default, porque é o caso desta tela.
+type Modalidade = "venda_nova" | "contemplada";
+
+type ParcelamentoAdesao = "a_vista" | "3x" | "5x" | "12x" | "qualquer";
+
+// Grade de comissão da Prospere (consorcios.comissoes via RPC). É RECEITA da
+// Prospere, paga pela administradora — NUNCA custo do cliente. Por isso não
+// entra em nenhum fluxo de TIR; viaja ao lado, só para o vendedor.
+type GradeComissao = {
+  administradora_id: number | null;
+  segmento: string;
+  parcelamento_adesao: string;
+  pct_total: number | string | null;
+  cronograma: number[] | null;
+  vigencia_inicio: string | null;
+  vigencia_fim: string | null;
+  observacao: string | null;
+};
+
+export type ComissaoProspere = {
+  pctTotal: number;
+  totalRS: number;
+  cronogramaRS: number[];
+  parcelas: number;
+  observacao: string | null;
+};
+
+type Ctx = {
+  modalidade: Modalidade;
+  parcelamentoAdesao: ParcelamentoAdesao;
+  grades: GradeComissao[];
+};
+
+const CTX_PADRAO: Ctx = { modalidade: "venda_nova", parcelamentoAdesao: "qualquer", grades: [] };
+
+const cent = (v: number) => Math.round(v * 100) / 100;
+
+// Escolha da grade: casa segmento; imóvel usa o parcelamento da adesão
+// (default "qualquer" → cai em "a_vista"), auto e pesados têm grade única
+// gravada como "qualquer".
+// A administradora entra como trava, não como fallback: só serve a grade da
+// própria administradora do grupo (ou uma grade genérica, sem administradora).
+// Se amanhã entrar uma administradora sem grade cadastrada, o certo é não
+// mostrar comissão — nunca emprestar a grade da Porto pra outra.
+function selecionarGrade(g: Grupo, ctx: Ctx): GradeComissao | null {
+  const parcelamento: string =
+    g.segmento === "imovel"
+      ? ctx.parcelamentoAdesao === "qualquer" ? "a_vista" : ctx.parcelamentoAdesao
+      : "qualquer";
+  const candidatas = ctx.grades.filter(
+    (x) => x.segmento === g.segmento && x.parcelamento_adesao === parcelamento
+  );
+  return (
+    candidatas.find((x) => x.administradora_id === g.administradora_id) ??
+    candidatas.find((x) => x.administradora_id == null) ??
+    null
+  );
+}
+
+function comissaoProspereDe(g: Grupo, credito: number, ctx: Ctx): ComissaoProspere | null {
+  if (ctx.modalidade !== "venda_nova") return null;
+  const grade = selecionarGrade(g, ctx);
+  if (!grade) return null;
+  const pctTotal = Number(grade.pct_total);
+  if (!Number.isFinite(pctTotal)) return null;
+  const totalRS = (credito * pctTotal) / 100;
+  const pesos = (grade.cronograma ?? []).map(Number).filter((n) => Number.isFinite(n));
+  const cronograma = pesos.length ? pesos : [1];
+  return {
+    pctTotal,
+    totalRS: cent(totalRS),
+    cronogramaRS: cronograma.map((p) => cent(totalRS * p)),
+    parcelas: cronograma.length,
+    observacao: grade.observacao ?? null,
+  };
+}
+
+// soma posição a posição de cronogramas de comprimentos diferentes
+function somarCronogramas(listas: number[][]): number[] {
+  const n = Math.max(0, ...listas.map((l) => l.length));
+  const out = new Array(n).fill(0);
+  for (const l of listas) l.forEach((v, i) => { out[i] += v; });
+  return out.map(cent);
+}
 
 // ---------- motor ----------
 function sorteiosCalibrados(g: Grupo): number {
@@ -117,7 +213,9 @@ export type Opcao = {
   lanceEmbutidoPct: number;
   lanceProprioPct: number;
   lanceProprioRS: number;
-  comissaoRS: number; // 7% do crédito, somada à entrada (regra Bidcon)
+  modalidade: Modalidade;
+  comissaoRS: number; // custo do cliente: 7% do crédito só em "contemplada"; 0 em venda nova
+  comissaoProspere: ComissaoProspere | null; // receita da Prospere (só venda nova) — fora do fluxo
   desembolsoContemplacao: number;
   saldoDevedorPos: number;
   parcelasRestantesPos: number;
@@ -135,7 +233,8 @@ function simular(
   credito: number,
   lancePct: number,
   tipoLance: "livre" | "embutido",
-  indices?: IndicesSegmento | null
+  indices?: IndicesSegmento | null,
+  ctx: Ctx = CTX_PADRAO
 ): Opcao | null {
   if (!g.restantes || g.restantes < 1) return null;
   const tetoEmb = Number(g.lance_embutido_pct ?? 0);
@@ -144,7 +243,9 @@ function simular(
   const creditoLiquido = credito * (1 - emb / 100);
   const parcela = parcelaDiluicao(g, credito);
   const T = tempoEsperado(g, lancePct);
-  const comissao = credito * 0.07; // Bidcon: 7% do crédito na entrada
+  // 7% Bidcon na entrada SÓ existe no marketplace de contempladas. Em venda
+  // nova (cota não contemplada) o cliente não paga essa comissão.
+  const comissao = ctx.modalidade === "contemplada" ? credito * 0.07 : 0;
   const lanceProprioRS = (credito * proprio) / 100;
 
   // lance abate parcelas finais
@@ -194,7 +295,10 @@ function simular(
     credito, creditoLiquido, parcela,
     tempoEsperadoMeses: T,
     lancePct, lanceEmbutidoPct: emb, lanceProprioPct: proprio,
-    lanceProprioRS, comissaoRS: comissao,
+    lanceProprioRS,
+    modalidade: ctx.modalidade,
+    comissaoRS: comissao,
+    comissaoProspere: comissaoProspereDe(g, credito, ctx),
     desembolsoContemplacao: lanceProprioRS + comissao,
     saldoDevedorPos: parcelasPos * parcela,
     parcelasRestantesPos: parcelasPos,
@@ -225,14 +329,15 @@ function multiJuncao(
   lancePct: number,
   tipoLance: "livre" | "embutido",
   segmento?: string,
-  indices?: IndicesSegmento | null
+  indices?: IndicesSegmento | null,
+  ctx: Ctx = CTX_PADRAO
 ) {
   const CAMADAS: Opcao["veredito"][] = ["vence_agora", "janela_3m", "fila"];
 
   const eleg = grupos
     .filter(g => (!segmento || g.segmento === segmento) && g.cred_max && g.restantes >= 10)
     .map(g => {
-      const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance, indices);
+      const amostra = simular(g, Number(g.cred_max), lancePct, tipoLance, indices, ctx);
       const capGrupo = Math.max(1, Math.min(Number(g.vencedores_ultimo ?? 2), 3));
       const estoque = g.cotas_venda != null ? Number(g.cotas_venda) : 1;
       const limiteGrupo = Math.min(capGrupo, estoque);
@@ -262,7 +367,7 @@ function multiJuncao(
         if (usadas >= limiteGrupo) continue;
         const falta = alvo - acumulado;
         const credito = Math.min(Number(g.cred_max), Math.max(Number(g.cred_min ?? 0), falta));
-        const op = simular(g, credito, lancePct, tipoLance, indices);
+        const op = simular(g, credito, lancePct, tipoLance, indices, ctx);
         if (!op || op.tirMes == null || op.tirMes <= 0) continue;
         cartas.push(op);
         acumulado += credito;
@@ -281,6 +386,15 @@ function multiJuncao(
     desembolsoTotal: cartas.reduce((s, c) => s + c.desembolsoContemplacao, 0),
     saldoDevedorTotal: cartas.reduce((s, c) => s + c.saldoDevedorPos, 0),
     tempoEsperadoMeses: tempoTotal,
+    // receita consolidada da Prospere na cesta (só venda nova; null quando não há grade)
+    comissaoProspereTotal: (() => {
+      const com = cartas.filter(c => c.comissaoProspere != null);
+      return com.length > 0 ? cent(com.reduce((s, c) => s + c.comissaoProspere!.totalRS, 0)) : null;
+    })(),
+    comissaoProspereCronograma: (() => {
+      const cron = cartas.filter(c => c.comissaoProspere != null).map(c => c.comissaoProspere!.cronogramaRS);
+      return cron.length > 0 ? somarCronogramas(cron) : null;
+    })(),
     tirMedia:
       cartas.length > 0
         ? Math.round(
@@ -322,14 +436,20 @@ export async function POST(req: NextRequest) {
     const {
       modo = "grupo",            // "grupo" | "juncao" | "ranking"
       administradora,            // opcional: slug (ex. "porto"); ausente = TODAS (cruzamento multi-admin)
-      segmento,                  // "auto" | "imovel"
+      segmento,                  // "auto" | "imovel" | "pesados" — sem hardcode, vale o que vier do banco
       codigo,                    // p/ modo grupo
       credito = 100000,
       creditoAlvo = 1000000,     // p/ modo juncao
       lancePct = 30,
       tipoLance = "livre",       // "livre" | "embutido"
       limite = 10,
+      modalidade: modalidadeBody,        // "venda_nova" (padrão) | "contemplada"
+      parcelamentoAdesao: parcBody,      // "a_vista" | "3x" | "5x" | "12x" | "qualquer" (padrão)
     } = body ?? {};
+
+    const modalidade: Modalidade = modalidadeBody === "contemplada" ? "contemplada" : "venda_nova";
+    const parcelamentoAdesao: ParcelamentoAdesao =
+      ["a_vista", "3x", "5x", "12x"].includes(parcBody) ? parcBody : "qualquer";
 
     const db = createXtvClient();
 
@@ -338,15 +458,29 @@ export async function POST(req: NextRequest) {
     // schemas" da API. Filtros aplicados aqui, em memória. Índices BCB
     // buscados em paralelo (cache 12h — ver lib/indices-bcb.ts) pro
     // tirMesComIndice; nunca inventa valor, só null se indisponível.
-    const [{ data, error }, indicesResult] = await Promise.all([
+    // A grade de comissão da Prospere (consorcios_comissoes) só é usada em
+    // venda nova — em "contemplada" nem se busca. Falha na grade não derruba
+    // a simulação: sem grade, a opção volta com comissaoProspere = null.
+    const [{ data, error }, indicesResult, gradesResult] = await Promise.all([
       db.rpc("consorcios_grupos_calibrados"),
       getIndicesBcb(),
+      modalidade === "venda_nova"
+        ? db.rpc("consorcios_comissoes")
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (error) throw error;
     const indices: IndicesSegmento = {
       imovel: indicesResult.indices.incc.acumulado12m,
       auto: indicesResult.indices.ipca.acumulado12m,
     };
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const grades = ((gradesResult.data ?? []) as unknown as GradeComissao[]).filter(
+      (x) =>
+        (x.vigencia_inicio == null || x.vigencia_inicio <= hoje) &&
+        (x.vigencia_fim == null || x.vigencia_fim >= hoje)
+    );
+    const ctx: Ctx = { modalidade, parcelamentoAdesao, grades };
     let grupos = (data ?? []) as unknown as Grupo[];
     if (administradora) grupos = grupos.filter((g) => g.administradora === administradora);
     if (segmento) grupos = grupos.filter((g) => g.segmento === segmento);
@@ -358,18 +492,18 @@ export async function POST(req: NextRequest) {
     if (modo === "grupo") {
       const g = grupos[0];
       if (!g) return NextResponse.json({ erro: "grupo não encontrado" }, { status: 404 });
-      return NextResponse.json({ opcao: simular(g, credito, lancePct, tipoLance, indices) });
+      return NextResponse.json({ opcao: simular(g, credito, lancePct, tipoLance, indices, ctx) });
     }
 
     if (modo === "juncao") {
-      return NextResponse.json(multiJuncao(grupos, creditoAlvo, lancePct, tipoLance, segmento, indices));
+      return NextResponse.json(multiJuncao(grupos, creditoAlvo, lancePct, tipoLance, segmento, indices, ctx));
     }
 
     // ranking: melhores opções para o crédito informado
     const ops = grupos
       .filter(g => g.cred_min != null && g.cred_max != null &&
                    credito >= Number(g.cred_min) && credito <= Number(g.cred_max))
-      .map(g => simular(g, credito, lancePct, tipoLance, indices))
+      .map(g => simular(g, credito, lancePct, tipoLance, indices, ctx))
       .filter((o): o is Opcao => !!o && o.tirMes != null)
       .sort((a, b) => (a.tempoEsperadoMeses - b.tempoEsperadoMeses) || (a.tirMes! - b.tirMes!))
       .slice(0, limite);
