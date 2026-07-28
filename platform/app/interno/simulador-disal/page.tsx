@@ -18,9 +18,17 @@ import {
   custoEfetivoPlanoNovo,
   custoEfetivoCarteira,
   formatarCustoEfetivoTexto,
+  projetarParcelaMensal,
+  projetarParcelaAnual,
   chaveIndiceBcb,
   type FaseFluxo,
 } from "@/lib/disal/custo-efetivo-plano-novo";
+import {
+  simularFinanciamento,
+  type SistemaAmortizacao,
+  type UnidadeTaxa,
+  type ResultadoFinanciamento,
+} from "@/lib/financiamento";
 import {
   resumirCarteira,
   descreverFases,
@@ -41,8 +49,34 @@ type Base = "100" | "75";
 // de custo errado é pior que ausência de número.
 type ItemCarteiraUI = ItemCarteira & { fasesBase100: FaseFluxo[] };
 
-// Acima deste volume a proposta deixa de ser rotina comercial.
-const COTAS_VOLUME_ALTO = 20;
+// Acima deste número de cartas, confirmar o limite com a administradora.
+// NÃO é um teto: o campo de quantidade continua livre até QTD_MAX. Nenhum
+// limite de cartas por junção foi publicado pela Disal — inventar um seria
+// inventar regra de negócio.
+const COTAS_CONFIRMAR_LIMITE = 10;
+
+// Aviso permanente da junção — mesma frase na tela e no texto do cliente.
+const AVISO_JUNCAO =
+  "Junção só entre cartas da mesma administradora e do mesmo segmento. " +
+  "O poder de compra combinado só fica disponível quando todas as cotas forem contempladas.";
+
+// Sem esta frase a comparação com financiamento é proibida — ela é a
+// diferença real entre os dois produtos, e é o que o número sozinho esconde.
+const AVISO_COMPARADOR =
+  "No financiamento o bem é entregue de imediato; no consórcio a entrega depende de contemplação " +
+  "(sorteio ou lance) — os cenários acima usam C declarado como referência, nunca como promessa.";
+
+const fmtPct2 = (v: number) =>
+  `${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+// Atalhos do dia a dia. Todos existem no boletim vigente (imóvel 200/300/400,
+// auto 150) — nenhum crédito inventado.
+const PRESETS = [
+  { label: "Imóvel R$ 300 mil", tipo: "imovel", credito: 300000, quantidade: 1 },
+  { label: "Veículo R$ 150 mil", tipo: "veiculo", credito: 150000, quantidade: 1 },
+  { label: "Junção 2× R$ 200 mil imóvel", tipo: "imovel", credito: 200000, quantidade: 2 },
+  { label: "Junção 3× R$ 400 mil imóvel", tipo: "imovel", credito: 400000, quantidade: 3 },
+] as const;
 
 // Cenário de referência do mês de contemplação — mesmo default usado pela
 // tool buscar_planos (regra permanente "toda simulação termina em TIR").
@@ -78,6 +112,62 @@ const S = {
   card: { background: "#0F1526", borderRadius: 12, padding: 12, border: "1px solid #16213A" } as const,
 };
 
+// Gráfico da parcela ao longo do plano — SVG inline, sem dependência nova.
+// Mostra os dois efeitos juntos: sobe no aniversário (índice) e despenca
+// quando uma cota termina. Escada, não curva: a parcela muda em degraus.
+function GraficoParcela({
+  serie,
+  projetada,
+  fmtEixo,
+}: {
+  serie: number[];
+  projetada: boolean;
+  fmtEixo: (v: number) => string;
+}) {
+  if (serie.length < 2) return null;
+  const W = 720, H = 240, padL = 74, padR = 12, padT = 14, padB = 30;
+  const n = serie.length;
+  const max = Math.max(...serie) * 1.08;
+  const x = (mes: number) => padL + ((mes - 1) / (n - 1)) * (W - padL - padR);
+  const y = (v: number) => padT + (1 - v / max) * (H - padT - padB);
+
+  // caminho em escada: horizontal dentro do mês, vertical na mudança
+  let d = `M ${x(1).toFixed(1)} ${y(serie[0]).toFixed(1)}`;
+  for (let t = 2; t <= n; t++) {
+    d += ` L ${x(t).toFixed(1)} ${y(serie[t - 2]).toFixed(1)}`;
+    if (Math.abs(serie[t - 1] - serie[t - 2]) > 0.005) d += ` L ${x(t).toFixed(1)} ${y(serie[t - 1]).toFixed(1)}`;
+  }
+  const marcasY = [0, max / 2, max];
+  const marcasX = [1, Math.round(n / 4), Math.round(n / 2), Math.round((3 * n) / 4), n];
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" role="img"
+      aria-label={`Parcela mensal ao longo de ${n} meses${projetada ? ", projetada com índice" : ", nominal"}`}
+      style={{ display: "block", marginTop: 8 }}>
+      {marcasY.map((v) => (
+        <g key={v}>
+          <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke="#16213A" strokeWidth={1} />
+          <text x={padL - 8} y={y(v) + 4} textAnchor="end" fontSize={10} fill="#6b7280"
+            fontFamily="'IBM Plex Mono',monospace">
+            {fmtEixo(v)}
+          </text>
+        </g>
+      ))}
+      {marcasX.map((m) => (
+        <text key={m} x={x(m)} y={H - 10} textAnchor="middle" fontSize={10} fill="#6b7280"
+          fontFamily="'IBM Plex Mono',monospace">
+          {m}
+        </text>
+      ))}
+      <path d={d} fill="none" stroke={projetada ? "#36C5F0" : "#6b7280"} strokeWidth={2}
+        strokeLinejoin="round" />
+      <text x={W - padR} y={padT + 2} textAnchor="end" fontSize={10} fill="#6b7280">
+        mês do plano →
+      </text>
+    </svg>
+  );
+}
+
 export default function SimuladorDisal() {
   const { autosFaixaII, autosFaixaIII, imoveis220, mes } = BOLETIM_DISAL_ATUAL;
 
@@ -88,6 +178,14 @@ export default function SimuladorDisal() {
   const [nomeCliente, setNomeCliente] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [itens, setItens] = useState<ItemCarteiraUI[]>([]);
+  // null = acompanha o default do segmento; número = valor digitado pelo vendedor
+  const [cJuncao, setCJuncao] = useState<number | null>(null);
+  // comparador com financiamento — sem taxa default de propósito (G.1)
+  const [comparadorAberto, setComparadorAberto] = useState(false);
+  const [taxaFin, setTaxaFin] = useState("");
+  const [unidadeTaxa, setUnidadeTaxa] = useState<UnidadeTaxa>("aa");
+  const [entradaPct, setEntradaPct] = useState(0);
+  const [prazoFin, setPrazoFin] = useState<number | null>(null);
 
   // Índices BCB (INCC/IPCA) pro custo efetivo "com correção projetada" —
   // mesma fonte real (acumulado 12m) que a tool buscar_planos usa. Nunca
@@ -162,54 +260,98 @@ export default function SimuladorDisal() {
   });
 
   // ---------------------------------------------------------------------
-  // Carteira multi-cota
+  // Junção de cartas (mesmo segmento, mesma administradora, um bem só)
   // ---------------------------------------------------------------------
   // Identidade do item: tipo + código do bem + crédito + base. O MD pede
   // "mesmo cod + base", mas o código do bem se repete entre créditos
   // diferentes do boletim — incluir o crédito impede fundir duas cartas
   // distintas numa linha só.
-  function itemAtual(): ItemCarteiraUI {
-    if (segmento === "veiculo") {
-      return {
-        id: `veiculo|${codAuto}|${creditoAuto}|${base}`,
-        tipo: "veiculo",
-        rotulo: `Veículo · ${fmtCredito(creditoAuto)} · ${rotuloFaixa}`,
-        cod: codAuto,
-        credito: creditoAuto,
-        quantidade: 1,
-        base,
-        prazo: faixaAuto.prazo,
-        taxa: faixaAuto.taxa,
-        indice: faixaAuto.indice,
-        fases: [{ meses: faixaAuto.prazo, valor: parcelaAuto }],
-        fasesBase100: fasesBase100Auto,
-      };
-    }
+  function montarItemAuto(credito: number, quantidade: number): ItemCarteiraUI {
+    const { linha, faixa, rotuloFaixa: rf } = linhaAutoMaisProxima(credito, autosFaixaII, autosFaixaIII);
+    const [creditoReal, cod, p100, p75] = linha;
     return {
-      id: `imovel|${linhaImovel.cod}|${linhaImovel.credito}|${base}`,
+      id: `veiculo|${cod}|${creditoReal}|${base}`,
+      tipo: "veiculo",
+      rotulo: `Veículo · ${fmtCredito(creditoReal)} · ${rf}`,
+      cod,
+      credito: creditoReal,
+      quantidade,
+      base,
+      prazo: faixa.prazo,
+      taxa: faixa.taxa,
+      indice: faixa.indice,
+      fases: [{ meses: faixa.prazo, valor: base === "100" ? p100 : p75 }],
+      fasesBase100: [{ meses: faixa.prazo, valor: p100 }],
+    };
+  }
+
+  function montarItemImovel(linha: LinhaImovel, quantidade: number): ItemCarteiraUI {
+    const f = base === "100" ? linha.b100 : linha.b75;
+    return {
+      id: `imovel|${linha.cod}|${linha.credito}|${base}`,
       tipo: "imovel",
-      rotulo: `Imóvel · ${fmtCredito(linhaImovel.credito)}`,
-      cod: linhaImovel.cod,
-      credito: linhaImovel.credito,
-      quantidade: 1,
+      rotulo: `Imóvel · ${fmtCredito(linha.credito)}`,
+      cod: linha.cod,
+      credito: linha.credito,
+      quantidade,
       base,
       prazo: imoveis220.prazo,
       taxa: imoveis220.taxa,
       indice: imoveis220.indice,
-      fases: FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: fasesImovel[i] })),
-      fasesBase100: fasesBase100Imovel,
+      fases: FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: f[i] })),
+      fasesBase100: FASES_IMOVEL_MESES.map((meses, i) => ({ meses, valor: linha.b100[i] })),
     };
   }
 
+  function itemAtual(): ItemCarteiraUI {
+    return segmento === "veiculo" ? montarItemAuto(creditoAuto, 1) : montarItemImovel(linhaImovel, 1);
+  }
+
+  // Presets de 1 clique: monta a junção inteira e já deixa o resultado na
+  // tela. Todos apontam para linhas que existem no boletim vigente — se um
+  // boletim futuro não tiver o crédito, o snap do auto cai na linha mais
+  // próxima e o imóvel some da lista em vez de inventar valor.
+  function aplicarPreset(p: (typeof PRESETS)[number]) {
+    setSegmento(p.tipo);
+    if (p.tipo === "veiculo") {
+      const { linha } = linhaAutoMaisProxima(p.credito, autosFaixaII, autosFaixaIII);
+      setCreditoAuto(linha[0]);
+      setItens([montarItemAuto(p.credito, p.quantidade)]);
+    } else {
+      const idx = imoveis220.linhas.findIndex((l) => l.credito === p.credito);
+      if (idx < 0) return;
+      setImovelIdx(idx);
+      setItens([montarItemImovel(imoveis220.linhas[idx], p.quantidade)]);
+    }
+    setCJuncao(null);
+  }
+
+  // Segmento travado pela primeira carta adicionada. Junção é para UM bem:
+  // veículo e imóvel não se somam, então a mistura é estado inválido, não
+  // alerta — o botão de adicionar do outro segmento fica desabilitado.
+  const segmentoDaJuncao = itens.find((i) => i.quantidade > 0)?.tipo ?? null;
+  const segmentoBloqueado = segmentoDaJuncao != null && segmentoDaJuncao !== segmento;
+  const nomeSegmento = (t: "veiculo" | "imovel") => (t === "veiculo" ? "veículo" : "imóvel");
+  const razaoBloqueio = segmentoBloqueado
+    ? `A junção em andamento é de ${nomeSegmento(segmentoDaJuncao!)}. Cartas de ${nomeSegmento(segmento)} não podem ser juntadas com as de ${nomeSegmento(segmentoDaJuncao!)} — junção é para um bem só, do mesmo segmento. Limpe a junção para começar outra.`
+    : "";
+
   function adicionarACarteira() {
+    if (segmentoBloqueado) return;
     const novo = itemAtual();
     setItens((atual) => {
+      if (atual.length === 0) setCJuncao(null); // volta ao default do segmento
       const i = atual.findIndex((x) => x.id === novo.id);
       if (i < 0) return [...atual, novo];
       const copia = [...atual];
       copia[i] = { ...copia[i], quantidade: Math.min(QTD_MAX, copia[i].quantidade + 1) };
       return copia;
     });
+  }
+
+  function limparJuncao() {
+    setItens([]);
+    setCJuncao(null);
   }
 
   function mudarQuantidade(id: string, valor: number) {
@@ -225,10 +367,18 @@ export default function SimuladorDisal() {
   const temCarteira = itens.length > 0 && carteira.cotas > 0;
   const linhasFases = descreverFases(carteira.fases, fmtValor);
 
-  // Um índice só vale para a carteira toda quando TODAS as cotas seguem o
-  // mesmo. Carteira mista (veículo IPCA + imóvel INCC) não tem fator único:
-  // passa null e a projeção sai como indisponível, em vez de um número que
-  // não corresponde a nenhum contrato.
+  // Cenário da ÚLTIMA contemplação — é quando o poder de compra combinado
+  // fica utilizável. Default = C de referência do segmento da junção; o
+  // vendedor pode declarar outro. Clampado ao prazo da cota mais longa.
+  const cJuncaoDefault = C_REF[segmentoDaJuncao ?? segmento];
+  const cJuncaoEfetivo = temCarteira
+    ? Math.max(1, Math.min(cJuncao ?? cJuncaoDefault, carteira.prazoMaximo))
+    : cJuncaoDefault;
+
+  // Junção é de segmento único, então o índice é o mesmo em todas as cotas.
+  // A checagem continua aqui como trava: se por qualquer motivo houver mais
+  // de um, passa null e a projeção sai indisponível — um fator único sobre
+  // índices diferentes daria um custo que não corresponde a nenhum contrato.
   const indicesDaCarteira = new Set(itens.filter((i) => i.quantidade > 0).map((i) => i.indice));
   const indiceNomeCarteira = indicesDaCarteira.size === 1 ? [...indicesDaCarteira][0] : undefined;
   const chaveIndiceCarteira = indiceNomeCarteira ? chaveIndiceBcb(indiceNomeCarteira) : null;
@@ -236,71 +386,145 @@ export default function SimuladorDisal() {
     ? indicesBcb?.[chaveIndiceCarteira]?.acumulado12m ?? null
     : null;
 
-  // Cenário declarado: cada tipo recebe a carta no seu próprio mês de
-  // referência, então numa carteira mista o texto precisa citar os dois.
-  const tiposNaCarteira = new Set(itens.filter((i) => i.quantidade > 0).map((i) => i.tipo));
-  const cenarioCarteira =
-    tiposNaCarteira.size > 1
-      ? `carta de crédito no mês ${C_REF.veiculo} no veículo e ${C_REF.imovel} no imóvel`
-      : tiposNaCarteira.has("imovel")
-        ? `carta de crédito no mês ${C_REF.imovel}`
-        : `carta de crédito no mês ${C_REF.veiculo}`;
+  const resultadoCarteira = temCarteira
+    ? custoEfetivoCarteira({
+        // TIR sempre sobre a Base 100% — ver nota em ItemCarteiraUI.
+        itens: itens.map((i) => ({ ...i, fases: i.fasesBase100 })),
+        C: cJuncaoEfetivo,
+        indiceAnualPct: indiceAnualPctCarteira,
+      })
+    : null;
 
   const custoEfetivoTextoCarteira = temCarteira
     ? formatarCustoEfetivoTexto({
-        resultado: custoEfetivoCarteira({
-          // TIR sempre sobre a Base 100% — ver nota em ItemCarteiraUI.
-          itens: itens.map((i) => ({ ...i, fases: i.fasesBase100 })),
-          C: C_REF,
-          indiceAnualPct: indiceAnualPctCarteira,
-        }),
-        C: C_REF.imovel,
-        cenario: cenarioCarteira,
+        resultado: resultadoCarteira!,
+        C: cJuncaoEfetivo,
+        cenario: `poder de compra combinado no mês ${cJuncaoEfetivo}`,
         indiceNome: indiceNomeCarteira,
         indiceAnualPct: indiceAnualPctCarteira,
       })
     : "";
 
+  // Número curto para barra fixa e cards — tirado do resultado, NUNCA de
+  // fatiar o texto formatado (o cenário também tem dois-pontos).
+  const custoEfetivoCurto =
+    resultadoCarteira?.semCorrecao != null
+      ? `${fmtPct2(resultadoCarteira.semCorrecao.mensal * 100)} a.m.`
+      : "não fecha numa taxa única";
+  const custoEfetivoCurtoComIndice =
+    resultadoCarteira?.comIndice != null
+      ? `${fmtPct2(resultadoCarteira.comIndice.mensal * 100)} a.m. com ${indiceNomeCarteira} projetado — estimativa`
+      : null;
+
+  // Estado inválido: a tela bloqueia a mistura na entrada, então isto só
+  // aparece se o bloqueio falhar. Fica como rede de segurança visível.
+  const juncaoInvalida = carteira.segmentosMisturados;
+
   const avisosCarteira: string[] = [];
-  if (carteira.segmentosMisturados) {
-    avisosCarteira.push(
-      "Cotas de veículo e imóvel não podem ser juntadas para adquirir um mesmo bem — a soma acima é de cotas independentes.",
-    );
+  if (carteira.cotas > COTAS_CONFIRMAR_LIMITE) {
+    avisosCarteira.push("Confirmar com a administradora o limite de cartas por junção.");
   }
-  if (temCarteira) {
-    avisosCarteira.push("Junção só é permitida entre cartas da mesma administradora.");
-  }
-  if (carteira.cotas > COTAS_VOLUME_ALTO) {
-    avisosCarteira.push(
-      "Volume alto — confirmar disponibilidade de grupos e análise de crédito com a administradora antes de apresentar ao cliente.",
-    );
+
+  // ---------------------------------------------------------------------
+  // H — projeção da parcela com o índice acumulado 12m (cenário, não promessa)
+  // ---------------------------------------------------------------------
+  const projecaoDisponivel = indiceAnualPctCarteira != null;
+  const serieParcela = temCarteira ? projetarParcelaMensal(carteira.fases, indiceAnualPctCarteira) : [];
+  const anosProjetados = temCarteira ? projetarParcelaAnual(carteira.fases, indiceAnualPctCarteira) : [];
+  const rotuloIndices = (() => {
+    const partes: string[] = [];
+    const incc = indicesBcb?.incc?.acumulado12m;
+    const ipca = indicesBcb?.ipca?.acumulado12m;
+    if (incc != null) partes.push(`INCC ${fmtPct2(incc)}`);
+    if (ipca != null) partes.push(`IPCA ${fmtPct2(ipca)}`);
+    return partes.length ? `${partes.join(" / ")} — BCB` : null;
+  })();
+
+  // ---------------------------------------------------------------------
+  // G — comparador com financiamento. Sem taxa default: o número vem da
+  // proposta bancária que o cliente tem na mão.
+  // ---------------------------------------------------------------------
+  const taxaFinNum = Number(taxaFin.replace(",", "."));
+  const taxaFinValida = taxaFin.trim() !== "" && Number.isFinite(taxaFinNum) && taxaFinNum >= 0;
+  const prazoFinEfetivo = prazoFin ?? carteira.prazoMaximo;
+  const paramsFin = {
+    valorBem: carteira.creditoTotal,
+    entradaPct,
+    taxa: taxaFinNum,
+    unidade: unidadeTaxa,
+    prazo: prazoFinEfetivo,
+  };
+  const finPrice: ResultadoFinanciamento | null =
+    temCarteira && taxaFinValida ? simularFinanciamento({ ...paramsFin, sistema: "price" }) : null;
+  // SAC é praxe no crédito imobiliário; em veículo o mercado usa Price.
+  const finSac: ResultadoFinanciamento | null =
+    temCarteira && taxaFinValida && segmentoDaJuncao === "imovel"
+      ? simularFinanciamento({ ...paramsFin, sistema: "sac" })
+      : null;
+  const comparaveis = [finSac, finPrice].filter((f): f is ResultadoFinanciamento => f != null);
+  const diferencaTotal = (f: ResultadoFinanciamento) => f.totalPago - carteira.totalPlano;
+
+  function imprimir() {
+    if (typeof window !== "undefined") window.print();
   }
 
   function gerarTextoCarteira(): string {
     const nome = nomeCliente.trim() || "Olá";
     const ativos = itens.filter((i) => i.quantidade > 0);
+    const bem = segmentoDaJuncao === "imovel" ? "Imóveis" : "Veículos";
     return [
-      `🧾 *Proposta de cotas — Disal*`,
+      `🧾 *Junção de cartas — Disal · ${bem}*`,
       `_Boletim de Crédito · ${mes}_`,
       ``,
       `${nome}, segue sua simulação 👇`,
       ``,
-      `*Cotas selecionadas*`,
+      `*Cartas da junção*`,
       ...ativos.map(
         (i) =>
-          `• ${i.quantidade}× ${i.tipo === "veiculo" ? "Veículo" : "Imóvel"} ${fmtCredito(i.credito)} — ${i.prazo} meses (Base ${i.base === "100" ? "100%" : "75% Light"})`,
+          `• ${i.quantidade}× ${fmtCredito(i.credito)} — ${i.prazo} meses (Base ${i.base === "100" ? "100%" : "75% Light"})`,
       ),
       ``,
-      `💳 Crédito total: *${fmtCredito(carteira.creditoTotal)}*`,
+      `💳 Poder de compra combinado: *${fmtCredito(carteira.creditoTotal)}*`,
       `🛡️ Seguro prestamista incluso`,
       ``,
       `✅ *Parcela somada:*`,
       ...linhasFases.map((l) => `   ${l}`),
       ``,
       `💰 Total do plano (sem reajustes): ${fmtValor(carteira.totalPlano)}`,
-      `📊 Custo além do crédito: ${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
+      `📊 Custo além do poder de compra: ${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
       `📈 ${custoEfetivoTextoCarteira}`,
+      `_(cenário de referência declarado, não é promessa de prazo)_`,
+      ...(projecaoDisponivel && anosProjetados.length > 1
+        ? [
+            ``,
+            `📅 *Parcela projetada ano a ano* (índice acumulado 12m${rotuloIndices ? `: ${rotuloIndices}` : ""})`,
+            ...anosProjetados
+              .slice(0, 5)
+              .map((a) => `   Ano ${a.ano}: ${fmtValor(a.primeira)}/mês${a.mudaNoAno ? ` → ${fmtValor(a.ultima)}` : ""}`),
+            anosProjetados.length > 5 ? `   … plano completo com ${anosProjetados.length} anos` : "",
+            `_Cenário com o índice dos últimos 12 meses; o índice futuro varia._`,
+          ].filter(Boolean)
+        : []),
+      ...(comparaveis.length > 0
+        ? [
+            ``,
+            `⚖️ *Comparação com financiamento* (taxa informada: ${taxaFin.replace(".", ",")}% ${unidadeTaxa === "am" ? "a.m." : "a.a."}, entrada ${entradaPct}%)`,
+            `   Consórcio — total do plano ${fmtValor(carteira.totalPlano)} · custo efetivo ${custoEfetivoCurto} (cenário: poder de compra combinado no mês ${cJuncaoEfetivo})`,
+            ...comparaveis.map(
+              (f) =>
+                `   Financiamento ${f.sistema === "sac" ? "SAC" : "Price"} — total ${fmtValor(f.totalPago)} · 1ª ${fmtValor(f.primeiraParcela)} · última ${fmtValor(f.ultimaParcela)} · custo efetivo ${f.tirMes != null ? fmtPct2(f.tirMes * 100) : "—"} a.m.`,
+            ),
+            ...comparaveis
+              .filter((f) => diferencaTotal(f) > 0)
+              .map(
+                (f) =>
+                  `   💡 Economia projetada de ${fmtValor(diferencaTotal(f))} ao longo do plano frente ao ${f.sistema === "sac" ? "SAC" : "Price"}.`,
+              ),
+            `⚠️ ${AVISO_COMPARADOR}`,
+          ]
+        : []),
       ``,
+      `⚠️ ${AVISO_JUNCAO}`,
       ...avisosCarteira.map((a) => `⚠️ ${a}`),
       ``,
       `Compra programada para o seu patrimônio, sem juros de financiamento.`,
@@ -385,6 +609,28 @@ export default function SimuladorDisal() {
       }}
     >
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+        {/* Responsividade e impressão precisam de media query — inline style
+            não faz isso. A equipe vende pelo celular: aqui a tabela da junção
+            vira cartões empilhados e os steppers ganham alvo de toque ≥40px. */}
+        <style>{`
+          .dsl-num { font-family: 'IBM Plex Mono', monospace; }
+          @media (max-width: 720px) {
+            .dsl-tabela-junc thead { display: none; }
+            .dsl-tabela-junc, .dsl-tabela-junc tbody, .dsl-tabela-junc tr, .dsl-tabela-junc td { display: block; width: 100%; }
+            .dsl-tabela-junc tr { border: 1px solid #16213A; border-radius: 12px; padding: 8px; margin-bottom: 10px; }
+            .dsl-tabela-junc td { padding: 6px 4px !important; }
+            .dsl-tabela-junc td[data-rot]::before {
+              content: attr(data-rot); display: block; font-size: 10px; opacity: .55; margin-bottom: 2px;
+            }
+            .dsl-toque { min-width: 40px !important; min-height: 40px !important; }
+            .dsl-cards { grid-template-columns: 1fr !important; }
+            .dsl-barra { position: fixed !important; left: 0; right: 0; bottom: 0; border-radius: 0 !important; }
+          }
+          @media print {
+            .dsl-nao-imprime { display: none !important; }
+            .dsl-barra { display: none !important; }
+          }
+        `}</style>
         <SimuladorTabNav ativo="disal" />
 
         <h1
@@ -403,7 +649,31 @@ export default function SimuladorDisal() {
           mensal, nunca prometida por data.
         </p>
 
-        <div style={{ display: "flex", gap: 8, margin: "20px 0" }}>
+        <div className="dsl-nao-imprime" style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 8 }}>Atalhos — monta e calcula num clique</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => aplicarPreset(p)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: "1px solid #16213A",
+                  background: "#0F1526",
+                  color: "#8FB7FF",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="dsl-nao-imprime" style={{ display: "flex", gap: 8, margin: "20px 0" }}>
           {(["veiculo", "imovel"] as const).map((s) => (
             <button key={s} onClick={() => setSegmento(s)} style={S.pill(segmento === s)}>
               {s === "veiculo" ? "Veículos" : "Imóveis"}
@@ -528,22 +798,42 @@ export default function SimuladorDisal() {
         <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
           <button
             onClick={adicionarACarteira}
+            disabled={segmentoBloqueado}
+            title={segmentoBloqueado ? razaoBloqueio : undefined}
             style={{
               padding: "10px 20px",
               borderRadius: 10,
-              border: 0,
-              cursor: "pointer",
-              background: "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)",
-              color: "#0A0E1A",
+              border: segmentoBloqueado ? "1px solid #16213A" : 0,
+              cursor: segmentoBloqueado ? "not-allowed" : "pointer",
+              background: segmentoBloqueado ? "transparent" : "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)",
+              color: segmentoBloqueado ? "#6b7280" : "#0A0E1A",
               fontWeight: 800,
             }}
           >
-            + Adicionar à carteira
+            + Adicionar à junção
           </button>
           <span style={{ fontSize: 11, opacity: 0.55 }}>
-            Monte uma proposta com várias cotas ({QTD_MIN} a {QTD_MAX} por linha).
+            Junte cartas do mesmo segmento para um bem só ({QTD_MIN} a {QTD_MAX} por linha).
           </span>
         </div>
+
+        {segmentoBloqueado && (
+          <p
+            style={{
+              marginTop: 10,
+              marginBottom: 0,
+              background: "#1a1207",
+              border: "1px solid #3f2d0a",
+              borderRadius: 10,
+              padding: "10px 14px",
+              fontSize: 12,
+              color: "#FCD34D",
+              lineHeight: 1.5,
+            }}
+          >
+            🚫 {razaoBloqueio}
+          </p>
+        )}
 
         {temCarteira && (
           <div
@@ -557,11 +847,12 @@ export default function SimuladorDisal() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#8FB7FF" }}>
-                Carteira · {carteira.cotas} {carteira.cotas === 1 ? "cota" : "cotas"} em {carteira.itens}{" "}
+                Junção de cartas · {carteira.cotas} {carteira.cotas === 1 ? "carta" : "cartas"} em {carteira.itens}{" "}
                 {carteira.itens === 1 ? "linha" : "linhas"}
+                {segmentoDaJuncao ? ` · ${segmentoDaJuncao === "imovel" ? "Imóveis" : "Veículos"}` : ""}
               </div>
               <button
-                onClick={() => setItens([])}
+                onClick={limparJuncao}
                 style={{
                   padding: "4px 12px",
                   borderRadius: 999,
@@ -572,15 +863,51 @@ export default function SimuladorDisal() {
                   fontSize: 11,
                 }}
               >
-                Limpar carteira
+                Limpar junção
               </button>
             </div>
 
+            {/* aviso permanente — mesma frase que vai no texto do cliente */}
+            <p
+              style={{
+                marginTop: 10,
+                marginBottom: 0,
+                background: "#1a1207",
+                border: "1px solid #3f2d0a",
+                borderRadius: 10,
+                padding: "10px 14px",
+                fontSize: 12,
+                color: "#FCD34D",
+                lineHeight: 1.5,
+              }}
+            >
+              ⚠️ {AVISO_JUNCAO}
+            </p>
+
+            {juncaoInvalida && (
+              <p
+                style={{
+                  marginTop: 10,
+                  marginBottom: 0,
+                  background: "#2a0d0d",
+                  border: "1px solid #7f1d1d",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  fontSize: 12,
+                  color: "#F87171",
+                  lineHeight: 1.5,
+                }}
+              >
+                🚫 Estado inválido: há cartas de segmentos diferentes nesta junção. Limpe a junção — os números acima
+                não representam uma junção possível.
+              </p>
+            )}
+
             <div style={{ marginTop: 12, overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table className="dsl-tabela-junc" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ color: "#8FB7FF", textAlign: "left" }}>
-                    {["Cota", "Cód. bem", "Qtd.", "Crédito unit.", "Crédito × qtd.", "Parcela unit. (1ª)", "Parcela × qtd.", ""].map(
+                    {["Carta", "Cód. bem", "Qtd.", "Carta de crédito", "× qtd.", "Parcela unit. (1ª)", "Parcela × qtd.", ""].map(
                       (h) => (
                         <th key={h} style={{ padding: "8px 10px", borderBottom: "1px solid #16213A", fontWeight: 700 }}>
                           {h}
@@ -600,12 +927,13 @@ export default function SimuladorDisal() {
                             Base {i.base === "100" ? "100%" : "75% Light"} · {i.prazo} meses · {i.indice}
                           </div>
                         </td>
-                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", opacity: 0.7 }}>
+                        <td data-rot="Cód. bem" style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", opacity: 0.7 }}>
                           {i.cod}
                         </td>
-                        <td style={{ padding: "8px 10px" }}>
+                        <td data-rot="Quantidade" style={{ padding: "8px 10px" }}>
                           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                             <button
+                              className="dsl-toque"
                               onClick={() => mudarQuantidade(i.id, i.quantidade - 1)}
                               disabled={i.quantidade <= QTD_MIN}
                               aria-label="Diminuir quantidade"
@@ -623,15 +951,17 @@ export default function SimuladorDisal() {
                               −
                             </button>
                             <input
+                              className="dsl-toque"
                               type="number"
                               min={QTD_MIN}
                               max={QTD_MAX}
                               value={i.quantidade}
                               onChange={(e) => mudarQuantidade(i.id, +e.target.value)}
-                              aria-label={`Quantidade de cotas — ${i.rotulo}`}
+                              aria-label={`Quantidade de cartas — ${i.rotulo}`}
                               style={{ ...S.input, width: 64, padding: "4px 6px", textAlign: "center" } as any}
                             />
                             <button
+                              className="dsl-toque"
                               onClick={() => mudarQuantidade(i.id, i.quantidade + 1)}
                               disabled={i.quantidade >= QTD_MAX}
                               aria-label="Aumentar quantidade"
@@ -650,19 +980,19 @@ export default function SimuladorDisal() {
                             </button>
                           </div>
                         </td>
-                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
+                        <td data-rot="Carta de crédito" style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
                           {fmtCredito(i.credito)}
                         </td>
-                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
+                        <td data-rot="× qtd." style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
                           {fmtCredito(i.credito * i.quantidade)}
                         </td>
-                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
+                        <td data-rot="Parcela unit. (1ª)" style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace" }}>
                           {fmtValor(parcelaUnit)}
                         </td>
-                        <td style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
+                        <td data-rot="Parcela × qtd." style={{ padding: "8px 10px", fontFamily: "'IBM Plex Mono',monospace", color: "#8FB7FF" }}>
                           {fmtValor(parcelaUnit * i.quantidade)}
                         </td>
-                        <td style={{ padding: "8px 10px" }}>
+                        <td className="dsl-nao-imprime" style={{ padding: "8px 10px" }}>
                           <button
                             onClick={() => removerItem(i.id)}
                             aria-label={`Remover ${i.rotulo}`}
@@ -713,12 +1043,12 @@ export default function SimuladorDisal() {
               }}
             >
               {[
-                ["Cotas", String(carteira.cotas)],
-                ["Crédito total", fmtCredito(carteira.creditoTotal)],
+                ["Cartas na junção", String(carteira.cotas)],
+                ["Poder de compra combinado", fmtCredito(carteira.creditoTotal)],
                 ["Parcela inicial somada", `${fmtValor(carteira.parcelaInicial)}/mês`],
                 ["Total do plano (sem reajustes)", fmtValor(carteira.totalPlano)],
                 [
-                  "Custo além do crédito",
+                  "Custo além do poder de compra",
                   `${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
                 ],
               ].map(([k, v]) => (
@@ -730,8 +1060,33 @@ export default function SimuladorDisal() {
             </div>
 
             <div style={{ ...S.card, marginTop: 10 }}>
+              <label style={S.label} htmlFor="cjuncao">
+                Cenário de referência — mês da última contemplação da junção
+              </label>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  id="cjuncao"
+                  type="number"
+                  min={1}
+                  max={carteira.prazoMaximo}
+                  value={cJuncao ?? cJuncaoDefault}
+                  onChange={(e) => setCJuncao(+e.target.value)}
+                  style={{ ...S.input, width: 90 } as any}
+                />
+                <span style={{ fontSize: 11, opacity: 0.55, maxWidth: 560, lineHeight: 1.5 }}>
+                  É só quando a última carta é contemplada que o poder de compra combinado fica utilizável — por isso
+                  o custo efetivo é medido nesse mês, não no da primeira. Cenário declarado para comparar opções,
+                  nunca uma data prometida ao cliente. Padrão: {cJuncaoDefault}.
+                  {cJuncao != null && cJuncao !== cJuncaoEfetivo
+                    ? ` Ajustado para ${cJuncaoEfetivo} — limite do plano mais longo (${carteira.prazoMaximo} meses).`
+                    : ""}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ ...S.card, marginTop: 10 }}>
               <div style={{ fontSize: 11, opacity: 0.6 }}>
-                Custo efetivo da carteira (TIR sobre o fluxo consolidado, Base 100% de referência)
+                Custo efetivo da junção (TIR sobre o fluxo consolidado, Base 100% de referência)
               </div>
               <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#8FB7FF", marginTop: 2 }}>
                 {custoEfetivoTextoCarteira}
@@ -748,6 +1103,271 @@ export default function SimuladorDisal() {
                 </div>
               ))}
             </div>
+
+            {/* H — projeção ano a ano + gráfico */}
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#8FB7FF", marginBottom: 2 }}>
+                Sua parcela ano a ano
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.6, lineHeight: 1.5, marginBottom: 8 }}>
+                {projecaoDisponivel ? (
+                  <>
+                    Projeção com o índice acumulado dos últimos 12 meses
+                    {rotuloIndices ? ` (${rotuloIndices})` : ""} — cenário, não promessa; o índice futuro varia.
+                    {indiceNomeCarteira ? ` Índice do plano: ${indiceNomeCarteira}.` : ""}
+                  </>
+                ) : (
+                  <>Projeção de índice indisponível — os valores abaixo são nominais, sem correção anual.</>
+                )}
+              </div>
+
+              <GraficoParcela serie={serieParcela} projetada={projecaoDisponivel} fmtEixo={fmtCredito} />
+
+              <div style={{ overflowX: "auto", marginTop: 10 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ color: "#8FB7FF", textAlign: "left" }}>
+                      {["Ano", "Meses", projecaoDisponivel ? "Parcela/mês projetada" : "Parcela/mês (nominal)"].map(
+                        (h) => (
+                          <th key={h} style={{ padding: "6px 10px", borderBottom: "1px solid #16213A" }}>
+                            {h}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {anosProjetados.map((a) => (
+                      <tr key={a.ano} style={{ borderBottom: "1px solid #10182B" }}>
+                        <td style={{ padding: "6px 10px" }}>{a.ano}</td>
+                        <td style={{ padding: "6px 10px", opacity: 0.7 }} className="dsl-num">
+                          {a.mesInicio}–{a.mesFim}
+                        </td>
+                        <td style={{ padding: "6px 10px", color: "#8FB7FF" }} className="dsl-num">
+                          {fmtValor(a.primeira)}
+                          {a.mudaNoAno ? ` → ${fmtValor(a.ultima)}` : ""}
+                          {a.mudaNoAno ? (
+                            <span style={{ fontSize: 10, opacity: 0.5 }}> (uma carta termina no ano)</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* G — comparador com financiamento */}
+            <div style={{ ...S.card, marginTop: 10 }}>
+              <button
+                onClick={() => setComparadorAberto((v) => !v)}
+                className="dsl-nao-imprime"
+                aria-expanded={comparadorAberto}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  background: "transparent",
+                  border: 0,
+                  color: "#8FB7FF",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {comparadorAberto ? "▾" : "▸"} Comparar com financiamento
+              </button>
+
+              {comparadorAberto && (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ fontSize: 11, opacity: 0.6, marginTop: 0, lineHeight: 1.5 }}>
+                    Digite a taxa da proposta bancária que o cliente tem em mãos. Não há taxa padrão aqui de
+                    propósito — a comparação vale pelo número do papel dele, não por uma referência inventada.
+                  </p>
+
+                  <div
+                    className="dsl-cards"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+                      gap: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div>
+                      <label style={S.label} htmlFor="taxafin">
+                        Taxa de juros do financiamento
+                      </label>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          id="taxafin"
+                          type="text"
+                          inputMode="decimal"
+                          value={taxaFin}
+                          onChange={(e) => setTaxaFin(e.target.value)}
+                          placeholder="ex.: 11,5"
+                          style={{ ...S.input, width: "100%", minWidth: 0 } as any}
+                        />
+                        {(["aa", "am"] as const).map((u) => (
+                          <button
+                            key={u}
+                            onClick={() => setUnidadeTaxa(u)}
+                            className="dsl-toque"
+                            style={{
+                              padding: "0 10px",
+                              borderRadius: 8,
+                              border: "1px solid #1E6FE6",
+                              cursor: "pointer",
+                              background: unidadeTaxa === u ? "linear-gradient(90deg,#36C5F0,#1E6FE6)" : "transparent",
+                              color: unidadeTaxa === u ? "#0A0E1A" : "#8FB7FF",
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          >
+                            {u === "aa" ? "a.a." : "a.m."}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={S.label} htmlFor="entradafin">
+                        Entrada (% do bem)
+                      </label>
+                      <input
+                        id="entradafin"
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={entradaPct}
+                        onChange={(e) => setEntradaPct(Math.max(0, Math.min(99, +e.target.value || 0)))}
+                        style={{ ...S.input, width: "100%" } as any}
+                      />
+                    </div>
+                    <div>
+                      <label style={S.label} htmlFor="prazofin">
+                        Prazo (meses)
+                      </label>
+                      <input
+                        id="prazofin"
+                        type="number"
+                        min={1}
+                        max={480}
+                        value={prazoFin ?? carteira.prazoMaximo}
+                        onChange={(e) => setPrazoFin(Math.max(1, Math.min(480, +e.target.value || 1)))}
+                        style={{ ...S.input, width: "100%" } as any}
+                      />
+                      <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>
+                        Padrão: o mesmo prazo do plano ({carteira.prazoMaximo} meses).
+                      </div>
+                    </div>
+                  </div>
+
+                  {!taxaFinValida ? (
+                    <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>
+                      Informe a taxa para comparar.
+                    </p>
+                  ) : (
+                    <>
+                      <div
+                        className="dsl-cards"
+                        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}
+                      >
+                        <div style={{ ...S.card, borderColor: "#1E6FE6" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#8FB7FF" }}>
+                            Consórcio (junção atual)
+                          </div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Total do plano</div>
+                          <div className="dsl-num" style={{ fontSize: 16, color: "#E5E9F0" }}>
+                            {fmtValor(carteira.totalPlano)}
+                          </div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Custo além do poder de compra</div>
+                          <div className="dsl-num" style={{ fontSize: 14, color: "#E5E9F0" }}>
+                            {fmtValor(carteira.custoAlemCredito)} ({fmtPct(carteira.custoAlemCreditoPct)})
+                          </div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Custo efetivo/mês</div>
+                          <div className="dsl-num" style={{ fontSize: 14, color: "#36C5F0" }}>
+                            {custoEfetivoCurto}
+                            {custoEfetivoCurtoComIndice ? (
+                              <div style={{ fontSize: 11, opacity: 0.7 }}>{custoEfetivoCurtoComIndice}</div>
+                            ) : null}
+                          </div>
+                          <div style={{ fontSize: 10, opacity: 0.5, marginTop: 6 }}>
+                            Compra programada, sem juros de financiamento.
+                          </div>
+                        </div>
+
+                        {comparaveis.map((f) => (
+                          <div key={f.sistema} style={S.card}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#8FB7FF" }}>
+                              Financiamento {f.sistema === "sac" ? "SAC" : "Price"}
+                            </div>
+                            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Total pago (com entrada)</div>
+                            <div className="dsl-num" style={{ fontSize: 16, color: "#E5E9F0" }}>
+                              {fmtValor(f.totalPago)}
+                            </div>
+                            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Custo além do bem</div>
+                            <div className="dsl-num" style={{ fontSize: 14, color: "#E5E9F0" }}>
+                              {fmtValor(f.custoAlemDoBem)} ({fmtPct(f.custoAlemDoBemPct)})
+                            </div>
+                            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Custo efetivo/mês (TIR)</div>
+                            <div className="dsl-num" style={{ fontSize: 14, color: "#36C5F0" }}>
+                              {f.tirMes != null ? `${fmtPct2(f.tirMes * 100)} a.m.` : "não fecha numa taxa única"}
+                            </div>
+                            <div className="dsl-num" style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>
+                              1ª {fmtValor(f.primeiraParcela)} · última {fmtValor(f.ultimaParcela)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {comparaveis.some((f) => diferencaTotal(f) > 0) && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            background: "#052e16",
+                            border: "1px solid #14532d",
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                          }}
+                        >
+                          {comparaveis
+                            .filter((f) => diferencaTotal(f) > 0)
+                            .map((f) => (
+                              <p key={f.sistema} style={{ margin: "4px 0", fontSize: 13, color: "#4ade80" }}>
+                                Economia projetada de <strong>{fmtValor(diferencaTotal(f))}</strong> ao longo do plano
+                                frente ao financiamento {f.sistema === "sac" ? "SAC" : "Price"}.
+                              </p>
+                            ))}
+                        </div>
+                      )}
+
+                      <p
+                        style={{
+                          marginTop: 10,
+                          marginBottom: 0,
+                          background: "#1a1207",
+                          border: "1px solid #3f2d0a",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                          fontSize: 12,
+                          color: "#FCD34D",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        ⚠️ {AVISO_COMPARADOR}
+                      </p>
+
+                      <p style={{ fontSize: 11, opacity: 0.55, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+                        A parcela do consórcio acima é projetada pelo índice do plano
+                        {indiceNomeCarteira ? ` (${indiceNomeCarteira})` : ""}; a do financiamento usa a taxa informada
+                        como está — Price fixa, SAC decrescente. No crédito imobiliário a parcela do banco também
+                        costuma ter correção (TR/IPCA, conforme o contrato), que esta simulação não aplica.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -761,7 +1381,8 @@ export default function SimuladorDisal() {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#8FB7FF" }}>
-            Gerador de proposta WhatsApp {temCarteira ? `· carteira de ${carteira.cotas} cotas` : ""}
+            Gerador de proposta WhatsApp{" "}
+            {temCarteira ? `· junção de ${carteira.cotas} ${carteira.cotas === 1 ? "carta" : "cartas"}` : ""}
           </div>
           <label style={S.label}>Nome do cliente (opcional)</label>
           <input
@@ -786,7 +1407,21 @@ export default function SimuladorDisal() {
           >
             {textoProposta}
           </pre>
-          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+          <div className="dsl-nao-imprime" style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            <button
+              onClick={imprimir}
+              style={{
+                padding: "10px 20px",
+                borderRadius: 10,
+                border: "1px solid #1E6FE6",
+                background: "transparent",
+                color: "#8FB7FF",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Imprimir
+            </button>
             <button
               onClick={copiarProposta}
               style={{
@@ -821,6 +1456,84 @@ export default function SimuladorDisal() {
             </a>
           </div>
         </div>
+
+        {/* F.2 — resumo sempre visível enquanto rola; no celular vira rodapé fixo */}
+        {temCarteira && (
+          <div
+            className="dsl-barra"
+            style={{
+              position: "sticky",
+              bottom: 12,
+              zIndex: 5,
+              marginTop: 20,
+              background: "rgba(15,21,38,0.96)",
+              border: "1px solid #1E6FE6",
+              borderRadius: 14,
+              padding: "10px 14px",
+              display: "flex",
+              gap: 16,
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+              {[
+                ["Poder de compra", fmtCredito(carteira.creditoTotal)],
+                ["Parcela inicial", `${fmtValor(carteira.parcelaInicial)}/mês`],
+                [
+                  "Custo efetivo",
+                  custoEfetivoCurto,
+                ],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 10, opacity: 0.55 }}>{k}</div>
+                  <div className="dsl-num" style={{ fontSize: 14, color: "#8FB7FF" }}>
+                    {v}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="dsl-nao-imprime" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={imprimir}
+                className="dsl-toque"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #1E6FE6",
+                  background: "transparent",
+                  color: "#8FB7FF",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 12,
+                }}
+              >
+                Imprimir
+              </button>
+              <a
+                href={linkWhatsApp("", textoProposta)}
+                target="_blank"
+                rel="noreferrer"
+                className="dsl-toque"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  border: 0,
+                  background: "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)",
+                  color: "#0A0E1A",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                WhatsApp
+              </a>
+            </div>
+          </div>
+        )}
 
         <p style={{ marginTop: 32, fontSize: 11, opacity: 0.45, borderTop: "1px solid #16213A", paddingTop: 12 }}>
           Bidcon · Prospere Consórcios. Simulação ilustrativa de planejamento e compra programada de carta de

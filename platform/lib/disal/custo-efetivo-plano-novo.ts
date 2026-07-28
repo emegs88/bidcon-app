@@ -31,7 +31,7 @@
 // ============================================================================
 import { tirMensalMenorRaiz, anualEquivalente } from "@/lib/tir";
 import type { ChaveIndiceBcb } from "@/lib/indices-bcb";
-import { consolidarFases, totalMesesItem, type ItemCarteira } from "./carteira";
+import { consolidarFases, type ItemCarteira } from "./carteira";
 
 export type FaseFluxo = { meses: number; valor: number };
 
@@ -159,31 +159,36 @@ export function custoEfetivoPlanoNovo(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Carteira multi-cota — MESMO modelo de fluxo acima, aplicado a N cotas.
+// JUNÇÃO de cartas — N cotas do MESMO segmento somadas para adquirir UM bem.
+// (Correção de escopo do Emerson, 28/07: não é portfólio de cotas
+// independentes. Cotas de segmentos diferentes não se juntam — a tela
+// bloqueia a mistura, e este modelo pressupõe esse bloqueio.)
 //
-// Não é média das TIRs individuais: média de TIR não é a TIR da carteira
-// (a taxa que zera a soma dos fluxos não é a média das taxas que zeram cada
-// fluxo). Aqui monta-se UM fluxo consolidado e resolve-se uma vez só.
+// A diferença que muda o número: o poder de compra combinado só existe
+// quando TODAS as cotas estiverem contempladas. Logo o crédito NÃO entra
+// aos poucos, cota a cota — entra de uma vez só, no cenário da ÚLTIMA
+// contemplação (`C`). Creditar cada cota no seu próprio mês adiantaria
+// dinheiro que o cliente ainda não pode usar e baratearia a junção no
+// papel.
 //
 // Saída (t=1..N): soma das parcelas ativas de todas as cotas em cada mês,
 //   via consolidarFases() — que já derruba a parcela em degraus quando uma
-//   cota curta termina antes das longas.
-// Entrada: cada item recebe seu crédito no SEU próprio mês de referência
-//   (24 veículo / 36 imóvel), corrigido pelo mesmo fator acumulado que o
-//   fluxoPlanoNovo aplica ao crédito de uma cota só. Duas cotas de tipos
-//   diferentes recebem em meses diferentes — é isso que a carteira mostra.
+//   cota curta termina antes das longas. As parcelas seguem até o fim de
+//   cada plano, inclusive depois de C, igual ao modelo de cota única.
+// Entrada: poder de compra combinado inteiro em C, corrigido pelo mesmo
+//   fator acumulado que o fluxoPlanoNovo aplica ao crédito de uma cota só.
+// Não é média das TIRs individuais: a taxa que zera a soma dos fluxos não
+//   é a média das taxas que zeram cada fluxo.
 // Sem lance: a tela Disal não tem entrada de lance (lancePct=0 no modelo de
 //   cota única também). Se um dia tiver, entra aqui pela mesma mecânica de
 //   abate de parcelas finais do fluxoPlanoNovo, não por atalho.
 // ---------------------------------------------------------------------------
 
-/** Mês de referência do recebimento da carta, por tipo de cota. Cenário
- *  declarado, nunca promessa — mesmos valores do C_REF da página. */
-export type CenarioCarteira = { veiculo: number; imovel: number };
-
 export function fluxoCarteira(params: {
   itens: ItemCarteira[];
-  C: CenarioCarteira;
+  /** Mês da ÚLTIMA contemplação — cenário de referência declarado na tela,
+   *  nunca promessa. Clampado a [1, prazo da cota mais longa]. */
+  C: number;
   comIndice?: boolean;
   indiceAnualPct?: number;
 }): number[] {
@@ -194,33 +199,33 @@ export function fluxoCarteira(params: {
   if (n <= 0) return [];
 
   const g = comIndice && indiceAnualPct != null ? indiceAnualPct / 100 : 0;
+  const cRef = Math.max(1, Math.min(Math.round(C), n));
 
   const fluxo: number[] = new Array(n + 1).fill(0); // t=0: sem desembolso na assinatura
   for (let t = 1; t <= n; t++) {
     const fator = g > 0 ? Math.pow(1 + g, Math.floor((t - 1) / 12)) : 1;
     fluxo[t] = -(faseNoMes(fases, t).valor * fator);
   }
-  for (const item of ativos) {
-    const cRef = Math.max(1, Math.min(C[item.tipo], totalMesesItem(item)));
-    const fator = g > 0 ? Math.pow(1 + g, Math.floor((cRef - 1) / 12)) : 1;
-    fluxo[cRef] += item.credito * item.quantidade * fator;
-  }
+
+  const poderDeCompra = ativos.reduce((s, i) => s + i.credito * i.quantidade, 0);
+  const fatorEmC = g > 0 ? Math.pow(1 + g, Math.floor((cRef - 1) / 12)) : 1;
+  fluxo[cRef] += poderDeCompra * fatorEmC;
+
   return fluxo;
 }
 
 /**
- * Custo efetivo da carteira inteira. Devolve `null` em cada lado que não
+ * Custo efetivo da junção inteira. Devolve `null` em cada lado que não
  * fecha numa taxa única — nunca um número aproximado no lugar.
  *
- * `indiceAnualPct`: um índice só para a carteira toda. Quem chama só deve
- * passar valor quando TODAS as cotas seguem o mesmo índice; em carteira
- * mista (veículo IPCA + imóvel INCC) o certo é passar null e a projeção sai
- * como indisponível — misturar dois índices num fator único produziria um
- * custo que não corresponde a nenhum contrato.
+ * `indiceAnualPct`: um índice só. Como a junção é de segmento único, todas
+ * as cotas seguem o mesmo índice; ainda assim, quem chama deve passar null
+ * se por qualquer motivo houver mais de um — um fator único sobre índices
+ * diferentes produziria um custo que não corresponde a nenhum contrato.
  */
 export function custoEfetivoCarteira(params: {
   itens: ItemCarteira[];
-  C: CenarioCarteira;
+  C: number;
   indiceAnualPct?: number | null;
 }): ResultadoCustoEfetivo {
   const { itens, C, indiceAnualPct } = params;
@@ -237,6 +242,61 @@ export function custoEfetivoCarteira(params: {
   }
 
   return { semCorrecao, comIndice };
+}
+
+// ---------------------------------------------------------------------------
+// Projeção da parcela com índice — MESMA convenção de degrau anual usada nos
+// fluxos acima (fator = (1+g)^floor((t−1)/12)), para que a tabela e o gráfico
+// da tela mostrem exatamente a parcela que entra no cálculo da TIR. Se as
+// duas divergissem, o vendedor mostraria um número e cobraria outro.
+//
+// `indiceAnualPct` ausente/null = projeção indisponível: devolve a série
+// NOMINAL. Quem chama tem de rotular como nominal — nunca inventar fator.
+// ---------------------------------------------------------------------------
+
+/** Parcela mês a mês (índice 0 = mês 1) já projetada. */
+export function projetarParcelaMensal(fases: FaseFluxo[], indiceAnualPct?: number | null): number[] {
+  const n = totalMeses(fases);
+  const g = indiceAnualPct != null ? indiceAnualPct / 100 : 0;
+  const serie: number[] = [];
+  for (let t = 1; t <= n; t++) {
+    const fator = g > 0 ? Math.pow(1 + g, Math.floor((t - 1) / 12)) : 1;
+    serie.push(faseNoMes(fases, t).valor * fator);
+  }
+  return serie;
+}
+
+export type AnoProjetado = {
+  ano: number;
+  mesInicio: number;
+  mesFim: number;
+  primeira: number;
+  ultima: number;
+  /** true quando alguma cota termina no meio do ano e a parcela muda. */
+  mudaNoAno: boolean;
+};
+
+/** Mesma série, agrupada em anos do plano (1..12, 13..24, ...). */
+export function projetarParcelaAnual(
+  fases: FaseFluxo[],
+  indiceAnualPct?: number | null,
+): AnoProjetado[] {
+  const serie = projetarParcelaMensal(fases, indiceAnualPct);
+  const anos: AnoProjetado[] = [];
+  for (let inicio = 0; inicio < serie.length; inicio += 12) {
+    const trecho = serie.slice(inicio, inicio + 12);
+    const primeira = trecho[0];
+    const ultima = trecho[trecho.length - 1];
+    anos.push({
+      ano: anos.length + 1,
+      mesInicio: inicio + 1,
+      mesFim: inicio + trecho.length,
+      primeira,
+      ultima,
+      mudaNoAno: trecho.some((v) => Math.abs(v - primeira) > 0.005),
+    });
+  }
+  return anos;
 }
 
 // ---------------------------------------------------------------------------
