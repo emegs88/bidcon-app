@@ -7,25 +7,17 @@
 // vazia — nunca a grade de outra administradora. Herdar a grade da Porto para
 // mostrar um número na tela da Disal seria inventar receita.
 //
-// Hoje só a Porto (id 1) tem grade cadastrada; a Disal ainda não existe em
-// consorcios.administradoras. Esta rota já responde certo quando existir.
+// Estado em 28/07/2026: Porto (id 1) com 6 grades; Disal (id 2) CADASTRADA e
+// sem nenhuma grade. Estar cadastrada não é ter grade — a resposta sai
+// `cadastrada: true, grades: []` e a tela fica muda, igual a uma
+// administradora inexistente. Coberto por lib/comissao.test.ts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { gradesVigentesDaAdministradora, type GradeComissao } from "@/lib/comissao";
 
 export const dynamic = "force-dynamic";
-
-type GradeComissao = {
-  administradora_id: number | null;
-  segmento: string;
-  parcelamento_adesao: string;
-  pct_total: number | string | null;
-  cronograma: number[] | null;
-  vigencia_inicio: string | null;
-  vigencia_fim: string | null;
-  observacao: string | null;
-};
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,11 +59,12 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     const hoje = new Date().toISOString().slice(0, 10);
-    const grades = ((data ?? []) as unknown as GradeComissao[]).filter(
-      (g) =>
-        g.administradora_id === adms.id &&
-        (g.vigencia_inicio == null || g.vigencia_inicio <= hoje) &&
-        (g.vigencia_fim == null || g.vigencia_fim >= hoje),
+    // filtro em lib pura e testada (lib/comissao.ts + comissao.test.ts):
+    // administradora cadastrada SEM grade devolve [], igual a não cadastrada.
+    const grades = gradesVigentesDaAdministradora(
+      (data ?? []) as unknown as GradeComissao[],
+      adms.id,
+      hoje,
     );
 
     return NextResponse.json({ administradora: slug, cadastrada: true, grades });

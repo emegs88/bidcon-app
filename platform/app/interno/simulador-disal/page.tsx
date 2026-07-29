@@ -21,6 +21,8 @@ import {
   totaisFallbackJuncao,
   C_LIMIAR_CORRECAO,
   formatarCustoEfetivoTexto,
+  fluxoJuncao,
+  fluxoIndependente,
   projetarParcelaMensal,
   projetarParcelaAnual,
   chaveIndiceBcb,
@@ -39,6 +41,7 @@ import {
   QTD_MAX,
   type ItemCarteira,
 } from "@/lib/disal/carteira";
+import { gradeDoSegmento, calcularComissao, type GradeComissao } from "@/lib/comissao";
 import { SimuladorTabNav } from "../SimuladorTabNav";
 
 type Segmento = "veiculo" | "imovel";
@@ -69,14 +72,7 @@ const CENARIOS_C: Record<ModoCarteira, readonly number[]> = {
 // nada aparece na tela. É o comportamento correto: nunca herdar a da Porto.
 const SLUG_ADMINISTRADORA = "disal";
 
-type GradeComissao = {
-  administradora_id: number | null;
-  segmento: string;
-  parcelamento_adesao: string;
-  pct_total: number | string | null;
-  cronograma: number[] | null;
-  observacao: string | null;
-};
+// tipo e regra vêm da lib pura testada em lib/comissao.test.ts
 
 // Acima deste número de cartas, confirmar o limite com a administradora.
 // NÃO é um teto: o campo de quantidade continua livre até QTD_MAX. Nenhum
@@ -470,6 +466,60 @@ export default function SimuladorDisal() {
 
   // Número curto para barra fixa e cards — tirado do resultado, NUNCA de
   // fatiar o texto formatado (o cenário também tem dois-pontos).
+  // Resumo de um cenário (lance + C) sem tocar no motor: chama os fluxos que
+  // já existem e lê deles o prazo efetivo. É o que o lance de fato melhora —
+  // antecipa a quitação e reduz a soma de parcelas —, ao contrário da TIR,
+  // que sobe porque o dinheiro sai mais cedo.
+  function resumirCenario(lPct: number, c: number) {
+    if (!temCarteira) return null;
+    const cEf = Math.max(1, Math.min(Math.round(c), carteira.prazoMaximo));
+    const lanceObj = { lanceProprioPct: lPct };
+    const alvoC = modo === "juncao" ? cEf : { veiculo: cEf, imovel: cEf };
+    const resultado = custoEfetivoCarteira({
+      itens: itensBase100,
+      modo,
+      C: alvoC,
+      indiceAnualPct: indiceAnualPctCarteira,
+      lance: lanceObj,
+    });
+    const fluxo =
+      modo === "juncao"
+        ? fluxoJuncao({ itens: itensBase100, C: cEf, lance: lanceObj })
+        : fluxoIndependente({ itens: itensBase100, C: { veiculo: cEf, imovel: cEf }, lance: lanceObj });
+    const prazo = Math.max(0, fluxo.length - 1);
+    const serie = projetarParcelaMensal(carteira.fases, indiceAnualPctCarteira).slice(0, prazo);
+    const somaParcelas = serie.reduce((s, v) => s + v, 0);
+    const lanceRS = (carteira.creditoTotal * lPct) / 100;
+    const met = modo === "juncao" ? escolherMetricaJuncao(resultado, cEf) : null;
+    const taxa =
+      met?.tipo === "tir_corrigida" || met?.tipo === "tir_nominal"
+        ? `${fmtPct2(met.mensal * 100)} a.m.`
+        : met?.tipo === "totais"
+          ? "sem taxa única"
+          : resultado.semCorrecao != null
+            ? `${fmtPct2(resultado.semCorrecao.mensal * 100)} a.m.`
+            : "sem taxa única";
+    return {
+      C: cEf,
+      lancePct: lPct,
+      lanceRS,
+      prazo,
+      totalPago: somaParcelas + lanceRS,
+      projetado: projecaoDisponivel,
+      taxa,
+    };
+  }
+
+  const cenarioAtual = resumirCenario(lancePct, cJuncaoEfetivo);
+  // D — comparação de 1 clique: dois cenários DECLARADOS, lado a lado
+  const cenarioSemLance = resumirCenario(0, 36);
+  const cenarioComLance = resumirCenario(30, 12);
+
+  function aplicarCenario(lPct: number, c: number) {
+    setLancePct(lPct);
+    setCJuncao(c);
+  }
+
   const custoEfetivoCurto = (() => {
     if (!resultadoCarteira) return "—";
     if (metrica?.tipo === "tir_corrigida") {
@@ -503,25 +553,15 @@ export default function SimuladorDisal() {
   }
 
   // D.4 — comissão Prospere: só aparece com grade da PRÓPRIA administradora.
-  const gradeDisal = (() => {
-    if (!gradesDisal || gradesDisal.length === 0 || !segmentoDaJuncao) return null;
-    const segBanco = segmentoDaJuncao === "veiculo" ? "auto" : "imovel";
-    return gradesDisal.find((g) => g.segmento === segBanco) ?? null;
-  })();
-  const comissaoProspere = (() => {
-    if (!gradeDisal || !temCarteira) return null;
-    const pct = Number(gradeDisal.pct_total);
-    if (!Number.isFinite(pct)) return null;
-    const total = (carteira.creditoTotal * pct) / 100;
-    const pesos = (gradeDisal.cronograma ?? []).map(Number).filter((n) => Number.isFinite(n));
-    const cron = pesos.length ? pesos : [1];
-    return {
-      pctTotal: pct,
-      totalRS: total,
-      cronogramaRS: cron.map((p) => Math.round(total * p * 100) / 100),
-      observacao: gradeDisal.observacao,
-    };
-  })();
+  // A resposta da API já vem filtrada pela administradora pedida. `grades: []`
+  // — seja porque a Disal não está cadastrada, seja porque está cadastrada
+  // (id 2) e ainda não tem grade — resulta em null aqui e o bloco não
+  // aparece. Ver lib/comissao.test.ts.
+  const gradeDisal =
+    gradesDisal && segmentoDaJuncao
+      ? gradeDoSegmento(gradesDisal, segmentoDaJuncao === "veiculo" ? "auto" : "imovel")
+      : null;
+  const comissaoProspere = temCarteira ? calcularComissao(gradeDisal, carteira.creditoTotal) : null;
 
   // Estado inválido: a tela bloqueia a mistura na entrada, então isto só
   // aparece se o bloqueio falhar. Fica como rede de segurança visível.
@@ -1540,6 +1580,46 @@ export default function SimuladorDisal() {
                   </div>
                 </>
               )}
+
+              {/* os números que o lance de fato melhora, ao lado da taxa */}
+              {cenarioAtual && (
+                <div
+                  className="dsl-cards"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+                    gap: 10,
+                    marginTop: 12,
+                    paddingTop: 12,
+                    borderTop: "1px solid #16213A",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>Prazo até quitar</div>
+                    <div className="dsl-num" style={{ fontSize: 16, color: "#8FB7FF" }}>
+                      {cenarioAtual.prazo} meses
+                    </div>
+                    {lancePct > 0 && (
+                      <div style={{ fontSize: 10, opacity: 0.5 }}>
+                        {carteira.prazoMaximo - cenarioAtual.prazo} a menos que sem lance
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>
+                      Total pago no cenário {cenarioAtual.projetado ? "(projetado)" : "(nominal)"}
+                    </div>
+                    <div className="dsl-num" style={{ fontSize: 16, color: "#8FB7FF" }}>
+                      {fmtValor(cenarioAtual.totalPago)}
+                    </div>
+                    {lancePct > 0 && (
+                      <div style={{ fontSize: 10, opacity: 0.5 }}>
+                        inclui o lance de {fmtValor(cenarioAtual.lanceRS)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* D.2 — lance próprio; embutido travado por falta de teto publicado */}
@@ -1557,7 +1637,8 @@ export default function SimuladorDisal() {
                 style={{ width: "100%" }}
               />
               <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4, lineHeight: 1.5 }}>
-                Recurso do bolso do cliente, abatendo parcelas finais — mesma mecânica do motor de cota única.
+                O lance abate parcelas finais (antecipa a quitação). O que ele compra de verdade é chance de
+                contemplar mais cedo — ao aumentar o lance, ajuste o cenário C para baixo.
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
                 <input type="range" min={0} max={50} value={0} disabled aria-label="Lance embutido (indisponível)"
@@ -1566,6 +1647,68 @@ export default function SimuladorDisal() {
                   Lance embutido indisponível — teto Disal não publicado; confirmar com a administradora.
                 </span>
               </div>
+
+              {/* comparação de 1 clique — dois cenários DECLARADOS */}
+              {cenarioSemLance && cenarioComLance && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #16213A" }}>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
+                    Comparar cenários — os dois são hipóteses declaradas para conversar com o cliente, nenhum é
+                    previsão de quando a carta sai.
+                  </div>
+                  <div
+                    className="dsl-cards"
+                    style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}
+                  >
+                    {[
+                      { titulo: "Sem lance · C=36", r: cenarioSemLance },
+                      { titulo: "Lance 30% · C=12", r: cenarioComLance },
+                    ].map(({ titulo, r }) => {
+                      const ativo = lancePct === r.lancePct && cJuncaoEfetivo === r.C;
+                      return (
+                        <div
+                          key={titulo}
+                          style={{ ...S.card, borderColor: ativo ? "#1E6FE6" : "#16213A" }}
+                        >
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#8FB7FF" }}>{titulo}</div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Custo efetivo</div>
+                          <div className="dsl-num" style={{ fontSize: 15, color: "#36C5F0" }}>
+                            {r.taxa}
+                          </div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Prazo até quitar</div>
+                          <div className="dsl-num" style={{ fontSize: 15 }}>{r.prazo} meses</div>
+                          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>
+                            Total pago {r.projetado ? "(projetado)" : "(nominal)"}
+                          </div>
+                          <div className="dsl-num" style={{ fontSize: 15 }}>{fmtValor(r.totalPago)}</div>
+                          <button
+                            onClick={() => aplicarCenario(r.lancePct, r.C)}
+                            className="dsl-toque"
+                            style={{
+                              marginTop: 10,
+                              width: "100%",
+                              padding: "8px 0",
+                              borderRadius: 8,
+                              border: "1px solid #1E6FE6",
+                              background: ativo ? "linear-gradient(90deg,#36C5F0,#1E6FE6)" : "transparent",
+                              color: ativo ? "#0A0E1A" : "#8FB7FF",
+                              cursor: "pointer",
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          >
+                            {ativo ? "Cenário aplicado ✓" : "Usar este cenário"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, opacity: 0.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+                    O lance maior sai mais caro na taxa porque o dinheiro sai antes — o que ele melhora é o prazo e o
+                    total pago. Por isso os dois cenários vêm com C diferente: comparar lance alto mantendo o mesmo
+                    mês de contemplação esconde justamente o que o lance compra.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div style={{ ...S.card, marginTop: 10 }}>
