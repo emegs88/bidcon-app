@@ -1,0 +1,53 @@
+name: testes
+
+# POR QUE ESTE WORKFLOW EXISTE
+# Em 24/07/2026 o commit 617d2a0 estreitou o guardrail de compliance e, sem
+# querer, parou de bloquear "contemplação no mês N" — promessa de data de
+# contemplação, a violação mais grave do projeto. O teste que cobria isso
+# ficou VERMELHO na main e assim permaneceu por 5 dias, invisível: os testes
+# só rodavam quando alguém digitava `npx tsx --test` à mão.
+#
+# Este workflow existe para que esse tipo de regressão vire check vermelho no
+# PR no mesmo dia. Ele NÃO tem continue-on-error e NÃO tem `|| true` em passo
+# nenhum: qualquer teste quebrado derruba o job, e o job derruba o check.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Um PR que recebe vários pushes seguidos só precisa do resultado do último.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    # O app Next vive em platform/; a raiz do repo é o site estático.
+    defaults:
+      run:
+        working-directory: platform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20 # LTS ativa
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+
+      # `npm ci` (não `npm install`): instala exatamente o lockfile e falha se
+      # package.json e package-lock.json estiverem fora de sincronia.
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Checagem de tipos
+        run: npx tsc --noEmit
+
+      - name: Testes
+        run: npm test
