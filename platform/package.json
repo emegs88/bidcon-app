@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test lib/ia.guardrail.test.ts lib/disal/custo-efetivo-plano-novo.test.ts lib/reserve/0017.test.ts lib/reserve/repasse-pricing.test.ts lib/reserve/reserve.test.ts lib/simulador/engine.test.ts lib/simulador/otimizador.test.ts lib/whatsapp/cerebro.test.ts"
+    "test": "tsx --tsconfig tsconfig.test.json --test lib/comissao.test.ts lib/ia.guardrail.test.ts lib/simulador-disal.test.tsx lib/disal/custo-efetivo-plano-novo.test.ts lib/reserve/0017.test.ts lib/reserve/repasse-pricing.test.ts lib/reserve/reserve.test.ts lib/simulador/engine.test.ts lib/simulador/otimizador.test.ts lib/whatsapp/cerebro.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.7",
     "tsx": "^4.23.1",
     "typescript": "^5.5.4"
   }

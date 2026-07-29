@@ -1,0 +1,7 @@
+{
+  "//": "Só para rodar os testes com tsx. O tsconfig do app usa jsx: 'preserve' porque quem transforma o JSX é o Next; fora dele o tsx cairia no transform clássico (React.createElement) e estouraria 'React is not defined'. Aqui o runtime automático resolve, sem tocar na config do build.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}

@@ -23,6 +23,7 @@ Campos e valores permitidos:
 - lancePct: número de 0 a 80; se a pessoa der o lance em reais, converta para % do crédito; se não mencionar, use 30
 - tipoLance: "livre" (recurso próprio) | "embutido" (abate do crédito)
 - codigo: código do grupo se citado (ex.: "AF217"), senão null
+- quantidade: número de 1 a 100 — quantas cartas IGUAIS o cliente quer ("juntar 3 cartas de 200 mil" => 3); se não disser, 1
 - modalidade: "venda_nova" (cota não contemplada, padrão) | "contemplada" (se falar em carta contemplada, Bidcon, cota já contemplada)
 - parcelamentoAdesao: "a_vista" | "3x" | "5x" | "12x" | "qualquer" (padrão "qualquer")
 - resumoPedido: frase curta em português confirmando o que foi entendido
@@ -32,6 +33,8 @@ Regras de interpretação:
 - "caminhão", "carreta", "cavalo mecânico", "frota" => segmento "pesados".
 - "casa", "apartamento", "terreno", "imóvel", "obra" => "imovel". "carro", "veículo", "moto" => "auto".
 - Se o lance vier em reais, lancePct = round(lance / crédito * 100).
+- "juntar N cartas de X" / "N cotas de X" => modo "juncao", quantidade N,
+  credito = X (valor de CADA carta) e creditoAlvo = N × X (o total).
 - Nunca invente segmento: se não der para saber, use null.`;
 
 export async function POST(req: NextRequest) {
@@ -106,6 +109,7 @@ export async function POST(req: NextRequest) {
         credito: params.credito != null ? lim(params.credito, 1000, 50_000_000, 100_000) : null,
         creditoAlvo: params.creditoAlvo != null ? lim(params.creditoAlvo, 1000, 50_000_000, 1_000_000) : null,
         lancePct: lim(params.lancePct, 0, 80, 30),
+        quantidade: Math.round(lim(params.quantidade, 1, 100, 1)),
         tipoLance: params.tipoLance === "embutido" ? "embutido" : "livre",
         codigo: typeof params.codigo === "string" ? params.codigo.toUpperCase() : null,
         modalidade: params.modalidade === "contemplada" ? "contemplada" : "venda_nova",
