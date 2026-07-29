@@ -164,3 +164,70 @@ test("[regressão] formato antigo 'contemplação no mês N' É engolido pelo gu
     "se isto falhar, o guardrail mudou de comportamento — revisar antes de reintroduzir 'contemplação no mês N' em qualquer texto de chat"
   );
 });
+
+// ============================================================================
+// 5) Regressão 2026-07-29 — o teste acima ficou VERMELHO na main e ninguém
+//    viu. O matcher F3.1 (commit 617d2a0) trocou a janela genérica por
+//    padrões com verbo explícito e, ao fazer isso, deixou de pegar a forma
+//    "apontar um mês/data" — que é promessa igual, só que sem verbo.
+//    Aqui a cobertura é ampliada para as variações, dos dois lados: o que
+//    TEM de bloquear e o que NÃO pode voltar a bloquear.
+// ============================================================================
+const PROMESSAS_DE_DATA = [
+  "contemplação no mês 36",
+  "contemplacao no mes 12",
+  "você é contemplado no mês 24",
+  "contemplação prevista para o mês 36",
+  "contemplação no 36º mês",
+  "contemplado em até 3 meses",
+  "contempla em 6 meses",
+  "contemplação em março",
+  "contemplado até dezembro",
+  "contemplação em 03/2026",
+  "sua carta será contemplada no mês 18 do grupo",
+];
+
+for (const frase of PROMESSAS_DE_DATA) {
+  test(`[guardrail] promessa de data BLOQUEIA: "${frase}"`, () => {
+    assert.equal(
+      sanitizarCompliance(`Boa tarde! ${frase}, pode contar com isso.`, FALLBACK_TESTE),
+      FALLBACK_TESTE,
+      "apontar mês/data de contemplação nunca pode chegar ao cliente",
+    );
+  });
+}
+
+// O falso-positivo de 2026-07-23 bloqueava "carta já contemplada" — o nome do
+// próprio produto. A correção de hoje NÃO pode reabrir isso.
+const ESTADO_DO_PRODUTO = [
+  "Essa carta já está contemplada e disponível",
+  "Temos cotas contempladas da Embracon",
+  "Foi contemplada por sorteio na 1ª assembleia",
+  "Foi contemplada por sorteio na primeira assembleia",
+  "carta de crédito contemplada, pronta para transferência",
+  "a cota foi contemplada por lance no grupo anterior",
+];
+
+for (const frase of ESTADO_DO_PRODUTO) {
+  test(`[guardrail] estado do produto PASSA: "${frase}"`, () => {
+    assert.equal(
+      sanitizarCompliance(frase, FALLBACK_TESTE),
+      frase,
+      "descrever uma carta já contemplada é fato do produto, não promessa — bloquear aqui foi o bug de 2026-07-23",
+    );
+  });
+}
+
+// A frase que o próprio simulador manda para o chat continua passando: foi
+// justamente por isso que "contemplação no mês N" virou "carta de crédito no
+// mês N" nos textos de produção.
+test("[guardrail] o formato ATUAL do custo efetivo continua passando", () => {
+  const atual = formatarCustoEfetivoTexto({
+    resultado: { semCorrecao: { mensal: 0.0059, anual: 0.073 }, comIndice: { mensal: 0.0105, anual: 0.1336 } },
+    C: 36,
+    indiceNome: "INCC",
+    indiceAnualPct: 5,
+  });
+  assert.ok(atual.includes("carta de crédito no mês 36"));
+  assert.equal(sanitizarCompliance(atual, FALLBACK_TESTE), atual, "o texto de produção não pode cair no fallback");
+});
