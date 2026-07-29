@@ -190,6 +190,35 @@ const PROMESSA_PRAZO_PATTERNS: RegExp[] = [
   /\bcontemplacao (garantida|rapida|certa|imediata)\b/, // "contemplação GARANTIDA/RÁPIDA/..."
   /\bcontempla(cao|do|da)?\s+em\s+(ate\s+)?\d+\s*(dias?|meses|semanas?)\b/, // "contemplado EM até 3 MESES"
   /\bgarant\w*[\s\S]{0,20}contempl\w*/, // "GARANTIMOS ... CONTEMPLAção" (qualquer ordem/distância curta)
+
+  // --------------------------------------------------------------------
+  // REGRESSÃO 2026-07-29 — apontar um MÊS ou uma DATA específica também é
+  // promessa, mesmo sem verbo de futuro.
+  //
+  // O matcher F3.1 (acima) trocou a janela genérica de 40 chars por padrões
+  // com verbo explícito, e com isso perdeu a forma "contemplação no mês N" —
+  // que a janela antiga pegava e o teste de regressão de
+  // lib/disal/custo-efetivo-plano-novo.test.ts documentava. O teste passou a
+  // falhar na main sem que ninguém percebesse.
+  //
+  // Estes padrões NÃO reabrem o falso-positivo de 2026-07-23 ("carta já
+  // contemplada" / "cota contemplada" / "foi contemplada por sorteio na 1ª
+  // assembleia"): todos exigem, depois da âncora, uma PREPOSIÇÃO DE DESTINO
+  // seguida de um alvo temporal CONCRETO — mês com número, nome de mês ou
+  // data. Estado do produto não tem alvo temporal concreto; a ponte de até 3
+  // palavras cobre "prevista para", sem virar janela genérica de novo.
+  // --------------------------------------------------------------------
+  /\bcontempla\w*(\s+\w+){0,3}\s+(n[oa]|em|para|ate|apos)\s+(o\s+)?mes\s+\d+/, // "contemplação no mês 36"
+  /\bcontempla\w*(\s+\w+){0,3}\s+(n[oa]|em|para|ate|apos)\s+(o\s+)?\d+\s*[oaº]?\s*mes\b/, // "contemplação no 36º mês"
+  /\bcontempla\w*(\s+\w+){0,3}\s+(n[oa]|em|para|ate|apos)\s+(o\s+mes\s+de\s+)?(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/, // "contemplação em março"
+  /\bcontempla\w*(\s+\w+){0,3}\s+(n[oa]|em|para|ate|apos)\s+\d{1,2}\/\d{1,2}/, // "contemplação em 03/2026"
+
+  // NÃO incluído de propósito: "contemplação na próxima/primeira assembleia".
+  // Bloquearia junto "foi contemplada por sorteio na primeira assembleia", que
+  // é FATO passado sobre o produto — exatamente a classe de frase do
+  // falso-positivo de 2026-07-23. Separar promessa de relato aqui exige
+  // checagem de tempo verbal, que é fatia própria. O DoD desta correção é
+  // mês/data com número.
 ];
 
 // Negações que LIBERAM a promessa ("não há data", "sem prazo de contemplação",
