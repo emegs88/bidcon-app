@@ -17,6 +17,9 @@ import {
 import {
   custoEfetivoPlanoNovo,
   custoEfetivoCarteira,
+  escolherMetricaJuncao,
+  totaisFallbackJuncao,
+  C_LIMIAR_CORRECAO,
   formatarCustoEfetivoTexto,
   projetarParcelaMensal,
   projetarParcelaAnual,
@@ -48,6 +51,32 @@ type Base = "100" | "75";
 // contra o crédito cheio produziria um custo menor do que o real — número
 // de custo errado é pior que ausência de número.
 type ItemCarteiraUI = ItemCarteira & { fasesBase100: FaseFluxo[] };
+
+// Junção = várias cartas para UM bem (mesmo segmento, mesma administradora).
+// Independente = cotas que não se juntam, cada uma comprando o seu bem.
+// São dois produtos diferentes, com dois modelos de fluxo diferentes — não é
+// só rótulo. Ver os dois motores em lib/disal/custo-efetivo-plano-novo.ts.
+type ModoCarteira = "juncao" | "independente";
+
+// Cenários oferecidos em cada modo. Na junção começam mais tarde de
+// propósito: quanto mais cartas, mais tarde tende a ser a última contemplação.
+const CENARIOS_C: Record<ModoCarteira, readonly number[]> = {
+  juncao: [24, 36, 48, 60],
+  independente: [12, 24, 36, 48],
+};
+
+// A Disal ainda não está em consorcios.administradoras — a grade vem vazia e
+// nada aparece na tela. É o comportamento correto: nunca herdar a da Porto.
+const SLUG_ADMINISTRADORA = "disal";
+
+type GradeComissao = {
+  administradora_id: number | null;
+  segmento: string;
+  parcelamento_adesao: string;
+  pct_total: number | string | null;
+  cronograma: number[] | null;
+  observacao: string | null;
+};
 
 // Acima deste número de cartas, confirmar o limite com a administradora.
 // NÃO é um teto: o campo de quantidade continua livre até QTD_MAX. Nenhum
@@ -178,8 +207,18 @@ export default function SimuladorDisal() {
   const [nomeCliente, setNomeCliente] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [itens, setItens] = useState<ItemCarteiraUI[]>([]);
-  // null = acompanha o default do segmento; número = valor digitado pelo vendedor
+  const [modo, setModo] = useState<ModoCarteira>("juncao");
+  // null = acompanha o default do segmento; número = cenário escolhido/digitado
   const [cJuncao, setCJuncao] = useState<number | null>(null);
+  const [lancePct, setLancePct] = useState(0);
+  const [parcelaAlvo, setParcelaAlvo] = useState("");
+  const [frase, setFrase] = useState("");
+  const [interpretando, setInterpretando] = useState(false);
+  const [resumoPedido, setResumoPedido] = useState("");
+  const [erroFrase, setErroFrase] = useState("");
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  const [gradesDisal, setGradesDisal] = useState<GradeComissao[] | null>(null);
+  const [restaurado, setRestaurado] = useState(false);
   // comparador com financiamento — sem taxa default de propósito (G.1)
   const [comparadorAberto, setComparadorAberto] = useState(false);
   const [taxaFin, setTaxaFin] = useState("");
@@ -266,35 +305,35 @@ export default function SimuladorDisal() {
   // "mesmo cod + base", mas o código do bem se repete entre créditos
   // diferentes do boletim — incluir o crédito impede fundir duas cartas
   // distintas numa linha só.
-  function montarItemAuto(credito: number, quantidade: number): ItemCarteiraUI {
+  function montarItemAuto(credito: number, quantidade: number, b: Base = base): ItemCarteiraUI {
     const { linha, faixa, rotuloFaixa: rf } = linhaAutoMaisProxima(credito, autosFaixaII, autosFaixaIII);
     const [creditoReal, cod, p100, p75] = linha;
     return {
-      id: `veiculo|${cod}|${creditoReal}|${base}`,
+      id: `veiculo|${cod}|${creditoReal}|${b}`,
       tipo: "veiculo",
       rotulo: `Veículo · ${fmtCredito(creditoReal)} · ${rf}`,
       cod,
       credito: creditoReal,
       quantidade,
-      base,
+      base: b,
       prazo: faixa.prazo,
       taxa: faixa.taxa,
       indice: faixa.indice,
-      fases: [{ meses: faixa.prazo, valor: base === "100" ? p100 : p75 }],
+      fases: [{ meses: faixa.prazo, valor: b === "100" ? p100 : p75 }],
       fasesBase100: [{ meses: faixa.prazo, valor: p100 }],
     };
   }
 
-  function montarItemImovel(linha: LinhaImovel, quantidade: number): ItemCarteiraUI {
-    const f = base === "100" ? linha.b100 : linha.b75;
+  function montarItemImovel(linha: LinhaImovel, quantidade: number, b: Base = base): ItemCarteiraUI {
+    const f = b === "100" ? linha.b100 : linha.b75;
     return {
-      id: `imovel|${linha.cod}|${linha.credito}|${base}`,
+      id: `imovel|${linha.cod}|${linha.credito}|${b}`,
       tipo: "imovel",
       rotulo: `Imóvel · ${fmtCredito(linha.credito)}`,
       cod: linha.cod,
       credito: linha.credito,
       quantidade,
-      base,
+      base: b,
       prazo: imoveis220.prazo,
       taxa: imoveis220.taxa,
       indice: imoveis220.indice,
@@ -326,11 +365,12 @@ export default function SimuladorDisal() {
     setCJuncao(null);
   }
 
-  // Segmento travado pela primeira carta adicionada. Junção é para UM bem:
-  // veículo e imóvel não se somam, então a mistura é estado inválido, não
-  // alerta — o botão de adicionar do outro segmento fica desabilitado.
+  // Segmento travado pela primeira carta adicionada — SÓ no modo junção.
+  // Junção é para UM bem: veículo e imóvel não se somam, então a mistura é
+  // estado inválido, não alerta. No modo independente as cotas não se juntam,
+  // logo misturar segmentos é legítimo e nada é bloqueado.
   const segmentoDaJuncao = itens.find((i) => i.quantidade > 0)?.tipo ?? null;
-  const segmentoBloqueado = segmentoDaJuncao != null && segmentoDaJuncao !== segmento;
+  const segmentoBloqueado = modo === "juncao" && segmentoDaJuncao != null && segmentoDaJuncao !== segmento;
   const nomeSegmento = (t: "veiculo" | "imovel") => (t === "veiculo" ? "veículo" : "imóvel");
   const razaoBloqueio = segmentoBloqueado
     ? `A junção em andamento é de ${nomeSegmento(segmentoDaJuncao!)}. Cartas de ${nomeSegmento(segmento)} não podem ser juntadas com as de ${nomeSegmento(segmentoDaJuncao!)} — junção é para um bem só, do mesmo segmento. Limpe a junção para começar outra.`
@@ -386,20 +426,43 @@ export default function SimuladorDisal() {
     ? indicesBcb?.[chaveIndiceCarteira]?.acumulado12m ?? null
     : null;
 
+  const itensBase100 = itens.map((i) => ({ ...i, fases: i.fasesBase100 }));
+  const lance = { lanceProprioPct: lancePct };
+
   const resultadoCarteira = temCarteira
     ? custoEfetivoCarteira({
         // TIR sempre sobre a Base 100% — ver nota em ItemCarteiraUI.
-        itens: itens.map((i) => ({ ...i, fases: i.fasesBase100 })),
-        C: cJuncaoEfetivo,
+        itens: itensBase100,
+        modo,
+        C: modo === "juncao" ? cJuncaoEfetivo : { veiculo: cJuncaoEfetivo, imovel: cJuncaoEfetivo },
         indiceAnualPct: indiceAnualPctCarteira,
+        lance,
       })
     : null;
+
+  // Decisão da métrica (regra do Emerson): a partir de C=48 na junção, a
+  // corrigida vira a principal; se nem ela fechar, só totais em R$.
+  const metrica = temCarteira && modo === "juncao" ? escolherMetricaJuncao(resultadoCarteira!, cJuncaoEfetivo) : null;
+  const totaisFallback =
+    metrica?.tipo === "totais"
+      ? totaisFallbackJuncao({
+          fases: carteira.fases,
+          poderDeCompra: carteira.creditoTotal,
+          C: cJuncaoEfetivo,
+          indiceAnualPct: indiceAnualPctCarteira,
+        })
+      : null;
+
+  const cenarioTexto =
+    modo === "juncao"
+      ? `poder de compra combinado no mês ${cJuncaoEfetivo}`
+      : `carta de crédito no mês ${cJuncaoEfetivo}`;
 
   const custoEfetivoTextoCarteira = temCarteira
     ? formatarCustoEfetivoTexto({
         resultado: resultadoCarteira!,
         C: cJuncaoEfetivo,
-        cenario: `poder de compra combinado no mês ${cJuncaoEfetivo}`,
+        cenario: cenarioTexto,
         indiceNome: indiceNomeCarteira,
         indiceAnualPct: indiceAnualPctCarteira,
       })
@@ -407,14 +470,58 @@ export default function SimuladorDisal() {
 
   // Número curto para barra fixa e cards — tirado do resultado, NUNCA de
   // fatiar o texto formatado (o cenário também tem dois-pontos).
-  const custoEfetivoCurto =
-    resultadoCarteira?.semCorrecao != null
-      ? `${fmtPct2(resultadoCarteira.semCorrecao.mensal * 100)} a.m.`
-      : "não fecha numa taxa única";
+  const custoEfetivoCurto = (() => {
+    if (!resultadoCarteira) return "—";
+    if (metrica?.tipo === "tir_corrigida") {
+      return `${fmtPct2(metrica.mensal * 100)} a.m. com ${indiceNomeCarteira ?? "índice"} projetado`;
+    }
+    if (metrica?.tipo === "totais") return "sem taxa única — ver totais em R$";
+    if (resultadoCarteira.semCorrecao != null) return `${fmtPct2(resultadoCarteira.semCorrecao.mensal * 100)} a.m.`;
+    return "não fecha numa taxa única";
+  })();
   const custoEfetivoCurtoComIndice =
-    resultadoCarteira?.comIndice != null
+    metrica?.tipo !== "tir_corrigida" && resultadoCarteira?.comIndice != null
       ? `${fmtPct2(resultadoCarteira.comIndice.mensal * 100)} a.m. com ${indiceNomeCarteira} projetado — estimativa`
+      : metrica?.tipo === "tir_corrigida" && resultadoCarteira?.semCorrecao != null
+        ? `${fmtPct2(resultadoCarteira.semCorrecao.mensal * 100)} a.m. sem correção`
+        : null;
+
+  // D.1 — parcela alvo: sugere quantidade, nada automático. O vendedor
+  // clica se quiser. Base: parcela inicial de UMA carta da configuração atual.
+  const parcelaAlvoNum = Number(parcelaAlvo.replace(/\./g, "").replace(",", "."));
+  const parcelaUnitariaAtual = itemAtual().fases[0]?.valor ?? 0;
+  const qtdSugerida =
+    Number.isFinite(parcelaAlvoNum) && parcelaAlvoNum > 0 && parcelaUnitariaAtual > 0
+      ? Math.max(QTD_MIN, Math.min(QTD_MAX, Math.floor(parcelaAlvoNum / parcelaUnitariaAtual)))
       : null;
+
+  function aplicarQuantidadeSugerida() {
+    if (qtdSugerida == null) return;
+    const novo = itemAtual();
+    setItens([{ ...novo, quantidade: qtdSugerida }]);
+    setCJuncao(null);
+  }
+
+  // D.4 — comissão Prospere: só aparece com grade da PRÓPRIA administradora.
+  const gradeDisal = (() => {
+    if (!gradesDisal || gradesDisal.length === 0 || !segmentoDaJuncao) return null;
+    const segBanco = segmentoDaJuncao === "veiculo" ? "auto" : "imovel";
+    return gradesDisal.find((g) => g.segmento === segBanco) ?? null;
+  })();
+  const comissaoProspere = (() => {
+    if (!gradeDisal || !temCarteira) return null;
+    const pct = Number(gradeDisal.pct_total);
+    if (!Number.isFinite(pct)) return null;
+    const total = (carteira.creditoTotal * pct) / 100;
+    const pesos = (gradeDisal.cronograma ?? []).map(Number).filter((n) => Number.isFinite(n));
+    const cron = pesos.length ? pesos : [1];
+    return {
+      pctTotal: pct,
+      totalRS: total,
+      cronogramaRS: cron.map((p) => Math.round(total * p * 100) / 100),
+      observacao: gradeDisal.observacao,
+    };
+  })();
 
   // Estado inválido: a tela bloqueia a mistura na entrada, então isto só
   // aparece se o bloqueio falhar. Fica como rede de segurança visível.
@@ -468,31 +575,181 @@ export default function SimuladorDisal() {
     if (typeof window !== "undefined") window.print();
   }
 
+  // -------------------------------------------------------------------
+  // D.3 — estado serializado na querystring. Link interno: só abre para
+  // quem tem sessão admin (a página vive sob /interno). Não é link público.
+  // -------------------------------------------------------------------
+  function querystringAtual(): string {
+    const cartas = itens
+      .filter((i) => i.quantidade > 0)
+      .map((i) => `${i.tipo === "veiculo" ? "v" : "i"}-${i.credito}-${i.quantidade}`)
+      .join(",");
+    const p = new URLSearchParams();
+    p.set("modo", modo);
+    p.set("base", base);
+    if (cartas) p.set("cartas", cartas);
+    if (cJuncao != null) p.set("c", String(cJuncao));
+    if (lancePct > 0) p.set("lance", String(lancePct));
+    return p.toString();
+  }
+
+  async function copiarLink() {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}${window.location.pathname}?${querystringAtual()}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2000);
+    } catch {
+      /* sem clipboard: o vendedor copia da barra de endereço */
+    }
+  }
+
+  // restaura uma vez, na montagem
+  useEffect(() => {
+    if (restaurado) return;
+    setRestaurado(true);
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const cartas = p.get("cartas");
+    if (!cartas) return;
+    const b: Base = p.get("base") === "75" ? "75" : "100";
+    const m: ModoCarteira = p.get("modo") === "independente" ? "independente" : "juncao";
+    const novos: ItemCarteiraUI[] = [];
+    for (const parte of cartas.split(",")) {
+      const [t, cred, qtd] = parte.split("-");
+      const credito = Number(cred);
+      const quantidade = Math.max(QTD_MIN, Math.min(QTD_MAX, Number(qtd) || 1));
+      if (!Number.isFinite(credito) || credito <= 0) continue;
+      if (t === "v") novos.push(montarItemAuto(credito, quantidade, b));
+      else if (t === "i") {
+        const linha = imoveis220.linhas.find((l) => l.credito === credito);
+        if (linha) novos.push(montarItemImovel(linha, quantidade, b));
+      }
+    }
+    if (novos.length === 0) return;
+    setBase(b);
+    setModo(m);
+    setSegmento(novos[0].tipo);
+    setItens(novos);
+    const c = Number(p.get("c"));
+    if (Number.isFinite(c) && c > 0) setCJuncao(c);
+    const l = Number(p.get("lance"));
+    if (Number.isFinite(l) && l > 0) setLancePct(Math.min(50, l));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurado]);
+
+  // D.4 — grade de comissão da própria administradora. 401/403/vazio => nada
+  // na tela. Nunca cai na grade de outra administradora.
+  useEffect(() => {
+    fetch(`/api/comissoes?administradora=${SLUG_ADMINISTRADORA}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setGradesDisal(Array.isArray(d?.grades) ? d.grades : []))
+      .catch(() => setGradesDisal([]));
+  }, []);
+
+  // -------------------------------------------------------------------
+  // C — conversa. A IA só extrai parâmetros; o snap para um crédito que
+  // existe no boletim e todo o cálculo continuam aqui.
+  // -------------------------------------------------------------------
+  async function interpretarFrase() {
+    if (!frase.trim()) return;
+    setInterpretando(true);
+    setErroFrase("");
+    setResumoPedido("");
+    try {
+      const r = await fetch("/api/interpretar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ texto: frase }),
+      });
+      const d = await r.json();
+      if (r.status === 422) {
+        setErroFrase("Não entendi — tente reescrever.");
+        return;
+      }
+      if (!r.ok || d.erro) throw new Error(d.erro ?? "não consegui interpretar");
+
+      const q = d.parametros ?? {};
+      // o boletim Disal tem veículo e imóvel; "auto" da IA vira "veiculo"
+      const tipo: Segmento = q.segmento === "imovel" ? "imovel" : "veiculo";
+      const quantidade = Math.max(QTD_MIN, Math.min(QTD_MAX, Number(q.quantidade) || 1));
+      const creditoPedido = Number(q.credito) > 0 ? Number(q.credito) : null;
+      if (creditoPedido == null) {
+        setErroFrase("Entendi o pedido, mas sem o valor da carta não dá para montar. Diga o valor do crédito.");
+        return;
+      }
+      // "juntar N cartas" é junção; carta única não muda o modo escolhido
+      const novoModo: ModoCarteira = quantidade > 1 ? "juncao" : modo;
+
+      let item: ItemCarteiraUI | null = null;
+      if (tipo === "veiculo") {
+        item = montarItemAuto(creditoPedido, quantidade);
+        setCreditoAuto(item.credito);
+      } else {
+        // snap: crédito de imóvel mais próximo entre os que existem no boletim
+        const linha = imoveis220.linhas.reduce((melhor, l) =>
+          Math.abs(l.credito - creditoPedido) < Math.abs(melhor.credito - creditoPedido) ? l : melhor,
+        );
+        item = montarItemImovel(linha, quantidade);
+        setImovelIdx(imoveis220.linhas.findIndex((l) => l.cod === linha.cod));
+      }
+
+      setSegmento(tipo);
+      setModo(novoModo);
+      setItens([item]);
+      setCJuncao(null);
+      const snap =
+        item.credito !== creditoPedido
+          ? ` (ajustei para ${fmtCredito(item.credito)}, crédito que existe no boletim ${mes})`
+          : "";
+      setResumoPedido(
+        `${quantidade > 1 ? `junção de ${quantidade} cartas` : "1 carta"} de ${fmtCredito(item.credito)} em ${
+          tipo === "veiculo" ? "veículo" : "imóvel"
+        }${snap}. ${q.resumoPedido ?? ""}`.trim(),
+      );
+    } catch (e: any) {
+      setErroFrase(e.message ?? "não consegui interpretar");
+    } finally {
+      setInterpretando(false);
+    }
+  }
+
   function gerarTextoCarteira(): string {
     const nome = nomeCliente.trim() || "Olá";
     const ativos = itens.filter((i) => i.quantidade > 0);
     const bem = segmentoDaJuncao === "imovel" ? "Imóveis" : "Veículos";
+    const ehJuncao = modo === "juncao";
     return [
-      `🧾 *Junção de cartas — Disal · ${bem}*`,
+      ehJuncao ? `🧾 *Junção de cartas — Disal · ${bem}*` : `🧾 *Cotas de consórcio — Disal*`,
       `_Boletim de Crédito · ${mes}_`,
       ``,
       `${nome}, segue sua simulação 👇`,
       ``,
-      `*Cartas da junção*`,
+      ehJuncao ? `*Cartas da junção*` : `*Cotas selecionadas*`,
       ...ativos.map(
         (i) =>
           `• ${i.quantidade}× ${fmtCredito(i.credito)} — ${i.prazo} meses (Base ${i.base === "100" ? "100%" : "75% Light"})`,
       ),
       ``,
-      `💳 Poder de compra combinado: *${fmtCredito(carteira.creditoTotal)}*`,
+      ehJuncao
+        ? `💳 Poder de compra combinado: *${fmtCredito(carteira.creditoTotal)}*`
+        : `💳 Crédito total: *${fmtCredito(carteira.creditoTotal)}*`,
       `🛡️ Seguro prestamista incluso`,
       ``,
       `✅ *Parcela somada:*`,
       ...linhasFases.map((l) => `   ${l}`),
       ``,
       `💰 Total do plano (sem reajustes): ${fmtValor(carteira.totalPlano)}`,
-      `📊 Custo além do poder de compra: ${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
-      `📈 ${custoEfetivoTextoCarteira}`,
+      `📊 Custo além do ${ehJuncao ? "poder de compra" : "crédito"}: ${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
+      ...(metrica?.tipo === "totais" && totaisFallback
+        ? [
+            `📈 Neste cenário o fluxo não fecha numa taxa única — nem com a correção projetada. Os números em reais:`,
+            `   Total pago ao longo do plano: ${fmtValor(totaisFallback.totalPagoProjetado)}`,
+            `   Poder de compra no mês ${cJuncaoEfetivo}: ${fmtValor(totaisFallback.poderDeCompraCorrigido)}`,
+          ]
+        : [`📈 ${custoEfetivoTextoCarteira}`]),
+      ...(lancePct > 0 ? [`🎯 Lance próprio considerado: ${lancePct}% (${fmtValor((carteira.creditoTotal * lancePct) / 100)})`] : []),
       `_(cenário de referência declarado, não é promessa de prazo)_`,
       ...(projecaoDisponivel && anosProjetados.length > 1
         ? [
@@ -509,7 +766,7 @@ export default function SimuladorDisal() {
         ? [
             ``,
             `⚖️ *Comparação com financiamento* (taxa informada: ${taxaFin.replace(".", ",")}% ${unidadeTaxa === "am" ? "a.m." : "a.a."}, entrada ${entradaPct}%)`,
-            `   Consórcio — total do plano ${fmtValor(carteira.totalPlano)} · custo efetivo ${custoEfetivoCurto} (cenário: poder de compra combinado no mês ${cJuncaoEfetivo})`,
+            `   Consórcio — total do plano ${fmtValor(carteira.totalPlano)} · custo efetivo ${custoEfetivoCurto} (cenário: ${cenarioTexto})`,
             ...comparaveis.map(
               (f) =>
                 `   Financiamento ${f.sistema === "sac" ? "SAC" : "Price"} — total ${fmtValor(f.totalPago)} · 1ª ${fmtValor(f.primeiraParcela)} · última ${fmtValor(f.ultimaParcela)} · custo efetivo ${f.tirMes != null ? fmtPct2(f.tirMes * 100) : "—"} a.m.`,
@@ -524,8 +781,8 @@ export default function SimuladorDisal() {
           ]
         : []),
       ``,
-      `⚠️ ${AVISO_JUNCAO}`,
-      ...avisosCarteira.map((a) => `⚠️ ${a}`),
+      ...(ehJuncao ? [`⚠️ ${AVISO_JUNCAO}`] : []),
+      ...(ehJuncao ? avisosCarteira.map((a) => `⚠️ ${a}`) : []),
       ``,
       `Compra programada para o seu patrimônio, sem juros de financiamento.`,
       `Contemplação por sorteio ou lance mensal.`,
@@ -648,6 +905,72 @@ export default function SimuladorDisal() {
           Boletim de Crédito · {mes} — parcelas com seguro prestamista incluso. Contemplação por sorteio ou lance
           mensal, nunca prometida por data.
         </p>
+
+        {/* A — modo: dois produtos diferentes, dois modelos de fluxo */}
+        <div className="dsl-nao-imprime" style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 8 }}>Modo</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(
+              [
+                ["juncao", "Junção — um bem só", "Várias cartas somadas para comprar UM bem. Mesmo segmento e mesma administradora."],
+                ["independente", "Cotas independentes — patrimônio", "Cotas que não se juntam: cada uma compra o seu bem, no seu próprio prazo."],
+              ] as const
+            ).map(([m, label, ajuda]) => (
+              <button key={m} onClick={() => setModo(m)} style={S.pill(modo === m)} title={ajuda}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, opacity: 0.55, margin: "8px 0 0", lineHeight: 1.5 }}>
+            {modo === "juncao"
+              ? "Na junção o poder de compra combinado só fica disponível quando todas as cartas forem contempladas — por isso o custo é medido no mês da última."
+              : "Em cotas independentes cada carta é recebida no seu próprio mês de referência; nada é somado para um bem único."}
+          </p>
+        </div>
+
+        {/* C — conversa: a IA só extrai parâmetros, o cálculo continua no motor */}
+        <div className="dsl-nao-imprime" style={{ marginTop: 18, background: "#0F1526", border: "1px solid #16213A", borderRadius: 14, padding: 14 }}>
+          <label style={S.label} htmlFor="frase-disal">
+            Montar conversando
+          </label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              id="frase-disal"
+              type="text"
+              value={frase}
+              onChange={(e) => setFrase(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !interpretando) interpretarFrase();
+              }}
+              placeholder="Ex.: juntar 3 cartas de 200 mil de imóvel"
+              style={{ ...S.input, flex: "1 1 380px", minWidth: 0, fontFamily: "'Space Grotesk', sans-serif" } as any}
+            />
+            <button
+              onClick={() => interpretarFrase()}
+              disabled={interpretando}
+              className="dsl-toque"
+              style={{
+                padding: "10px 24px",
+                borderRadius: 10,
+                border: 0,
+                cursor: interpretando ? "wait" : "pointer",
+                background: "linear-gradient(90deg,#8FB7FF,#36C5F0,#1E6FE6)",
+                color: "#0A0E1A",
+                fontWeight: 800,
+              }}
+            >
+              {interpretando ? "Lendo…" : "Montar"}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, opacity: 0.5, margin: "8px 0 0" }}>
+            A frase só preenche os controles — o crédito é encaixado num valor que existe no boletim e todo o cálculo
+            continua no motor.
+          </p>
+          {erroFrase && <p style={{ color: "#F87171", fontSize: 12, margin: "8px 0 0" }}>{erroFrase}</p>}
+          {resumoPedido && (
+            <p style={{ fontSize: 12, opacity: 0.7, fontStyle: "italic", margin: "8px 0 0" }}>Entendi: {resumoPedido}</p>
+          )}
+        </div>
 
         <div className="dsl-nao-imprime" style={{ marginTop: 18 }}>
           <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 8 }}>Atalhos — monta e calcula num clique</div>
@@ -813,7 +1136,52 @@ export default function SimuladorDisal() {
             + Adicionar à junção
           </button>
           <span style={{ fontSize: 11, opacity: 0.55 }}>
-            Junte cartas do mesmo segmento para um bem só ({QTD_MIN} a {QTD_MAX} por linha).
+            {modo === "juncao"
+              ? `Junte cartas do mesmo segmento para um bem só (${QTD_MIN} a ${QTD_MAX} por linha).`
+              : `Cotas independentes, cada uma com o seu bem (${QTD_MIN} a ${QTD_MAX} por linha).`}
+          </span>
+        </div>
+
+        {/* D.1 — parcela alvo: sugere, não aplica sozinho */}
+        <div className="dsl-nao-imprime" style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div>
+            <label style={S.label} htmlFor="alvo">
+              Parcela que o cliente aguenta (R$/mês)
+            </label>
+            <input
+              id="alvo"
+              type="text"
+              inputMode="decimal"
+              value={parcelaAlvo}
+              onChange={(e) => setParcelaAlvo(e.target.value)}
+              placeholder="ex.: 6000"
+              className="dsl-toque"
+              style={{ ...S.input, width: 160 } as any}
+            />
+          </div>
+          {qtdSugerida != null && (
+            <button
+              onClick={aplicarQuantidadeSugerida}
+              className="dsl-toque"
+              style={{
+                padding: "10px 18px",
+                borderRadius: 10,
+                border: "1px solid #1E6FE6",
+                background: "transparent",
+                color: "#8FB7FF",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              Sugerir {qtdSugerida} {qtdSugerida === 1 ? "carta" : "cartas"} de {fmtCredito(itemAtual().credito)}
+            </button>
+          )}
+          {parcelaAlvo.trim() !== "" && qtdSugerida == null && (
+            <span style={{ fontSize: 11, color: "#FCD34D" }}>Valor não reconhecido.</span>
+          )}
+          <span style={{ fontSize: 11, opacity: 0.5, maxWidth: 380, lineHeight: 1.5 }}>
+            Só sugere — nada é aplicado sem o seu clique. Conta feita sobre a parcela inicial da configuração atual.
           </span>
         </div>
 
@@ -847,9 +1215,12 @@ export default function SimuladorDisal() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#8FB7FF" }}>
-                Junção de cartas · {carteira.cotas} {carteira.cotas === 1 ? "carta" : "cartas"} em {carteira.itens}{" "}
+                {modo === "juncao" ? "Junção de cartas" : "Cotas independentes"} · {carteira.cotas}{" "}
+                {carteira.cotas === 1 ? "carta" : "cartas"} em {carteira.itens}{" "}
                 {carteira.itens === 1 ? "linha" : "linhas"}
-                {segmentoDaJuncao ? ` · ${segmentoDaJuncao === "imovel" ? "Imóveis" : "Veículos"}` : ""}
+                {modo === "juncao" && segmentoDaJuncao
+                  ? ` · ${segmentoDaJuncao === "imovel" ? "Imóveis" : "Veículos"}`
+                  : ""}
               </div>
               <button
                 onClick={limparJuncao}
@@ -863,11 +1234,12 @@ export default function SimuladorDisal() {
                   fontSize: 11,
                 }}
               >
-                Limpar junção
+                {modo === "juncao" ? "Limpar junção" : "Limpar cotas"}
               </button>
             </div>
 
-            {/* aviso permanente — mesma frase que vai no texto do cliente */}
+            {/* aviso permanente da junção — mesma frase que vai no texto do cliente */}
+            {modo === "juncao" && (
             <p
               style={{
                 marginTop: 10,
@@ -883,8 +1255,9 @@ export default function SimuladorDisal() {
             >
               ⚠️ {AVISO_JUNCAO}
             </p>
+            )}
 
-            {juncaoInvalida && (
+            {modo === "juncao" && juncaoInvalida && (
               <p
                 style={{
                   marginTop: 10,
@@ -1043,12 +1416,12 @@ export default function SimuladorDisal() {
               }}
             >
               {[
-                ["Cartas na junção", String(carteira.cotas)],
-                ["Poder de compra combinado", fmtCredito(carteira.creditoTotal)],
+                [modo === "juncao" ? "Cartas na junção" : "Cotas", String(carteira.cotas)],
+                [modo === "juncao" ? "Poder de compra combinado" : "Crédito total", fmtCredito(carteira.creditoTotal)],
                 ["Parcela inicial somada", `${fmtValor(carteira.parcelaInicial)}/mês`],
                 ["Total do plano (sem reajustes)", fmtValor(carteira.totalPlano)],
                 [
-                  "Custo além do poder de compra",
+                  modo === "juncao" ? "Custo além do poder de compra" : "Custo além do crédito",
                   `${fmtValor(carteira.custoAlemCredito)} (${fmtPct(carteira.custoAlemCreditoPct)})`,
                 ],
               ].map(([k, v]) => (
@@ -1061,7 +1434,9 @@ export default function SimuladorDisal() {
 
             <div style={{ ...S.card, marginTop: 10 }}>
               <label style={S.label} htmlFor="cjuncao">
-                Cenário de referência — mês da última contemplação da junção
+                {modo === "juncao"
+                  ? "Cenário de referência — mês da última contemplação da junção"
+                  : "Cenário de referência — mês de recebimento da carta"}
               </label>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <input
@@ -1071,25 +1446,125 @@ export default function SimuladorDisal() {
                   max={carteira.prazoMaximo}
                   value={cJuncao ?? cJuncaoDefault}
                   onChange={(e) => setCJuncao(+e.target.value)}
+                  className="dsl-toque"
                   style={{ ...S.input, width: 90 } as any}
                 />
-                <span style={{ fontSize: 11, opacity: 0.55, maxWidth: 560, lineHeight: 1.5 }}>
-                  É só quando a última carta é contemplada que o poder de compra combinado fica utilizável — por isso
-                  o custo efetivo é medido nesse mês, não no da primeira. Cenário declarado para comparar opções,
-                  nunca uma data prometida ao cliente. Padrão: {cJuncaoDefault}.
-                  {cJuncao != null && cJuncao !== cJuncaoEfetivo
-                    ? ` Ajustado para ${cJuncaoEfetivo} — limite do plano mais longo (${carteira.prazoMaximo} meses).`
-                    : ""}
-                </span>
+                {CENARIOS_C[modo].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCJuncao(c)}
+                    className="dsl-toque"
+                    style={{
+                      ...S.pill(cJuncaoEfetivo === c),
+                      padding: "6px 14px",
+                      fontSize: 12,
+                    }}
+                  >
+                    {c}
+                  </button>
+                ))}
               </div>
+              <p style={{ fontSize: 11, opacity: 0.55, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+                {modo === "juncao" ? (
+                  <>
+                    É só quando a última carta é contemplada que o poder de compra combinado fica utilizável — por
+                    isso o custo é medido nesse mês, não no da primeira. Quanto mais cartas, mais tarde tende a ser a
+                    última contemplação. Cenário declarado para comparar opções, nunca uma data prometida ao cliente.
+                  </>
+                ) : (
+                  <>
+                    Cada cota é recebida no seu próprio mês de referência. Cenário declarado, nunca data prometida.
+                  </>
+                )}{" "}
+                Padrão: {cJuncaoDefault}.
+                {cJuncao != null && cJuncao !== cJuncaoEfetivo
+                  ? ` Ajustado para ${cJuncaoEfetivo} — limite do plano mais longo (${carteira.prazoMaximo} meses).`
+                  : ""}
+              </p>
             </div>
 
+            {/* B — métrica principal decidida pela regra do C */}
             <div style={{ ...S.card, marginTop: 10 }}>
               <div style={{ fontSize: 11, opacity: 0.6 }}>
-                Custo efetivo da junção (TIR sobre o fluxo consolidado, Base 100% de referência)
+                {modo === "juncao" ? "Custo efetivo da junção" : "Custo efetivo das cotas"} (TIR sobre o fluxo
+                consolidado, Base 100% de referência)
               </div>
-              <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: "#8FB7FF", marginTop: 2 }}>
-                {custoEfetivoTextoCarteira}
+
+              {metrica?.tipo === "totais" && totaisFallback ? (
+                <>
+                  <div style={{ fontSize: 12, color: "#FCD34D", marginTop: 6, lineHeight: 1.5 }}>
+                    Neste cenário o fluxo não fecha numa taxa única — nem com a correção projetada. Em vez de uma
+                    taxa que não existe, os números em reais:
+                  </div>
+                  <div
+                    className="dsl-cards"
+                    style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10, marginTop: 8 }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, opacity: 0.6 }}>
+                        Total pago ao longo do plano {totaisFallback.projetado ? "(projetado)" : "(nominal)"}
+                      </div>
+                      <div className="dsl-num" style={{ fontSize: 17, color: "#E5E9F0" }}>
+                        {fmtValor(totaisFallback.totalPagoProjetado)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, opacity: 0.6 }}>
+                        Poder de compra no mês {cJuncaoEfetivo} {totaisFallback.projetado ? "(corrigido)" : "(nominal)"}
+                      </div>
+                      <div className="dsl-num" style={{ fontSize: 17, color: "#8FB7FF" }}>
+                        {fmtValor(totaisFallback.poderDeCompraCorrigido)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8, lineHeight: 1.5 }}>
+                    Os dois valores são do mesmo cenário declarado. Não há percentual aqui de propósito: um número
+                    com cara de taxa, sem ser taxa, enganaria mais do que a ausência.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="dsl-num" style={{ fontSize: 17, color: "#36C5F0", marginTop: 4 }}>
+                    {custoEfetivoCurto}
+                  </div>
+                  {custoEfetivoCurtoComIndice && (
+                    <div className="dsl-num" style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
+                      {custoEfetivoCurtoComIndice}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6, lineHeight: 1.5 }}>
+                    Cenário: {cenarioTexto}.
+                    {metrica?.tipo === "tir_corrigida"
+                      ? ` A partir do mês ${C_LIMIAR_CORRECAO} a métrica principal passa a ser a corrigida pelo índice — é a que continua fechando numa taxa única em cenários longos.`
+                      : ""}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* D.2 — lance próprio; embutido travado por falta de teto publicado */}
+            <div className="dsl-nao-imprime" style={{ ...S.card, marginTop: 10 }}>
+              <label style={S.label} htmlFor="lance">
+                Lance próprio: {lancePct}% {lancePct > 0 ? `· ${fmtValor((carteira.creditoTotal * lancePct) / 100)}` : ""}
+              </label>
+              <input
+                id="lance"
+                type="range"
+                min={0}
+                max={50}
+                value={lancePct}
+                onChange={(e) => setLancePct(+e.target.value)}
+                style={{ width: "100%" }}
+              />
+              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4, lineHeight: 1.5 }}>
+                Recurso do bolso do cliente, abatendo parcelas finais — mesma mecânica do motor de cota única.
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                <input type="range" min={0} max={50} value={0} disabled aria-label="Lance embutido (indisponível)"
+                  style={{ width: 140, opacity: 0.35 }} />
+                <span style={{ fontSize: 11, color: "#FCD34D", lineHeight: 1.5 }}>
+                  Lance embutido indisponível — teto Disal não publicado; confirmar com a administradora.
+                </span>
               </div>
             </div>
 
@@ -1156,6 +1631,39 @@ export default function SimuladorDisal() {
                 </table>
               </div>
             </div>
+
+            {/* D.4 — comissão Prospere. Só aparece com grade da PRÓPRIA
+                administradora cadastrada. Hoje a Disal não está em
+                consorcios.administradoras, então este bloco fica invisível —
+                de propósito: herdar a grade da Porto seria inventar receita. */}
+            {comissaoProspere && (
+              <div style={{ ...S.card, marginTop: 10 }}>
+                <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 700, marginBottom: 6 }}>Comissão Prospere</div>
+                <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "baseline" }}>
+                  <div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>Total</div>
+                    <div className="dsl-num" style={{ fontSize: 18, color: "#8FB7FF" }}>
+                      {fmtValor(comissaoProspere.totalRS)}
+                    </div>
+                    <div style={{ fontSize: 11, opacity: 0.5 }}>
+                      {fmtPct2(comissaoProspere.pctTotal)} do crédito
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>Cronograma de recebimento</div>
+                    <div className="dsl-num" style={{ fontSize: 13 }}>
+                      {comissaoProspere.cronogramaRS.every((v) => Math.abs(v - comissaoProspere.cronogramaRS[0]) < 0.01)
+                        ? `${comissaoProspere.cronogramaRS.length}× ${fmtValor(comissaoProspere.cronogramaRS[0])}`
+                        : comissaoProspere.cronogramaRS.map((v, i) => `${i + 1}ª ${fmtValor(v)}`).join(" · ")}
+                    </div>
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, opacity: 0.6, marginTop: 10, marginBottom: 0 }}>
+                  {comissaoProspere.observacao ??
+                    "Recebimento condicionado ao pagamento das parcelas pelo cliente. Não considera período de campanha."}
+                </p>
+              </div>
+            )}
 
             {/* G — comparador com financiamento */}
             <div style={{ ...S.card, marginTop: 10 }}>
@@ -1422,6 +1930,23 @@ export default function SimuladorDisal() {
             >
               Imprimir
             </button>
+            {temCarteira && (
+              <button
+                onClick={copiarLink}
+                title="Link interno — só abre para quem tem sessão admin"
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: "1px solid #1E6FE6",
+                  background: "transparent",
+                  color: "#8FB7FF",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                {linkCopiado ? "Link copiado ✓" : "Copiar link da simulação"}
+              </button>
+            )}
             <button
               onClick={copiarProposta}
               style={{
@@ -1479,7 +2004,7 @@ export default function SimuladorDisal() {
           >
             <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
               {[
-                ["Poder de compra", fmtCredito(carteira.creditoTotal)],
+                [modo === "juncao" ? "Poder de compra" : "Crédito total", fmtCredito(carteira.creditoTotal)],
                 ["Parcela inicial", `${fmtValor(carteira.parcelaInicial)}/mês`],
                 [
                   "Custo efetivo",
