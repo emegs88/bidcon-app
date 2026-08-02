@@ -440,18 +440,77 @@ preserva histórico de preço) · backfill de embeddings · defeito de acento do
 
 ---
 
-## 14. O que a FASE B executaria
+## 14. Runbook do ciclo supervisionado (FASE B)
 
-1. Aplicar `0063` no xtv (draft em `T6_migration_fase_b_DRAFT.sql`, 16 seções, RLS + rodapé de grants em tudo).
-2. `analyze public.cartas`.
-3. Deploy do `route.ts` na Vercel.
-4. Um ciclo supervisionado, com a faixa 650–1.740 órfãs/dia como linha de base.
-5. Confirmar `trg_bidcon_price` ainda em `tgenabled = 'O'`.
-6. Conferir, no primeiro ciclo real, que o número de linhas com `bidcon_atualizado_em` tocado é
-   compatível com **novas + mudanças reais de preço**, e não com o total de reivindicações —
-   verificação de campo do ADENDO-4 (§7-A).
-7. Conferir que o ciclo **não** registrou `ciclo_integridade_falhou`. Um `orfas=0` acompanhado
-   desse evento não é sucesso: é a varredura se recusando a varrer (§7-B).
+**Nada aqui executa sem a frase.** Este é o plano ratificado, anexado à FASE A para que a ordem e
+o critério de aceite estejam escritos **antes** de qualquer escrita em produção — e não
+improvisados no meio dela.
+
+### 14.1 Ordem de execução
+
+| # | Passo | Observação |
+|---|---|---|
+| 1 | Aplicar a migration **0063** no xtv | draft em `T6_migration_fase_b_DRAFT.sql`, 16 seções, RLS + rodapé de grants em tudo |
+| 2 | `analyze public.cartas` | após o backfill de fingerprint |
+| 3 | Deploy do `route.ts` na Vercel | diff no `T6_route_diff.md` |
+| 4 | **Um ciclo real supervisionado**, cobrindo **cada fonte da lista branca** (D12) | julgado contra o aceite de §14.2 |
+| 5 | Relatório **antes/depois** | |
+| 6 | **Só então**, drop do SHIM da varredura legada (ADENDO-1) | |
+
+**A janela entre (1) e (2) fica sem varredura.** Isso é deliberado e é seguro pelo kit **j**: um
+ciclo sem varredura não corrompe nada — o ciclo seguinte fecha com `novas=0, orfas=0, 0
+divergências`. O SHIM permanece de pé durante toda a supervisão, exatamente para poder segurar as
+varreduras se algo falhar.
+
+### 14.2 Aceite do ciclo supervisionado
+
+A lição do n-v2 (§7-B) está escrita no item 1: **ciclo quieto não é ciclo bom.**
+
+| # | Critério | Referência |
+|---|---|---|
+| 1 | **Δ `ciclo_integridade_falhou` = 0 em todas as fontes.** Um ciclo quieto **com** esse evento é a varredura se recusando a varrer — **não** é sucesso | §7-B |
+| 2 | **Controle recíproco de órfãs:** orfanizações ≈ sumiços reais da fonte no ciclo. Baseline agregada declarada: **650–1.740/dia** | kit `n-v3-orfa`, ADENDO-3 |
+| 3 | **Criações em centenas/dia.** O contador "novas hoje" (variante B) sai do **~218 falso** para o número honesto — **registrar o primeiro valor real** | §10 |
+| 4 | **Duplicatas conhecidas da vitrine (22/31) colapsam**; as ~22 invisíveis rebaixadas sem evento voltam como **NOVAS** — efeito **esperado**, não anomalia | §8 |
+| 5 | **LANCE:** novas reais, **zero órfã de guarda**. **Itaú e BIDCON_DIRETO byte a byte intocadas** — âncora medida abaixo | D12, kit **g** |
+| 6 | **`trg_bidcon_price`:** disparos **só** em INSERT / mudança real de preço; custo de reivindicação na ordem do medido (**~3 ms/linha**) | §7-A, kit `n-v3` |
+| 7 | **`eventos_sync`:** `carta_nova` / `carta_indisponivel` **1:1** com criações/orfanizações do ciclo — o kit **f-aud** rodando em produção | kit **f-aud** |
+| 8 | **Backfill da migration:** segundos, com **md5 das colunas comerciais idêntico antes/depois** | §7 |
+
+### 14.2.1 Âncora da partição protegida (item 5) — medida agora, no xtv
+
+Para o item 5 não depender de inspeção a olho, medi a âncora **antes** de qualquer escrita. São
+**14 linhas** fora de `fonte='360prospere'`:
+
+| `fonte` | `administradora_origem` | linhas | vivas |
+|---|---|---|---|
+| `contempla_bens` | Itaú | 13 | 13 |
+| `cliente_direto` | BIDCON_DIRETO | 1 | 1 |
+
+```sql
+-- Rodar ANTES e DEPOIS do ciclo supervisionado. Tem de dar idêntico.
+select count(*) linhas,
+       md5(string_agg(
+         id::text||'|'||coalesce(fonte,'')||'|'||coalesce(administradora_origem,'')||'|'||
+         coalesce(numero_externo::text,'')||'|'||status::text||'|'||coalesce(tipo::text,'')||'|'||
+         coalesce(valor_credito::text,'')||'|'||coalesce(valor_entrada::text,'')||'|'||
+         coalesce(valor_parcela::text,'')||'|'||coalesce(qtd_parcelas::text,''),
+         E'\n' order by id))
+from cartas where fonte is distinct from '360prospere';
+```
+
+**Valor na FASE A: `linhas = 14`, `md5 = 5c7819be56b9bc584b1704cf11047e96`.**
+
+Essas 14 linhas são protegidas por **dois** mecanismos independentes, e é bom que sejam dois: a
+whitelist D12 (`administradora_origem` não está nela) **e** o filtro `fonte='360prospere'` da
+própria varredura. O item 5 falha se o md5 mudar — não importa por qual dos dois caminhos.
+
+### 14.3 Regra de parada
+
+**Falha em qualquer item → PARAR. Não corrigir a quente.** O SHIM segura as varreduras;
+diagnóstico primeiro. Corrigir no escuro, no meio de um ciclo de produção, é como se produz o
+verde falso que esta fatia inteira existe para combater — e o n-v2 é a prova de que ele acontece
+mesmo quando se está tentando evitá-lo.
 
 O draft está deliberadamente em `ident01/`, **fora de `supabase/migrations/`**, para não poder
 ser aplicado por acidente. Cabeçalho: `*** DRAFT DA FASE B. NÃO APLICAR. ***`

@@ -27,6 +27,25 @@
 -- mais um item (n-v2) revogado pela própria auditoria e substituído (n-v3).
 -- As DUAS divergências deliberadas contra o szs estão marcadas com
 -- "DIVERGE DO ENSAIO" e justificadas no ponto.
+--
+-- ----------------------------------------------------------------------------
+-- ESTA MIGRATION É O PASSO 1 DE 6. NÃO É O FIM.
+--
+-- Runbook completo e critério de aceite: T7_relatorio_fase_a.md §14.
+--   1. esta migration          4. ciclo real supervisionado (cada fonte da
+--   2. analyze public.cartas      lista branca), julgado contra §14.2
+--   3. deploy do route.ts      5. relatório antes/depois
+--                              6. SÓ ENTÃO: drop do SHIM legado (§11)
+--
+-- A janela entre (1) e (2) fica SEM VARREDURA — deliberado, e seguro pelo
+-- kit j. O SHIM fica de pé durante toda a supervisão, de propósito: é ele
+-- que segura as varreduras se o aceite falhar.
+--
+-- REGRA DE PARADA: falha em qualquer item do aceite => PARAR, não corrigir a
+-- quente. Diagnóstico primeiro. Em especial (§14.2 item 1): um ciclo quieto
+-- ACOMPANHADO de `ciclo_integridade_falhou` NÃO é sucesso — é a varredura se
+-- recusando a varrer. Foi assim que o kit n-v2 produziu um verde falso no
+-- ensaio (T7 §7-B).
 -- ============================================================================
 
 begin;
@@ -758,15 +777,46 @@ commit;
 
 -- ============================================================================
 -- PÓS-APLICAÇÃO (fora da transação, ordem obrigatória)
+-- Runbook completo: T7_relatorio_fase_a.md §14.
 --
--- 1. Rodar `analyze public.cartas;` — o planner precisa saber que a coluna
+-- 2. Rodar `analyze public.cartas;` — o planner precisa saber que a coluna
 --    nova existe, ou o índice parcial fica sem estatística no primeiro ciclo.
--- 2. SÓ ENTÃO fazer o deploy do route.ts (T6_route_diff.md). A ordem inversa
+-- 3. SÓ ENTÃO fazer o deploy do route.ts (T6_route_diff.md). A ordem inversa
 --    quebra: route novo + migration velha = 42883 em todas as fontes.
--- 3. Primeiro ciclo supervisionado: acompanhar eventos_sync procurando
---    'ciclo_integridade_falhou', 'varredura_legada_chamada' e 'numero_retido'.
---    É nesse ciclo que a faixa de 650–1.740 mortes/dia (que a FASE A NÃO
---    verificou — a janela reduzida do replay não permitia) vira baseline.
--- 4. Conferir que trg_bidcon_price segue habilitado (tgenabled='O'). Esta
---    migration não o toca, e não precisa: o backfill não o dispara.
+-- 4. Ciclo real supervisionado, cobrindo CADA FONTE da lista branca (D12),
+--    julgado contra o aceite abaixo.
+-- 5. Relatório antes/depois.
+-- 6. SÓ ENTÃO: drop do SHIM legado da seção 11. Enquanto o aceite não fechar,
+--    o SHIM fica de pé de propósito — é ele que segura as varreduras.
+--
+-- ----------------------------------------------------------------------------
+-- ACEITE DO CICLO SUPERVISIONADO (T7 §14.2) — os 8 itens
+--
+-- 1. Δ ciclo_integridade_falhou = 0 EM TODAS AS FONTES. Ciclo quieto COM esse
+--    evento é a varredura se recusando a varrer, NÃO é sucesso. (T7 §7-B)
+-- 2. Controle recíproco de órfãs: orfanizações ~ sumiços reais da fonte no
+--    ciclo. Baseline agregada declarada: 650–1.740/dia. A FASE A NÃO verificou
+--    essa faixa — a janela reduzida do replay não permitia.
+-- 3. Criações em centenas/dia. O contador "novas hoje" (variante B) sai do
+--    ~218 falso para o número honesto — REGISTRAR o primeiro valor real.
+-- 4. Duplicatas conhecidas da vitrine (22/31) colapsam; as ~22 invisíveis
+--    rebaixadas sem evento voltam como NOVAS. Efeito ESPERADO, não anomalia.
+-- 5. LANCE: novas reais, zero órfã de guarda. Itaú e BIDCON_DIRETO byte a
+--    byte intocadas. Âncora medida na FASE A (14 linhas fora de
+--    fonte='360prospere'): md5 = 5c7819be56b9bc584b1704cf11047e96.
+--    Query de conferência (rodar antes E depois) em T7 §14.2.1.
+-- 6. trg_bidcon_price: disparos só em INSERT / mudança real de preço; custo de
+--    reivindicação na ordem do medido (~3 ms/linha). (ADENDO-4, T7 §7-A)
+-- 7. eventos_sync: carta_nova / carta_indisponivel 1:1 com criações e
+--    orfanizações do ciclo — o kit f-aud rodando em produção.
+-- 8. Backfill desta migration: segundos, com md5 das colunas comerciais
+--    idêntico antes/depois.
+--
+-- Acompanhar em eventos_sync: 'ciclo_integridade_falhou',
+-- 'varredura_legada_chamada' (= chamador desatualizado) e 'numero_retido'.
+-- Conferir que trg_bidcon_price segue em tgenabled='O'. Esta migration não o
+-- toca, e não precisa: o backfill não o dispara.
+--
+-- REGRA DE PARADA: falha em qualquer item => PARAR, NÃO corrigir a quente.
+-- O SHIM segura as varreduras; diagnóstico primeiro.
 -- ============================================================================
