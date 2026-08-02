@@ -174,10 +174,22 @@ begin
     if v_cand is not null then
       -- Deslocamento de número (D7 / T1-a) antes de gravar.
       v_num := public.sync_alocar_numero(p_origem, r.numero, v_cand);
+      -- ADENDO-4 — REIVINDICAÇÃO NÃO ESCREVE PREÇO.
+      -- A candidata foi casada por IGUALDADE DE FINGERPRINT, e o fingerprint
+      -- É (tipo, credito, entrada, parcela, parcelas, adm) ao centavo. Logo os
+      -- quatro campos comerciais já são idênticos por construção: reescrevê-los
+      -- gravaria o mesmo valor e, pior, dispararia trg_bidcon_price
+      -- (UPDATE OF valor_credito, valor_entrada, valor_parcela, qtd_parcelas,
+      -- tipo) a ~392 ms/linha, recalculando TIR que não mudou.
+      -- Mudança REAL de preço muda o fingerprint => a linha antiga não casa,
+      -- vira órfã na varredura e nasce linha nova — e aí o trigger dispara no
+      -- INSERT, que é o comportamento correto.
+      -- administradora_raw/administradora_id PERMANECEM no SET: mantêm
+      -- trg_cartas_fingerprint disparando e a coluna fingerprint em dia (D4).
       -- Reivindicação: sincronizada_em := now(). NUNCA mexe em status —
       -- reivindicar uma 'reservada' atualiza numero/metadados e só (D11).
-      update cartas set numero_externo=v_num, valor_credito=r.vc, valor_entrada=r.ve, valor_parcela=r.vp,
-        qtd_parcelas=r.qp, entrada_parceiro_raw=r.ep, administradora_raw=coalesce(r.adm_raw,administradora_raw),
+      update cartas set numero_externo=v_num,
+        entrada_parceiro_raw=r.ep, administradora_raw=coalesce(r.adm_raw,administradora_raw),
         administradora_id=coalesce(v_adm_in,administradora_id), fornecedor_id=coalesce(fornecedor_id,v_forn_id),
         categoria=v_cat, sincronizada_em=v_now where id=v_cand;
       v_atu:=v_atu+1;

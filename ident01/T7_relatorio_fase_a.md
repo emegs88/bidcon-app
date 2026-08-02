@@ -1,6 +1,7 @@
 # IDENTIDADE-01 — RELATÓRIO FINAL DA FASE A
 
-**Veredito: PASS integral.** Nenhuma escrita em produção. A FASE B segue travada pela frase.
+**Veredito: PASS integral** — kit a–p, 25/25, **mais um item revogado pela própria auditoria e
+substituído** (§7-B). Nenhuma escrita em produção. A FASE B segue travada pela frase.
 
 - **xtv** `xtvjpnyadcdeadhmzyff` — produção, **somente leitura** durante toda a FASE A.
 - **szs** `szsqdpwwxtmrtrhaikuh` — ensaio, escritas autorizadas.
@@ -17,7 +18,7 @@ CARTAS + LANCE, 29/07→01/08. A evidência fica em três camadas, e nenhuma del
 sustenta a fatia:
 
 1. **Algoritmo** — provado no replay matemático de 13 dias, todas as fontes, 15×.
-2. **Implementação** — provada neste replay real (80 passos de ciclo) mais o kit sintético a–o.
+2. **Implementação** — provada neste replay real (80 passos de ciclo) mais o kit sintético a–p.
 3. **Escala plena** — só se confirma no ciclo supervisionado da FASE B.
 
 **"Replay reconstruído do histórico persistido"** (spec). Ponto cego declarado e não
@@ -43,6 +44,7 @@ do relógio do banco no momento da execução — e foi o que dissolveu a fronte
 | D15 (corrigido) | Objetos da fatia (não do gabarito): REVOKE de PUBLIC/anon/authenticated + GRANT a `service_role` | aplicado no szs; rodapé no draft §15 |
 | Modelo de vida v2 | Multi-intervalo, "último evento vence" | T2 linha 26, reescrita |
 | Transporte | Blocos com md5 nos **dois lados**; caminho de script local **retirado** — nenhuma credencial nova em lugar nenhum | §4 |
+| ADENDO-4 | Reivindicação **não escreve preço**: o UPDATE deixa de listar as quatro colunas comerciais | T1 §9, draft §9, kit **p / p-insert / p-sonda / m-v2 / n-v3**, §7-A |
 
 ---
 
@@ -129,7 +131,7 @@ corte: as ressurreições eram materiais, e passaram a ser contadas.
 
 ---
 
-## 6. Kit de borda a–o — 19/19 PASS
+## 6. Kit de borda a–p — 25/25 PASS (1 item revogado e substituído)
 
 | Item | O que prova | Obtido | |
 |---|---|---|---|
@@ -150,8 +152,20 @@ corte: as ressurreições eram materiais, e passaram a ser contadas.
 | **k** | Bootstrap com estado vazio — retrato do 1º ciclo real | novas=0, atualizadas=1200, orfas=0 | PASS |
 | **l** | Modo avulso (array puro, `p_varrer=true`) | t0 do estado, 0 divergências, estado avança | PASS |
 | **m** | Materialização | 25 amostras, 0 divergentes; `valor_entrada` troca o fp; reversível | PASS |
-| **n** | Escala (ADENDO-3) | 1.200 cotas contra 2.608 linhas, mult. máx 6, **2.988 ms** (teto 30 s) | PASS |
+| **n** | Escala (ADENDO-3), trigger de preço **desligado** | 1.200 cotas contra 2.608 linhas, mult. máx 6, **2.988 ms** (teto 30 s) | PASS |
 | **o** | SHIM legado (ADENDO-1) | retorno 0, 1 evento, md5 de `cartas` inalterado | PASS |
+
+**Itens acrescentados pelo ADENDO-4** (§7-A) e pela revogação do n-v2 (§7-B):
+
+| Item | O que prova | Obtido | |
+|---|---|---|---|
+| **p** | Reivindicação em massa com `trg_bidcon_price` **LIGADO** | novas=0, atualizadas=1.200, orfas=0, **disparos da sonda = 0** (UPDATE=0, INSERT=0), 4.526 ms, `tgenabled='O'` o tempo todo | PASS |
+| **p-insert** | Contra-controle: a sonda **dispara mesmo** | 25 INSERTs → **25 disparos**; as 25 novas nascem com preço calculado; as 1.200 reivindicadas seguem `bidcon_custo_am IS NULL` | PASS |
+| **p-sonda** | Auditoria da própria sonda no período | 2 disparos de UPDATE no intervalo, **ambos rastreados ao kit m-v2** (que muda preço de propósito); 1.225 reivindicações → 0 | PASS |
+| **m-v2** | Materialização **sobre a função já ajustada** | universo reivindicado 1.225, **0 divergentes**; `valor_entrada` troca o fp (`dd28…`→`8005…`) e reverte | PASS |
+| **n-v3** | Escala do ADENDO-3 **com o trigger ligado** (substitui n-v2) | estoque 2.524, 800 classes vivas, mult. máx 6; 13 lotes; novas=0 **atualizadas=1.224** orfas=0; **Δ`ciclo_integridade_falhou` = 0**; sonda=0; com_preco=0; **3.731,9 ms → 3,05 ms/linha** | PASS |
+| **n-v3-orfa** | Controle recíproco: a varredura **orfaniza de verdade** | mesmo ciclo com payload reduzido (1.200 de 1.224) → **orfas=24 exatas**, `indisponivel` 1.300→1.324, Δ integridade = 0 | PASS |
+| ~~**n-v2**~~ | ~~Escala com trigger ligado~~ | **REVOGADO pela própria auditoria** — verde falso: `orfas=0` veio do ramo de autocura, não da varredura. §7-B | **FAIL** |
 
 Item **k** merece nota: é o retrato exato do primeiro ciclo da FASE B, quando
 `sync_fonte_estado` estará vazio contra 94.747 linhas pré-existentes. Casou 1.200 de 1.200 sem
@@ -185,6 +199,95 @@ Uma transação. **Sem tocar no trigger de precificação.**
 **Idempotência provada:** rerodar o backfill deixou o md5 dos fingerprints inalterado — o que
 confirma, por caminho independente, que a materialização do trigger e a expressão explícita do
 backfill concordam exatamente.
+
+---
+
+## 7-A. ADENDO-4 — reivindicação não escreve preço
+
+**A regra.** Igualdade de fingerprint implica, **por construção**, que os quatro campos
+comerciais são idênticos: `carta_fingerprint` os consome inteiros. Logo o UPDATE de
+reivindicação nunca teve motivo para listá-los. Ele passa a tocar apenas `numero_externo`,
+`sincronizada_em` e metadados não-comerciais (`entrada_parceiro_raw`, `administradora_raw`,
+`administradora_id`, `fornecedor_id`, `categoria`).
+
+**Por que isso importa.** `trg_bidcon_price` é `UPDATE OF valor_credito, valor_entrada,
+valor_parcela, qtd_parcelas, tipo`. Um trigger assim dispara quando a coluna **aparece na lista
+SET** — não quando o valor muda. Escrever o mesmo número no mesmo campo custava 47 solves de TIR
+por linha, para produzir o resultado que já estava lá. Na escala do ciclo real
+(~1.200 reivindicações por ciclo, dezenas de ciclos por dia) é a diferença entre um trigger
+irrelevante e horas de CPU diárias.
+
+**A prova de que "idêntico por construção" é literal.** Antes de mexer, medi no xtv o resíduo
+entre a candidata casada e a cota entrante nos quatro campos: **0 divergências em
+`valor_credito`, 0 em `valor_entrada`, 0 em `valor_parcela`, 0 em `qtd_parcelas`** — ao centavo.
+A cláusula removida era escrita pura.
+
+**A prova de que o trigger parou de disparar.** Não bastava confiar na semântica do `UPDATE OF`;
+`track_functions` está em `none` no Supabase, então contei disparos com uma **sonda**: um segundo
+trigger com cláusula de evento **byte a byte idêntica** à do `trg_bidcon_price`, conferida por
+`pg_get_triggerdef`. Três camadas independentes:
+
+| Camada | Resultado |
+|---|---|
+| Sonda em 1.200 reivindicações (kit **p**) | **0 disparos**, com `trg_bidcon_price` em `tgenabled='O'` |
+| Contra-controle de 25 INSERTs (kit **p-insert**) | **25 disparos** — a sonda funciona |
+| Controle NULL diferencial | fixture nasce com `bidcon_custo_am IS NULL`; após 1.200 reivindicações **segue NULL**; as 25 novas nascem **com** preço |
+
+O kit **p-sonda** fecha a contabilidade: no intervalo inteiro a sonda registrou exatamente **2**
+disparos de UPDATE, ambos atribuídos ao kit **m-v2**, que muda `valor_entrada` de propósito. Ou
+seja: o trigger continua disparando em INSERT e em mudança real de preço — que é o
+comportamento correto — e só nisso.
+
+**Escala com o trigger ligado:** kit **n-v3**, 1.224 reivindicações em 13 lotes contra estoque de
+2.524, **3.731,9 ms — 3,05 ms/linha**, folga de 8× sobre o teto de 30 s do ADENDO-3.
+
+Aplicado no szs (T1 §9) e no draft 0063 (§9). Âncora da versão exercitada:
+`md5(prosrc)` de `sync_aplicar_cotas` = **`2cb6f66391d4fbff77d5ba3156880c8d`**, conferido ao vivo
+após todos os kits — a função no szs não contém `valor_credito=r.vc` e contém o bloco `ADENDO-4`.
+
+---
+
+## 7-B. O verde falso que a fatia pegou em si mesma
+
+Este item existe porque a regra da VIA 1 vale também contra mim: **PASS condicional ou não
+examinado é o verde falso que a fatia inteira combate.**
+
+**O que aconteceu.** O kit **n-v2** — primeira remedição de escala com o trigger ligado —
+reportou `novas=0 atualizadas=1.224 orfas=0` e foi registrado como PASS. Ao conciliar contagens
+de `eventos_sync` para o §12, apareceu no mesmo timestamp do ensaio:
+
+```
+ciclo_integridade_falhou | PLAYCONTEMPLADAS divergencias=855
+```
+
+**O mecanismo.** `sync_varrer_ausentes` compara a CTE `entrante` com a CTE `vivo`; se divergem,
+ela registra o evento, **avança `sync_fonte_estado` e faz `return 0` antes de orfanizar**. É o
+ramo de autocura — o mesmo comportamento que o kit **i** exercita de propósito. Portanto
+`orfas=0` tinha duas leituras possíveis: "não havia órfã" ou **"a varredura se recusou a
+varrer"**. No n-v2 era a segunda.
+
+**A causa raiz — defeito do harness, não da função.** `vivo` só conta linhas com
+`sincronizada_em >= p_ciclo_inicio`. As 855 divergências ≈ o total de classes, ou seja: `vivo`
+veio **vazio**. O `p_ciclo_inicio` passado à varredura era posterior ao `sincronizada_em` que os
+lotes tinham acabado de gravar, porque cada lote resolveu seu próprio `t0`. Lendo o fonte de
+`sync_ciclo_t0`, ela devolve o `ciclo_t0` do envelope quando presente — logo a correção é passar
+**um único t0 compartilhado** em todo envelope e também à varredura.
+
+**A asserção que faltava.** Nenhum kit exigia que `ciclo_integridade_falhou` **não** aparecesse.
+O n-v3 passou a medir o contador antes e depois e a exigir `Δ = 0` (obtido: pre=2, pos=2).
+
+**O controle recíproco.** Mesmo com Δ=0, `orfas=0` continua sendo um zero. O kit **n-v3-orfa**
+roda o mesmo ciclo com payload deliberadamente reduzido — 1.200 das 1.224 cotas — e exige
+orfanização exata: **orfas=24**, `indisponivel` de 1.300 para 1.324, Δ integridade = 0. A
+varredura orfaniza de verdade; o zero do n-v3 é um zero honesto.
+
+**Auditoria do resto do kit.** Varri `eventos_sync` inteiro atrás de outros
+`ciclo_integridade_falhou`: existem **dois** no total do ensaio — o do kit **i**, que é o
+objetivo declarado daquele item, e o do n-v2 revogado. Nenhum outro item do kit a–p passou pelo
+ramo de autocura sem que isso fosse o teste.
+
+**Registro.** O n-v2 permanece no `kit_resultado` do szs com `pass=false` e a explicação
+completa. Não foi apagado: o rastro do erro é parte da evidência.
 
 ---
 
@@ -289,17 +392,30 @@ Risco residual declarado: o POST da varredura da PLAYCONTEMPLADAS cresce de ~10 
 | `cartas` | 1.408 linhas — CARTAS 1.322, LANCE 86 |
 | vivas | 292 |
 | `fingerprint` nulos | **0** |
-| `eventos_sync` | 1.889 |
-| `sync_fonte_estado` | 3 linhas |
-| `sync_snapshot_ciclo` | 97 |
-| objetos `ensaio_*` | 19 (staging do replay, preservado) |
+| `eventos_sync` | 1.890 |
+| `sync_fonte_estado` | **2 linhas** — `CARTAS`, `LANCE` |
+| `sync_snapshot_ciclo` | 101 |
+| objetos `ensaio_*` | 6 tabelas + 5 funções (staging do replay, preservado) |
+| `kit_resultado` | 28 linhas — **25 itens de kit PASS**, 1 revogado (`n-v2`, §7-B), 2 registros de limpeza D14 |
 | `trg_bidcon_price` | **`O` — restaurado** |
 | `trg_cartas_fingerprint` | `O` |
+| sonda de disparo (`ensaio_price_sonda`) | **removida** — trigger, função e tabela dropados |
 
-Limpeza D14 executada com guardas e pós-asserções; o trigger de precificação foi restaurado de
-`D` para `O` e preencheu 10/10 colunas de preço na verificação. ACL da fatia fechada (D15):
-REVOKE de PUBLIC/anon/authenticated, GRANT EXECUTE só a `service_role`; o trigger segue
-disparando normalmente, porque EXECUTE não é checado no disparo.
+Foram **duas** limpezas D14, ambas com guardas e pós-asserções: a primeira ao fim do kit a–o, a
+segunda ao fim do ADENDO-4. A segunda removeu 2.524 cartas sintéticas PLAYCONTEMPLADAS, 24
+`eventos_sync` ligados a elas, 1.224 linhas de `kit_cota`, 7 linhas de diagnóstico e os três
+objetos da sonda. As guardas abortariam se houvesse qualquer `vendida`, qualquer vínculo real ou
+se o remanescente não-PLAY divergisse de 1.408.
+
+**Divergência declarada:** `sync_fonte_estado` caiu de 3 para 2 linhas — a limpeza removeu a
+linha de PLAYCONTEMPLADAS, estado operacional de uma fonte que voltou a ter zero cartas. É
+aperto consistente com D14. Já `sync_snapshot_ciclo` **manteve** os snapshots de
+PLAYCONTEMPLADAS de propósito: são trilha de evidência dos ensaios de escala, não estado
+operacional.
+
+O trigger de precificação foi restaurado de `D` para `O` e preencheu 10/10 colunas de preço na
+verificação. ACL da fatia fechada (D15): REVOKE de PUBLIC/anon/authenticated, GRANT EXECUTE só a
+`service_role`; o trigger segue disparando normalmente, porque EXECUTE não é checado no disparo.
 
 Dados sintéticos marcados e removidos. A partição protegida do gabarito permanece byte a byte
 intocada.
@@ -308,9 +424,19 @@ intocada.
 
 ## 13. Fora da fatia (não tocado)
 
-Arquivamento das ~90 mil órfãs (recomendação registrada: **arquivar** — preserva histórico de
-preço) · backfill de embeddings · defeito de acento do `resolver_administradora` (pendência
-junto a 0023_administradoras_v2/0023b) · ENSAIO-01.
+**PRICE-01 — revisão do próprio `trg_bidcon_price`.** Registrada aqui e **deliberadamente não
+tocada**. O ADENDO-4 tirou o trigger do caminho da reivindicação, que era o volume; ele continua
+disparando em INSERT e em mudança real de preço, onde deve disparar. O que fica pendente é o
+custo unitário: **47 solves de TIR por linha**, ~392 ms. Enquanto o volume era de milhares de
+reivindicações por ciclo isso era catastrófico; agora é um custo de nascimento de carta, tolerável
+mas não ótimo. Caminhos a avaliar quando a pendência for aberta: cache por classe de fingerprint
+(cartas com o mesmo fingerprint têm, por construção, o mesmo custo), semente melhor no solver, ou
+tolerância de convergência mais frouxa. **Nada disso é da FATIA IDENTIDADE-01** e nada foi
+alterado no trigger.
+
+Também fora da fatia: arquivamento das ~90 mil órfãs (recomendação registrada: **arquivar** —
+preserva histórico de preço) · backfill de embeddings · defeito de acento do
+`resolver_administradora` (pendência junto a 0023_administradoras_v2/0023b) · ENSAIO-01.
 
 ---
 
@@ -321,6 +447,11 @@ junto a 0023_administradoras_v2/0023b) · ENSAIO-01.
 3. Deploy do `route.ts` na Vercel.
 4. Um ciclo supervisionado, com a faixa 650–1.740 órfãs/dia como linha de base.
 5. Confirmar `trg_bidcon_price` ainda em `tgenabled = 'O'`.
+6. Conferir, no primeiro ciclo real, que o número de linhas com `bidcon_atualizado_em` tocado é
+   compatível com **novas + mudanças reais de preço**, e não com o total de reivindicações —
+   verificação de campo do ADENDO-4 (§7-A).
+7. Conferir que o ciclo **não** registrou `ciclo_integridade_falhou`. Um `orfas=0` acompanhado
+   desse evento não é sucesso: é a varredura se recusando a varrer (§7-B).
 
 O draft está deliberadamente em `ident01/`, **fora de `supabase/migrations/`**, para não poder
 ser aplicado por acidente. Cabeçalho: `*** DRAFT DA FASE B. NÃO APLICAR. ***`
