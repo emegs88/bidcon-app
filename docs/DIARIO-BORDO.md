@@ -1375,3 +1375,124 @@ que falta pro selo.
 2. Teste de aceite fim-a-fim com o modelo real nos dois canais (mesma
    pendência recorrente de F4-TOOL/TOM-01).
 3. Push — condicionado a PUBLICA explícito desta fatia.
+
+## 2026-08 — IDENTIDADE-01 / CORRECAO-1: achados de bancada (szs)
+
+Entrada de REGISTRO, não de deploy. Nada foi escrito no xtv: todas as
+escritas desta rodada foram no harness `szs` (szsqdpwwxtmrtrhaikuh), e o
+draft `supabase/migrations/ident01/CORRECAO-1_d16_d17_NAO_APLICAR.sql`
+nasce sem número, fora do caminho de qualquer runner, aguardando a frase
+`AUTORIZO IDENTIDADE-01 CORRECAO-1`. Migrations são numeradas pela ordem
+REAL de aplicação — a primeira frase que chegar (CORRECAO-1 ou
+CORRECAO-2) leva o `0064`; a última aplicada hoje é a
+`0062_wa_conversas_referral.sql`.
+
+**Sete itens em `kit_resultado`, todos `pass=true`**: `q0`, `q-repro`,
+`q-pos`, `i-d16`, `j-d16`, `r1-r2-d17`, `r3-d16-d17`. O `r3` rodou com
+D16 e D17 **juntas**, que é a combinação que a migration entrega — as
+metades não foram ensaiadas só em separado.
+
+**O harness não estava em paridade, e isso quase invalidou o ensaio.**
+`trg_bidcon_price` no szs não quarentenava INSERT degenerado como o do
+xtv faz. Um kit q rodado nesse estado teria "passado" sem nunca produzir
+uma linha nascida morta — exatamente o fenômeno sob teste. A fase `q0`
+existiu só para fechar essa diferença antes de qualquer conclusão. Lição
+de método: paridade do harness é a primeira medição da fatia, não um
+pressuposto — harness fora de paridade produz verde falso, que é pior
+que vermelho.
+
+**Custo assimétrico medido, e foi ele que redesenhou a fixture.** O
+caminho de INSERT custa ~578 ms/linha (10 INSERTs = 5.785 ms) porque
+dispara `trg_bidcon_price`; o caminho de reivindicação custa ~3,05
+ms/linha (1.224 reivindicações em 3,7 s, kit n-v3). As 1215 cotas
+originalmente desenhadas para os kits i/j dariam ~11,7 min de INSERT,
+acima do teto de uma chamada. Os kits i/j foram re-rodados sobre fixture
+REDUZIDA — **120 cotas = 40 fingerprints × multiplicidade 3, em 12 lotes
+de 10** — e a redução está declarada em três lugares (aqui, no cabeçalho
+da migration e nas descrições de `kit_registrar('i-d16')`/`('j-d16')` no
+szs) para o registro não poder enganar depois. Justificativa: i/j testam
+LÓGICA (colapso de duplicata, ausência de órfã indevida, idempotência
+entre ciclos), não escala — e escala já está coberta pelo n-v3.
+
+**`ciclo_t0` tem direção, e errá-la fabrica resultado.** O t0 precisa
+ser ANTERIOR a todas as escritas do próprio ciclo e POSTERIOR às do
+ciclo anterior. t0 tarde demais: as linhas do próprio ciclo ficam sem
+pegada e a integridade acusa divergência inexistente. t0 cedo demais: as
+linhas do ciclo passado entram na contagem e mascaram divergência real.
+Na prática de bancada, cada rodada foi precedida de leitura de `now()` e
+`max(sincronizada_em)` para escolher o t0 no intervalo entre os dois —
+não é detalhe operacional, é pré-condição do que a checagem significa.
+
+**Timeout de MCP NÃO reverte transação.** Uma chamada que estoura o
+tempo pode ter commitado. Verificar estado antes de re-executar é
+obrigatório; re-rodar por reflexo duplica escrita.
+
+**MCP devolve só o ÚLTIMO result set de SQL multi-statement.** Três
+`select` numa chamada retornaram apenas o terceiro — os dois primeiros
+sumiram sem erro. Uma consulta por chamada, quando o resultado importa.
+
+**Achado estrutural (QUARENTENA-01 reproduzida em bancada, não
+inferida): um corpo NUNCA é reivindicável.** A busca de candidata exige
+`status in ('disponivel','reservada')`; uma linha nascida `indisponivel`
+jamais casa. Logo, a cada ciclo, a mesma cota degenerada cunha um corpo
+NOVO. O `r3` fechou com `corpos_da_degenerada = 2` para uma única cota
+degenerada em dois ciclos. É o motor do `b22893c1` (62 corpos), agora
+demonstrado. A D17 impede que esses corpos contem como estreia e que
+entrem na fila de push; ela **não estanca a criação deles** — estancar é
+a fatia QUARENTENA-01, e o verde do kit r não deve ser lido como
+"problema resolvido".
+
+**Defeito colateral achado ao instrumentar a D17, fechado junto porque é
+a MESMA linha de código**: o nascimento emitia `carta_nova` com
+`push_pendente=true` incondicionalmente, inclusive para a natimorta —
+isto é, uma carta `indisponivel` podia ser anunciada ao cliente como
+novidade. Não estava nomeado na CORRECAO-1.
+
+**Raio de alcance da D17 em aplicação: zero arquivos.**
+`eventos_sync.tipo` é `text` sem check constraint (verificado no xtv),
+então o tipo novo `carta_nova_quarentenada` não exige ALTER TYPE.
+E `carta_nova` tem **um único** consumidor em código —
+`app/api/vitrine/route.ts:133`, que alimenta `novas_hoje` — e ele já
+conta exatamente esse tipo: com a natimorta emitindo outro tipo, o
+contador passa a contar só estreias vivas sozinho.
+
+**Housekeeping — draft mudou de lar, e a conferência veio antes do move,
+não depois.** O draft nascera em `platform/supabase/migrations/ident01/`.
+Foi movido para `ident01/` na raiz, junto do
+`T6_migration_fase_b_DRAFT.sql` — lar único dos drafts NÃO APLICAR.
+
+Conferência do runner, resultado registrado: **não existe runner
+automático de migrations neste repo.** Sem `supabase/config.toml` (CLI
+não inicializada, logo `supabase db push` não está ligado); os dois
+workflows (`atualizar-vitrine.yml`, `testes.yml`) não citam
+migration/psql/sql; sem script de migration em `package.json`; sem
+`readdir`/glob/`**/*.sql` em código algum. O único consumidor
+programático do diretório é `platform/lib/reserve/0017.test.ts`, que
+resolve **um caminho literal** (`0017_repasse.sql`) e não varre pasta.
+Aplicação é manual, por MCP `apply_migration`.
+
+Isso torna "recursivo" discutível para máquina — mas **não elimina o
+risco, que é humano**: `SETUP.md` e `PLANO_MESTRE.md` mandam o operador
+olhar `platform/supabase/migrations/` "nesta ordem", e um subdiretório
+`ident01/` sentado lá dentro aparecia nessa listagem. A mitigação é de
+leitura humana, não de glob. Pós-move, `migrations/` contém somente
+arquivos `.sql` numerados, nenhum subdiretório.
+
+Quatro regras novas no `CLAUDE.md` a partir desta fatia: timeout de MCP ≠
+transação revertida (verificar estado no servidor antes de re-executar);
+SQL multi-statement por MCP devolve só o último result set; draft NÃO
+APLICAR não mora em pasta de migration; numeração sai da ordem REAL de
+aplicação.
+
+**Pendências desta fatia**:
+1. Aplicar o draft D16+D17 — **só** sob `AUTORIZO IDENTIDADE-01
+   CORRECAO-1`; renomear para o próximo número livre e mover para
+   `platform/supabase/migrations/` no ato. Ordem decidida: CORRECAO-2
+   primeiro, CORRECAO-1 em seguida — se ela se mantiver, este draft leva
+   `0065` e o da CORRECAO-2 leva `0064`.
+2. Ciclo supervisionado 2 com expectativas DECLARADAS antes de rodar.
+3. Drop do SHIM (passo 6) — bloqueado até dois ciclos fecharem verde.
+4. `QUARENTENA-01` e `REF-01` — fatias nomeadas, priorização com
+   Emerson após o fecho. A taxa de vazamento da QUARENTENA-01 fica
+   registrada como **a re-medir na fatia própria** (a estimativa de
+   ~300/dia não se sustentou na medição por evento).

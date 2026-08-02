@@ -262,7 +262,7 @@ Nenhuma linha sobra em nenhum dos lados.
 | 2 | orfanizações ≈ sumiços reais | **parcial** — só CARTAS varreu (8); as outras 3 não são julgáveis |
 | 3 | contador sai do falso | **não exercitado** — zero novas vivas; segue 0 |
 | 4 | 31 excedentes da PLAY colapsam | **não alcançado** — a varredura da PLAY se recusou |
-| 5 | protegidas byte a byte | **PASS por prova direta** (ver ressalva abaixo); LANCE **não exercitável** |
+| 5 | protegidas byte a byte | **PASS pela âncora §14.2.1** (`5c7819be…` idêntico); LANCE **não exercitável** |
 | 6 | `trg_bidcon_price` só em INSERT/mudança real | **PASS estrutural** — interseção vazia com o UPDATE de reivindicação |
 | 7 | `carta_nova`/`carta_indisponivel` 1:1 | **PASS** — 13 eventos ↔ 13 linhas criadas; 8 eventos ↔ 8 orfanizações |
 | 8 | backfill em segundos, md5 comercial | **PASS** (passo 2) |
@@ -270,13 +270,48 @@ Nenhuma linha sobra em nenhum dos lados.
 `md5_comerciais` mudou (`b6bcb039…` → `6236e920…`) — **esperado**: 13 linhas novas
 entraram. A âncora do item 8 era a janela do backfill, já fechada verde no passo 2.
 
-### Ressalva de escrituração — âncora da partição protegida
+### Âncora da partição protegida — RETIFICADO (CORRECAO-1, item 4)
 
-`md5_protegidas` deu `ff3ca206…` contra `5c7819be…` registrado no ANTES, e **não
-consegui reproduzir `5c7819be` com nenhuma variante da expressão**. A âncora que
-registrei é irreproduzível: **defeito meu de escrituração**, declarado, não descartado.
+**A ressalva anterior era falsa e está retirada.** Com a expressão **canônica do
+T7 §14.2.1**, o valor bate exato:
 
-A prova substituta é mais forte que o md5 e é direta:
+```sql
+-- §14.2.1 — a ÚNICA expressão válida para o item 5. Expressão e valor andam juntos.
+select count(*) linhas,
+       md5(string_agg(
+         id::text||'|'||coalesce(fonte,'')||'|'||coalesce(administradora_origem,'')||'|'||
+         coalesce(numero_externo::text,'')||'|'||status::text||'|'||coalesce(tipo::text,'')||'|'||
+         coalesce(valor_credito::text,'')||'|'||coalesce(valor_entrada::text,'')||'|'||
+         coalesce(valor_parcela::text,'')||'|'||coalesce(qtd_parcelas::text,''),
+         E'\n' order by id))
+from cartas where fonte is distinct from '360prospere';
+```
+
+| momento | linhas | md5 |
+|---|---|---|
+| FASE A | 14 | `5c7819be56b9bc584b1704cf11047e96` |
+| ANTES 19:28:12 | 14 | `5c7819be56b9bc584b1704cf11047e96` |
+| **DEPOIS do ciclo 20:01** | **14** | **`5c7819be56b9bc584b1704cf11047e96`** ✓ |
+
+**H-ÂNCORA: refutada.** A expressão canônica **não** contém `fingerprint` nem
+`row_to_json` — só id, fonte, administradora_origem, numero_externo, status, tipo e os
+quatro comerciais. O backfill do 0063 não a toca. A hipótese de que `5c7819be` fosse o
+valor pré-backfill não se sustenta: ele é o valor pós-backfill também, porque a coluna
+`fingerprint` nunca entrou na expressão.
+
+**A causa real foi minha, e é de processo.** No DEPOIS usei uma expressão *ad-hoc*
+(`id:status:numero_externo:sincronizada_em`) em vez de buscar a canônica. Agravante:
+**este erro já tinha ocorrido antes nesta mesma sessão** — o falso alarme `ed49a932…` —
+e naquela vez fui ao §14.2.1 e corrigi na hora. Na segunda vez não fui, e ainda declarei
+a âncora "irreproduzível": uma confissão falsa sobre um controle íntegro, que teria
+entrado no registro permanente.
+
+Regra registrada: **antes de declarar um controle quebrado ou irreproduzível, buscar a
+expressão canônica no artefato.** Um controle só é julgado pela expressão com que foi
+ancorado. O §14.2.1 existe para matar expressão ad-hoc; funcionou nas duas vezes em que
+foi consultado e só falhou quando não foi.
+
+A prova direta abaixo permanece como confirmação independente:
 
 - as **14** linhas seguem lá, todas `status='disponivel'`, números 9001–9013 + BIDCON_DIRETO;
 - **`sincronizada_em IS NULL` nas 14** — todo caminho de sync escreve `sincronizada_em`,

@@ -68,6 +68,28 @@ Próxima: derivar de `list_migrations` + pasta no momento (referência: 0068
 aplicada → próxima = 0069; gap 0022→0063 documentado nos cabeçalhos dos
 arquivos 0063/0064 — ver `migrations-nnv/`).
 
+**Regra 3 — timeout de MCP ≠ transação revertida.** Chamada que estoura o
+tempo PODE ter commitado: o timeout é do cliente, não do servidor. Antes de
+re-executar, VERIFICAR o estado no servidor (`list_migrations`, contagem,
+`pg_get_functiondef`). Re-rodar por reflexo duplica escrita.
+
+Corolário: SQL multi-statement por MCP devolve **só o último result set** —
+os anteriores somem sem erro. Uma consulta por chamada quando o resultado
+importa.
+
+**Regra 4 — draft NÃO APLICAR não mora em pasta de migration.** Lar único:
+`ident01/` na raiz do repo (ou pasta da fatia), nunca
+`platform/supabase/migrations*/`. Não existe runner automático neste repo
+(sem `supabase/config.toml`, sem step de migration em CI, sem glob em
+código — conferido), então o risco não é de máquina: é do operador, que
+`SETUP.md` manda listar a pasta de migrations "nesta ordem". Pasta de
+migration contém só `.sql` numerados, nenhum subdiretório.
+
+**Regra 5 — numeração sai da ordem REAL de aplicação, não da de escrita.**
+Draft que espera gate nasce SEM número; recebe o próximo livre no momento
+de aplicar. Dois drafts esperando: o primeiro autorizado leva o número
+menor. Nunca renomear por antecipação.
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
