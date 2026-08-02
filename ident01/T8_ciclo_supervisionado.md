@@ -110,6 +110,51 @@ Provas negativas adicionais, do contrato novo:
 - `vivas_com_vinculo = 0` no ANTES ⇒ o caminho de proteção de vínculo
   **não é exercitável** neste ciclo. Registrado como tal, não como PASS.
 
+## Item 6 — resolvido por estrutura, antes do ciclo (19:42 UTC)
+
+Gatilhos vivos em `public.cartas`, lidos do banco:
+
+```
+trg_bidcon_price       BEFORE INSERT OR UPDATE OF
+  valor_credito, valor_entrada, valor_parcela, qtd_parcelas, tipo, parcelas_detalhe
+trg_cartas_fingerprint BEFORE INSERT OR UPDATE OF
+  tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas,
+  administradora_id, administradora_raw
+```
+
+UPDATE de reivindicação publicado (`sync_aplicar_cotas`, linhas 61–64):
+
+```sql
+update cartas set numero_externo=v_num,
+  entrada_parceiro_raw=r.ep, administradora_raw=coalesce(r.adm_raw,administradora_raw),
+  administradora_id=coalesce(v_adm_in,administradora_id), fornecedor_id=coalesce(fornecedor_id,v_forn_id),
+  categoria=v_cat, sincronizada_em=v_now where id=v_cand;
+```
+
+**Contra `trg_bidcon_price`: interseção vazia.** Postgres decide o disparo pela
+lista de colunas do comando, não pela mudança de valor. Logo o gatilho de preço
+**não pode** disparar em reivindicação — item 6 é PASS por construção, não por
+medição. O ADENDO-4 está publicado e funcionando.
+
+**Contra `trg_cartas_fingerprint`: interseção `{administradora_id, administradora_raw}`.**
+Esse gatilho **dispara** em toda reivindicação. Não é defeito, e não foi escondido:
+
+- é D4 fazendo o trabalho dele — se a reivindicação toca a administradora, o
+  fingerprint materializado tem de ser recomputado ou fica mentindo;
+- e o recomputo é **idempotente aqui por invariante**: a candidata foi escolhida
+  *porque* o fingerprint dela é igual ao da entrante, e o fingerprint entrante
+  foi calculado a partir do mesmo `r.adm_raw` que o UPDATE grava. Recomputar
+  devolve o mesmo valor.
+
+Custo: um `md5` de concatenação por linha reivindicada — microssegundos, contra
+os ~47 solves de TIR que o ADENDO-4 eliminou. Fica **registrado como observação**,
+não como pendência. Se o `total_ms` do ciclo sair fora da faixa histórica, este é
+o primeiro lugar a olhar.
+
+Faixa histórica de duração (12 ciclos, 08:00–19:01): `total_ms` **12.008–15.035**,
+mediana ~13.100, um outlier de 22.575 às 09:00. Sempre `fontes_ok=3 fontes_falha=2`
+(LANCE e PIFFER caem os dois em `sync_pulado`, 2 por ciclo).
+
 ## Falha
 
 Falha em qualquer item eliminatório → **PARAR**, não corrigir a quente.
