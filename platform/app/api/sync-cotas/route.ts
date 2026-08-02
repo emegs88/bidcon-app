@@ -57,6 +57,7 @@ type ResultadoFonte = {
   origem: FonteMarca;
   ok: boolean;
   motivo?: string;         // preenchido quando ok=false
+  cicloT0?: string;        // D6: fronteira do ciclo, do relógio do banco
   lidas?: number;
   lotes?: number;
   contagemAnterior?: number;
@@ -125,6 +126,32 @@ export async function GET(req: Request) {
         continue;
       }
 
+      // (3b) ABERTURA DO CICLO (D6). Um único t0 por fonte, compartilhado por
+      // TODOS os lotes e pela varredura final. Precisa vir do relógio do BANCO:
+      // com t0 do relógio do Node adiantado em relação ao Postgres, uma carta
+      // reivindicada no lote 1 (sincronizada_em = now() do banco) ainda
+      // satisfaria `sincronizada_em < t0` no lote 2 e seria reivindicada duas
+      // vezes. sync_ciclo_t0(origem, '{}') devolve o ultima_varredura_em do
+      // estado — a fronteira exata entre o ciclo passado e este — e faz o
+      // bootstrap com now() na primeira execução da fonte (nunca -infinity).
+      const { data: t0Raw, error: errT0 } = await db.rpc("sync_ciclo_t0", {
+        p_origem: origem,
+        p_cotas: {},
+      });
+      if (errT0 || !t0Raw) {
+        try {
+          await db.from("eventos_sync").insert({
+            tipo: "sync_abortado",
+            detalhe: origem + " ciclo_t0: " + (errT0?.message ?? "nulo"),
+          });
+        } catch {
+          // silencioso de propósito
+        }
+        resultados.push({ origem, ok: false, motivo: "ciclo_t0", contagemAnterior });
+        continue;
+      }
+      const cicloT0 = t0Raw as string;
+
       // (4) aplica em LOTES de 100, sem varredura (p_varrer=false).
       // entrada_parceiro (cru) vai como entrada_parceiro; null vira null no jsonb.
       const payload = leitura.cotas.map((c) => ({
@@ -147,7 +174,9 @@ export async function GET(req: Request) {
         const indice = Math.floor(i / TAMANHO_LOTE) + 1;
         const { data, error } = await db.rpc("sync_aplicar_cotas", {
           p_origem: origem,
-          p_cotas: lote,
+          // D6: envelope canônico. A assinatura (p_origem, p_cotas, p_varrer)
+          // continua CONGELADA — o t0 viaja DENTRO do jsonb, não num 4º arg.
+          p_cotas: { ciclo_t0: cicloT0, cotas: lote },
           p_varrer: false,
         });
         if (error) {
@@ -177,10 +206,15 @@ export async function GET(req: Request) {
 
       // (5) todos os lotes aplicaram => varredura única com a lista COMPLETA.
       // A RPC tem trava própria: lista vazia jamais varre.
-      const numeros = payload.map((c) => c.numero);
+      // IDENTIDADE-01: a varredura nova casa por FINGERPRINT (D1), não por
+      // numero_externo (que é POSIÇÃO, D1). Ela precisa do payload inteiro
+      // para recomputar os fingerprints entrantes e rodar a checagem de
+      // integridade do ciclo — por isso vai `payload`, não `numeros`.
+      // Mesmo cicloT0 dos lotes: a fronteira do ciclo tem que ser uma só.
       const { data: varridas, error: errVarrer } = await db.rpc("sync_varrer_ausentes", {
         p_origem: origem,
-        p_numeros: numeros,
+        p_cotas: { ciclo_t0: cicloT0, cotas: payload },
+        p_ciclo_inicio: cicloT0,
       });
       if (errVarrer) {
         try {
@@ -206,6 +240,7 @@ export async function GET(req: Request) {
       resultados.push({
         origem,
         ok: true,
+        cicloT0,
         lidas: payload.length,
         lotes: Math.ceil(payload.length / TAMANHO_LOTE),
         contagemAnterior,
