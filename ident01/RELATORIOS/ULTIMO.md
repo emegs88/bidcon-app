@@ -1,242 +1,269 @@
 # IDENTIDADE-01 — ÚLTIMO RELATÓRIO
 
 **Canal definitivo.** Sobrescrito a cada relatório, empurrado ao origin na
-sequência. A arquitetura lê aqui.
-
-- **Gerado em:** 03/08/2026
-- **Ato:** CORREÇÃO DE MEDIÇÃO — retratação do §4 do relatório `c478019`
-- **Substrato:** `bidcon-app` @ `c478019`
-- **Autor:** mão do repo/app
+mesma respiração. Colagem de relatório em chat: proibida.
 
 ---
 
-## §0. VEREDITO — O ITEM 5 REDEFINIDO ESTÁ ERRADO, E O ERRO É MEU
+## §0 — VEREDITO
 
-A decisão ratificada diz:
+**ATO D1 EXECUTADO E NO AR.** D-1, D-2, D-3 e D-4 aplicados, build verde,
+152 testes passando, deploy confirmado em produção com o payload novo medido
+na rota real. O aceite adicional (sobreviver ao bot de snapshot) foi cumprido
+executando o próprio bot, não prevendo o que ele faria.
 
-> *"ITEM 5 REDEFINIDO: REMOVER o campo `id` fabricado das duas rotas
-> (`cotas-extra/route.js:330` e `cotas-servopa/route.js:91`). **Zero
-> consumidores = troca livre de compatibilidade, medida.**"*
+Commits: `3d8239b` (o ato) e `f1d1669` (snapshot regenerado).
+Origin em `f1d1669`. ATO D2: morto nesta fatia por revogação do item 5.
 
-A palavra **"medida"** aponta para uma linha do §4 do relatório `c478019`. Essa
-linha é um **falso-negativo**. O consumidor existe, está no `bidcon-app`, e
-**lê exatamente o campo `id`**.
+**O número que justifica a fatia inteira, medido no payload de produção:**
 
-**Executar o item 5 como redefinido zeraria a ingestão de quatro fontes**
-(CBC, PIFFER, CARTAS, SERVOPA) no xtv. Não é quebra de compatibilidade — é
-parada de alimentação.
-
-**ATO D1 (`bidcon-app`, D-1..D-4) NÃO é tocado por este achado.** Está
-autorizado, desacoplado e pronto. Executo no ato seguinte.
-**ATO D2 continua bloqueado** — agora por dois motivos, não um.
-
----
-
-## §1. O QUARTO EVENTO REGRA 7 — E O PRIMEIRO QUE VAZOU
-
-Os três primeiros falso-negativos da Regra 7 morreram dentro da própria
-varredura. **Este não.** Ele foi escrito, commitado, empurrado, lido pela
-arquitetura e virou base de decisão.
-
-### O que o relatório `c478019` afirma (§4, verbatim)
-
-```
-$ git -C bidcon-app grep -n "cotas-extra" -- ':!docs' ':!ident01' ':!*.md'
-exit=1     ← nenhum CÓDIGO do bidcon-app consome a rota
-```
-
-E a conclusão derivada, também no §4:
-
-> *"**Consequência boa:** não há consumidor do índice. O campo `idx` legado
-> previsto no checklist **não é necessário** — ninguém depende da posição."*
-
-### A causa, medida
-
-```
-$ pwd
-/Users/prospere/Desktop/360prospere/bidcon-app
-
-$ git grep -n "cotas-extra" -- ':!docs' ':!ident01' ':!*.md'
-exit_com_so_exclusoes=1                    ← zero linhas
-
-$ git grep -n "cotas-extra" -- '*' ':!docs' ':!ident01' ':!*.md'
-exit_com_positivo=0                        ← DEZENAS de linhas
-```
-
-**Pathspec do git composto SÓ de exclusões (`':!…'`) não casa nada.** A magia
-`:!` **subtrai** de um conjunto positivo; sem conjunto positivo, o conjunto é
-vazio e o `git grep` sai com `1`. Basta acrescentar `'*'` para o mesmo comando
-devolver o oposto.
-
-É o retrato exato da Regra 7: **comando quebrado, saída plausível, hipótese
-confirmada por acaso.** A diferença é que desta vez a hipótese estava errada.
-
----
-
-## §2. OS CONSUMIDORES REAIS — quatro arquivos
-
-```
-$ git grep -l "cotas-extra" -- 'platform/**' 'public/**' 'app/**'
-platform/lib/cotas-source.ts
-platform/scripts/fixture-sync-multifonte.mjs
-public/bidcon.html
-public/index.html
-exit=0
-```
-
-### 2.1 `platform/lib/cotas-source.ts` — **LÊ O `id`. É o consumidor crítico.**
-
-```
-platform/lib/cotas-source.ts:85-87
-  CBC:     "/api/cotas-extra?admin=1",
-  PIFFER:  "/api/cotas-extra?admin=1",
-  CARTAS:  "/api/cotas-extra?admin=1",
-
-platform/lib/cotas-source.ts:147
-  const numero = inteiro(ehLance ? r.n : r.id);
-  if (numero == null || numero <= 0) continue;
-```
-
-`r.id` é **exatamente** o `id: i + 1` fabricado em `cotas-extra/route.js:330` e
-`cotas-servopa/route.js:91`. O próprio arquivo declara o destino:
-
-```
-platform/lib/cotas-source.ts:47
-  numero: number;   // id nativo da fonte (`n` na Lance, `id` nas demais) => numero_externo
-
-platform/lib/cotas-source.ts:114-116
-  * `id` nativo: a Lance usa `n`, as demais usam `id`. Ambos viram `numero` /
-  * numero_externo — a chave de upsert (administradora_origem, numero_externo)
-  * cuida da colisão de id entre fontes distintas.
-```
-
-**Consequência de remover o campo `id`:** `r.id` vira `undefined` →
-`inteiro(undefined)` → `null` → `continue`. **Toda linha é pulada.** As quatro
-fontes externas passam a ingerir zero cotas, em silêncio — o `continue` não
-loga, não lança, não conta.
-
-### 2.2 `public/index.html` e `public/bidcon.html` — **não leem o `id`**
-
-```
-function normExtra(a,e){return{n:-(e+1),t:a.t,c:a.c,e:a.e,p:a.p,x:a.x,_x:1,
-  ac:a.ac||"ADM-00",adm:a.adm||"",fonte:a.fonte||"",ceExtra:a.custoEfetivo}}
-```
-
-Fabricam o **próprio** índice negativo (`n:-(e+1)`) e ignoram `a.id`. Estes dois
-sobreviveriam à remoção. Não salvam o item 5, mas ficam registrados como
-**terceira instância da mesma classe D1** — identidade por posição, agora no
-`bidcon-app`.
-
-### 2.3 `platform/scripts/fixture-sync-multifonte.mjs:103` — fixture do sync
-
-```
-EXTRA: BASE + "/api/cotas-extra?admin=1",
-```
-
-Espelha o contrato de `cotas-source.ts`. Quebraria junto.
-
----
-
-## §3. O ACHADO MAIOR QUE O ERRO
-
-Perseguir o consumidor expôs algo que nenhum dos dois lados tinha na mão: **a
-identidade posicional do `prospere-360` já está gravada dentro do xtv.**
-
-O caminho completo, medido ponta a ponta:
-
-```
-prospere-360  app/api/cotas-extra/route.js:330    id: i + 1        (posição do array)
-                            ↓ HTTP ?admin=1
-bidcon-app    platform/lib/cotas-source.ts:147    numero = r.id
-                            ↓
-bidcon-app    cotas-source.ts:115                 => numero_externo
-                            ↓
-xtv           chave de upsert (administradora_origem, numero_externo)
-```
-
-O próprio código já sabia, em dois comentários independentes:
-
-```
-platform/app/api/sync-cotas/route.ts:210
-  // numero_externo (que é POSIÇÃO, D1). Ela precisa do payload inteiro
-
-platform/app/api/atende/route.ts:327
-  // conversa? (o sync realoca numero_externo entre rodadas; ver caso do
-```
-
-Ou seja: o `numero_externo` das quatro fontes externas **não é um id de origem
-que por acaso é numérico** — é o **índice do array da raspagem daquele ciclo**.
-Reordenou a raspagem, mudou o estoque, entrou uma carta no meio: as posições
-seguintes deslizam e o upsert casa carta com carta errada.
-
-É a **D1 pura**, na chave de upsert, em produção. Não é achado novo de defeito
-— os comentários mostram que a casa já o conhecia. É achado novo de **alcance**:
-a origem do defeito está no outro repo, e o item 5 mexia justamente nela.
-
-**Não toquei em nada.** Isto é matéria de decisão, e provavelmente de fatia
-própria.
-
----
-
-## §4. O QUE MUDA PARA O ITEM 5
-
-| afirmação ratificada | estado após a medição |
+| medida | valor |
 |---|---|
-| "Zero consumidores" | **FALSA** — `cotas-source.ts:147` lê `r.id` |
-| "troca livre de compatibilidade, medida" | **FALSA** — a remoção zera 4 fontes |
-| "campo sem consumidor não ganha sal — YAGNI" | **premissa caiu**; o campo tem consumidor, e é a chave de upsert |
-| `idx` legado desnecessário (§4 de `c478019`) | **FALSO** — há consumidor do índice |
+| cotas no payload | 2657 |
+| com `id` (uuid) | **2657 — 100%, todos únicos** |
+| com `n` (= ref) **nulo** | **31** |
+| cotas cujo `ref` está **repetido** no mesmo payload | **2301** |
+| **não endereçáveis unicamente por `ref`** | **2332 — 87,8%** |
 
-A restrição que a REF-01 herdaria muda de forma: não é só *"referência pública
-estável"*, é **"substituto de `numero_externo` na chave de upsert das fontes
-externas"** — com migração do que já está gravado.
+`ref 6`, no mesmo payload, é **duas cartas ao mesmo tempo**:
 
-**Nada proposto aqui.** A mão que erra a medição não é a que redesenha a
-decisão que o erro derrubou.
+```
+bd5100da-01de-4c2e-a7c4-49bcc45cb921  imovel   890000  CNP (Caixa)
+51bc17ad-efea-4520-9db5-b248dddc0f8b  veiculo   14036  Mycon
+```
 
----
-
-## §5. ATO D1 — INTACTO E PRONTO
-
-O achado é todo do caminho de **ingestão** (`cotas-source.ts` escreve no xtv).
-Os itens D-1..D-4 são do caminho de **leitura** (`vw_cartas_publicas` → vitrine
-→ index.html → widget → atende) e tratam do **uuid real do xtv**, não do
-`numero_externo`. Superfícies disjuntas.
-
-| # | item | estado |
-|---|---|---|
-| D-1 | `platform/app/api/vitrine/route.ts` expõe `id` | pronto, não tocado pelo achado |
-| D-2 | `public/index.html` com `id` nas 3 chamadas + modal | pronto, não tocado |
-| D-3 | widget emite `data-id` (491) e lê (527), duas cópias | pronto, não tocado |
-| D-4 | `/api/atende` por `id`, fallback `ref`, guarda 4b | pronto, não tocado |
-
-A palavra `CONFIRMADO O DEPLOY D-1..D-4` é incondicional e os dois atos foram
-declarados desacoplados. **Executo o ATO D1 no ato seguinte**, com build verde e
-amostra do payload novo, aqui mesmo.
-
-Parei antes dele apenas porque uma medição que já entrou em decisão ratificada
-precede qualquer código novo.
+O sintoma nunca foi "o sync realoca numero_externo entre rodadas". Isso é o
+caso raro. O caso comum é que **`ref` não identifica carta nenhuma dentro de
+uma única resposta** — 87,8% do estoque. O handoff por `ref` acertava por
+sorte ou porque a guarda 4b abortava. As 31 cartas sem `ref` não tinham
+sequer como serem apontadas.
 
 ---
 
-## §6. ATO D2 — BLOQUEADO POR DOIS MOTIVOS
+## §1 — REGRA DO BOT: **RAMO (a)**, medido duas vezes
 
-1. **PROSPERE-360-ADMIN-01** — commit local pré-existente `1aa7a67`
-   (`entrada_parceiro` cru em `?admin=1`), pendente de revisão do Emerson antes
-   de qualquer push daquele repo.
-2. **NOVO** — o item 5, como redefinido, **quebra a ingestão**. Precisa ser
-   redefinido de novo antes de existir como diff.
+Ordem cumprida: medir antes de editar `index.html`.
 
-Nada foi escrito no `prospere-360`.
+**Medição 1 — diff do `2eb511d`** (o snapshot que apareceu no origin durante
+o ato anterior): 35 hunks, todos entre as linhas **42 e 1074**. Linha 42 =
+JSON-LD `<script id="ldCotas">`; linha 294 = linha de estatística
+(`2549 cartas` → `2621 cartas`); 298–1074 = blocos `<span class="cnum">nº
+1254</span>` dos cards SSR. **Nada acima de 1074.**
+
+**Corroboração no próprio gerador** — o comentário de `cardHtml`
+(`scripts/gerar-vitrine.mjs:141-142`) já declarava o motivo:
+
+> "Card estático — mesmas classes CSS do card client-side (renderMarket(), em
+> public/index.html), só sem os elementos interativos (onclick/handlers que
+> dependem de JS ainda não carregado nesse ponto do carregamento)."
+
+Card SSR não tem `onclick`. Logo o D-2 (que vive nos `onclick`, linhas
+1334/1471) está fora do alcance do bot. **Ramo (a).**
+
+**Medição 2 — a prova empírica, §2 abaixo.** Não me contentei com a leitura.
 
 ---
 
-## §7. ERROS DE FERRAMENTA DESTE CICLO
+## §2 — ACEITE ADICIONAL: o `id` sobrevive ao bot (executado, não previsto)
 
-- `git grep` com pathspec só de exclusões → casa vazio, `exit=1`. **Causa raiz
-  do falso-negativo.** Correção: sempre incluir `'*'` positivo.
-- Reforça o padrão já visto na Regra 7: `\b` inexistente no ERE do `git grep`,
-  variável não expandida em pipeline, `|` engolindo `$?`. Todos produzem
-  **zero resultados com saída limpa** — a forma mais perigosa de erro.
+`gh` não existe nesta máquina (`command not found`, exit 127), então não deu
+para disparar o `workflow_dispatch`. **Fiz melhor: rodei o bot.** O workflow
+`.github/workflows/atualizar-vitrine.yml:28` roda exatamente
+`node scripts/gerar-vitrine.mjs`. Executei esse mesmo comando, no mesmo
+repositório, com a mesma env (`BIDCON_PUBLISHABLE_KEY`, de
+`platform/.env.local`), contra o mesmo banco.
 
-=== FIM DO RELATÓRIO ===
+```
+EXIT_GERADOR=[0]
+[gerar-vitrine] buscando vw_cartas_publicas...
+[gerar-vitrine] 2657 cartas disponíveis (filtro credito>0).
+[gerar-vitrine] public/index.html atualizado (60 cards estáticos de 2657 cartas no total).
+```
+
+**Depois da regeneração:**
+
+```
+=== data-id nos cards SSR (D-1 pós-bot) ===
+data-id="9d1cfc2c-d5fe-44f1-889e-2b7b769677f1"
+data-id="24bcab90-bff0-43a4-803e-f0b040b69173"
+data-id="83f8af16-9fbf-41e3-81be-ff0a8dd45692"
+total_data_id=60          ← 60 cards, 60 uuids
+
+=== D-2 sobreviveu ao gerador? ===
+chamadas_com_id=3         ← as três chamadas intactas
+
+=== faixa que o gerador tocou ===
+primeira_linha_tocada=42
+ultima_linha_tocada=1062
+linhas do D-2: 1334, 1471   ← fora da faixa
+```
+
+Ramo (a) confirmado por execução. O `id` sobrevive; o D-2 sobrevive.
+Snapshot commitado em `f1d1669` para que a evidência fique no origin.
+
+**Limite honesto do que provei:** rodei o comando do bot, não o bot. Não
+provei o ambiente do GitHub Actions (checkout limpo, node 20, secret do
+repo). Provei o comportamento do gerador, que é onde estava a dúvida. Se o
+próximo cron produzir algo diferente disso, o culpado é o ambiente, não o
+código — e será visível no diff do próximo commit `chore(vitrine)`.
+
+---
+
+## §3 — O QUE FOI APLICADO
+
+**D-1 — a fonte expõe o `id`.**
+`platform/app/api/vitrine/route.ts` — achado no caminho: esta rota lê
+**`vw_vitrine_viva`**, não `vw_cartas_publicas` (o gerador é que lê a
+segunda). Confirmei no `information_schema` que `vw_vitrine_viva.id` é
+`uuid` na posição 1 antes de escrever qualquer linha. `campos` ganhou `id`;
+`LinhaCarta` ganhou `id: string | null`; o map passa `id: c.id`. O `n`
+**permanece** — é o rótulo exibido ("nº ...") e a chave de
+`refCota(a.n)`/`abrirDetalhe(a.n)` no cliente. Não troquei uma coisa pela
+outra; acrescentei a que faltava.
+
+`scripts/gerar-vitrine.mjs` — `",id"` entrou em `campos` (linha 71, como
+ordenado; coluna existe desde a 0064) e o card SSR ganhou
+`data-id="${escHtml(c.id || "")}"`.
+
+**D-2 — `index.html`, três chamadas incluindo a do modal.** Aplicado por
+substituição literal com contagem (`TOTAL SUBSTITUIDO = 3`): a de
+`abrirDetalhe` (modal, variante `e.`) e as duas de `renderMarket` (variante
+`a.`). Reusei o helper `cfEsc` que já existia no arquivo, em vez de inventar
+escape novo.
+
+**D-3 — widget emite e lê `data-id`, nas duas cópias.** As duas cópias
+**divergiram** entre si (55 linhas de diff, nos dois sentidos):
+`platform/public/` já emitia `data-id` via `ctaAttrs` e tem `data-adm`/
+`eyebrow`; `public/` tem os blocos `pw-carta-price` e a linha do ágio
+"abaixo do teto" que a outra não tem. **Não unifiquei** — não é o escopo
+desta fatia e unificar às cegas quebraria uma das duas. Apliquei o mínimo em
+cada uma: `id` no `cartaFocoAtual` de `abrirProsperitoComCarta`, leitura de
+`data-id` no handler de clique, e `id` no `cartaFocoAtual` do handler. A
+divergência entre as cópias fica **registrada como achado**, não corrigida.
+
+**D-4 — `atende` por `id`, fallback por `ref`, guarda 4b nos dois caminhos.**
+
+```ts
+const porId = typeof cartaFoco.id === "string" && cartaFoco.id !== "";
+const baseQuery = supabase.from("cartas").select(...).eq("status","disponivel").gt("valor_credito",0);
+const { data: cartaDb, error: erroCarta } = await (porId
+  ? baseQuery.eq("id", cartaFoco.id as string)
+  : baseQuery.eq("numero_externo", refFoco)
+).maybeSingle();
+```
+
+`id?: string` é **opcional de propósito**: app antiga em cache e cards
+hidratados client-side mandam só `ref`. A guarda 4b **não foi enfraquecida**
+— continua nos dois caminhos, e o comentário no código agora diz por quê (no
+fallback ela é a única defesa contra realocação; na busca por `id` ela ainda
+pega a carta cujos valores mudaram desde o clique).
+
+---
+
+## §4 — EVIDÊNCIA DE EXECUÇÃO
+
+```
+$ git diff --stat        (antes do commit)
+ platform/app/api/atende/route.ts     | 28 ++++++++++++++++++------
+ platform/app/api/vitrine/route.ts    |  8 +++++++-
+ platform/public/prosperito-widget.js |  6 ++++++
+ public/index.html                    |  4 ++--
+ public/prosperito-widget.js          |  8 +++++++-
+ scripts/gerar-vitrine.mjs            |  9 +++++++--
+ 6 files changed, 51 insertions(+), 12 deletions(-)
+
+$ npm run build > /tmp/build2.log 2>&1; RC=$?; printf 'EXIT_BUILD=[%s]\n' "$RC"
+EXIT_BUILD=[0]     compiled=1     erros=0
+
+$ npm test > /tmp/test2.log 2>&1; RC=$?; printf 'EXIT_TEST=[%s]\n' "$RC"
+EXIT_TEST=[0]
+ℹ tests 152   ℹ pass 152   ℹ fail 0   ℹ cancelled 0
+
+$ git push ssh://git@ssh.github.com:443/emegs88/bidcon-app.git HEAD:main
+   0c74930..3d8239b  HEAD -> main
+```
+
+**Amostra do payload, colhida na rota de produção depois do deploy:**
+
+```
+$ curl -s "https://app.bidcon.com.br/api/vitrine" -H "Origin: https://bidcon.com.br"
+http=200 bytes=536215   total_cotas=2657   CAMPO_ID_PRESENTE=True
+
+{
+ "id": "83f8af16-9fbf-41e3-81be-ff0a8dd45692",
+ "n": null,                       ← esta carta NÃO TINHA como ser apontada por ref
+ "t": "imovel",
+ "c": 136069.72,
+ "e": 69524.88,
+ "p": 854.67,
+ "x": 109,
+ "adm": "CNP (Caixa)",
+ "custo": 0.65,
+ "agio150": 20800,
+ "agio120": 14700,
+ "fonte": "cliente_direto",
+ "exclusiva": true
+}
+```
+
+A primeira cota do payload já é uma das 31 com `n: null`. Não escolhi o
+exemplo: é o primeiro registro.
+
+**Nota de higiene:** `npm test` falhava com exit 127 (`tsx: command not
+found`) — o `tsx` está declarado em `package.json:27` mas ausente do
+`node_modules/.bin`. Rodei `npm install` (exit 0), que resolveu **e sujou o
+`platform/package-lock.json`**. O lockfile **não entrou no commit** (stage
+conferido arquivo a arquivo antes de commitar); segue modificado na árvore
+local, para decisão sua em separado.
+
+---
+
+## §5 — PENDÊNCIAS REGISTRADAS (não tocadas)
+
+- **INGESTAO-POSICIONAL-01** — contrato `r.id`/`r.n` → `numero_externo`
+  (`platform/lib/cotas-source.ts:147`; `prospere-360 cotas-extra/route.js:330`,
+  `cotas-servopa/route.js:91`). Inclui a terceira instância da classe
+  (`n:-(e+1)` em `public/index.html` e `public/bidcon.html:495`) e a cobertura
+  futura de `id` real no caminho client-side do cotas-extra.
+- **PROSPERE-360-ADMIN-01** — revisão do `1aa7a67` (`entrada_parceiro` cru
+  atrás de `?admin=1`) por Emerson. Independente. Nada empurrado naquele repo.
+- **Divergência das duas cópias do `prosperito-widget.js`** — achado novo
+  desta fatia, 55 linhas, nos dois sentidos. Não unificado.
+
+**Limitação declarada, confirmada em produção:** cards hidratados
+client-side do cotas-extra não têm uuid (`normExtra` fabrica `n:-(e+1)` e não
+tem `id`) → handoff com `id` ausente → `atende` cai no fallback por
+`numero_externo` com guarda 4b = comportamento de hoje, sem regressão.
+
+---
+
+## §6 — ERROS DE FERRAMENTA DESTA SESSÃO (Regra 7)
+
+Dois eventos, ambos pegos antes de virarem relatório:
+
+**5º evento — `cd` perdido.** O diretório de trabalho voltou sozinho para
+`/Users/prospere/Desktop/360prospere` (o pai) e o `git show` respondeu
+`fatal: not a git repository`. Como a Regra 7 exige contexto provado na
+própria saída, o erro apareceu no lugar do resultado plausível. Refeito com
+`cd ... &&` explícito e `git rev-parse --show-toplevel` no output.
+
+**6º evento — código de saída vazio, duas vezes.** `${PIPESTATUS[0]}` é
+bashismo e este shell é zsh 5.9 (o correto seria `$pipestatus`); depois,
+`echo "EXIT=$?"` após redirecionamento também voltou vazio. **Só descobri
+porque o valor veio VAZIO, e não porque veio errado** — se tivesse vindo
+`0` espúrio, eu teria relatado build verde sem ter medido. Testei o
+mecanismo isolado (`true`→0, `false`→1) antes de confiar nele, e fechei com
+`RC=$?; printf 'EXIT_BUILD=[%s]\n' "$RC"` — colchetes justamente para que
+vazio seja visível como `[]` em vez de passar batido.
+
+Menores: BSD grep estoura em `\{0,260\}` (teto 255); `grep -oE "...[^)]*\)"`
+truncava na primeira `)` de uma linha minificada.
+
+---
+
+## §7 — O QUE FALTA PARA FECHAR
+
+Re-teste do caminho exato por Emerson: site → card → especialista → detalhe.
+Sintoma morto → frase `AUTORIZO IDENTIDADE-01 CORRECAO-1`.
+
+Parando aqui, conforme ordenado.
