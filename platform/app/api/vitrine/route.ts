@@ -46,6 +46,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type LinhaCarta = {
+  // uuid real da carta (IDENTIDADE-01 / D-1). `ref` é POSIÇÃO — o sync realoca
+  // numero_externo entre rodadas; só o `id` sobrevive a um ciclo de raspagem.
+  id: string | null;
   ref: number | null;
   tipo: string | null;
   credito: number | null;
@@ -88,7 +91,7 @@ export async function GET(req: Request) {
     const supabase = createXtvClient();
 
     const campos =
-      "ref,tipo,credito,entrada,parcela,parcelas,custo_am,agio_120,agio_150,administradora,fonte,exclusiva";
+      "id,ref,tipo,credito,entrada,parcela,parcelas,custo_am,agio_120,agio_150,administradora,fonte,exclusiva";
 
     // O gateway do Supabase corta em 1000 linhas por resposta mesmo com
     // .limit() maior — pagina via .range() até esgotar ou bater o teto de
@@ -144,6 +147,9 @@ export async function GET(req: Request) {
     }
 
     const cotas = linhas.map((c) => ({
+      // `id` = uuid estável (D-1). `n` PERMANECE: é o rótulo exibido ("nº ...")
+      // e a chave de refCota(a.n)/abrirDetalhe(a.n) no cliente.
+      id: c.id,
       n: c.ref,
       t: c.tipo,
       c: num(c.credito),

@@ -326,6 +326,10 @@ window.abrirProsperitoComCarta = function (carta) {
   var nparcelas = Number(carta.nparcelas);
   var custo = Number(carta.custo);
   cartaFocoAtual = {
+    // uuid real (IDENTIDADE-01 / D-3). Opcional: app antiga em cache e cards
+    // hidratados do cotas-extra mandam só `ref` — o /api/atende cai no
+    // fallback por numero_externo com a guarda 4b, comportamento de hoje.
+    id: carta.id != null ? String(carta.id).slice(0, 40) : '',
     ref: ref, tipo: tipo, adm: adm,
     credito: isNaN(credito) ? 0 : credito,
     entrada: isNaN(entrada) ? 0 : entrada,
@@ -524,6 +528,7 @@ body.addEventListener('click', function (ev) {
   var btn = ev.target && ev.target.closest ? ev.target.closest('.pw-carta-cta') : null;
   if (!btn) return;
   var ref = btn.getAttribute('data-ref') || '';
+  var id  = btn.getAttribute('data-id')  || '';
   var tipo = (btn.getAttribute('data-tipo') || '').slice(0, 20);
   var adm = (btn.getAttribute('data-adm') || '').slice(0, 60);
   var credito = Number(btn.getAttribute('data-credito'));
@@ -532,6 +537,7 @@ body.addEventListener('click', function (ev) {
   var nparcelas = Number(btn.getAttribute('data-nparcelas'));
   var custo = Number(String(btn.getAttribute('data-custo') || '').replace(',', '.'));
   cartaFocoAtual = {
+    id: id.slice(0, 40),
     ref: ref.slice(0, 40), tipo: tipo, adm: adm,
     credito: isNaN(credito) ? 0 : credito,
     entrada: isNaN(entrada) ? 0 : entrada,

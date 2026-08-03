@@ -211,6 +211,10 @@ async function blocoCartas(supabase: ReturnType<typeof createXtvClient>): Promis
 // truncadas; qualquer campo essencial ausente/inválido descarta o bloco
 // inteiro (a conversa segue normal, sem CARTA EM FOCO).
 type CartaFoco = {
+  // uuid real da carta (IDENTIDADE-01 / D-4). OPCIONAL DE PROPÓSITO: app antiga
+  // em cache e cards hidratados client-side do cotas-extra mandam só `ref` —
+  // esses caem no fallback por numero_externo, comportamento de hoje.
+  id?: string;
   ref: string;
   tipo: string;
   credito: number;
@@ -224,6 +228,7 @@ type CartaFoco = {
 function lerCartaFoco(raw: unknown): CartaFoco | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
+  const id = String(o.id ?? '').trim().slice(0, 40);
   const ref = String(o.ref ?? '').trim().slice(0, 40);
   const tipo = String(o.tipo ?? '').trim().slice(0, 20);
   const adm = String(o.adm ?? '').trim().slice(0, 60);
@@ -242,7 +247,7 @@ function lerCartaFoco(raw: unknown): CartaFoco | null {
     Number.isFinite(custoRaw) && custoRaw > 0 && custoRaw <= 100
       ? Math.round(custoRaw * 100) / 100
       : undefined;
-  return { ref, tipo, credito, entrada, parcela, nparcelas, adm, custo };
+  return { id: id || undefined, ref, tipo, credito, entrada, parcela, nparcelas, adm, custo };
 }
 
 // Monta o bloco CARTA EM FOCO no mesmo formato de linha do blocoCartas.
@@ -308,15 +313,23 @@ async function processarReservaCarta(
   try {
     // 4) busca a carta DE VERDADE no banco, no momento atual — nunca usa os
     // números de carta_foco/texto do modelo daqui pra frente.
-    const { data: cartaDb, error: erroCarta } = await supabase
+    // IDENTIDADE-01 / D-4: PREFERE o uuid quando ele veio no carta_foco. O
+    // numero_externo é POSIÇÃO — o sync o realoca entre rodadas, então buscar
+    // por ele pode devolver OUTRA carta. O `id` é estável por construção.
+    // Fallback por numero_externo continua vivo e é o caminho da app antiga em
+    // cache e dos cards hidratados client-side (cotas-extra, sem uuid).
+    const porId = typeof cartaFoco.id === "string" && cartaFoco.id !== "";
+    const baseQuery = supabase
       .from("cartas")
       .select(
         "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, administradora_raw, administradora:administradora_id(nome)"
       )
-      .eq("numero_externo", refFoco)
       .eq("status", "disponivel")
-      .gt("valor_credito", 0)
-      .maybeSingle();
+      .gt("valor_credito", 0);
+    const { data: cartaDb, error: erroCarta } = await (porId
+      ? baseQuery.eq("id", cartaFoco.id as string)
+      : baseQuery.eq("numero_externo", refFoco)
+    ).maybeSingle();
     if (erroCarta) {
       console.error("[atende] reserva: erro ao buscar carta:", erroCarta);
       return FRASE_RESERVA_ESCALONAR;
@@ -325,7 +338,10 @@ async function processarReservaCarta(
 
     // 4b) consistência: a linha atual do ref ainda é a MESMA carta da
     // conversa? (o sync realoca numero_externo entre rodadas; ver caso do
-    // ref 86 em 09/07). Parcela fica de fora da comparação (tolera reajuste
+    // ref 86 em 09/07). PERMANECE nos DOIS caminhos (D-4): no fallback por
+    // numero_externo ela é a única defesa contra a realocação; na busca por
+    // `id` ela ainda pega a carta cujos valores mudaram desde o clique.
+    // Parcela fica de fora da comparação (tolera reajuste
     // de centavos) — só credito/entrada, que são os campos mais estáveis e
     // discriminantes entre cartas diferentes.
     const mesmaCarta =

@@ -67,8 +67,11 @@ if (!PUBLISHABLE_KEY) {
 async function buscarCartas() {
   const linhas = [];
   let offset = 0;
+  // `id` (uuid) entra desde a 0064 — a coluna existe em vw_cartas_publicas.
+  // O card SSR não tem onclick (ver cardHtml), então o id viaja como data-id
+  // e é o que o cliente reaproveita no handoff. `ref` é POSIÇÃO, não identidade.
   const campos =
-    "ref,tipo,credito,entrada,parcela,parcelas,custo_am,administradora";
+    "id,ref,tipo,credito,entrada,parcela,parcelas,custo_am,administradora";
   for (;;) {
     // order: espelha EXATAMENTE o "order by custo_am asc nulls last,
     // credito asc" da RPC buscar_cartas (migration 0043) — mesmo desempate
@@ -162,7 +165,9 @@ function cardHtml(c, i) {
   const parcelasMes = c.parcelas
     ? '<span style="font-size:11px;color:var(--cinza)">/mês</span>'
     : "";
-  return `<div class="ccard bc-card ${tipoImovel ? "imovel" : "veiculo"}" id="item-${i + 1}">
+  return `<div class="ccard bc-card ${tipoImovel ? "imovel" : "veiculo"}" id="item-${i + 1}" data-id="${escHtml(
+    c.id || ""
+  )}">
       <div class="ctop">
         <span class="ccat"><span class="emo">${ic(
           tipoImovel ? "casa" : "carro"
