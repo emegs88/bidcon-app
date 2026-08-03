@@ -1,6 +1,6 @@
 # bidcon
 
-> Marketplace de cartas de consórcio contempladas da Prospere Consórcios. A bidcon intermedia a compra e a venda de cotas de consórcio já contempladas (com crédito liberado) e cruza, lado a lado, o estoque de veículos e imóveis das lojas parceiras com as cartas disponíveis — mostrando crédito, entrada, parcela, prazo e custo mensal estimado. A bidcon não é instituição financeira e não aprova crédito; toda combinação é uma estimativa sujeita à análise da administradora do consórcio.
+> Marketplace de cartas de consórcio contempladas do Grupo Prospere, operado pela EGS Capital Participações Ltda. A bidcon intermedia a compra e a venda de cotas de consórcio já contempladas (com crédito liberado) e cruza, lado a lado, o estoque de veículos e imóveis das lojas parceiras com as cartas disponíveis — mostrando crédito, entrada, parcela, prazo e custo mensal estimado. A bidcon não é instituição financeira e não aprova crédito; toda combinação é uma estimativa sujeita à análise da administradora do consórcio.
 
 ## Páginas principais
 
@@ -30,17 +30,17 @@
 
 - Intermediação de cartas de consórcio contempladas (compra e venda de cotas com crédito liberado).
 - Segmentos: veículos (lojistas) e imóveis (residencial e comercial).
-- Atuação: Brasil. Operação local em Hortolândia/SP (Prospere Consórcios).
+- Atuação: Brasil. Operação local em Hortolândia/SP (EGS Capital Participações Ltda).
 
 ## Observações de conformidade
 
 - Consórcio é compra programada, não investimento.
-- A bidcon / Prospere Consórcios não é instituição financeira e não aprova crédito.
+- A bidcon (EGS Capital Participações Ltda) não é instituição financeira e não aprova crédito.
 - Valores exibidos (crédito, entrada, parcela, prazo, custo mensal) são estimativas e ficam sujeitos à análise e à transferência pela administradora do consórcio.
 - A entrada é paga exclusivamente por boleto da conta vinculada ao 5º Tabelionato de Notas de Campinas, e o saldo é quitado nas parcelas, conforme a administradora.
 
 ## Contato
 
 - Site institucional: https://www.prospere.com.br/
-- WhatsApp: (19) 99756-1909
+- WhatsApp: (11) 97320-2967
 - E-mail: contato@prospere.com.br

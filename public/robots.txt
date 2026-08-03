@@ -1,4 +1,4 @@
-# bidcon · Marketplace de Cotas Contempladas — Prospere Consórcios
+# bidcon · Marketplace de Cotas Contempladas — Grupo Prospere
 User-agent: *
 Allow: /
 
