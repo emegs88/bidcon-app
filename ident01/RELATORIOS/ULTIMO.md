@@ -365,3 +365,81 @@ gated.*
 
 Sessão em espera. O fecho real vem depois do **ciclo supervisionado 2**,
 verificado pela arquitetura.
+
+---
+
+## §9 — 0065 APLICADA (append, 03/08)
+
+O §8.1 acima ficou **desatualizado no mesmo dia**: ele afirma que a 0065 nunca
+foi aplicada, e isso deixou de ser verdade. Append, não reescrita — o §8.1
+descreve corretamente o estado em que foi escrito.
+
+**Ato executado na arquitetura, sob a frase de Emerson.** Não fui eu, e não
+tenho como medir o conteúdo do que rodou daqui.
+
+**Repassado pela arquitetura (atribuído, não medido por mim):** md5 pós —
+`varrer3=83846ddb`, `aplicar=c83894d4`; shim intocado; 95.270 cartas
+inalteradas; filtro 2→1; `quarentenada` + `returning` presentes.
+
+**Medido por mim, independentemente**, no `supabase_migrations` do xtv:
+
+```
+20260802191207  0063_identidade_estavel_fingerprint
+20260803013639  0064_correcao2_view_id_invoker
+20260803014919  create_farol_log            ← sem número, fora da liturgia
+20260803181037  0065_correcao1_d16_d17      ← ÚLTIMA, aplicada
+```
+
+Confirmo o **registro** da 0065 como aplicada e que ela é a última da fila.
+**Não** confirmo os md5 nem as contagens — esses são medição da arquitetura e
+ficam atribuídos a ela. Registro separado de propósito: repetir número alheio
+como se fosse meu é exatamente o vício que a Regra 7 existe para impedir.
+
+### 9.1 — Achado colateral sobre o FAROL-LOG-01
+
+A listagem acima responde parcialmente o "origem a confirmar" do §8.2. A
+`create_farol_log` **não** é um resíduo antigo nem apareceu em janela isolada:
+foi aplicada em **03/08 01:49**, ou seja, **13 minutos depois da 0064**
+(03/08 01:36) e no mesmo bloco de trabalho. Está cronologicamente encravada
+entre a CORRECAO-2 e a CORRECAO-1.
+
+Isso estreita a pergunta para Emerson: não é "de onde veio essa tabela?", é
+"o que rodou nesta máquina/sessão entre 01:36 e 01:49 de 03/08". A resposta
+provável é ferramenta automatizada agindo fora da liturgia na mesma janela em
+que a 0064 foi aplicada — o que, se confirmado, vale mais como alerta de
+processo do que como incidente de segurança (a tabela segue em *default deny*,
+§8.2).
+
+**Continua sem ação da minha parte.** Vale a regra já registrada: footprint de
+banco do FAROL só sob fatia própria, gated.
+
+### 9.2 — LACUNA DO §2 FECHADA: o bot real rodou
+
+O §2 declarou um limite honesto: *"rodei o comando do bot, não o bot. Não
+provei o ambiente do GitHub Actions."* Esse limite **caiu sozinho**. Ao
+empurrar este relatório, o push foi rejeitado porque o origin havia andado —
+era o workflow `atualizar-vitrine` executando de verdade, no Actions:
+
+```
+a789af9  chore(vitrine): snapshot automático do estoque
+ public/index.html | 204 ++++++------- (102 insertions, 102 deletions)
+```
+
+Medido **no arquivo que o bot real produziu**
+(`git show a789af9:public/index.html`):
+
+```
+data_id_uuids=60          ← 60 cards SSR, 60 uuids
+chamadas_com_id=3         ← as três chamadas do D-2 intactas
+data-id="9d1cfc2c-d5fe-44f1-889e-2b7b769677f1"
+data-id="24bcab90-bff0-43a4-803e-f0b040b69173"
+```
+
+**Ramo (a) agora está provado no ambiente de produção do bot**, não por
+simulação local nem por leitura de código. O aceite adicional do ATO D1 está
+integralmente cumprido: o `id` sobreviveu ao snapshot real.
+
+### 9.3 — Estado
+
+Próximo tick = **ciclo supervisionado 2**, medido pela arquitetura contra o
+§14.2 / T8. Sessão segue em espera. Pendências do §8.3 inalteradas.
