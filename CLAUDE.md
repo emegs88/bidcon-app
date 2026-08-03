@@ -30,6 +30,15 @@
 
 ## Migrations — regras (pós-incidente 0063/0064, 22/07)
 
+> **Esta seção é APPEND-ONLY. Nunca renumerar uma regra.** Diários, relatórios
+> e cabeçalhos de migration citam regra por NÚMERO ("CLAUDE.md, Regra 4") —
+> renumerar quebra referência histórica em silêncio, e o texto que aponta pra
+> regra errada é pior que texto nenhum. Regra nova entra no fim com o próximo
+> número livre. Regra revogada fica no lugar, marcada `REVOGADA` + motivo +
+> data; o número não é reciclado. O escopo da seção cresceu além de migrations
+> (ver Regra 6) — o título permanece por essa mesma norma.
+> (Origem: decisão de arquitetura, 02/08.)
+
 **Regra 1 — rodapé obrigatório de toda função/RPC em `public` (nnv E xtv):**
 ```sql
 revoke all on function public.<fn>(<args>) from public, anon;
@@ -89,6 +98,25 @@ migration contém só `.sql` numerados, nenhum subdiretório.
 Draft que espera gate nasce SEM número; recebe o próximo livre no momento
 de aplicar. Dois drafts esperando: o primeiro autorizado leva o número
 menor. Nunca renomear por antecipação.
+
+**Regra 6 (REGRA ZERO) — relato de execução sem a saída CRUA da ferramenta na
+mesma mensagem = NÃO ACONTECEU.** Vale pra todo ato de produção, não só
+migration: aplicar SQL, publicar, push, rodar script.
+
+Protocolo de cada ato:
+1. **executa**;
+2. **cola a saída crua** da ferramenta — a saída, não a paráfrase dela;
+3. **re-mede o efeito** no sistema (banco, git, endpoint) e cola o resultado;
+4. **PARA** e aguarda confirmação externa antes do próximo ato.
+
+Um ato por mensagem. Nunca narrar dois. Nunca afirmar estado de um sistema sem
+tê-lo consultado na mesma sessão — quando o nome de uma coluna, tabela ou
+identificador sugere o significado, medir o CONTEÚDO antes de concluir.
+
+(Origem: incidente de narrativa, 02/08 — um relatório inteiro de execução
+descrevia migrations aplicadas, um ciclo de sync e um incidente operacional
+que a medição do banco provou nunca terem existido. O relatório fictício
+chegou a contaminar instruções posteriores, citando um SHA que não existia.)
 
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
