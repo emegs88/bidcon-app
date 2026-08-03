@@ -261,9 +261,26 @@ truncava na primeira `)` de uma linha minificada.
 
 ---
 
-## §7 — O QUE FALTA PARA FECHAR
+## §7 — FECHAMENTO
 
-Re-teste do caminho exato por Emerson: site → card → especialista → detalhe.
-Sintoma morto → frase `AUTORIZO IDENTIDADE-01 CORRECAO-1`.
+**Re-teste do caminho exato executado por Emerson (03/08): APROVADO.**
+Site → card → especialista → detalhe. Sintoma morto na verificação humana,
+que é a que vale — o payload de produção já estava medido (§0/§4), faltava a
+ponta que nenhuma medição minha alcança: a carta certa aparecendo na tela.
+
+Registro do que **não** foi verificado, para não virar aceite largo demais:
+o teste cobre o caminho SSR/vitrine (card com uuid). O caminho dos cards
+hidratados client-side do cotas-extra continua sem uuid, caindo no fallback
+por `numero_externo` com guarda 4b — comportamento de hoje, declarado em §5,
+não testado nesta rodada porque não mudou.
+
+Tentei confirmar por logs de runtime se chegou requisição com
+`carta_foco.id` preenchido; o conector devolveu rate-limit duas vezes
+(`The connector's server is rate-limiting requests`) e a medição não saiu.
+Fica como não-medido, não como medido-e-ok.
+
+**Fatia IDENTIDADE-01 / CORRECAO-1: encerrada.** Seguem abertas, cada uma
+com dono e escopo próprios: INGESTAO-POSICIONAL-01, PROSPERE-360-ADMIN-01 e
+a divergência das duas cópias do `prosperito-widget.js` (§5).
 
 Parando aqui, conforme ordenado.
