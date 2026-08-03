@@ -443,3 +443,71 @@ integralmente cumprido: o `id` sobreviveu ao snapshot real.
 
 Próximo tick = **ciclo supervisionado 2**, medido pela arquitetura contra o
 §14.2 / T8. Sessão segue em espera. Pendências do §8.3 inalteradas.
+
+---
+
+## §10 — FAROL-LOG-01 RESOLVIDO (append, 03/08)
+
+**Sem incidente.** Log do Postgres: `create_farol_log` aplicada em 03/08 01:49
+via conector claude.ai de Emerson, **autorizada por ele em 02/08** ("AUTORIZADO:
+farol_log") na conversa de design do FAROL. Liturgia própria daquela frente,
+padrão **SEGURANCA-01** (RLS on, sem policies). Encerrado como alerta.
+
+### 10.1 — Minha inferência do §9.1 estava errada
+
+O §9.1 concluiu: *"A resposta provável é ferramenta automatizada agindo fora da
+liturgia."* **Errado, e errado de um jeito específico que vale registrar.**
+
+Acertei o mecanismo (foi ferramenta — o conector) e errei o que importava: li
+**"sem número" como "sem autorização"**. Não estava fora da liturgia; estava
+dentro da liturgia *de outra frente*, com palavra de Emerson dada no dia
+anterior. Confundi *"não segue a convenção que eu conheço"* com *"não segue
+convenção nenhuma"* — que é a versão de processo do mesmo vício das outras
+vezes: **conclusão mais larga que a medição**. Eu tinha o timestamp; não tinha
+o log do Postgres nem a conversa do FAROL. Deveria ter parado no timestamp.
+
+O timestamp, aliás, foi útil: estreitou a janela e é o que permitiu resolver.
+O erro não foi medir — foi anexar hipótese de causa a uma medição de tempo.
+
+### 10.2 — O que do §8.2 permanece de pé
+
+A leitura técnica continua válida e agora tem nome de padrão: RLS ligado com
+zero policies = *default deny*, exposição ativa **nula** hoje. Isso é o
+SEGURANCA-01 funcionando.
+
+O que eu chamei de "armadilha carregada" **não era crítica ao padrão** — é
+exatamente a razão do item que já está na fila: **trim de grants**. Com
+`anon` segurando `SELECT/INSERT/UPDATE/DELETE/TRUNCATE` no papel, a proteção
+mora só no RLS; a primeira policy permissiva que alguém escrever abre tudo de
+uma vez. O trim tira a redundância perigosa e faz o `revoke` dizer explicitamente
+o que o RLS já diz implicitamente. Segue **dentro da FAROL-01**, não aqui.
+
+### 10.3 — Regra de namespace: evidência medida a favor
+
+A proposta (prefixo `farol_` por frente) tem suporte empírico no próprio
+histórico do xtv. A numeração sequencial global **já colidiu cinco vezes**,
+com frentes diferentes reivindicando o mesmo número:
+
+```
+0039_api_cartas_publicas (11/07)      ×  0039_fornecedores_sync_config_acesso_privado (24/07)
+0040_quarentena_cobre_update (11/07)  ×  0040_cartas_parcelas_detalhe_jsonb (24/07)
+0043_busca_bidcon_price (11/07)       ×  0043_bidcon_price_parcelas_detalhe (24/07)
+0047_whatsapp_envio (12/07)           ×  0047_sync_identidade_estavel (16/07)
+0048_whatsapp_f3 (12/07)              ×  0048_cartas_vitrine_publica (16/07)
+```
+
+Além disso: `0027_sync_lotes` foi aplicada **depois** da `0030`, e há buracos
+em 0050, 0051, 0056, 0059, 0060, 0061. Ou seja — o número sequencial global
+**já não descreve** nem ordem de aplicação nem unicidade. O prefixo por frente
+não é organização cosmética: é o reconhecimento de um fato que o banco já
+registrou cinco vezes.
+
+**Não é ato meu.** Fica como insumo medido para a decisão de Emerson.
+
+### 10.4 — Estado
+
+Pendências: INGESTAO-POSICIONAL-01 · PROSPERE-360-ADMIN-01 · divergência das
+cópias do widget · `package-lock` (decisão de Emerson) · trim de grants (dentro
+da FAROL-01) · regra de namespace (proposta a Emerson).
+
+FAROL-LOG-01: **fechado**. Sessão segue em espera pelo ciclo supervisionado 2.
