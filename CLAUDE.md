@@ -118,6 +118,28 @@ descrevia migrations aplicadas, um ciclo de sync e um incidente operacional
 que a medição do banco provou nunca terem existido. O relatório fictício
 chegou a contaminar instruções posteriores, citando um SHA que não existia.)
 
+**Regra 7 — medição só vale com CONTEXTO PROVADO na própria saída.** Todo
+comando de medição carrega a prova de onde rodou (`git -C <caminho>`, `pwd`,
+`git rev-parse --show-toplevel`) e essa prova aparece na saída colada — não na
+intenção de quem escreveu o comando.
+
+Comando quebrado que devolve resultado plausível é o pai do relatório fictício
+sem mentira. `cd` que falha, variável de shell que não expande, pipe que engole
+o `exit`, sintaxe de regex que o motor não suporta — todos devolvem "nenhuma
+ocorrência", que é uma resposta perfeitamente crível e completamente vazia.
+
+**Concordar com a hipótese não valida a medição.** Um falso-negativo que
+confirma o que já se esperava é mais perigoso que um erro barulhento, porque
+não pede revisão. Saída vazia exige provar o contexto ANTES de virar conclusão;
+sem prova, descarta-se e refaz-se.
+
+(Origem: 03/08 — numa varredura de duas superfícies, `cd` falhou com
+`too many arguments` e o bloco inteiro rodou fora do repositório, devolvendo
+`(nenhum data-id)` e `AUSENTE do bidcon-app`. As duas respostas estavam
+CERTAS por acaso: a hipótese era verdadeira. Foram descartadas e refeitas com
+`git -C`. Na varredura seguinte o mesmo padrão repetiu duas vezes — variável
+`$P` não expandida e `\b` inexistente no ERE do `git grep`.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
