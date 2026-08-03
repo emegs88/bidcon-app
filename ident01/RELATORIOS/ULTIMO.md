@@ -511,3 +511,126 @@ cópias do widget · `package-lock` (decisão de Emerson) · trim de grants (den
 da FAROL-01) · regra de namespace (proposta a Emerson).
 
 FAROL-LOG-01: **fechado**. Sessão segue em espera pelo ciclo supervisionado 2.
+
+---
+
+# §11 — CONSISTENCIA-01 · PREVIEW NO AR, AGUARDANDO O OLHO DE EMERSON
+
+Fatia nova, autorizada por `AUTORIZADO: consistencia-01` (Emerson, 03/08/2026).
+Alinhamento do bidcon.com.br ao dossiê G2. **Nada foi para produção.**
+
+- Branch: `consistencia-01` · commit `fd921ba` (base `72d6925`)
+- Preview: https://bidcon-app-git-consistencia-01-emerson-gomes-s-projects.vercel.app
+- Produção segue em `f4dd9c6`, intocada.
+
+## 11.1 — O achado que decidiu a execução (REGRA DO BOT, de novo)
+
+Das 73 ocorrências de "Prospere Consórcios" no `index.html`, **60 estavam na
+linha 42** — o JSON-LD que o workflow `atualizar-vitrine.yml` reescreve três
+vezes por dia a partir de `scripts/gerar-vitrine.mjs`.
+
+Corrigir só o HTML **passaria na auditoria e seria desfeito no próximo cron.**
+
+Isto não é hipótese. Enquanto eu trabalhava, o bot rodou na `main` (`f4dd9c6`)
+e o `git grep` pós-merge mede:
+
+```
+=== bot na main reintroduziu? ===
+      61
+```
+
+Sessenta e uma ocorrências de volta, na produção, sem mão humana. A correção
+foi feita **no gerador**, e verificada rodando o comando do próprio bot:
+
+```
+[gerar-vitrine] 2477 cartas disponíveis (filtro credito>0).
+EXIT_GERADOR=[0]
+=== JSON-LD do bot (index.html linha 42) ===
+  Bidcon — EGS Capital Participações Ltda: 60
+  Prospere: 0
+```
+
+## 11.2 — Auditoria do preview (fetch, 13 páginas)
+
+```
+PAGINA                           HTTP   BYTES | PC juros banco waAnt | GrupoProsp
+OK    /                              200 249201 |  0     0     0     0 | 6
+OK    /bidcon-lojista                200 121814 |  0     0     0     0 | 4
+OK    /bidcon-imobiliaria            200 111874 |  0     0     0     0 | 4
+OK    /carta-contemplada-veiculo     200 120774 |  0     0     0     0 | 4
+OK    /repasse                       200  58282 |  0     0     0     0 | 5
+OK    /conta-notarial                200  69169 |  0     0     0     0 | 1
+OK    /seguranca                     200  25696 |  0     0     0     0 | 2
+OK    /privacidade                   200  19853 |  0     0     0     0 | 3
+OK    /empresas                      200  25766 |  0     0     0     0 | 3
+OK    /vender-consorcio-contemplado  200  39746 |  0     0     0     0 | 5
+OK    /blog/                         200   9403 |  0     0     0     0 | 2
+OK    /llms.txt                      200   5290 |  0     0     0     0 | 1
+OK    /robots.txt                    200    726 |  0     0     0     0 | 1
+```
+
+Deve permanecer, medido na home: EGS Capital 66 · CNPJ 2 ·
+`NIRE 35.250.408.073 · Av. Brigadeiro Faria Lima, 1572, sala 1022 — São Paulo/SP` ·
+disclaimer de instituição financeira 1 · "compra programada" 2 · WhatsApp
+canônico 3. **Os seis critérios de aceite passam.**
+
+## 11.3 — Incidente de medição (Regra 7, terceira vez nesta sessão)
+
+A primeira auditoria que rodei deu **"OK" em 13 páginas** — e era lixo. As
+páginas devolviam 307/404 com corpo vazio; o `grep` em nada retorna zero, e
+zero é exatamente o resultado que a hipótese queria. Relatório fictício sem
+mentira, na forma pura.
+
+Duas causas, ambas minhas: (a) não segui os redirects da proteção de preview;
+(b) **eu estava auditando o projeto errado.** O `bidcon-plataforma` serve o
+Next.js de `platform/` (`<title>Bidcon · Área logada</title>`) — o site
+estático sai de um **segundo projeto Vercel, `bidcon-app`**, no mesmo repo.
+
+A auditoria só passou a valer quando pus uma **asserção de sanidade** —
+`Grupo Prospere` tem de ser > 0; se der 0, a medição não vale. Foi ela que
+pegou o erro.
+
+Registro estrutural: **um repo, dois projetos Vercel.** Todo push nesta
+`main` publica os dois.
+
+## 11.4 — Três pontos que precisam do olho de Emerson, não do meu
+
+1. **Reescrita editorial além dos padrões listados.** A spec dava substituição
+   para duas frases do comparativo bancário. A varredura achou "juros de
+   financiamento" em **seis outros lugares** (imobiliaria, lojista ×3,
+   carta-contemplada-veiculo, blog, bidcon.html), vários como bullet
+   `<li><b>Sem juros de financiamento:</b>`. Troquei por
+   `<b>Custo efetivo transparente:</b>`. Isso é **mexer em copy**, e a spec
+   diz explicitamente que mudança de conteúdo além dos padrões está fora de
+   escopo. Fiz porque o critério de aceite 2 exige zero ocorrências — os dois
+   itens da spec se contradizem aqui. **Se a leitura correta for outra, é
+   reverter estes seis.**
+
+2. **Resíduo de comparação que eu NÃO toquei.** Os mesmos bullets seguem com
+   "custo mensal mais previsível **do que linhas de crédito**". É comparação
+   bancária em espírito, mas não está na lista de padrões. Deixei. Nomeio em
+   vez de decidir sozinho.
+
+3. **Rebase antes de produção.** A branch nasceu em `72d6925`; a `main` já
+   está em `f4dd9c6`. O merge exige rebase — e o `index.html` da `main` foi
+   reescrito pelo bot. Depois do rebase, **rodar o gerador de novo** antes de
+   publicar.
+
+## 11.5 — Escopo tocado
+
+`scripts/gerar-vitrine.mjs` + 17 arquivos de `public/`. **Zero arquivos em
+`platform/`** — `app.bidcon.com.br` e "Modo leilão" não foram tocados, como
+manda a spec. `platform/package-lock.json` segue fora do commit.
+
+WhatsApp: 45 substituições em **três formatos** (`5519997561909`,
+`+55-19-99756-1909`, `(19) 99756-1909`). O grep de string crua da spec pegaria
+só o primeiro — os outros dois teriam sobrevivido à auditoria.
+
+## 11.6 — Estado
+
+CONSISTENCIA-01: **preview no ar, não encerrada.** Falta o olho de Emerson,
+a decisão sobre o item 11.4.1, o rebase e a publicação.
+
+Pendências mantidas: INGESTAO-POSICIONAL-01 · PROSPERE-360-ADMIN-01 ·
+divergência das cópias do widget · `package-lock` · trim de grants (FAROL-01) ·
+regra de namespace · ciclo supervisionado 2.
