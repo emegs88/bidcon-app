@@ -140,6 +140,27 @@ CERTAS por acaso: a hipótese era verdadeira. Foram descartadas e refeitas com
 `git -C`. Na varredura seguinte o mesmo padrão repetiu duas vezes — variável
 `$P` não expandida e `\b` inexistente no ERE do `git grep`.)
 
+**Regra 8 — auditoria por fetch exige ASSERÇÃO DE SANIDADE POSITIVA.** Nenhuma
+auditoria que lê um sistema remoto (curl, fetch, HTTP) vale sem, na mesma
+saída, uma asserção que PROVE que o corpo foi lido: um padrão que tem de
+existir e cuja contagem é > 0, mais o tamanho do corpo dentro da faixa
+esperada. Sem isso a auditoria não é aprovada nem reprovada — é inválida.
+
+**Zero em corpo vazio é falso negativo, não aprovação.** Procurar padrão
+proibido num corpo de 15 bytes devolve zero, que é exatamente o número que a
+hipótese quer. Aprovar por ausência só é lícito depois de provar presença.
+
+Vale igualmente para a superfície: antes de auditar, provar que o alvo é o
+sistema pretendido (título, rota, projeto). Um repositório pode alimentar mais
+de um deploy.
+
+(Origem: 03/08, CONSISTENCIA-01 — auditoria de 13 páginas imprimiu "OK" em
+todas com os padrões proibidos em zero. As páginas devolviam 307/404 com corpo
+vazio, por duas causas somadas: redirect de proteção de preview não seguido e,
+sobretudo, o projeto errado — o mesmo repo alimenta dois projetos na Vercel, e
+o auditado servia o app Next.js, não o site estático. Norma fixada por Emerson
+no mesmo dia.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do

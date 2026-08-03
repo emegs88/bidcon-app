@@ -634,3 +634,134 @@ a decisão sobre o item 11.4.1, o rebase e a publicação.
 Pendências mantidas: INGESTAO-POSICIONAL-01 · PROSPERE-360-ADMIN-01 ·
 divergência das cópias do widget · `package-lock` · trim de grants (FAROL-01) ·
 regra de namespace · ciclo supervisionado 2.
+
+---
+
+# 12 — CONSISTENCIA-01, segunda rodada: rebase, selo RA e Regra 8
+
+Autorizações desta rodada, todas de Emerson (03/08): manter a correção dos 6
+bullets editoriais; remover o resíduo "mais previsível do que linhas de
+crédito"; rebase em `f4dd9c6`; rodar o gerador de novo; reauditar o preview
+com asserção de sanidade; instalar o selo RA Verificada. **Produção segue
+travada aguardando aval nominal.**
+
+Branch `consistencia-01` = `0beb4c4` (forçada sobre `fd921ba` após rebase).
+
+## 12.1 — A decisão que virou norma
+
+Emerson: *"quando spec e critério de aceite conflitam, manda o critério de
+aceite — ele é o que a G2 vai medir."* A spec listava 2 substituições do
+bloco C e ao mesmo tempo exigia zero ocorrências global; os dois não cabem
+juntos. Fica registrado o critério de desempate, que não era meu para decidir
+sozinho e por isso foi levado ao portão em 11.4.1.
+
+## 12.2 — Rebase
+
+`git rebase f4dd9c6` conflitou em `public/index.html`, exatamente na região
+que o bot reescreve. Resolvido com `--theirs` (em rebase, `--theirs` é o MEU
+commit), verificado sem marcador de conflito e com os padrões proibidos em
+zero antes do `--continue`. Resultado `9136a36`;
+`git merge-base --is-ancestor f4dd9c6 HEAD` confirmou a ancestralidade.
+
+Gerador rodado depois: `EXIT_GERADOR=[0]`, 2477 cartas, 60 cards, linha 42
+com 60× "Bidcon — EGS Capital Participações Ltda" e 0× "Prospere".
+
+## 12.3 — Resíduo de comparação com produto financeiro
+
+Além do trecho nomeado, a varredura achou 22 "financiamento", 18 "juros" e
+5 "linha de crédito" ainda no site. Classificados antes de tocar:
+
+- **Corrigido (13 substituições):** cláusulas do tipo "sem os juros de um
+  financiamento" e "custo mensal mais previsível do que linhas de crédito",
+  mais um `<h2>` órfão — "Carta de crédito x financiamento" → "Como o custo
+  do consórcio é exibido" — que eu mesmo tinha deixado para trás na primeira
+  rodada ao reescrever o parágrafo sem reescrever o título dele.
+- **NÃO tocado, aguarda decisão nominal:** 7 pares de FAQ "Qual a diferença
+  entre carta de crédito e financiamento?" em `bidcon-imobiliaria` (2),
+  `bidcon-lojista` (2), `bidcon.html` (1) e `carta-contemplada-veiculo` (2).
+  A comparação está **na própria pergunta**, e cada par existe duplicado em
+  JSON-LD `FAQPage` + `<details>` visível: editar mexe em rich result do
+  Google. Não é decisão de execução.
+- **NÃO tocado, de propósito:** `ferramentas/termo-reserva.html`. A palavra
+  "juros" ali é item do `LEXICO_PROIBIDO` — é a guarda de compliance. Tocar
+  seria remover a trava enquanto se limpa a vitrine.
+
+Residual global: "mais previsível" 0, "linha(s) de crédito" 0.
+
+## 12.4 — Selo RA Verificada
+
+Instalado em **15 páginas**, 1 ocorrência por página, 0 duplicados.
+
+- Bloco entre `<!-- BC:SELO-RA-INICIO/FIM -->`, imediatamente antes de
+  `</body>`; medido `dentro_do_head = False` nas 15.
+- `defer` no script, para não regredir o LCP mobile.
+- **CSP precisou de mais do que o pedido.** O enunciado mandava liberar
+  `script-src`. Baixando o bundle antes de instalar, ele chama
+  `api.reclameaqui.com.br` e `verificada.reclameaqui.com.br`. Só com
+  `script-src`, o script carregaria e o fetch morreria em `connect-src`:
+  selo vazio — o cenário que o próprio enunciado classificou como pior que
+  ausência. Liberados os três.
+- **Armadilha do bot verificada, não assumida:** `gerar-vitrine.mjs` só
+  reescreve entre `BC:SSR-COTAS-*` e `BC:SSR-LD-*`. Gerador rodado DEPOIS da
+  inserção: bloco intacto, sem duplicação.
+- **Fora:** `ferramentas/termo-reserva.html`, página-ferramenta sem rodapé
+  institucional. Decisão minha, reportada e reversível.
+
+**Divergência no enunciado do item.** A "faixa de selos do rodapé (Conta
+Notarial, LGPD, Banco Central)" não existe. "Banco Central" aparece 1× em
+`index.html` e 1× em `bidcon.html`, como `<span class="tchip">` da faixa de
+confiança **do topo**. "LGPD" é texto corrido em `privacidade.html`. Não há
+elemento `<footer>`; o rodapé é `<div class="foot">`, ausente em 4 dos 16
+HTMLs. Por isso a âncora foi o fim do body, uniforme. Se a faixa era para
+existir, ela é outra fatia.
+
+## 12.5 — Auditoria do preview (Regra 8 em vigor)
+
+`bidcon-app-git-consistencia-01-…vercel.app`, commit `0beb4c4`, com bypass
+`_vercel_share` e cookie jar.
+
+15 páginas HTML: **http=200 em todas**, bytes de 10.068 a 249.866, asserção
+de sanidade `Grupo Prospere` ≥ 1 em todas, selo = 1, script = 1, soma dos 5
+padrões proibidos = 0. `llms.txt` (5.290) e `robots.txt` (726) limpos. CSP
+servida no preview já traz os três domínios.
+
+**Um número exigiu explicação antes de eu aprovar:** `/` e `/bidcon`
+devolveram 249.866 bytes idênticos. Não era coincidência — `vercel.json`
+linhas 10-11 têm 301 de `/bidcon` e `/bidcon.html` para `/`. A página foi
+aposentada de propósito. Consequências registradas, não corrigidas (fora do
+escopo): `public/bidcon.html` é peso morto e minhas edições nele — inclusive
+1 dos 7 pares de FAQ — nunca alcançam um usuário; o link interno
+`<a href="/bidcon">O que é a bidcon</a>` no index é um 301 de volta à própria
+home; e `/cartas → /bidcon → /` é salto duplo de 301.
+
+**Erro de medição meu nesta rodada, apanhado antes de virar relatório:** o
+check do selo pós-gerador imprimiu `selo_no_index=0` antes e depois — o `\"`
+dentro de `$( )` dentro de aspas duplas virou barra literal e o grep procurou
+`id=\"ra-verified-seal\"`. Um comando quebrado devolvendo o número que a
+hipótese temia. Descartado e refeito em Python: 15/15. Regra 7, terceira
+aparição na mesma fatia.
+
+Corrijo também um número que dei antes: os "247335 bytes" do `index.html`
+eram **caracteres** — `len()` do Python conta chars, e acento é 2 bytes em
+UTF-8. O arquivo tem 249.703 bytes e não mudou depois do commit.
+
+## 12.6 — Regra 8 no CLAUDE.md
+
+Gravada como ditada por Emerson: nenhuma auditoria por fetch vale sem asserção
+positiva que prove que o corpo foi lido; zero em corpo vazio é falso negativo,
+não aprovação; e provar que o alvo é o sistema pretendido antes de auditar,
+porque um repo pode alimentar mais de um deploy. Diff: 21 inserções, **0
+remoções**, 8 regras — append-only preservado.
+
+## 12.7 — Estado
+
+CONSISTENCIA-01: **preview reauditado e verde. NÃO encerrada.** Faltam:
+
+1. Aval nominal de Emerson para produção — não publico sem isso.
+2. Decisão sobre os 7 pares de FAQ (12.3).
+3. Decisão sobre o selo em `termo-reserva.html` (12.4).
+4. Se a "faixa de selos" do 12.4 deve passar a existir de fato.
+
+Pendências mantidas: INGESTAO-POSICIONAL-01 · PROSPERE-360-ADMIN-01 ·
+divergência das cópias do widget · `package-lock` · trim de grants (FAROL-01) ·
+regra de namespace · ciclo supervisionado 2.
