@@ -868,3 +868,83 @@ Seguem aguardando palavra nominal, de §12: os 7 pares de FAQ "Qual a diferença
 entre carta de crédito e financiamento?" (JSON-LD FAQPage + `<details>`
 visível), o selo RA em `termo-reserva.html`, e se a "faixa de selos" do rodapé
 — que **não existe** — deve ser construída.
+
+### 13.9 — Terceiro e quarto modos de falha de medição
+
+Acréscimo a §13.5. A lista de modos de falha de medição desta casa passa a ter
+quatro entradas, e elas apontam para direções diferentes:
+
+| # | modo | o que ele produz | o que o pega |
+|---|---|---|---|
+| 1 | contexto errado (Regra 7) | falso negativo plausível | provar `pwd`/`git -C` na própria saída |
+| 2 | corpo não lido (Regra 8) | falso negativo em corpo vazio | asserção de sanidade positiva |
+| 3 | **régua que mascara antes de medir** | **falso POSITIVO** | **inspecionar o que foi acusado** |
+| 4 | **resposta positiva que não discrimina** | **confirmação vazia** | **controle negativo** |
+
+**Modo 3 — a régua fabrica violação.** Descrito em §13.5: apagar o padrão
+permitido antes do regex criou 72 acusações falsas. A asserção de sanidade não
+pega isto, porque ela só prova que houve corpo — não que a acusação procede.
+**Sanidade positiva pega o falso negativo; só a inspeção do que foi acusado
+pega o falso positivo. As duas direções precisam de verificação.**
+
+**Modo 4 — instrumento que devolve sucesso para tudo (ditado por Emerson, 03/08).**
+Testei se `instagram.com/bidcon.br` existia: `http=200`. Parecia confirmação.
+Só virou informação quando criei o handle-controle
+`handle-que-nao-existe-xyz-99887` e ele devolveu **o mesmo 200, com 605 KB**.
+
+> **Regra: todo teste de existência precisa de controle negativo antes de valer
+> como evidência.** Instrumento que devolve sucesso para o caso verdadeiro e
+> para o falso não mede nada, mesmo parecendo confirmar.
+
+### 13.10 — Quarta rodada: `sameAs`, FAQ e selo (decisões nominais de Emerson)
+
+**`sameAs` — o achado era maior que a pergunta.** Ao medir por parse do JSON-LD
+(e não por string truncada), o dono do `sameAs` é `Organization name='bidcon'`,
+`@id=.../#org`, `legalName='EGS Capital Participações Ltda'` — não o Grupo. Nas
+**10** páginas ele continha `https://www.prospere.com.br/`, ou seja, o site
+declarava ao Google que a bidcon **é** o site do Grupo. `sameAs` é identidade;
+`parentOrganization` é vínculo — e o vínculo já estava correto.
+
+Decidido por Emerson: sai `instagram.com/prospere.consorcio`, sai
+`prospere.com.br`, entra e propaga `instagram.com/bidcon.br`. Resultado em todo
+o site: `sameAs = ["https://www.instagram.com/bidcon.br/"]`, único valor
+distinto nas 10, com `parentOrganization` preservado intacto em todas.
+
+**PROVENIÊNCIA, registrada como fato de Emerson e não como inferência minha:**
+`instagram.com/bidcon.br` está ativo e é a conta oficial da Bidcon — afirmado
+por Emerson em 03/08. **Eu não consegui verificar isso por HTTP** (modo 4:
+login-wall devolve 200 para qualquer handle). O dado entra no site pela palavra
+dele, não pela minha medição.
+
+**FAQ — o comparativo sobrevivia onde mais pesa.** As 7 ocorrências eram 3
+textos espelhados em JSON-LD `FAQPage` + `<details>`. Todas abriam com "O
+financiamento cobra juros sobre o valor emprestado" e afirmavam "custo mensal
+menor" — a mesma classe que o BLOCO C removeu do resto do site, só que em
+structured data, onde vira rich result e o Google exibe a comparação na SERP.
+
+Reescrito por Emerson, pergunta trocada de comparativa para descritiva:
+"O que é uma carta de crédito de consórcio contemplada?", com a resposta
+declarando compra programada sem juros e a transferência sujeita à análise e
+aprovação da administradora. Variantes do bem: `do imóvel` (imobiliária),
+`do veículo` (veículo), `do bem` (lojista). Residual: `custo mensal menor` = 0,
+`Qual a diferença entre carta de crédito e financiamento` = 0.
+
+**`bidcon.html`: bloco `FAQPage` removido inteiro** (o `<script>` só continha
+ele). Structured data de FAQ sem conteúdo visível viola a política do Google, e
+a página está 301 para `/` — era rich result declarado em página não servida.
+Não se recriou `<details>` ali: o certo era remover a declaração, não fabricar
+conteúdo para justificá-la.
+
+**Selo em `termo-reserva.html`: instalado**, mesma instalação das demais, no fim
+do body com `defer`. Cobertura agora **16 de 16** páginas HTML, 1× cada, zero
+duplicatas. O guarda de léxico da página
+(`["investimento","rendimento","rendimentos","rendendo","render","retorno","lucro garantido","juros","pix","sinal"]`)
+não é disparado pelo bloco.
+
+**Faixa de selos: NÃO construída**, por decisão de Emerson — a spec assumia uma
+faixa que não existe, e construir componente novo seria mudança de layout, fora
+do escopo desta fatia.
+
+**Auditoria local:** violações do critério = 0; 25 blocos `ld+json` válidos, 0
+inválidos; `sameAs` distintos no site = 1; selo 16/16; gerador com 0 ocorrências
+de `Prospere`, `sameAs`, `FAQPage` e `ra-verified` — não reintroduz nada.
