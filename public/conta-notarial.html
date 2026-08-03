@@ -852,5 +852,12 @@ footer::before{content:"";position:absolute;top:-1px;left:0;width:180px;height:1
 })();
 </script>
 <script src="/prosperito-widget.js" defer></script>
+<!-- BC:SELO-RA-INICIO — RA Verificada (CONSISTENCIA-01). Fica FORA dos marcadores
+     BC:SSR-* do scripts/gerar-vitrine.mjs, logo o snapshot do bot nao duplica nem remove.
+     id unico por pagina; script no fim do body, com defer, nunca no head. -->
+<div style="display:flex;justify-content:center;padding:6px 16px 26px">
+  <div id="ra-verified-seal"><script type="text/javascript" id="ra-embed-verified-seal" defer src="https://s3.amazonaws.com/raichu-beta/ra-verified/bundle.js" data-id="LWhmLTEzX01oQmQyMVFjTzplZ3MtY2FwaXRhbC1wYXJ0aWNpcGFjb2VzLWx0ZGE=" data-target="ra-verified-seal" data-model="horizontal_2"></script></div>
+</div>
+<!-- BC:SELO-RA-FIM -->
 </body>
 </html>
