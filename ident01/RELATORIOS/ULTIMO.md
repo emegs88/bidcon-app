@@ -284,3 +284,84 @@ com dono e escopo próprios: INGESTAO-POSICIONAL-01, PROSPERE-360-ADMIN-01 e
 a divergência das duas cópias do `prosperito-widget.js` (§5).
 
 Parando aqui, conforme ordenado.
+
+---
+
+## §8 — ERRATA DE REGISTRO (append, 03/08)
+
+O §7 acima fica como está — a liturgia é append-only, não reescrevo o que já
+foi lido pela arquitetura. Ele contém um erro de nomenclatura com consequência
+prática, corrigido aqui.
+
+### 8.1 — "CORRECAO-1 encerrada" está ERRADO
+
+O aceite de Emerson registrado no §7 refere-se ao **TESTE DA CORRECAO-2**
+(caminho SSR: site → card → especialista → detalhe). **Esse aceite é válido e
+está mantido** — o que foi testado, foi testado, e o que foi entregue (D-1..D-4,
+commits `3d8239b`/`f1d1669`) está no ar.
+
+**CORRECAO-1 é a migration 0065 (D16+D17), que NUNCA FOI APLICADA.** Carimbei
+como encerrada uma fatia à qual falta o ato principal. O banco mede, e desmente:
+
+| medida | valor |
+|---|---|
+| eventos `carta_nova_quarentenada` | **zero** |
+| `ciclo_integridade_falhou` nas últimas 6h | **16** |
+| varredura de CBC / PIFFER / PLAY | **travada** |
+| vazamento de push (natimorta anunciada como novidade) | **vivo** |
+
+**A FATIA NÃO ESTÁ ENCERRADA.** Falta um ato de produção, que executa **na
+arquitetura**, sob a frase de Emerson — não aqui.
+
+Erro meu, e da mesma família dos outros desta sessão: **conclusão mais larga
+que a medição**. O §7 chegou a registrar corretamente o que *não* fora
+verificado no caminho client-side, e ainda assim eu estendi um aceite de
+caminho a um encerramento de fatia. Um "aprovado" sobre um teste não é um
+"encerrado" sobre a fatia que o contém. Onde o §7 diz "CORRECAO-1: encerrada",
+leia-se: **teste da CORRECAO-2 aprovado; fatia aberta, pendente da 0065.**
+
+### 8.2 — FAROL-LOG-01 (registro novo)
+
+Migration `create_farol_log` presente no xtv **sem número e fora da liturgia**.
+Tabela `farol_log` vazia. Origem a confirmar com Emerson.
+
+Conferi as policies, como pedido — e o resultado **precisa** ser lido inteiro,
+porque metade dele engana:
+
+```
+RLS/LINHAS   farol_log   relrowsecurity=true   relforcerowsecurity=false   linhas=0
+POLICIES     (nenhuma linha retornada)
+GRANTS       anon           → SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+             authenticated  → SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+             service_role   → idem      postgres → idem
+```
+
+**Leitura:** RLS ligado com **zero policies** = *default deny*. Hoje `anon` e
+`authenticated` **não leem nem escrevem** nada, apesar dos grants. Confirmado o
+"latentes" da arquitetura — não há exposição ativa.
+
+**Mas o desenho é uma armadilha carregada.** A porta está trancada por RLS, não
+por permissão: a segurança depende da *ausência* de policy, e não da presença de
+uma regra. No dia em que alguém adicionar **uma única policy permissiva** — ou
+der `disable row level security` — `anon` ganha CRUD completo **incluindo
+TRUNCATE**, de uma vez, sem que ninguém tenha escrito "dar acesso a anon" em
+lugar nenhum. É o oposto do fail-safe: o default protege, a primeira mudança
+abre tudo.
+
+Não toquei em nada. `revoke` em tabela de origem desconhecida é ato de produção,
+e ato de produção não se faz de passagem — vai sob fatia própria.
+
+**Regra registrada:** *footprint de banco do FAROL só sob fatia própria,
+gated.*
+
+### 8.3 — Pendências mantidas
+
+- **INGESTAO-POSICIONAL-01** — contrato `r.id`/`r.n` → `numero_externo`.
+- **PROSPERE-360-ADMIN-01** — revisão do `1aa7a67` por Emerson.
+- **Divergência das duas cópias do `prosperito-widget.js`** — 55 linhas.
+- **`platform/package-lock.json`** — modificado na árvore local, fora de todos
+  os commits, decisão de Emerson.
+- **FAROL-LOG-01** — acima.
+
+Sessão em espera. O fecho real vem depois do **ciclo supervisionado 2**,
+verificado pela arquitetura.
