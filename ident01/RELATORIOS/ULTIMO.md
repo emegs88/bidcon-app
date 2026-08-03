@@ -4,251 +4,239 @@
 sequência. A arquitetura lê aqui.
 
 - **Gerado em:** 03/08/2026
-- **Ato:** ATO C — varredura do `emegs88/360prospere`
-- **Substrato de código:** `prospere-360` @ `1aa7a67` (origin `github.com/emegs88/360prospere.git`)
+- **Ato:** CORREÇÃO DE MEDIÇÃO — retratação do §4 do relatório `c478019`
+- **Substrato:** `bidcon-app` @ `c478019`
 - **Autor:** mão do repo/app
 
 ---
 
-## §0. VEREDITO — DEPLOY NÃO EXECUTADO
+## §0. VEREDITO — O ITEM 5 REDEFINIDO ESTÁ ERRADO, E O ERRO É MEU
 
-O ATO C trouxe **dois achados materiais** que mudam o item 5 do checklist §6.
-A palavra condicional de Emerson tem condição explícita — *"CONCLUÍDO O ATO C
-**SEM ACHADO QUE MUDE O CHECKLIST**"* — e a condição **não foi satisfeita**.
-A instrução do mesmo parágrafo é literal: *"Se o ATO C trouxer achado material:
-PARAR e reportar ANTES de deployar."*
+A decisão ratificada diz:
 
-**Parado. Nada foi deployado.** Os achados estão no §3.
+> *"ITEM 5 REDEFINIDO: REMOVER o campo `id` fabricado das duas rotas
+> (`cotas-extra/route.js:330` e `cotas-servopa/route.js:91`). **Zero
+> consumidores = troca livre de compatibilidade, medida.**"*
 
-Os itens 1–4 do checklist (snapshot, index.html, atende, widget) **não foram
-tocados pelos achados** — seguem válidos como escritos e prontos para executar
-assim que o item 5 for redefinido.
+A palavra **"medida"** aponta para uma linha do §4 do relatório `c478019`. Essa
+linha é um **falso-negativo**. O consumidor existe, está no `bidcon-app`, e
+**lê exatamente o campo `id`**.
 
----
+**Executar o item 5 como redefinido zeraria a ingestão de quatro fontes**
+(CBC, PIFFER, CARTAS, SERVOPA) no xtv. Não é quebra de compatibilidade — é
+parada de alimentação.
 
-## §1. DISCIPLINA DE CONTEXTO (Regra 7) — TRÊS FALSO-NEGATIVOS DESCARTADOS
-
-A Regra 7, ratificada neste ciclo, foi acionada **três vezes na própria
-varredura que a estreou**:
-
-1. `P=<caminho>; git -C "$P" grep numero_externo` → devolveu
-   `ZERO ocorrencias de numero_externo`, mas o bloco de prova de contexto veio
-   **vazio** e o stderr trazia `fatal: not a git repository`. A variável não
-   expandiu. **Descartado.**
-2. `git grep -nE '\bid: ' -- app public` → `exit=1`, zero linhas — quando já
-   sabíamos existir `id: i + 1`. Causa: **`\b` não existe no ERE do `git grep`**.
-   Não era falso-negativo de contexto, era de sintaxe. **Descartado.**
-3. `git grep ... | head -60` → saída vazia e `exit` em branco; o cano engoliu o
-   código de saída. **Descartado.**
-
-Nos três casos a resposta era plausível e o item 1 **estava certo por acaso** —
-`numero_externo` de fato não existe naquele repo. Confirmado depois, com
-contexto provado:
-
-```
-$ pwd                          → /Users/prospere/Desktop/360prospere/prospere-360
-$ git rev-parse --show-toplevel → /Users/prospere/Desktop/360prospere/prospere-360
-$ git grep -n "numero_externo" -- . ':!*.sql'
-exit_numero_externo=1          ← zero ocorrências, agora medido
-```
-
-Toda medição abaixo carrega `pwd` ou `git -C` explícito na saída.
+**ATO D1 (`bidcon-app`, D-1..D-4) NÃO é tocado por este achado.** Está
+autorizado, desacoplado e pronto. Executo no ato seguinte.
+**ATO D2 continua bloqueado** — agora por dois motivos, não um.
 
 ---
 
-## §2. VARREDURA — RESULTADO
+## §1. O QUARTO EVENTO REGRA 7 — E O PRIMEIRO QUE VAZOU
 
-Contexto: `pwd` = `/Users/prospere/Desktop/360prospere/prospere-360`, HEAD `1aa7a67`.
+Os três primeiros falso-negativos da Regra 7 morreram dentro da própria
+varredura. **Este não.** Ele foi escrito, commitado, empurrado, lido pela
+arquitetura e virou base de decisão.
 
-### 2.1 `numero_externo` — ZERO
-Confirmado com contexto provado (acima). O `prospere-360` não conhece o
-`numero_externo` nem as views do xtv.
-
-### 2.2 `ref` — três sítios, nenhum é identidade pública
+### O que o relatório `c478019` afirma (§4, verbatim)
 
 ```
-app/api/cotas-servopa/route.js:102-107   idParceiro (ref) — SÓ em ?admin=1
-app/api/fipe/route.js:48                 referencia: v.MesReferencia — FIPE, sem relação
-app/page.jsx:9-10                        href — sem relação
-```
-
-### 2.3 `id` — inventário completo de `app/` e `public/`
-
-```
-app/api/cotas-extra/route.js:330      id: i + 1,              ← DEFEITO D1
-app/api/cotas-servopa/route.js:91     id: i + 1,              ← DEFEITO D1 (novo)
-app/api/estoque/route.js:58           id: p.id,               ← repasse de id real, OK
-app/api/imoveis/route.js:162          id: codigo || url,      ← chave de negócio, fora de escopo
-public/painel.html:301-441            id:uid()                ← painel local, localStorage, fora de escopo
-```
-
-`app/api/cotas/route.js:37` — `const n = Number(o.id) || 0`: **lê** o id de
-origem da Lance e o publica como `n`. É o `numero_externo` (POSIÇÃO, na
-linguagem da D1), coerente com o resto. Não fabrica identidade.
-*Observação menor, não bloqueante:* o `|| 0` colapsa qualquer id não-numérico
-para `0` — duas cartas podem sair com `n=0`.
-
-### 2.4 `cotas-jsonld` — HIPÓTESE REFUTADA
-
-A arquitetura previu "mesma classe provável — âncora posicional". **Não é.**
-
-```
-app/api/cotas-jsonld/route.js:148-152
-  const itemListElement = disp.map((a, i) => ({
-    '@type': 'ListItem',
-    position: i + 1,
-    item: produto(a, ts),
-  }));
-```
-
-`position: i + 1` é o **contrato do schema.org**: o campo se chama `position` e
-significa posição na lista. É o oposto exato do defeito D1 — D1 é posição
-usando o nome `id`. Aqui a posição usa o nome `position`.
-
-`produto()` (linhas 98–125) emite `@type`, `name`, `category`, `dateModified`,
-`offers`, `additionalProperty` — **sem `@id`, sem `sku`, sem `identifier`, sem
-`url` por produto**. Nenhuma identidade posicional vaza para o schema.
-
-*Achado lateral, fora desta fatia:* justamente por não haver `sku`/`@id`, os
-produtos do JSON-LD não têm identificador estável para buscadores. É questão de
-SEO/deduplicação, não de D1. Registrado, não endereçado.
-
----
-
-## §3. OS DOIS ACHADOS MATERIAIS
-
-O checklist §6 item 5 dizia: *"`cotas-extra` `id: i+1` → uuid real, com `idx`
-legado se houver consumidor do índice."* A varredura mostra que essa formulação
-**não é executável como escrita**, por dois motivos independentes.
-
-### ACHADO 1 — não existe uuid a colocar no lugar
-
-`/api/cotas-extra` **não lê o banco xtv**. Ele agrega raspagem de três
-parceiros (CBC, PIFFER, CARTAS) e monta o payload em memória:
-
-```
-app/api/cotas-extra/route.js:320-348
-  let cotas = all.map((o, i) => {
-    ...
-    const out = {
-      id: i + 1,
-      fonte: o.fonte,  t: o.t,  c: o.c,  e: eExib,
-      p: o.p,  x: o.x,  ac: ..., adm: o.adm,  custoEfetivo,
-    };
-```
-
-O objeto de origem `o` traz `fonte, t, c, e, p, x, admN, adm, soma`. **Não há
-uuid, não há id de parceiro, não há chave do xtv.** "Trocar por uuid real" não
-tem origem de onde tirar o uuid. O item 5 pressupõe um dado que não existe
-nessa rota.
-
-### ACHADO 2 — no `cotas-servopa` o id real existe, e é DELIBERADAMENTE secreto
-
-Segundo sítio, não previsto no checklist:
-
-```
-app/api/cotas-servopa/route.js:90-107
-  const carta = { id: i + 1, fonte: ADM, t, c, e: entradaCliente, p, x, adm: ADM };
-  // Campos internos só no painel (?admin=1). Ambos NUNCA no payload público:
-  //  - idParceiro (ref): a Servopa é fonte EXCLUSIVA com página própria por ref
-  //    (cartascontempladasservopa.com.br/cartas/<ref>). Ref público = qualquer um
-  //    pega o número no card da Bidcon e vai direto no parceiro — mesmo bypass que
-  //    já fechamos pra administradora. Como aqui a fonte é única, o risco persiste.
-  if (admReq) { carta.idParceiro = o.ref; }
-```
-
-Aqui **existe** identidade estável de origem (`o.ref`), e ela está fora do
-payload público **por decisão explícita e documentada de anti-bypass**.
-
-Aplicar o item 5 ao pé da letra neste sítio — trocar `id: i+1` pelo id real —
-**publicaria o `ref` da Servopa e desfaria essa proteção em silêncio**. Seria
-executar uma correção de identidade criando um vazamento comercial.
-
-Não toquei. É exatamente o tipo de decisão que não é da mão que executa.
-
----
-
-## §4. CONSUMIDORES MAPEADOS — o campo `id` não é lido por ninguém
-
-Exigência do ato: mapear consumidores antes de qualquer troca.
-
-```
-$ git grep -n "cotas-extra\|cotas-servopa"    (prospere-360)
-app/api/cotas-jsonld/route.js:74   const r = await fetch(base + '/api/cotas-extra', ...)
-next.config.mjs:8                  source: '/api/:path(imoveis|estoque|fipe|cotas|cotas-extra)'
-(demais ocorrências são comentários)
-
 $ git -C bidcon-app grep -n "cotas-extra" -- ':!docs' ':!ident01' ':!*.md'
 exit=1     ← nenhum CÓDIGO do bidcon-app consome a rota
 ```
 
-O único consumidor de código é o `cotas-jsonld`, e ele **descarta o `id`**:
+E a conclusão derivada, também no §4:
+
+> *"**Consequência boa:** não há consumidor do índice. O campo `idx` legado
+> previsto no checklist **não é necessário** — ninguém depende da posição."*
+
+### A causa, medida
 
 ```
-app/api/cotas-jsonld/route.js:78-85
-  return cotas.filter((o) => Number(o.c) > 0).map((o) => {
-    const a = { t: ..., c: Number(o.c), e: Number(o.e) || 0 };
-    const adm = String(o.adm || '').trim();
-    if (adm) a.adm = adm;
-    return a;
-  });
+$ pwd
+/Users/prospere/Desktop/360prospere/bidcon-app
+
+$ git grep -n "cotas-extra" -- ':!docs' ':!ident01' ':!*.md'
+exit_com_so_exclusoes=1                    ← zero linhas
+
+$ git grep -n "cotas-extra" -- '*' ':!docs' ':!ident01' ':!*.md'
+exit_com_positivo=0                        ← DEZENAS de linhas
 ```
 
-Mapeia `{t, c, e, adm}`. Nunca lê `o.id`.
+**Pathspec do git composto SÓ de exclusões (`':!…'`) não casa nada.** A magia
+`:!` **subtrai** de um conjunto positivo; sem conjunto positivo, o conjunto é
+vazio e o `git grep` sai com `1`. Basta acrescentar `'*'` para o mesmo comando
+devolver o oposto.
 
-Nenhum front do `prospere-360` chama `/api/cotas-extra` — os HTMLs públicos
-(`bidcon.html`, `bidcon-lojista.html`, `bidcon-imobiliaria.html`,
-`cerebro.html`) chamam `/api/cotas`, rota diferente.
-
-**Consequência boa:** não há consumidor do índice. O campo `idx` legado
-previsto no checklist **não é necessário** — ninguém depende da posição. A
-troca é livre de compatibilidade; o que falta é *o quê* colocar no lugar.
+É o retrato exato da Regra 7: **comando quebrado, saída plausível, hipótese
+confirmada por acaso.** A diferença é que desta vez a hipótese estava errada.
 
 ---
 
-## §5. CAMINHO PROPOSTO — PARA DECISÃO DA ARQUITETURA, NÃO APLICADO
+## §2. OS CONSUMIDORES REAIS — quatro arquivos
 
-Os dois achados apontam para a mesma saída, e ela já é doutrina desta fatia:
-**identidade por pegada (fingerprint), que é a própria D1 e o mecanismo da
-0063.**
+```
+$ git grep -l "cotas-extra" -- 'platform/**' 'public/**' 'app/**'
+platform/lib/cotas-source.ts
+platform/scripts/fixture-sync-multifonte.mjs
+public/bidcon.html
+public/index.html
+exit=0
+```
 
-- **`cotas-extra`:** `id` = hash estável de `(fonte, t, c, e, p, x, adm)`.
-  Determinístico, não-posicional, sobrevive a reordenação e a mudança de teto.
-  Resolve o ACHADO 1 sem inventar uuid que não existe.
-- **`cotas-servopa`:** `id` = hash de `o.ref` **com sal**, ou da mesma tupla de
-  negócio. Dá identidade real e estável ao payload público **sem revelar o
-  `ref`** — o anti-bypass do comentário 102–105 fica intacto. Resolve o
-  ACHADO 2 sem desfazer a proteção.
+### 2.1 `platform/lib/cotas-source.ts` — **LÊ O `id`. É o consumidor crítico.**
 
-Ambos são opacos, estáveis e não-posicionais — atendem à regra de fundo
-(*id fabricado por índice não coexiste com id real no mesmo ecossistema*) sem
-os efeitos colaterais.
+```
+platform/lib/cotas-source.ts:85-87
+  CBC:     "/api/cotas-extra?admin=1",
+  PIFFER:  "/api/cotas-extra?admin=1",
+  CARTAS:  "/api/cotas-extra?admin=1",
 
-**Não apliquei.** Escolher a função de pegada, o sal e a granularidade é
-decisão de arquitetura, e o ACHADO 2 tem lado comercial que não é meu.
+platform/lib/cotas-source.ts:147
+  const numero = inteiro(ehLance ? r.n : r.id);
+  if (numero == null || numero <= 0) continue;
+```
+
+`r.id` é **exatamente** o `id: i + 1` fabricado em `cotas-extra/route.js:330` e
+`cotas-servopa/route.js:91`. O próprio arquivo declara o destino:
+
+```
+platform/lib/cotas-source.ts:47
+  numero: number;   // id nativo da fonte (`n` na Lance, `id` nas demais) => numero_externo
+
+platform/lib/cotas-source.ts:114-116
+  * `id` nativo: a Lance usa `n`, as demais usam `id`. Ambos viram `numero` /
+  * numero_externo — a chave de upsert (administradora_origem, numero_externo)
+  * cuida da colisão de id entre fontes distintas.
+```
+
+**Consequência de remover o campo `id`:** `r.id` vira `undefined` →
+`inteiro(undefined)` → `null` → `continue`. **Toda linha é pulada.** As quatro
+fontes externas passam a ingerir zero cotas, em silêncio — o `continue` não
+loga, não lança, não conta.
+
+### 2.2 `public/index.html` e `public/bidcon.html` — **não leem o `id`**
+
+```
+function normExtra(a,e){return{n:-(e+1),t:a.t,c:a.c,e:a.e,p:a.p,x:a.x,_x:1,
+  ac:a.ac||"ADM-00",adm:a.adm||"",fonte:a.fonte||"",ceExtra:a.custoEfetivo}}
+```
+
+Fabricam o **próprio** índice negativo (`n:-(e+1)`) e ignoram `a.id`. Estes dois
+sobreviveriam à remoção. Não salvam o item 5, mas ficam registrados como
+**terceira instância da mesma classe D1** — identidade por posição, agora no
+`bidcon-app`.
+
+### 2.3 `platform/scripts/fixture-sync-multifonte.mjs:103` — fixture do sync
+
+```
+EXTRA: BASE + "/api/cotas-extra?admin=1",
+```
+
+Espelha o contrato de `cotas-source.ts`. Quebraria junto.
 
 ---
 
-## §6. CHECKLIST DO DEPLOY — ESTADO APÓS O ATO C
+## §3. O ACHADO MAIOR QUE O ERRO
+
+Perseguir o consumidor expôs algo que nenhum dos dois lados tinha na mão: **a
+identidade posicional do `prospere-360` já está gravada dentro do xtv.**
+
+O caminho completo, medido ponta a ponta:
+
+```
+prospere-360  app/api/cotas-extra/route.js:330    id: i + 1        (posição do array)
+                            ↓ HTTP ?admin=1
+bidcon-app    platform/lib/cotas-source.ts:147    numero = r.id
+                            ↓
+bidcon-app    cotas-source.ts:115                 => numero_externo
+                            ↓
+xtv           chave de upsert (administradora_origem, numero_externo)
+```
+
+O próprio código já sabia, em dois comentários independentes:
+
+```
+platform/app/api/sync-cotas/route.ts:210
+  // numero_externo (que é POSIÇÃO, D1). Ela precisa do payload inteiro
+
+platform/app/api/atende/route.ts:327
+  // conversa? (o sync realoca numero_externo entre rodadas; ver caso do
+```
+
+Ou seja: o `numero_externo` das quatro fontes externas **não é um id de origem
+que por acaso é numérico** — é o **índice do array da raspagem daquele ciclo**.
+Reordenou a raspagem, mudou o estoque, entrou uma carta no meio: as posições
+seguintes deslizam e o upsert casa carta com carta errada.
+
+É a **D1 pura**, na chave de upsert, em produção. Não é achado novo de defeito
+— os comentários mostram que a casa já o conhecia. É achado novo de **alcance**:
+a origem do defeito está no outro repo, e o item 5 mexia justamente nela.
+
+**Não toquei em nada.** Isto é matéria de decisão, e provavelmente de fatia
+própria.
+
+---
+
+## §4. O QUE MUDA PARA O ITEM 5
+
+| afirmação ratificada | estado após a medição |
+|---|---|
+| "Zero consumidores" | **FALSA** — `cotas-source.ts:147` lê `r.id` |
+| "troca livre de compatibilidade, medida" | **FALSA** — a remoção zera 4 fontes |
+| "campo sem consumidor não ganha sal — YAGNI" | **premissa caiu**; o campo tem consumidor, e é a chave de upsert |
+| `idx` legado desnecessário (§4 de `c478019`) | **FALSO** — há consumidor do índice |
+
+A restrição que a REF-01 herdaria muda de forma: não é só *"referência pública
+estável"*, é **"substituto de `numero_externo` na chave de upsert das fontes
+externas"** — com migração do que já está gravado.
+
+**Nada proposto aqui.** A mão que erra a medição não é a que redesenha a
+decisão que o erro derrubou.
+
+---
+
+## §5. ATO D1 — INTACTO E PRONTO
+
+O achado é todo do caminho de **ingestão** (`cotas-source.ts` escreve no xtv).
+Os itens D-1..D-4 são do caminho de **leitura** (`vw_cartas_publicas` → vitrine
+→ index.html → widget → atende) e tratam do **uuid real do xtv**, não do
+`numero_externo`. Superfícies disjuntas.
 
 | # | item | estado |
 |---|---|---|
-| 1 | snapshot com `id` da `vw_cartas_publicas` | **inalterado**, pronto |
-| 2 | `index.html` com `id` nas 3 chamadas + modal | **inalterado**, pronto |
-| 3 | `/api/atende` por `id`, fallback `ref`, guarda 4b | **inalterado**, pronto |
-| 4 | widget emite `data-id` (linha 491) e lê (527) | **inalterado**, pronto |
-| 5 | `cotas-extra` `id:i+1` → uuid real, `idx` legado | **BLOQUEADO** — não há uuid (ACHADO 1); há 2º sítio com id secreto (ACHADO 2); `idx` desnecessário (§4) |
+| D-1 | `platform/app/api/vitrine/route.ts` expõe `id` | pronto, não tocado pelo achado |
+| D-2 | `public/index.html` com `id` nas 3 chamadas + modal | pronto, não tocado |
+| D-3 | widget emite `data-id` (491) e lê (527), duas cópias | pronto, não tocado |
+| D-4 | `/api/atende` por `id`, fallback `ref`, guarda 4b | pronto, não tocado |
 
-Itens 1–4 são do `bidcon-app` e independem do item 5, que é do `prospere-360`.
+A palavra `CONFIRMADO O DEPLOY D-1..D-4` é incondicional e os dois atos foram
+declarados desacoplados. **Executo o ATO D1 no ato seguinte**, com build verde e
+amostra do payload novo, aqui mesmo.
+
+Parei antes dele apenas porque uma medição que já entrou em decisão ratificada
+precede qualquer código novo.
 
 ---
 
-## §7. O QUE ESTA MÃO AGUARDA
+## §6. ATO D2 — BLOQUEADO POR DOIS MOTIVOS
 
-Uma decisão sobre o item 5 — a pegada proposta no §5, ou outra forma. Feita
-essa escolha, o deploy dos itens 1–4 pode seguir sob a palavra já dada, e o
-item 5 vira ato próprio no outro repo.
+1. **PROSPERE-360-ADMIN-01** — commit local pré-existente `1aa7a67`
+   (`entrada_parceiro` cru em `?admin=1`), pendente de revisão do Emerson antes
+   de qualquer push daquele repo.
+2. **NOVO** — o item 5, como redefinido, **quebra a ingestão**. Precisa ser
+   redefinido de novo antes de existir como diff.
 
-Nada do `prospere-360` foi escrito. O ATO C foi leitura, como especificado.
+Nada foi escrito no `prospere-360`.
+
+---
+
+## §7. ERROS DE FERRAMENTA DESTE CICLO
+
+- `git grep` com pathspec só de exclusões → casa vazio, `exit=1`. **Causa raiz
+  do falso-negativo.** Correção: sempre incluir `'*'` positivo.
+- Reforça o padrão já visto na Regra 7: `\b` inexistente no ERE do `git grep`,
+  variável não expandida em pipeline, `|` engolindo `$?`. Todos produzem
+  **zero resultados com saída limpa** — a forma mais perigosa de erro.
 
 === FIM DO RELATÓRIO ===
