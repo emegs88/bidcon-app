@@ -765,3 +765,106 @@ CONSISTENCIA-01: **preview reauditado e verde. NÃO encerrada.** Faltam:
 Pendências mantidas: INGESTAO-POSICIONAL-01 · PROSPERE-360-ADMIN-01 ·
 divergência das cópias do widget · `package-lock` · trim de grants (FAROL-01) ·
 regra de namespace · ciclo supervisionado 2.
+
+---
+
+## §13 — CONSISTENCIA-01, terceira rodada: o critério vira princípio
+
+Append-only. Corrige por acréscimo o que §12 deu por fechado.
+
+### 13.1 — O que passou por baixo de todas as auditorias anteriores
+
+Publiquei em produção (`3f94b1c`) e só então ampliei o conjunto de padrões.
+Achei **32 ocorrências de "Prospere" fora de "Grupo Prospere"** vivas no ar.
+
+Causa, sem atenuante: minhas auditorias mediam o literal `"Prospere
+Consórcios"`. Nenhuma dessas 32 usa esse literal. **O conjunto de padrões é
+que define o que se pode achar** — o meu era estreito demais, e por isso os
+verdes anteriores eram verdes verdadeiros de uma pergunta errada.
+
+### 13.2 — REGRA PERMANENTE DA CASA (ditada por Emerson, 03/08)
+
+> **O critério de aceite é o PRINCÍPIO, não a lista.**
+>
+> Critério: *zero ocorrências de "Prospere" fora de "Grupo Prospere", exceto a
+> allowlist explícita — `Prospere Hortolândia`, `Prospere Corretora de Seguros
+> LTDA`, e o texto de consentimento `pela bidcon/Prospere via WhatsApp`.*
+>
+> **Auditoria mede contra o princípio + allowlist, nunca contra literais
+> escolhidos a dedo.** Lista de literais é hipótese; princípio com allowlist é
+> critério. Quem audita pela lista só encontra o que já sabia.
+
+Vale por analogia para qualquer fatia: se o critério puder ser escrito como
+"zero X exceto allowlist", escreve-se assim, e a régua nasce do princípio.
+
+### 13.3 — Corrigido (24 substituições, commit `5f71e14`, 9 arquivos)
+
+| # | padrão | n | destino |
+|---|---|---|---|
+| A1 | ` \| Prospere` em og:title / twitter:title | 4 | removido |
+| B  | `Intermediação e suporte Prospere` | 4 | `... bidcon` |
+| B8 | `a bidcon/Prospere não é instituição financeira` | 3 | `a bidcon (EGS Capital Participações Ltda) não é ...` |
+| B3 | `verificada pela Prospere` (template JS do modal) | 1 | `verificada pela equipe bidcon` |
+| B4 | `Acompanhamento Prospere` | 1 | `Acompanhamento bidcon` |
+| —  | `A plataforma da Prospere para` | 3 | `A plataforma bidcon para` |
+| —  | JSON-LD `parentOrganization.name: "Prospere"` | 2 | `"Grupo Prospere"` |
+| —  | `Fale com a Prospere` / `fale com a Prospere` | 6 | `... a bidcon` |
+
+### 13.4 — Mantido intacto, por decisão nominal
+
+Não é inconsistência de entidade, é fato:
+- **Prospere Hortolândia** — agência parceira real.
+- **Prospere Corretora de Seguros LTDA** — outra PJ, fonte de dado.
+- **"Autorizo o contato pela bidcon/Prospere via WhatsApp"** — texto de
+  consentimento; alterar texto de consentimento já colhido é pior que a
+  inconsistência.
+
+### 13.5 — Dois erros do meu instrumento, na mesma auditoria
+
+Ambos apareceram na saída crua e foram corrigidos antes de virar relatório:
+
+1. **A régua fabricou violação.** O script apagava `"Grupo Prospere"` do corpo
+   antes do regex; onde havia `"name":"Grupo Prospere"` sobrava `"name":""` e o
+   `prospere.com.br` vizinho era contado como violação. 72 falsos positivos.
+   Corrigido mascarando com `@` do mesmo comprimento, preservando offsets.
+2. **Regra 8 disparou e estava certa.** `/ferramentas/termo-reserva` deu
+   `VIOL=0` com `sanidade=0` — a âncora `Grupo Prospere` não existe naquela
+   página. Zero sem âncora não é aprovação; é medição inválida. Refeito com
+   âncora `bidcon` (existe em todas), 4 ocorrências ali.
+
+### 13.6 — Auditoria de produção sob a Regra 8 (`5f71e14`)
+
+17 rotas derivadas do repo, não digitadas a dedo. Todas http=200, âncora
+positiva, `VIOLACOES DO CRITERIO = 0`. Menor corpo 726 B (robots), maior
+249 708 B (`/`). Âncora `bidcon` variando de 2 a 375 por página.
+
+Dois `308` provados no destino, ambos desejados: `/bidcon → /` (redirect
+declarado no `vercel.json`) e `/blog/ → /blog` (`trailingSlash:false`).
+
+O gerador não reintroduz: `grep -c Prospere scripts/gerar-vitrine.mjs` = **0**.
+O template JS do modal (B3) foi corrigido no próprio `index.html` e sobreviveu
+à rodada do gerador.
+
+### 13.7 — ABERTO: 76 ocorrências de infraestrutura, mascaradas e NÃO decididas
+
+Mascarar não é decidir. Ficam registradas para chamada de Emerson:
+
+| n | o quê | leitura |
+|---|---|---|
+| 37 | link/domínio `prospere.com.br` | é o site do **Grupo** Prospere, alvo do "by Grupo Prospere". Coerente. |
+| 15 | e-mail `contato@prospere.com.br` | e-mail real em uso. Trocar exige caixa nova, não é edição de texto. |
+| 15 | host `360prospere.vercel.app` | API interna. Invisível ao usuário, mas aparece no `window.BIDCON_API` e no CSP. |
+| 8  | variável JS `PROSPERE_COTAS` | nome de variável do snapshot. Renomear toca o gerador. |
+| 1  | `instagram.com/prospere.consorcio` em `sameAs` | **o único com cheiro de inconsistência de entidade**: o schema `Organization` da bidcon reivindica o Instagram da Prospere Consórcios como perfil dela. |
+
+Recomendo tratar só o último; os quatro primeiros são infraestrutura legítima
+ou custo desproporcional. Não toquei em nenhum.
+
+### 13.8 — Estado
+
+Produção `5f71e14`, deploy `dpl_4QxWAG5wXnSc52yAcDSbfsXbeVbp`, READY.
+
+Seguem aguardando palavra nominal, de §12: os 7 pares de FAQ "Qual a diferença
+entre carta de crédito e financiamento?" (JSON-LD FAQPage + `<details>`
+visível), o selo RA em `termo-reserva.html`, e se a "faixa de selos" do rodapé
+— que **não existe** — deve ser construída.
