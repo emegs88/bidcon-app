@@ -320,3 +320,39 @@ O texto renderizado em `route.ts:178` (`` `#${c.ref} — ...` ``) **não muda** 
 
 Um ato por mensagem, saída crua junto, confirmação externa antes do próximo
 (CLAUDE.md, Regra 6).
+
+---
+
+## §7. ERRATA-1 — escopo real da varredura do §2
+
+*Acrescentada em 02/08/2026, por decisão da arquitetura. Esta seção é
+**append-only**: o texto do §2 fica como está, errado, porque a errata é o
+registro honesto do erro de cobertura — corrigir por reescrita apagaria o
+rastro.*
+
+**O que o §2 afirma:** "Inventário **completo** (todas as ocorrências)" e
+"Varredura: `grep` em **todo o repo**".
+
+**O que foi de fato varrido:** o repositório **`emegs88/bidcon-app`**, e
+somente ele.
+
+**O que ficou de fora:** o repositório **`emegs88/360prospere`** (clone local
+`~/Desktop/360prospere/prospere-360`), que é uma segunda superfície de
+produção. Ele não foi varrido quando o §2 foi escrito; o §2 declarou cobertura
+maior do que a medição sustentava.
+
+**Por que o diff do §4 continua válido mesmo assim** — medido depois, não
+argumentado: `grep` no `360prospere` retorna **zero** ocorrências de
+`numero_externo`, `vw_cartas_publicas`, `vw_vitrine_viva` e `from("cartas")`.
+Aquele app **não toca o schema `cartas` do xtv**, logo o DDL do SQL irmão e os
+itens D-1..D-5 não o afetam nem dependem dele. O erro é de **declaração de
+escopo**, não de conteúdo do diff.
+
+**O que a varredura de fora encontrou** (registrado, endereçado em ato
+próprio): `app/api/cotas-extra/route.js:330` fabrica identidade por posição de
+array — `id: i + 1`. Mesma classe da D1, superfície distinta.
+
+**Classe do erro:** é a mesma do incidente de 02/08 — declarar cobertura mais
+larga do que a medição feita. Por isso entra aqui nomeada, e não some.
+
+**Escopo varrido: `bidcon-app`. Pendente: `360prospere` (ATO C).**
