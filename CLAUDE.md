@@ -161,6 +161,34 @@ sobretudo, o projeto errado — o mesmo repo alimenta dois projetos na Vercel, e
 o auditado servia o app Next.js, não o site estático. Norma fixada por Emerson
 no mesmo dia.)
 
+**Regra 9 — toda medição é suspeita até se provar CAPAZ DE FALHAR.** Antes de
+aceitar um resultado de auditoria, prove que o instrumento consegue
+discriminar. Cinco provas, todas na mesma saída:
+
+1. **Corpo real.** Asserção positiva que só passa se o conteúdo foi lido. Zero
+   em corpo vazio é falso negativo, não aprovação.
+2. **Âncora válida na página medida.** Âncora ausente invalida a medição
+   inteira — não a aprova.
+3. **Régua íntegra.** Transformação aplicada antes do regex pode FABRICAR
+   violação. Toda acusação é inspecionada no verbatim antes de virar relatório.
+4. **Controle negativo.** Teste de existência sem um caso sabidamente falso não
+   é evidência. Se o instrumento devolve sucesso para o verdadeiro e para o
+   falso, ele não mede nada.
+5. **Cobertura provada.** Rotas derivadas conferidas contra o que é servido de
+   fato; redirect não medido é cobertura ausente. Cobertura não medida não é
+   cobertura.
+
+E o **critério de aceite se escreve por PRINCÍPIO + ALLOWLIST EXPLÍCITA**, nunca
+por lista de literais — a lista só encontra o que quem a escreveu já imaginou.
+
+(Origem: 03/08, CONSISTENCIA-01. Absorve e generaliza a Regra 8. Os cinco modos
+apareceram todos nesta fatia: corpo vazio aprovado; âncora inexistente em
+`termo-reserva` dando VIOL=0; régua que apagava "Grupo Prospere" antes do regex
+e fabricou 72 falsos positivos; `http=200` do Instagram que também respondia 200
+para um handle inexistente de 605 KB; e `/blog/` derivado com barra, que era
+redirect e ficou sem medição. O critério por literal `"Prospere Consórcios"`
+deixou 32 ocorrências vivas em produção. Norma fixada por Emerson.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do

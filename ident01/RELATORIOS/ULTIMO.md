@@ -948,3 +948,30 @@ do escopo desta fatia.
 **Auditoria local:** violações do critério = 0; 25 blocos `ld+json` válidos, 0
 inválidos; `sameAs` distintos no site = 1; selo 16/16; gerador com 0 ocorrências
 de `Prospere`, `sameAs`, `FAQPage` e `ra-verified` — não reintroduz nada.
+
+### 13.11 — `bidcon.html`: INAUDITÁVEL POR CONSTRUÇÃO (limitação conhecida, não pendência)
+
+`public/bidcon.html` existe no repo, é buildado e sobe no deploy, mas **não é
+servido em nenhuma rota**. Medido:
+
+```
+/bidcon.html  -> 308  redirect=https://www.bidcon.com.br/bidcon
+/bidcon       -> 308  redirect=https://www.bidcon.com.br/
+/             -> 200  (index.html)
+```
+
+Corrente de dois saltos, por soma de duas regras do `vercel.json`:
+`"cleanUrls": true` tira o `.html` **antes** de a regra `/bidcon.html → /`
+disparar, então quem manda é `/bidcon → /`. A regra do `.html` virou letra
+morta e a chegada em `/` custa um hop a mais.
+
+**Consequência para toda auditoria futura:** nenhuma alteração em
+`bidcon.html` pode ser verificada por fetch. Nesta rodada removi dali o bloco
+`FAQPage` inteiro — a remoção está verificada **localmente e no diff do
+commit**, e é impossível de verificar em produção. Isso não é falha da Regra 9,
+item 5: é cobertura que não existe, e está declarada.
+
+Se a página voltar a ser servida (removendo o redirect), o que estará lá é o
+estado do commit `b6c0d0d`: sem `FAQPage`, com `sameAs` já corrigido e com o
+selo RA. **Não é pendência** — é propriedade conhecida da superfície,
+registrada para que ninguém a redescubra como incidente.
