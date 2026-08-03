@@ -220,9 +220,12 @@ function itemListJsonLd(cartas) {
         availability: "https://schema.org/InStock",
         itemCondition: "https://schema.org/UsedCondition",
         url,
+        // CONSISTENCIA-01: quem opera é a EGS Capital. Este bloco é reemitido
+        // 60x (uma por card) a cada snapshot do bot — corrigir só o
+        // public/index.html não adianta, o próximo cron desfaz.
         seller: {
           "@type": "Organization",
-          name: "Bidcon — Prospere Consórcios",
+          name: "Bidcon — EGS Capital Participações Ltda",
           url: "https://www.bidcon.com.br",
         },
         itemOffered: {
