@@ -975,3 +975,126 @@ Se a página voltar a ser servida (removendo o redirect), o que estará lá é o
 estado do commit `b6c0d0d`: sem `FAQPage`, com `sameAs` já corrigido e com o
 selo RA. **Não é pendência** — é propriedade conhecida da superfície,
 registrada para que ninguém a redescubra como incidente.
+
+---
+
+## 14 — CONTATO-01: migração do e-mail de contato (03/08)
+
+**Autorizado por Emerson.** `contato@prospere.com.br` → `contato@bidcon.com.br`
+no site estático. Commit `7d50a77`, deploy `dpl_AmwxaAmME2XxgPDw7MoHKMnq7RPq`.
+
+### 14.1 — PROVENIÊNCIA (declarada, não medida)
+
+A existência da caixa `contato@bidcon.com.br` e o fato de ela ser monitorada são
+**fato afirmado por Emerson**. Não são medição deste agente.
+
+O que eu medi foi só o domínio: `dig bidcon.com.br MX` devolve `1 smtp.google.com.`,
+com controle positivo (`prospere.com.br` → hostinger) e controle negativo
+(`xyz99887-nao-existe.com.br` → vazio). Isso prova que o **domínio** recebe e-mail.
+MX é registro de domínio, não de caixa: nenhum teste de DNS discrimina se
+`contato@` existe. A garantia da caixa é do Emerson.
+
+### 14.2 — O número reconcilia: 15 em produção, 17 no site, 19 no repo
+
+A autorização falava em 15. O repositório tinha 19. Não era divergência:
+
+| | |
+|---|---|
+| 8 HTML em `public/` × 2 campos cada | 16 |
+| − `bidcon.html`, que não é servido (§13.11) | −2 |
+| + `llms.txt` × 1 | +1 |
+| **= o que produção servia** | **15** |
+| + os 2 de `bidcon.html` | **17** migrados |
+| + `ULTIMO.md` (1) + `platform/` (1) | 19 no repo |
+
+Migrados os 17. Os 2 de `bidcon.html` entram pela consistência do arquivo, sem
+possibilidade de verificação em produção.
+
+### 14.3 — O achado que justifica a fatia
+
+O site publicava **dois endereços de contato diferentes ao mesmo tempo**:
+
+- `contato@bidcon.com.br` nas páginas legais — `privacidade.html` (3×),
+  `seguranca.html` (2×) — e na Regra de ouro do pagamento;
+- `contato@prospere.com.br` no structured data, que é o que o Google lê.
+
+Não era só inconsistência de entidade entre páginas. Era contradição interna
+**na mesma página**: `index.html` declarava um endereço no texto legal e outro
+no `Organization.email` do JSON-LD.
+
+Cada HTML tinha o endereço em dois campos do mesmo `@graph` já corrigido em
+CONSISTENCIA-01: `Organization.email` e `Organization.contactPoint.email`
+(`contactType: sales`).
+
+### 14.4 — NÃO alterado, por decisão explícita
+
+| onde | por quê |
+|---|---|
+| `ident01/RELATORIOS/ULTIMO.md` | a ocorrência é a linha de §13.7 que registra a própria pendência; arquivo append-only |
+| `platform/app/meu-processo/page.tsx` | app.bidcon.com.br, fora do escopo declarado da fatia |
+| `BIDCON_ADMIN_EMAILS=emerson@prospere.com.br` | controle de acesso, não contato publicado |
+| RLS `like '%@prospere.com.br'` (`0013_prospere_ancora.sql` + rascunho) | idem — alterar removeria o acesso admin da plataforma |
+| `prospere.com.br`, `360prospere.vercel.app`, `PROSPERE_COTAS` | infraestrutura, mantida intacta por ordem |
+
+Medido em `public/` após a migração: `prospere.com.br`=32, `360prospere.vercel.app`=18,
+`PROSPERE_COTAS`=9, `prospere.consorcio`=0. O `prospere.com.br` caiu de 49 para 32
+**sem que nenhuma referência de infraestrutura fosse tocada**: cada
+`contato@prospere.com.br` continha o domínio como substring.
+
+### 14.5 — Modo 3 outra vez: contagem por linha teria FABRICADO 8 acusações
+
+Ao inspecionar o diff, a contagem por linha removida acusava **8 ocorrências de
+`prospere.com.br` fora do e-mail**. Falso. O JSON-LD é minificado: a linha inteira
+é substituída, e essas 8 reaparecem intactas na linha adicionada.
+
+O instrumento que discrimina é a **diferença simétrica de tokens** entre linhas
+removidas e adicionadas:
+
+```
+TOKENS QUE SO SAIRAM:    -17x  contato@prospere.com.br
+TOKENS QUE SO ENTRARAM:  +17x  contato@bidcon.com.br
+```
+
+Nada mais mudou. Lição já na Regra 9, item 3, agora com segundo caso: **a unidade
+de medida escolhida é parte da régua.** Contar por linha num arquivo minificado é
+transformar antes de medir.
+
+### 14.6 — Modo 5 outra vez: sitemap é DECLARAÇÃO, não o que é servido
+
+Derivei a cobertura do `sitemap.xml`. Verde nas 14 rotas. Mas o sitemap tem 12
+rotas e `public/` tem 16 HTML: **`/seguranca` e `/ferramentas/termo-reserva` não
+estavam no sitemap e não foram medidos** — e `seguranca.html` é justamente uma
+das páginas que já publicava o endereço novo.
+
+Fechado por diferença contra o disco. Cobertura final: 12 do sitemap + `llms.txt`
++ `/blog` + as 2 faltantes = **16 rotas**, todas `ALVO=0`.
+
+Lição, para somar ao item 5 da Regra 9: **derivar cobertura de um artefato que o
+próprio site declara é derivar da intenção, não do fato.** Sitemap, índice e menu
+são declarações. A cobertura se prova contra o que é publicado.
+
+### 14.7 — Auditoria de produção sob a Regra 9 (`7d50a77`)
+
+Provas do instrumento, todas na mesma saída:
+
+- **can-fail**: corpo sintético com o alvo → régua conta 1; sem o alvo → 0.
+- **âncora positiva**: `bidcon` presente em toda página medida (4 a 377).
+- **controle negativo de rota**: `/rota-que-nao-existe-xyz99887` → 404, 0 bytes.
+- **verbatim**: qualquer ocorrência do alvo seria impressa com 120 caracteres de
+  entorno. Nenhuma foi.
+
+Resultado: **16 rotas, VIOLAÇÕES=0, FALHAS=0**, 24 ocorrências servidas de
+`contato@bidcon.com.br`. Local: 26 blocos `ld+json` válidos, 0 inválidos;
+`sameAs` preservado em valor único; gerador inerte (`contato@`=0, `prospere`=0,
+`email`=0).
+
+O único 308 é `/bidcon` — §13.11, inauditável por construção, não falha.
+
+### 14.8 — Estado
+
+CONTATO-01 fechada. Critério de aceite atingido: zero ocorrências de
+`contato@prospere.com.br` no site servido, endereço novo coerente com a Regra de
+ouro do pagamento e com as páginas legais.
+
+Segue aberto, sem decisão: a infraestrutura de §13.7 (`prospere.com.br`,
+`360prospere.vercel.app`, `PROSPERE_COTAS`), mantida intacta por ordem expressa.
