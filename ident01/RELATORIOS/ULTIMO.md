@@ -1570,3 +1570,167 @@ escrever já está feita:
 - **Todos os leads em "Novo" desde 29/07.** Duas causas incompatíveis: fluxo
   acontecendo fora do painel, com o status nunca avançando; ou lead não
   atendido. Não dá para escolher entre elas sem medir, e a segunda é a cara.
+
+
+## 19 — Fechamento dos achados abertos e escopo da LEADS-WA-01 (04/08/2026)
+
+### 19.1 — [[CARTA]]/[[OPCOES]] cru: o cliente nao ve
+
+Suspeita levantada na 18.8: markup aparecendo cru na thread do site.
+Medicao em dois caminhos independentes.
+
+Caminho 1 — banco, no nivel de MARCADOR (nao de mensagem):
+  416 mensagens; 47 contem [[CARTA]]; 90 aberturas, 90 fechamentos, 0 desbalanceadas.
+  [[OPCOES]]: 61 / 61 / 0. Maximo de 3 marcadores numa mesma mensagem.
+  Markup so em papel='agente', so no canal 'site'.
+  Regua provada CAPAZ DE FALHAR: isca sintetica com um marcador aberto e nao
+  fechado devolveu abre=2, fecha=1 — a regua acusou.
+
+Caminho 2 — os bytes efetivamente servidos ao navegador:
+  bidcon.com.br e www  -> sha256 9588ea4f... (31224 bytes)
+  app.bidcon.com.br    -> sha256 9fd5536f... (30846 bytes)
+  Ambos contem PW_CARTA_RE (5 ocorrencias) e replace(PW_CARTA_RE (1).
+  Controle negativo: caminho inexistente devolveu 404.
+
+VEREDITO: o parser existe no arquivo servido e todos os marcadores estao fechados.
+O cliente NAO ve markup cru. Severidade: cosmetica, restrita ao painel admin, que
+renderiza o conteudo bruto sem passar pelo parser do widget.
+
+Erro de regua registrado: a primeira contagem contava MENSAGENS que tinham abertura
+e fechamento. Uma mensagem com dois marcadores, o segundo sem fechar, passaria limpa.
+47 mensagens carregam 90 marcadores. A contagem por mensagem era cega justamente
+para o caso que importava.
+
+Desvio de prompt observado, sem acao: _prompt.ts:239 manda no MAXIMO 2 marcadores
+[[CARTA]] por mensagem, e o medido e 3. O modelo desobedece. Sem consequencia para
+o cliente enquanto os marcadores fecharem.
+
+### 19.2 — Leads em "Novo" desde 29/07: nao e fluxo fora do painel
+
+Fechado por medicao do Emerson: atendido_por nulo em 37 de 37, nenhum lead
+trabalhado desde 07/07. Nao ha fluxo paralelo — sao leads nao atendidos.
+Descontando testes e duplicatas, 31 pessoas reais esperando.
+Consequencia direta: a LEADS-WA-01 deixa de ser conveniencia e vira o caminho de
+contato.
+
+### 19.3 — Colisao de sufixo: zero real
+
+A regra 1 da LEADS-WA-01 casa pelos ultimos 8 digitos. Isso tolera DDI e nono digito
+ausentes, mas pode colidir entre DDDs diferentes. Medido, nao assumido.
+
+Primeira medicao (so digitos, sufixo 8):
+  a_COLISOES_entre_leads     = 5   -> todas duplicatas EXATAS, nao colisoes
+  c_COLISOES_entre_conversas = 0
+  e_pares_casados            = 2
+
+Segunda medicao (normalizacao completa da regra 4: prefixa 55 quando falta e exige
+igualdade INTEIRA):
+  d_pares_por_SUFIXO8            = 2
+  e_pares_canon_IGUAL            = 2
+  f_pares_canon_DIFERENTE_risco  = 0
+  b_leads_canon_INVALIDO         = 0
+  o_CONTROLE_NEGATIVO_impossivel = 0
+
+Verbatim dos pares:
+  7968d3a7 | Emerson | lead=19997561909 -> canon=5519997561909 || conv=5519997561909 || IGUAL=true
+  96ca3ae4 | emerosn | lead=19997561909 -> canon=5519997561909 || conv=5519997561909 || IGUAL=true
+
+Detector provado por isca sintetica (mesmo sufixo de 8, DDD diferente):
+  lead=11988887777 canon=5511988887777 || conv=5521988887777 canon=5521988887777 || IGUAL=false
+  h_ISCA_pares_por_sufixo = 1 ; i_ISCA_canon_diferente = 1
+
+VEREDITO: colisao real zero, com detector provado capaz de acusar. Os 8 digitos
+ficam, agora sem custo demonstrado.
+
+Erro de rotulo registrado: na primeira rodada chamei os 2 pares de SUSPEITOS. A
+diferenca era exatamente o 55 que a regra 4 manda tolerar — comportamento pretendido
+rotulado como anomalia. O verbatim colado matou o falso positivo antes de ele virar
+investigacao. Falso positivo criado pela nomenclatura da regua, nao pelos dados.
+
+### 19.4 — Duplicatas em interesses: resolve na exibicao, nao no dado
+
+5 grupos com 2 registros cada, 10 linhas ao todo:
+  5511979915526 | registros=2 | mais_recente=2026-07-12 17:49:20
+  5511981649351 | registros=2 | mais_recente=2026-07-15 18:03:17
+  5519997561909 | registros=2 | mais_recente=2026-07-07 21:16:19
+  5519999999999 | registros=2 | mais_recente=2026-07-13 22:15:07
+  5581997194289 | registros=2 | mais_recente=2026-07-24 02:40:19
+
+Dano ja existente, anterior a fatia: na lista entregue ao Emerson, Elvis, Claudia,
+Victor e Daniel apareciam duas vezes. Ligar duas vezes para a mesma pessoa e atrito
+com cliente real.
+
+Deduplicar e escrita destrutiva e exigiria decidir qual linha sobrevive. NAO ENTRA.
+
+DECISAO (Emerson): a lista agrupa por telefone normalizado na EXIBICAO. Uma linha
+por pessoa, com contagem ("2 registros") e a data do mais recente. O leads-status
+escreve em TODAS as linhas do grupo. Resolve a mentira sem apagar nada, e o banco
+mantem o historico integro. Cabe no escopo ja autorizado: status e atendido_por,
+agora em N linhas em vez de 1.
+
+37 linhas viram 32 na lista. Nomes divergem dentro do grupo (Emerson / emerosn):
+exibe-se o do registro mais recente, sem fundir dado.
+
+### 19.5 — Numeros de teste: sem filtro heuristico
+
+19999999999 e 19997561909 sao registros do proprio Emerson.
+PROIBIDO inventar filtro por padrao de digito repetido — reprovaria numero real.
+DECISAO (Emerson): leads de teste ficam VISIVEIS. Nenhum filtro, nada escondido.
+19999999999 gera wa.me para numero inexistente e esta tudo bem: e registro dele e
+ele sabe o que e.
+
+### 19.6 — WIDGET-SYNC-01: duas copias divergentes do widget
+
+Achado colateral da 19.1. As duas copias de prosperito-widget.js diferem e nenhuma
+e superconjunto da outra:
+  public/prosperito-widget.js           (9588ea4f...) tem .pw-carta-price e o rotulo
+                                        de preco; NAO tem data-adm.
+  platform/public/prosperito-widget.js  (9fd5536f...) tem adm no eyebrow e data-adm
+                                        no CTA; NAO tem o bloco de preco.
+
+Consequencia: reserva feita pelo host errado nasce com administradora vazia — dado
+perdido na hora de fechar, e e a administradora que sustenta a logica de join.
+
+Fatia propria, na fila DEPOIS da LEADS-WA-01. Escopo quando chegar a hora: convergir
+para um superconjunto (bloco de preco + administradora com data-adm). Primeiro ato
+da fatia: medir se da para servir UMA copia so pelos dois hosts. NAO TOCAR AGORA.
+
+### 19.7 — LEADS-WA-01: escopo fechado
+
+Baseline medido antes de escrever:
+  37 leads, 0 com telefone inutilizavel
+  6 conversas WhatsApp
+  2 linhas casam = 1 pessoa
+  32 grupos na exibicao: 1 com conversa, 31 sem
+  wa_conversas.interesse_id existe mas esta 100% vazio — regua muda, nao
+  contradicao; nao serve como caminho independente.
+
+O controle negativo da Regra 9 (lead sem conversa mostra o caminho 3) nao precisa
+ser fabricado: 31 dos 32 grupos sao o controle.
+
+Escopo:
+  1. Casamento por telefone normalizado (digitos, 55 prefixado, ultimos 8).
+  2. Com conversa: "Abrir conversa" -> thread interna. Preferencial, destacado.
+  3. Sem conversa: "Chamar no WhatsApp" -> wa.me/55<numero> com mensagem
+     pre-preenchida, MAIS aviso na interface de que a conversa acontece no aparelho
+     e nao entra no historico da Bidcon.
+  4. Numero invalido nao gera link.
+  5. Exibicao agrupada por telefone normalizado, com contagem e data mais recente.
+
+AUTORIZADO: leads-status. Escrita permitida EXCLUSIVAMENTE em interesses.status e
+interesses.atendido_por, a partir da lista, com o e-mail do gate como autor, em
+todas as linhas do grupo. Nenhuma outra coluna, nenhuma outra tabela, nenhuma
+migration. Todo o resto da fatia e somente leitura.
+
+Pendente antes de escrever: os valores validos do enum de interesses.status e se
+atendido_por e FK para profiles. Se for, vale a regra do atendente_id: so grava o id
+se houver linha, senao deixa nulo e registra o nome onde couber.
+
+### 19.8 — Ainda NAO PROVADO
+
+  - Controle negativo de nao-admin (403): segue em (c) declarado. Sai de graca
+    quando houver um segundo usuario no console.
+  - Devolver (bot volta a responder): fecha o item 1 do PAINEL-WA-01.
+  - Entrega da mensagem 99 no aparelho.
+  - Semantica de runtime do update().neq().select().
+  - GET /api/whatsapp 403 nunca medido antes do deploy.
