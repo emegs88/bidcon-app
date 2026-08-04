@@ -1098,3 +1098,109 @@ ouro do pagamento e com as páginas legais.
 
 Segue aberto, sem decisão: a infraestrutura de §13.7 (`prospere.com.br`,
 `360prospere.vercel.app`, `PROSPERE_COTAS`), mantida intacta por ordem expressa.
+
+---
+
+## 15 — SELO-CSP-01: o selo montava oculto (03/08)
+
+**Autorizado por Emerson**, com diagnóstico conclusivo dele. Commit `10e64fc`.
+
+### 15.1 — A causa
+
+O `bundle.js` do RA carregava — `script-src` já tinha `s3.amazonaws.com` — e o
+markup era montado. O que estava bloqueado era o **`styles.css` do widget**:
+`style-src` listava apenas `'self'`, `'unsafe-inline'` e `fonts.googleapis.com`.
+
+Sem a folha, a regra
+
+```
+.ra-widget-verified-content.ra-verified-loaded { visibility: visible !important }
+```
+
+nunca aplica, e o selo fica no DOM **permanentemente invisível**. Não era falha de
+instalação nem de `id`: era CSP. Um recurso pode ser autorizado numa diretiva e
+proibido em outra, e o sintoma — elemento presente e invisível — não se parece
+com bloqueio.
+
+Alterado, 1 diretiva, 1 linha, JSON revalidado antes de gravar:
+
+```
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com
+        -> ... https://fonts.googleapis.com https://s3.amazonaws.com
+```
+
+`font-src` já cobria: o CSS importa Open Sans de `fonts.googleapis.com` (style-src)
+e os arquivos de `fonts.gstatic.com` (font-src), ambos liberados. `img-src` e
+`connect-src` intactos.
+
+### 15.2 — Item 2: a duplicata NÃO existe no fonte
+
+A hipótese era tag do widget duplicada. Varredura das 16 páginas:
+
+```
+id="ra-verified-seal"=1   id="ra-embed-verified-seal"=1   raichu-beta=1   em TODAS
+gerador: ra-verified / raichu / ra-embed = 0
+```
+
+O HTML servido tem exatamente uma ocorrência por página, e o gerador não injeta
+selo. As duas requisições de `bundle.js` e `styles.css` observadas em algumas
+cargas têm **outra causa, em runtime** — provavelmente o próprio bundle
+reagindo ao bloqueio. Nada foi alterado a esse título: corrigir uma duplicata
+inexistente seria inventar trabalho e mexer em 16 arquivos sem motivo.
+
+### 15.3 — O que este instrumento NÃO alcança
+
+O selo é renderizado por JS. **Fetch de HTML não prova visibilidade.** A presença
+do `<div>` é condição necessária e não suficiente.
+
+Provado por fetch: (a) o header CSP servido, (b) o `styles.css` respondendo,
+(c) o `<div>` exatamente 1× por página.
+
+Não provado, e não afirmado: que o selo aparece. Isso só o Emerson confirma no
+navegador.
+
+### 15.4 — O erro do meu instrumento, pego por redundância
+
+Na primeira auditoria a saída se contradisse: o bloco [1] media `style-src+s3 =
+SIM` para `/`, e o bloco [3] media `nao` para **a mesma `/`**.
+
+Causa: em [1] eu lia o header com fallback de capitalização; em [3] só em
+minúsculas. `dict(r.headers)` preserva a capitalização original, então a chave
+minúscula não existe e o `.get` devolve vazio. O vazio virou "não tem s3".
+
+Isto é a Regra 7 aplicada a header em vez de comando: **um acesso que erra a
+chave devolve ausência, não erro.** A busca malsucedida se parece com uma
+medição bem-sucedida de zero.
+
+O que salvou foi ter medido a mesma coisa **duas vezes na mesma saída**, por
+caminhos diferentes. Não foi perícia: foi redundância. Lição a somar à Regra 9:
+quando o resultado for um zero ou um "não", vale medir o mesmo fato por um
+segundo caminho — duas rotas discordando é a única evidência barata de que uma
+delas está quebrada.
+
+### 15.5 — Auditoria de produção (`10e64fc`)
+
+Provas do instrumento, na mesma saída:
+
+- **can-fail do contador**: corpo sintético com o div → 1; sem o div → 0.
+- **can-fail da leitura de CSP**: header sintético sem s3 → `False`; com s3 →
+  `True`; sem a diretiva → `None` (ausência distinguida de negativa).
+- **controle negativo de rota**: `/rota-que-nao-existe-xyz99887` → 404, 0 bytes.
+- **controle negativo de asset**: arquivo inexistente no bucket do RA → 403, 0
+  bytes, contra 200 do `bundle.js` (8371 B) e do `styles.css` (3197 B).
+- **âncora positiva** `bidcon` em toda página medida (4 a 377).
+
+Resultado:
+
+| critério | resultado |
+|---|---|
+| (a) `style-src` com `s3.amazonaws.com` | **15 de 15** rotas servidas |
+| (b) `styles.css` do RA | **200**, 3197 B |
+| (c) `<div>` e script 1× por página | **15 de 15** |
+
+A 16ª é `/bidcon` — 308, inauditável por construção (§13.11).
+
+### 15.6 — Estado
+
+Correção no ar. **Pendente de confirmação visual do Emerson no navegador** — é o
+único critério que este agente não consegue medir.
