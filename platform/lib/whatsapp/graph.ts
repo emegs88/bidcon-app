@@ -10,8 +10,9 @@
 // checagem é feita AQUI DENTRO, não confiando no chamador (mesmo espírito
 // de "nunca confiar no client" já usado no webhook pro carta_foco/reserva).
 //
-// Toda tentativa de envio (sucesso ou falha) é registrada em wa_mensagens.
-// papel='prosperito' — o enum wa_papel (cliente|prosperito|humano|sistema,
+// Toda tentativa de envio (sucesso ou falha) é registrada em wa_mensagens
+// com papel = params.papel ?? 'prosperito' (o painel passa 'humano').
+// O enum wa_papel (cliente|prosperito|humano|sistema,
 // ver migration 0046) NÃO tem valor 'agente'; a persona real que respondeu
 // (ex. 'valentina') vai na coluna livre `agente`, mesmo padrão de
 // mensagens.agente no /api/atende (site).
@@ -43,6 +44,14 @@ type EnvioBase = {
   conversaId: string;
   telefone: string;
   agente?: string | null;
+  /** Quem está falando, no enum wa_papel. Default 'prosperito' — nenhum
+   *  chamador existente muda de comportamento. O painel passa 'humano'
+   *  (PAINEL-WA-01 item 3): mensagem escrita por pessoa não pode ser
+   *  gravada como se o bot tivesse escrito, senão a thread mente sobre a
+   *  autoria e o histórico montado pro modelo atribui a ele o que ele não
+   *  disse. Ambos os valores viram `assistant` na Anthropic (ver
+   *  montarMensagensWa em cerebro.ts) — o que muda é a verdade do registro. */
+  papel?: "prosperito" | "humano";
   tokensIn?: number | null;
   tokensOut?: number | null;
 };
@@ -133,7 +142,7 @@ async function registrarEnvio(
 ): Promise<void> {
   await db.from("wa_mensagens").insert({
     conversa_id: params.conversaId,
-    papel: "prosperito",
+    papel: params.papel ?? "prosperito",
     agente: params.agente ?? null,
     conteudo: params.conteudo,
     template: params.template ?? null,

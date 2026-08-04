@@ -261,8 +261,14 @@ export type ResultadoCerebro = {
 // existe no projeto xtv, zero migration nesta fatia — ver checkpoint).
 // `motivo` segue o formato "regra[,regra2,...]|acao" pedido (ex.:
 // "promessa_prazo|removido", "lexico:CDI|regenerado", "anti_loop|
-// escalado_humano"). Falha no log NUNCA bloqueia o envio da resposta —
-// por isso o try/catch engole qualquer erro e só loga um warning.
+// escalado_humano"). Falha no log NUNCA bloqueia o envio da resposta.
+//
+// PAINEL-WA-01 item 6 — o {error} passou a ser conferido. O try/catch sozinho
+// era cego: supabase-js DEVOLVE o erro no retorno, não lança. Falha de banco
+// nunca chegava ao catch, e a ausência de linha em wa_guardrail_log ficava
+// indistinguível de "não havia nada a bloquear" — justamente no dia da
+// primeira intervenção real, que é o dia em que o log importa. O catch fica,
+// porque exceção de rede/runtime existe e é outra coisa.
 async function logGuardrail(
   db: ReturnType<typeof createXtvClient>,
   conversaId: string,
@@ -271,13 +277,19 @@ async function logGuardrail(
   conteudoBloqueado: string
 ): Promise<void> {
   try {
-    await db.from("wa_guardrail_log").insert({
+    const { error } = await db.from("wa_guardrail_log").insert({
       conversa_id: conversaId,
       motivo: `${motivos.join(",")}|${acao}`,
       conteudo_bloqueado: conteudoBloqueado.slice(0, 4000),
     });
+    if (error) {
+      console.error(
+        "[cerebro][guardrail] falha ao gravar log (não bloqueia envio):",
+        error.message
+      );
+    }
   } catch (e) {
-    console.error("[cerebro][guardrail] falha ao gravar log (não bloqueia envio):", e);
+    console.error("[cerebro][guardrail] exceção ao gravar log (não bloqueia envio):", e);
   }
 }
 
@@ -286,18 +298,31 @@ async function logGuardrail(
 // (fallback) nos últimos ANTI_LOOP_JANELA_MIN minutos. Falha de leitura
 // devolve 0 (modo mais conservador: não dispara escalonamento por engano
 // só porque a consulta falhou).
+//
+// PAINEL-WA-01 item 6 — mesma cegueira do logGuardrail, com consequência
+// pior: aqui ela é COMPORTAMENTAL. Desestruturando só `count`, uma consulta
+// que falha devolve count=null → 0 → "nenhum fallback recente" → o anti-loop
+// deixa de escalar, silenciosamente e sem nada no log. O 0 continua sendo a
+// resposta (é mesmo o lado conservador), mas agora a falha é DITA.
 async function contarFallbacksRecentes(
   db: ReturnType<typeof createXtvClient>,
   conversaId: string
 ): Promise<number> {
   try {
     const limiteIso = new Date(Date.now() - ANTI_LOOP_JANELA_MIN * 60_000).toISOString();
-    const { count } = await db
+    const { count, error } = await db
       .from("wa_guardrail_log")
       .select("id", { count: "exact", head: true })
       .eq("conversa_id", conversaId)
       .like("motivo", "%|fallback_n3")
       .gte("criado_em", limiteIso);
+    if (error) {
+      console.error(
+        "[cerebro][guardrail] falha ao contar fallbacks recentes (assume 0):",
+        error.message
+      );
+      return 0;
+    }
     return count ?? 0;
   } catch (e) {
     console.error("[cerebro][guardrail] falha ao contar fallbacks recentes:", e);

@@ -1264,3 +1264,153 @@ perguntado. Por isso a regra incide sobre a ausência, não sobre a presença.
 
 `CLAUDE.md` com 9 regras, Regra 9 com 6 itens. Pendente apenas a confirmação
 visual do selo pelo Emerson (§15.6).
+
+---
+
+## 17 — PAINEL-WA-01: as seis correções do delta, e a régua que não cobria nada (04/08)
+
+Fatia ditada pelo Emerson em seis itens, escrita na branch `painel-wa-01` sobre
+a base `0d84a66`. **Oito commits, 14 arquivos, 846 inserções e 51 deleções.**
+Worktree limpo depois de cada um.
+
+```
+617110b item 6: o {error} do supabase-js passa a ser conferido
+93bb01b item 5 (UI): Encerrar como botão, Caminho B como link
+9a8e042 item 5 (backend): encerrar arquiva, e mensagem nova reabre
+bed0818 item 4: handoff vira mensagem na thread
+f918bd2 item 3 (UI): compositor no painel, janela de 24h visível
+96231e1 item 3 (backend): envio pelo painel com janela de 24h
+a5cc910 item 2: última atividade derivada das mensagens
+162b99b item 1: relê status antes de emitir
+```
+
+### 17.1 — A foto e a releitura, que era o defeito de verdade
+
+O item 1 tinha nome de corrida, mas o que estava embaixo era uma forma que
+reapareceu em quase toda a fatia: **valor fotografado num instante e usado como
+verdade em outro.** O webhook lia `conversa.status`, empacotava no job junto com
+o `podeResponder` já decidido, e o job atravessava `DEBOUNCE_MS = 8s` mais mídia,
+visão e geração da Anthropic — dez a vinte segundos. É exatamente a janela em que
+o operador clica "Assumir". A resposta do bot saía depois, por cima da pessoa,
+com a foto na mão dizendo que podia.
+
+A correção não foi um lock novo: foi **reler o status no ponto onde o lock já é
+adquirido**, imediatamente antes de emitir. E o job que aborta por status virado
+**registra o descarte na thread** — como o Emerson ditou, mensagem que some sem
+rastro é pior que resposta duplicada.
+
+A releitura ficou no **processador**, não no transporte. `sendText` precisa
+continuar servindo o envio manual do painel, que é legítimo justamente quando
+`status='humano'`. O `opt_out`, ao contrário, é do transporte — bloqueia toda
+saída, e por isso o `graph.ts` já o relia.
+
+O item 3 herdou o mesmo raciocínio na UI: o estado da janela no compositor é
+**foto do render**. A autoridade é a rota, que relê. A tela avisa; ela não decide.
+
+### 17.2 — O que cada item passou a fazer
+
+**Item 2 — `atualizado_em`.** A leitura passou a derivar a última atividade de
+`max(wa_mensagens.criado_em)`. A correção na escrita é DDL e continua **parada
+esperando `AUTORIZADO: wa-touch`**. Enquanto isso o campo segue sendo hora de
+criação com nome errado.
+
+**Item 3 — envio pelo painel.** Rota nova `responder/`, com recusas explícitas:
+409 se a conversa não está assumida, 409 no opt-out, 409 fora da janela de 24h,
+502 com o erro real da Cloud API. `graph.ts` ganhou `papel?: 'prosperito' |
+'humano'` — mensagem escrita por pessoa não pode ser gravada como se o bot
+tivesse escrito. O `status_envio` gravado é sempre o **real**, nunca um
+`'enviado'` otimista, e a bolha marca `· não entregue` quando falhou.
+
+A janela de 24h é calculada **no servidor**, a partir da última mensagem do
+cliente — resposta nossa não reabre janela nenhuma. O compositor não contém
+nenhum `Date`: recebe booleano e frase prontos. Isso evita divergência de
+hidratação e tira o relógio do navegador de uma decisão que é da Meta.
+
+**Item 4 — handoff na thread.** `lib/whatsapp/sistema.ts`. Assumir e devolver
+passam a narrar-se na conversa. Mensagens `sistema` são **descartadas da memória
+do modelo** (`montarMensagensWa` faz `continue`), então narrar não faz o agente
+acreditar depois que foi ele quem disse.
+
+Aqui eu ia introduzir um defeito e vi antes: clicar "Assumir" numa conversa já
+assumida era no-op silencioso; somar um insert sem mais nada geraria handoffs
+duplicados. Resolvido com o `.neq()` **dentro do próprio update** e `.select("id")`
+lendo o que mudou na mesma instrução. Ler antes e escrever depois deixaria a
+janela aberta para dois operadores clicando junto.
+
+**Item 5 — Encerrar.** `encerrado` existia no enum e aparecia em **um lugar do
+código inteiro**: o ternário do selo na lista. Ninguém escrevia, ninguém lia para
+decidir nada. Botar o botão sem mais nada criaria mentira nova, porque
+`podeResponder` só exclui `humano` — o bot continuaria respondendo com o selo
+dizendo "Encerrada". Havia duas saídas, e escolhi documentando a rejeitada:
+*encerrado também silencia o bot* foi **recusada** porque o cliente que voltasse a
+escrever receberia silêncio para sempre, e "nunca mais me mande nada" já tem
+mecanismo próprio, o opt-out. Ficou: **encerrar é arquivar, e mensagem nova
+reabre**, no webhook.
+
+O Caminho B ("Atender no meu WhatsApp") saiu como **link, não botão**. A
+diferença de peso visual é o conteúdo da fatia, não estética: disponível sem
+fricção, não sugerido — com o aviso de que nada do que for dito lá fica
+registrado aqui.
+
+**Item 6 — o `{error}`.** `supabase-js` **devolve** erro, não lança; `try/catch`
+em volta de query não pega nada. Corrigido no `logGuardrail` e — achado do
+caminho — no vizinho `contarFallbacksRecentes`, onde a cegueira era **pior**:
+query falha, `count` vem null, vira 0, e o anti-loop conclui "sem fallback
+recente" e **para de escalar em silêncio**. Consequência comportamental, não só
+log perdido.
+
+### 17.3 — A régua não cobria nada, e foi um erro meu que provou
+
+Numa isca de controle positivo escrevi `.neq("status", 12345)` esperando que o
+`tsc` acusasse. **Não acusou.** A conclusão fácil seria "não coberto" e seguir;
+a conclusão correta foi ver que a isca **não era capaz de falhar**: sem tipos
+gerados, `supabase-js` aceita `unknown` no valor. Reiscado com um erro de tipo de
+verdade (`const id: number = params.id`), o `tsc` acusou nas duas linhas.
+
+O que isso revelou vale mais que a fatia: **nenhuma query desta fatia é coberta
+pelo typecheck.** Nome de coluna é string; coluna errada compila e só quebra em
+produção. O `tsc` verde nunca disse o que eu estava lendo dele.
+
+Fechei o buraco pelo caminho independente que existia: conferi os **25 nomes de
+coluna** usados contra `information_schema.columns`, com **dois controles
+negativos** — `wa_conversas.coluna_que_nao_existe_xyz` e `wa_mensagens.assumido_em`.
+Os dois voltaram `### AUSENTE ###`, provando que a medição sabia dizer não. Os 25
+reais vieram com tipo. De quebra, `assumido_em` ausente confirma que a migração
+`wa-atendente` continua não aplicada.
+
+O controle positivo foi feito **dentro das regiões recém-escritas**, não em
+arquivo isca descartável, sete vezes, com restauração byte a byte conferida.
+
+### 17.4 — O que está provado e o que não está
+
+**Provado.** Build real do Next: `exit 0`, sem linha de erro, com as duas rotas
+novas coletadas (`.../encerrar`, `.../responder`) e a página da thread indo de
+3,56 kB para 4,2 kB. Typecheck limpo em todos os passos, com cobertura provada
+por isca. Os 25 nomes de coluna conferidos contra o catálogo, com controle
+negativo.
+
+**Não provado — e fica escrito assim.** Que `update().neq().select()` no
+`supabase-js` devolve as linhas afetadas é semântica de runtime: o `tsc` não mede
+isso e o build também não. A idempotência do assumir/devolver/encerrar depende
+disso. Quem prova é a auditoria no preview, exercitando as rotas — e é lá que as
+queries ganham a primeira cobertura real.
+
+### 17.5 — Estado: o push está bloqueado
+
+Os 8 commits existem **só na máquina local**. `git push` devolveu `could not read
+Username for 'https://github.com': Device not configured`. O remoto é HTTPS, o
+`gh` não está instalado, e o `credential.helper` é `osxkeychain`, indisponível
+aqui. **Não vou digitar credencial** — nem que fosse pedido.
+
+Leitura do remoto funciona (`ls-remote` exit 0), e por ela a base está segura:
+`0d84a66` é ancestral de `origin/main`; o remoto só tem à frente um commit não
+relacionado (`07c1c17`, snapshot automático do estoque).
+
+Sem push não há preview, e sem preview não há auditoria — inclusive os controles
+negativos obrigatórios de deslogado e não-admin. **A fatia está pronta e parada
+nesse ponto, esperando o Emerson.**
+
+Pendências nominais que seguem bloqueadas: `AUTORIZADO: wa-touch` (trigger do
+`atualizado_em`) e `AUTORIZADO: wa-atendente` (`atendente_id`, `atendente_nome`,
+`assumido_em`, confirmados ausentes do banco). E o teste ao vivo do Caminho A
+depende da conversa `9eb5f278`, única com janela de 24h aberta.

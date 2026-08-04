@@ -93,3 +93,62 @@
   font-size: 13px;
   color: var(--text-muted);
 }
+
+/* PAINEL-WA-01 item 3 — compositor do Caminho A (responder pelo painel). */
+.compositor {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+.textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.compositorRodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.contador {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.contadorEstourado {
+  color: #f3a4a4;
+  font-weight: 600;
+}
+/* Marca de entrega na bolha: só aparece quando a Cloud API RECUSOU. Ausência
+   de marca não é promessa de entrega — é ausência de falha registrada. */
+.falha {
+  color: #f3a4a4;
+}
+
+/* PAINEL-WA-01 item 5 — Caminho B: atender no WhatsApp pessoal. Disponível
+   sem fricção, mas deliberadamente sem peso visual de botão: quem escolhe
+   este caminho está abrindo mão do histórico, e a tela não deve empurrar. */
+.transferencia {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.linkExterno {
+  color: var(--text);
+  text-decoration: underline;
+}

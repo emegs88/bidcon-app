@@ -38,6 +38,71 @@ import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
 const DEBOUNCE_MS = 8_000;
 const LOCK_TTL_MS = 2 * 60_000;
 
+// ----------------------------------------------------------------------------
+// PAINEL-WA-01, item 1 — releitura de status imediatamente antes de emitir.
+// ----------------------------------------------------------------------------
+// O gate por VALOR (job.conversaStatus, fotografado no webhook) continua
+// valendo: é barato e evita trabalho inútil. Mas entre a foto e o envio
+// passam o debounce (8s), o download/visão do anexo e a geração pela
+// Anthropic — 10 a 20 segundos em que o operador pode clicar "Assumir" no
+// painel, que é justamente quando ele clica: ao ver a conversa chegar.
+// Confiar no valor que viajou dentro do job produz agente e humano
+// respondendo juntos, o cenário que o painel existe pra impedir.
+//
+// Mesmo padrão que graph.ts:sendText já aplica pro opt_out (releitura
+// fresca no último instante) — aqui só se completa pro status. A decisão
+// "o agente deve falar?" fica no PROCESSADOR e não no transporte: o
+// transporte precisa continuar servindo o envio MANUAL do painel, que é
+// legítimo exatamente quando status='humano'.
+//
+// Falha de leitura devolve `false` (NÃO silencia), mesmo critério de
+// contarFallbacksRecentes em cerebro.ts: consulta que falhou não é
+// informação, e não pode mudar o comportamento por conta própria. Não
+// saber que virou humano é diferente de saber que virou.
+async function assumidaPorHumano(
+  db: ReturnType<typeof createXtvClient>,
+  conversaId: string
+): Promise<boolean> {
+  const { data, error } = await db
+    .from("wa_conversas")
+    .select("status")
+    .eq("id", conversaId)
+    .maybeSingle();
+  if (error || !data) {
+    console.error(
+      "[whatsapp/background] releitura de status falhou (não silencia):",
+      error?.message ?? "sem linha"
+    );
+    return false;
+  }
+  return data.status === "humano";
+}
+
+// Registra na própria thread o texto que o agente gerou e NÃO enviou porque
+// a conversa foi assumida no meio do caminho. Mensagem que some sem rastro é
+// pior que resposta duplicada: o operador precisa ver o que o agente ia
+// dizer. papel='sistema' é descartado do histórico mandado à Anthropic (ver
+// montarMensagensWa em cerebro.ts) — o texto fica visível pro humano sem
+// virar memória do modelo, isto é, sem o agente passar a agir como se
+// tivesse dito o que não disse. status_envio fica NULL de propósito: não
+// houve tentativa de envio, e null é o que toda mensagem não-enviada já usa.
+async function registrarDescarte(
+  db: ReturnType<typeof createXtvClient>,
+  conversaId: string,
+  texto: string,
+  onde: string
+): Promise<void> {
+  const { error } = await db.from("wa_mensagens").insert({
+    conversa_id: conversaId,
+    papel: "sistema",
+    conteudo: `[não enviado — conversa assumida por humano antes do envio · ${onde}]\n${texto}`,
+    agente: "descarte_handoff",
+  });
+  if (error) {
+    console.error("[whatsapp/background] falha ao registrar descarte:", error.message);
+  }
+}
+
 export type WaJob = {
   conversaId: string;
   telefone: string;
@@ -123,12 +188,24 @@ async function processarUmJob(
         job.conversaOptOut !== true &&
         job.conversaStatus !== "humano"
       ) {
-        await sendText({
-          conversaId,
-          telefone,
-          texto: resumoExtratoWa(extrato),
-          agente: "sistema_extrato",
-        });
+        // Releitura antes de emitir (item 1): entre a foto do status no
+        // webhook e este ponto passaram o download da mídia e a chamada de
+        // visão — segundos de sobra pro operador assumir.
+        const resumo = resumoExtratoWa(extrato);
+        if (await assumidaPorHumano(db, conversaId)) {
+          console.log(
+            "[whatsapp/background] resumo de extrato NÃO enviado — conversa assumida por humano",
+            JSON.stringify({ conversaId })
+          );
+          await registrarDescarte(db, conversaId, resumo, "resumo de extrato");
+        } else {
+          await sendText({
+            conversaId,
+            telefone,
+            texto: resumo,
+            agente: "sistema_extrato",
+          });
+        }
       }
     } catch (e) {
       console.error(
@@ -202,6 +279,22 @@ async function processarUmJob(
         JSON.stringify({ conversaId, temResultado: !!resultado })
       );
       if (resultado) {
+        // Releitura antes de emitir (item 1) — último instante possível:
+        // depois do debounce, depois do lock e depois da geração pela
+        // Anthropic, que é o trecho mais demorado de todos. O `return`
+        // aborta o job sem aplicar `updates` (agente_ativo / escalarHumano):
+        // se um humano assumiu, a resposta descartada não pode mexer no
+        // estado da conversa. O `finally` abaixo libera o lock de qualquer
+        // forma.
+        if (await assumidaPorHumano(db, conversaId)) {
+          console.log(
+            "[whatsapp/background] resposta NÃO enviada — conversa assumida por humano durante a geração",
+            JSON.stringify({ conversaId, agente: resultado.agenteQueRespondeu })
+          );
+          await registrarDescarte(db, conversaId, resultado.texto, "resposta do agente");
+          return;
+        }
+
         await sendText({
           conversaId,
           telefone,

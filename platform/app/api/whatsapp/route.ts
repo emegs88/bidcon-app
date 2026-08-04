@@ -72,6 +72,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { registrarMensagemSistema } from "@/lib/whatsapp/sistema";
 import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
 
 export const dynamic = "force-dynamic";
@@ -372,6 +373,31 @@ export async function POST(req: Request) {
       .select("id")
       .single();
     if (errMsg || !msgInserida) continue;
+
+    // PAINEL-WA-01 item 5 — reabertura. 'encerrado' é arquivo, não bloqueio:
+    // cliente que volta a escrever traz a conversa de volta pra fila do bot.
+    // Sem isto, o selo "Encerrada" mentiria assim que chegasse mensagem nova,
+    // porque `podeResponder` (abaixo) só exclui 'humano'.
+    //
+    // Vem DEPOIS do insert da mensagem de propósito: a reabertura é
+    // consequência do que o cliente escreveu, e a thread deve contar nessa
+    // ordem. Enquanto o botão Encerrar não existir, nada grava 'encerrado' e
+    // este ramo simplesmente nunca dispara — mudança inerte por construção.
+    if (conversa.status === "encerrado") {
+      const { error: errReabrir } = await db
+        .from("wa_conversas")
+        .update({ status: "ativo" })
+        .eq("id", conversa.id);
+      if (errReabrir) {
+        console.error("[whatsapp] falha ao reabrir conversa encerrada:", errReabrir.message);
+      } else {
+        conversa.status = "ativo";
+        await registrarMensagemSistema({
+          conversaId: conversa.id as string,
+          conteudo: "Conversa reaberta — o cliente voltou a escrever depois do encerramento.",
+        });
+      }
+    }
 
     // Fatia 4 (LGPD/opt-out) — "não quero receber" marca opt_out=true,
     // detectado em qualquer uma das 3 formas (ver ehOptOut); F2/F3 devem
