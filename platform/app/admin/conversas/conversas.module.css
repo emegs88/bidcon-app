@@ -138,3 +138,17 @@
 .falha {
   color: #f3a4a4;
 }
+
+/* PAINEL-WA-01 item 5 — Caminho B: atender no WhatsApp pessoal. Disponível
+   sem fricção, mas deliberadamente sem peso visual de botão: quem escolhe
+   este caminho está abrindo mão do histórico, e a tela não deve empurrar. */
+.transferencia {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.linkExterno {
+  color: var(--text);
+  text-decoration: underline;
+}

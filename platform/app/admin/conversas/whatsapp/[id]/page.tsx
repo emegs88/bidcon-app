@@ -101,7 +101,12 @@ export default async function AdminConversaWhatsApp({
             {conversa.status === "humano" ? "Precisa de atenção" : conversa.status}
           </Badge>
         </div>
-        <ConversaAcoes canal="whatsapp" conversaId={conversa.id} status={conversa.status} />
+        <ConversaAcoes
+          canal="whatsapp"
+          conversaId={conversa.id}
+          status={conversa.status}
+          telefone={conversa.telefone as string | null}
+        />
         <ResponderWhatsApp
           conversaId={conversa.id as string}
           assumida={conversa.status === "humano"}
