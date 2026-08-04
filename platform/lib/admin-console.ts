@@ -58,7 +58,7 @@ export async function exigirAdminConsolePagina(): Promise<{
 }
 
 export type CheckAdminConsoleApi =
-  | { ok: true; email: string }
+  | { ok: true; email: string; userId?: string }
   | { ok: false; status: 401 | 403; motivo: string };
 
 /**
@@ -74,5 +74,10 @@ export async function checarAdminConsoleApi(): Promise<CheckAdminConsoleApi> {
   if (!ehAdminConsole(user.email)) {
     return { ok: false, status: 403, motivo: "acesso restrito ao console admin" };
   }
-  return { ok: true, email: user.email as string };
+  // userId sai do proprio objeto de sessao — nao ha consulta extra, entao os
+  // 12 chamadores nao pagam latencia por um campo que so um deles usa.
+  // OPCIONAL de proposito: se a sessao nao trouxer id, devolve undefined e
+  // quem grava deixa a coluna nula. Identidade nao se inventa.
+  const uid = typeof user.id === "string" && user.id.length > 0 ? user.id : undefined;
+  return { ok: true, email: user.email as string, userId: uid };
 }

@@ -38,9 +38,42 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const supabase = createXtvClient();
+
+  // Identidade do atendente (PAINEL-WA-01 / wa-atendente).
+  // atendente_id so e preenchido se o perfil EXISTIR em profiles: a coluna tem
+  // FK e uma violacao derrubaria o assumir inteiro — o operador perderia a
+  // pausa do bot por causa de um campo de registro. Sem perfil, id fica nulo.
+  // O nome cai no e-mail autenticado, mesmo fallback de
+  // exigirAdminConsolePagina — e dado real da sessao, nao identidade inventada.
+  let atendenteId: string | null = null;
+  let atendenteNome: string | null = acesso.email ?? null;
+  if (acesso.userId) {
+    const { data: perfil, error: errPerfil } = await supabase
+      .from("profiles")
+      .select("id, nome")
+      .eq("id", acesso.userId)
+      .maybeSingle();
+    if (errPerfil) {
+      console.error(
+        "[admin/conversas/whatsapp/assumir] falha ao ler profiles (segue sem id):",
+        errPerfil.message,
+      );
+    } else if (perfil) {
+      atendenteId = (perfil.id as string) ?? null;
+      atendenteNome = (perfil.nome as string | null) ?? acesso.email ?? null;
+    }
+  }
+
+  const agora = new Date().toISOString();
   const { data: alteradas, error } = await supabase
     .from("wa_conversas")
-    .update({ status: "humano", atualizado_em: new Date().toISOString() })
+    .update({
+      status: "humano",
+      atualizado_em: agora,
+      atendente_id: atendenteId,
+      atendente_nome: atendenteNome,
+      assumido_em: agora,
+    })
     .eq("id", id)
     .neq("status", "humano")
     .select("id");
