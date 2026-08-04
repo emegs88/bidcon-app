@@ -163,7 +163,7 @@ no mesmo dia.)
 
 **Regra 9 — toda medição é suspeita até se provar CAPAZ DE FALHAR.** Antes de
 aceitar um resultado de auditoria, prove que o instrumento consegue
-discriminar. Cinco provas, todas na mesma saída:
+discriminar. Seis provas, todas na mesma saída:
 
 1. **Corpo real.** Asserção positiva que só passa se o conteúdo foi lido. Zero
    em corpo vazio é falso negativo, não aprovação.
@@ -177,6 +177,12 @@ discriminar. Cinco provas, todas na mesma saída:
 5. **Cobertura provada.** Rotas derivadas conferidas contra o que é servido de
    fato; redirect não medido é cobertura ausente. Cobertura não medida não é
    cobertura.
+6. **Medição redundante em caminho independente.** Diante de um zero, de um
+   "não" ou de qualquer ausência, meça por um segundo caminho antes de concluir.
+   Duas rotas discordando é a evidência mais barata de que uma delas está
+   quebrada; duas rotas concordando é a confirmação mais barata que existe.
+   Ausência nunca se aceita de uma leitura só quando há caminho independente
+   disponível.
 
 E o **critério de aceite se escreve por PRINCÍPIO + ALLOWLIST EXPLÍCITA**, nunca
 por lista de literais — a lista só encontra o que quem a escreveu já imaginou.
@@ -188,6 +194,15 @@ e fabricou 72 falsos positivos; `http=200` do Instagram que também respondia 20
 para um handle inexistente de 605 KB; e `/blog/` derivado com barra, que era
 redirect e ficou sem medição. O critério por literal `"Prospere Consórcios"`
 deixou 32 ocorrências vivas em produção. Norma fixada por Emerson.)
+
+(Item 6 acrescentado em 03/08, SELO-CSP-01. Origem em §15.4: ler o header com
+`.get('content-security-policy')` num dicionário que preserva a capitalização
+original devolve vazio, e o vazio passou por medição — dois blocos da mesma
+saída discordando sobre a MESMA rota foi o que denunciou. Um acesso que erra a
+chave devolve AUSÊNCIA, não erro. E fora do repo, o mesmo modo: um fetch de
+bidcon.com.br devolveu a página anterior à fatia, servida de cache, e quase
+virou o relato de que o deploy não havia subido; o que desmentiu foi consultar
+a Vercel, fonte independente. Norma fixada por Emerson.)
 
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full

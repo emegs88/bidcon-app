@@ -1204,3 +1204,63 @@ A 16ª é `/bidcon` — 308, inauditável por construção (§13.11).
 
 Correção no ar. **Pendente de confirmação visual do Emerson no navegador** — é o
 único critério que este agente não consegue medir.
+
+---
+
+## 16 — Regra 9 ganha o sexto item: medição redundante (03/08)
+
+**Ditado por Emerson.** Item 6 acrescentado à Regra 9 no `CLAUDE.md`.
+
+> **Medição redundante em caminho independente.** Diante de um zero, de um "não"
+> ou de qualquer ausência, meça por um segundo caminho antes de concluir. Duas
+> rotas discordando é a evidência mais barata de que uma delas está quebrada;
+> duas rotas concordando é a confirmação mais barata que existe. Ausência nunca
+> se aceita de uma leitura só quando há caminho independente disponível.
+
+### 16.1 — Uma linha modificada, declarada antes de gravar
+
+A seção de regras do `CLAUDE.md` é append-only. Esta edição **quebra isso em uma
+linha**, deliberadamente e com aviso prévio: `"Cinco provas"` → `"Seis provas"`.
+Manter "Cinco" acima de seis itens seria deixar no arquivo de normas o mesmo
+defeito que a fatia CONTATO-01 corrigiu no site — duas afirmações contraditórias
+no mesmo documento.
+
+Diff medido: **16 inserções, 1 deleção**, e a única linha removida é a da
+contagem. A nota de origem dos cinco modos foi preservada intacta, porque é
+registro histórico do que aconteceu na CONSISTENCIA-01; o item 6 recebeu nota de
+origem própria.
+
+### 16.2 — As duas ocorrências que motivaram
+
+**Dentro do repo (§15.4, medida por mim).** `.get('content-security-policy')` num
+dicionário que preserva a capitalização original devolve vazio. O vazio passou
+por medição: o relatório teria dito que o `style-src` não tinha `s3`, com o
+header correto sendo servido. O que denunciou foi a mesma saída conter dois
+blocos que mediam a MESMA rota e discordavam.
+
+**Fora do repo (relato de Emerson).** Um fetch de `bidcon.com.br` devolveu a
+página **anterior à fatia**, servida de cache. Estava a um passo de virar o
+relato de que o deploy não havia subido — uma afirmação falsa construída sobre
+uma leitura verdadeira. O que desmentiu foi consultar a Vercel: **fonte
+independente**, não uma segunda tentativa do mesmo caminho.
+
+Os dois casos têm a mesma forma. O instrumento não erra: ele responde. O que
+falha é a inferência de que a resposta descreve o sistema, quando descreve
+apenas o caminho até ele — a chave usada, o cache atravessado, o intermediário
+que respondeu no lugar.
+
+### 16.3 — O que muda na prática
+
+Repetir o mesmo comando não é redundância; é a mesma leitura duas vezes.
+Redundância exige **caminho independente**: outro protocolo, outro campo, outra
+fonte, outro nível da pilha. Header contra corpo. Fetch contra API da Vercel.
+Parse contra string. Disco contra sitemap.
+
+E a assimetria que justifica o custo: um "sim" costuma trazer o conteúdo junto,
+que é evidência em si. Um "não" não traz nada — é indistinguível de não ter
+perguntado. Por isso a regra incide sobre a ausência, não sobre a presença.
+
+### 16.4 — Estado
+
+`CLAUDE.md` com 9 regras, Regra 9 com 6 itens. Pendente apenas a confirmação
+visual do selo pelo Emerson (§15.6).
