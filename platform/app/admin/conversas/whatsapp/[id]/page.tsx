@@ -1,5 +1,10 @@
-// /admin/conversas/whatsapp/[id] — thread somente leitura de wa_mensagens +
-// ações Assumir/Devolver. Mesmo gate/dados do resto de /admin/conversas.
+// /admin/conversas/whatsapp/[id] — thread de wa_mensagens + ações
+// Assumir/Devolver + envio pelo painel (PAINEL-WA-01 item 3). Mesmo
+// gate/dados do resto de /admin/conversas.
+//
+// A janela de 24h é calculada AQUI, no servidor, a partir da última mensagem
+// DO CLIENTE — resposta nossa não reabre janela nenhuma. O componente recebe
+// o resultado pronto: relógio de navegador não decide regra da Meta.
 import { notFound } from "next/navigation";
 import { exigirAdminConsolePagina } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
@@ -8,6 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ConversaAcoes } from "../../ConversaAcoes";
+import { ResponderWhatsApp } from "../../ResponderWhatsApp";
 import styles from "../../conversas.module.css";
 
 export const dynamic = "force-dynamic";
@@ -51,15 +57,33 @@ export default async function AdminConversaWhatsApp({
 
   const { data: mensagens } = await supabase
     .from("wa_mensagens")
-    .select("id, papel, conteudo, agente, criado_em")
+    .select("id, papel, conteudo, agente, criado_em, status_envio, erro")
     .eq("conversa_id", conversa.id)
     .order("criado_em", { ascending: true });
+
+  // Janela de 24h: medida da última mensagem DO CLIENTE. `mensagens` já está em
+  // ordem crescente, então o último 'cliente' do array é o marco — evita uma
+  // segunda ida ao banco pra buscar o que já está na memória.
+  const JANELA_MS = 24 * 60 * 60 * 1000;
+  const ultimaCliente = [...(mensagens ?? [])]
+    .reverse()
+    .find((m) => m.papel === "cliente");
+  const marco = ultimaCliente?.criado_em
+    ? new Date(ultimaCliente.criado_em as string).getTime()
+    : null;
+  const janelaAberta = marco !== null && Date.now() - marco < JANELA_MS;
+  const janelaTexto =
+    marco === null
+      ? "Esta conversa não tem mensagem do cliente — a janela de 24h nunca abriu."
+      : janelaAberta
+        ? `Janela de 24h aberta até ${dataHora(new Date(marco + JANELA_MS).toISOString())}.`
+        : `Janela de 24h fechada desde ${dataHora(new Date(marco + JANELA_MS).toISOString())}.`;
 
   return (
     <AppShell nome={nome} equipeAdminConsole>
       <PageHeader
         title={conversa.nome || conversa.telefone}
-        subtitle="Canal WhatsApp — thread completa, somente leitura."
+        subtitle="Canal WhatsApp — thread completa. Assuma a conversa para responder por aqui."
         backHref="/admin/conversas"
         backLabel="Conversas"
       />
@@ -78,6 +102,13 @@ export default async function AdminConversaWhatsApp({
           </Badge>
         </div>
         <ConversaAcoes canal="whatsapp" conversaId={conversa.id} status={conversa.status} />
+        <ResponderWhatsApp
+          conversaId={conversa.id as string}
+          assumida={conversa.status === "humano"}
+          optOut={conversa.opt_out === true}
+          janelaAberta={janelaAberta}
+          janelaTexto={janelaTexto}
+        />
       </Card>
 
       <ul className={styles.thread}>
@@ -87,6 +118,12 @@ export default async function AdminConversaWhatsApp({
             <span className={styles.bolhaMeta}>
               {m.papel}
               {m.agente ? ` · ${m.agente}` : ""} · {dataHora(m.criado_em as string)}
+              {m.status_envio === "falha" ? (
+                <span className={styles.falha}>
+                  {" "}
+                  · não entregue{m.erro ? `: ${String(m.erro)}` : ""}
+                </span>
+              ) : null}
             </span>
           </li>
         ))}
