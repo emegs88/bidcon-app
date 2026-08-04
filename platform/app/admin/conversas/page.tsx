@@ -28,7 +28,11 @@ type LinhaConversa = {
   nome: string | null;
   telefone: string | null;
   status: string;
-  atualizado_em: string;
+  /** Momento da última atividade REAL da conversa — ordena a lista e é o que
+   *  a tela mostra. `fonteAtividade` diz de onde veio: as duas fontes não
+   *  sabem a mesma coisa, e a tela tem de dizer qual está exibindo. */
+  ultimaAtividade: string;
+  fonteAtividade: "mensagem" | "registro";
 };
 
 function dataHora(v: string | null): string {
@@ -64,8 +68,7 @@ export default async function AdminConversas({
   const [{ data: waConversas }, { data: conversas }] = await Promise.all([
     supabase
       .from("wa_conversas")
-      .select("id, telefone, nome, status, atualizado_em")
-      .order("atualizado_em", { ascending: false }),
+      .select("id, telefone, nome, status, atualizado_em"),
     supabase
       .from("conversas")
       .select("id, interesse_id, status, atualizado_em")
@@ -80,14 +83,51 @@ export default async function AdminConversas({
     : { data: [] as { id: string; nome: string; telefone: string }[] };
   const interesseMap = new Map((interesses ?? []).map((i) => [i.id, i]));
 
-  const linhasWa: LinhaConversa[] = (waConversas ?? []).map((c) => ({
-    id: c.id as string,
-    canal: "whatsapp",
-    nome: c.nome as string | null,
-    telefone: c.telefone as string | null,
-    status: c.status as string,
-    atualizado_em: c.atualizado_em as string,
-  }));
+  // PAINEL-WA-01, item 2 — wa_conversas.atualizado_em NÃO avança com mensagem
+  // nova. `conversas` (site) tem o trigger `conversas_touch`; wa_conversas não
+  // tem trigger nenhum — medido em pg_trigger, não no comentário do código.
+  // Na prática o campo guarda a hora de CRIAÇÃO com nome de atualização: em
+  // 04/08/2026 a conversa 9eb5f278 carimbava 15/07 23:44 tendo mensagem de
+  // 04/08 09:43 — 19,42 dias de mentira, 64 mensagens. Ordenar e rotular por
+  // ele faz o painel errar justamente o dado que o operador usa pra priorizar:
+  // ele rola até o fim procurando o que deveria estar no topo.
+  //
+  // Aqui a última atividade é DERIVADA de max(wa_mensagens.criado_em). Quando
+  // o trigger equivalente for autorizado (wa-touch), o campo passa a ser
+  // verdadeiro e esta derivação deixa de ser a única fonte pra virar a
+  // segunda — dois caminhos concordando, que é o desenho desejado e não
+  // redundância desperdiçada.
+  //
+  // LIMITE_MSGS impede a página de crescer sem teto. As mensagens vêm em ordem
+  // decrescente, então a PRIMEIRA ocorrência de cada conversa já é o máximo
+  // dela. Conversa antiga o bastante pra cair fora do teto fica sem derivação
+  // — e a tela DIZ isso, em vez de exibir o carimbo errado fingindo ser a hora
+  // da última mensagem.
+  const LIMITE_MSGS = 5000;
+  const { data: msgsRecentes } = await supabase
+    .from("wa_mensagens")
+    .select("conversa_id, criado_em")
+    .order("criado_em", { ascending: false })
+    .limit(LIMITE_MSGS);
+
+  const ultimaMsgWa = new Map<string, string>();
+  for (const m of msgsRecentes ?? []) {
+    const cid = m.conversa_id as string;
+    if (!ultimaMsgWa.has(cid)) ultimaMsgWa.set(cid, m.criado_em as string);
+  }
+
+  const linhasWa: LinhaConversa[] = (waConversas ?? []).map((c) => {
+    const derivada = ultimaMsgWa.get(c.id as string);
+    return {
+      id: c.id as string,
+      canal: "whatsapp" as const,
+      nome: c.nome as string | null,
+      telefone: c.telefone as string | null,
+      status: c.status as string,
+      ultimaAtividade: derivada ?? (c.atualizado_em as string),
+      fonteAtividade: derivada ? ("mensagem" as const) : ("registro" as const),
+    };
+  });
   const linhasSite: LinhaConversa[] = (conversas ?? []).map((c) => {
     const interesse = c.interesse_id ? interesseMap.get(c.interesse_id as string) : null;
     return {
@@ -96,12 +136,13 @@ export default async function AdminConversas({
       nome: interesse?.nome ?? null,
       telefone: interesse?.telefone ?? null,
       status: c.status as string,
-      atualizado_em: c.atualizado_em as string,
+      ultimaAtividade: c.atualizado_em as string,
+      fonteAtividade: "registro" as const,
     };
   });
 
   const todas = [...linhasWa, ...linhasSite].sort(
-    (a, b) => new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime(),
+    (a, b) => new Date(b.ultimaAtividade).getTime() - new Date(a.ultimaAtividade).getTime(),
   );
 
   const filtroCanal =
@@ -184,7 +225,10 @@ export default async function AdminConversas({
                       <span className={styles.nomeLead}>{l.nome ?? l.telefone ?? "Sem nome"}</span>
                     </div>
                     <span className={styles.meta}>
-                      {l.telefone ?? "—"} · atualizado em {dataHora(l.atualizado_em)}
+                      {l.telefone ?? "—"} ·{" "}
+                      {l.fonteAtividade === "mensagem"
+                        ? `última mensagem em ${dataHora(l.ultimaAtividade)}`
+                        : `registro criado/atualizado em ${dataHora(l.ultimaAtividade)}`}
                     </span>
                   </div>
                   <Badge tone={info.tone}>{info.label}</Badge>
