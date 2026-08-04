@@ -1414,3 +1414,159 @@ Pendências nominais que seguem bloqueadas: `AUTORIZADO: wa-touch` (trigger do
 `atualizado_em`) e `AUTORIZADO: wa-atendente` (`atendente_id`, `atendente_nome`,
 `assumido_em`, confirmados ausentes do banco). E o teste ao vivo do Caminho A
 depende da conversa `9eb5f278`, única com janela de 24h aberta.
+
+## 18 — PAINEL-WA-01 fecha em produção: DDL, o push destravado por SSH, e o que ficou sem prova (04/08)
+
+### 18.1 — O que foi aplicado no banco
+
+Dois DDLs, cada um sob token nominal do Emerson.
+
+`wa_touch_atualizado_em`. `atualizado_em` era mantida à mão por cada rota; quem
+esquecesse deixaria a lista mentindo sobre a última atividade. **A convenção não
+veio da minha memória:** li as funções já existentes e copiei o padrão da casa —
+`<tabela>_touch` BEFORE UPDATE chamando `tg_<tabela>_touch()`, todas com
+`SET search_path TO ''`. Eu teria omitido o search_path escrevendo de cabeça.
+
+Provado **por comportamento, não por catálogo**: um bloco DO atualizou uma linha
+sem tocar em `atualizado_em`, e um RAISE EXCEPTION carregou a medição para fora
+forçando rollback — `antes=2026-07-16 … depois=2026-08-04 … DISPAROU=t`, com
+`inalterada=true` na leitura seguinte. A prova não deixou resíduo. Sem backfill:
+corrigir linhas antigas seria inventar história que ninguém mediu.
+
+`wa_atendente_campos_handoff`. `atendente_id uuid references profiles(id) on
+delete set null`, `atendente_nome text`, `assumido_em timestamptz`. A FK aponta
+para `profiles` e não para `auth.users` porque **nenhuma tabela do public
+referencia auth.users diretamente** nesta base; precedente exato:
+`interesses.atendido_por`. Descoberto por reconhecimento, não suposto.
+
+### 18.2 — As colunas nasceram MORTAS, e isso foi dito na hora
+
+Criadas, nada as preenchia: `checarAdminConsoleApi()` devolvia só `{ok, email}`.
+Registrei como coluna morta em vez de fingir entrega.
+
+Decisão do Emerson: gate **aditivo**, `userId?: string` no braço `ok:true`.
+Exigências dele, cumpridas e medidas:
+
+- **Nenhum chamador quebra:** 12 call sites, **zero desestruturação** — todos
+  `const acesso = await checarAdminConsoleApi()`. Medido por leitura dirigida,
+  não suposto.
+- **Typecheck com controle positivo DENTRO do gate:** tsc limpo PASSOU; com isca
+  em `admin-console.ts:82` (dentro da própria função) e em `assumir/route.ts:68`,
+  FALHOU nominalmente nas duas; restaurado, **sha256 idêntico byte a byte**;
+  PASSOU de novo. Sem o passo do meio, o primeiro verde não valeria nada.
+- **Identidade não se inventa:** sessão sem id devolve `undefined` e a coluna
+  fica nula.
+
+**Perigo encontrado antes de morder:** `atendente_id` tem FK. Um admin sem linha
+em `profiles` causaria violação e derrubaria o *Assumir inteiro* — o operador
+perderia a pausa do bot por causa de um campo de registro. O id só é gravado se o
+perfil existir; o nome cai no e-mail autenticado, dado real da sessão.
+
+`devolver` e `encerrar` **não foram tocados**, por decisão do Emerson: "status já
+responde quem está nela agora; a coluna existe para responder quem assumiu.
+Zerar destrói a única informação que ela guarda."
+
+### 18.3 — O push estava bloqueado, e não foi credencial que resolveu
+
+`could not read Username for 'https://github.com'`. Não pedi nem digitei senha.
+Medi o que já existia: `ssh -T git@github.com` respondeu `Hi emegs88!`. Push por
+URL SSH explícita, **sem alterar o config do repositório**. Efeito colateral
+registrado: `origin/main` local ficou desatualizado, então `@{u}` virou régua
+mentirosa e foi descartado em favor de `ls-remote`.
+
+### 18.4 — Publicado em produção SEM auditoria de runtime, por decisão explícita
+
+Ofereci três caminhos; o Emerson escolheu nominalmente o merge em main, cujo
+texto dizia "SEM auditoria de runtime". A objeção foi feita uma vez; a decisão
+foi dele.
+
+Antes do merge, o que dava para provar sem sessão: build exit 0 com controle
+negativo, e as 4 rotas em 401 com **corpo real da app**. Esse segundo ponto quase
+virou relatório fictício: no preview o 401 vinha do **SSO da Vercel**, não do meu
+portão — corpo que não é o corpo real, modo 1 da Regra 9. Refeito com URL de
+bypass e cookie jar até sair `{"erro":"não autenticado"}` da própria app, contra
+`404` na rota isca.
+
+### 18.5 — Teste vivo, feito pelo Emerson em produção
+
+`Assumir` gravou a mensagem `sistema` **uma única vez** (msg 98) e o envio pelo
+painel gravou `papel: humano` (msg 99). Itens 3 e 4 provados por comportamento —
+única régua que existia para eles, já que o tsc não cobre query nenhuma desta
+fatia. As colunas `atendente_*` vieram nulas nesse teste porque o commit do gate
+ainda não estava publicado: explicação, não mistério.
+
+### 18.6 — NÃO PROVADO: a lista honesta
+
+- **Controle negativo de não-admin.** Só o deslogado foi medido. Um usuário
+  autenticado fora da allowlist deveria parar no 403, e ninguém verificou. Exige
+  uma sessão que não temos, e **não se força**. Caminhos, do mais barato ao mais
+  arriscado: (a) logar com um segundo e-mail que **não** esteja na allowlist e
+  abrir uma rota admin — se vier 403 com corpo da app, fecha; (b) remover
+  temporariamente o próprio e-mail da allowlist, medir, e repor — deixa o painel
+  sem dono por alguns segundos, em produção; (c) permanecer aberto e declarado.
+  Nenhuma delas eu executo sozinho: (a) depende de sessão humana, (b) mexe em
+  controle de acesso em produção.
+- **Que `update().neq().select()` devolve as linhas afetadas.** Semântica de
+  runtime do supabase-js, e a idempotência de assumir/devolver/encerrar depende
+  dela. A msg 98 aparecendo uma vez só é indício forte, não prova fechada.
+- **Devolver** — o bot voltar a responder é o que fecha o item 1, a releitura de
+  status. Não medido.
+- **Entrega da msg 99 no aparelho.** Depende do WhatsApp; fora do alcance.
+- **`GET /api/whatsapp` = 403.** Medido depois do deploy, nunca antes. Não posso
+  afirmar que está inalterado, só que está assim.
+
+### 18.7 — A Regra 7 apareceu três vezes nesta fatia
+
+Todas pegas antes de virarem relatório, todas do mesmo tipo: comando quebrado
+devolvendo resultado plausível.
+
+1. `git status` imprimindo vazio seguido do meu próprio eco "(vazio acima =
+   worktree limpo)". O diretório havia revertido sozinho e **todos** os git
+   tinham errado. Corrigido com `git -C <abs>` e marcadores de fim.
+2. `PUSH exit=` e `BUILD exit=` saindo **vazios**: a captura de `$?` quebrou
+   depois de pipe. Substituído por veredito explícito com controle negativo
+   (`false` → FALHOU), provando que a régua rejeita.
+3. As quebras de linha de um bloco inteiro se perderam e o shell recebeu tudo
+   como um comando só — `(eval):cd:1: too many arguments`. **Apareceu na tela um
+   `RESULTADO=BUILD_FALHOU` que não era o build falhando: era lixo.** O build
+   nunca rodou. Refeito por arquivo de script, com `EXIT_CODE=0` de verdade.
+
+E uma quarta, ao gravar esta própria seção: a asserção de âncora usou
+`t.count("## 17")`, que conta substring — `### 17.1` também casa. Deu 6 e
+abortou. Reescrita para `^## 17` por início de linha, deu **AUSENTE** — e o §17
+existe. O formato da casa é `## N — Título (data)`, com travessão e sem ponto.
+Duas réguas erradas seguidas, ambas **falhando para o lado seguro**: nenhuma
+gravou nada. É o comportamento que se quer de uma asserção pré-escrita.
+
+Lição gravada: **eco meu não é medição.** Se a frase que interpreta o resultado
+foi escrita por mim e não pelo instrumento, ela não prova nada.
+
+### 18.8 — Fatias abertas na fila
+
+**LEADS-WA-01** (ditada pelo Emerson) — botão de contato por WhatsApp na lista de
+leads: link interno quando a conversa existe, `wa.me` com aviso de saída do
+histórico quando não existe. A medição prévia que ele exigiu **antes** de
+escrever já está feita:
+
+- 37 leads, **todos** com telefone utilizável (≥8 dígitos).
+- **6 conversas na base inteira.**
+- **2 leads casam** pela regra dos últimos 8 dígitos. 35 vão para o `wa.me`.
+- 0 ambíguos; controle negativo 0; controle positivo 37.
+- **`wa_conversas.interesse_id` existe e está 100% vazia.** Eu ia usá-la como
+  caminho independente (Regra 9, item 6). Medi a causa antes de concluir: se
+  tivesse lido "0 por interesse_id contra 2 por telefone" como divergência,
+  teria inventado um problema. É régua muda, não contradição — **e fica
+  registrado que o casamento por telefone segue sem corroboração de segunda
+  rota.**
+- Pendente antes de escrever: colisão de sufixo. `11 98115-0213` e
+  `21 98115-0213` têm os mesmos 8 finais e são pessoas diferentes. Entregar um
+  "Abrir conversa" que leva à thread de outra pessoa é pior que não entregar.
+
+**Dois achados abertos, ainda não investigados:**
+
+- Markup `[[CARTA]]` / `[[OPCOES]]` aparecendo **cru** na thread do site. Falta
+  medir o essencial: **o cliente também vê**, ou só vaza no painel? A resposta
+  muda a severidade de cosmética para exposição.
+- **Todos os leads em "Novo" desde 29/07.** Duas causas incompatíveis: fluxo
+  acontecendo fora do painel, com o status nunca avançando; ou lead não
+  atendido. Não dá para escolher entre elas sem medir, e a segunda é a cara.
