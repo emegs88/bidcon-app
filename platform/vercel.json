@@ -8,6 +8,10 @@
     {
       "path": "/api/backfill-embeddings",
       "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/sentinela/varredura",
+      "schedule": "0 12,18 * * *"
     }
   ]
 }

@@ -529,6 +529,23 @@ function contextoVercelSuportaWaitUntil(): boolean {
 // normalizarTexto().
 const TEXTO_BOTAO_OPT_OUT = "não quero receber";
 
+// SENTINELA-01 (04/08/2026): o template de reativação instrui "responda
+// SAIR" — palavras universais de descadastro digitadas livremente também
+// marcam opt-out. Só valem em text.body como mensagem INTEIRA (após
+// normalizarTexto), o que zera falso positivo com frases longas tipo
+// "quero sair do consórcio". "cancelar" fica DE FORA de propósito: colide
+// com cancelamento de reserva no meio do fluxo. Variante sem acento
+// incluída porque normalizarTexto não remove acento.
+const PALAVRAS_OPT_OUT = new Set([
+  TEXTO_BOTAO_OPT_OUT,
+  "nao quero receber",
+  "sair",
+  "parar",
+  "pare",
+  "stop",
+  "descadastrar",
+]);
+
 /** trim + lowercase + remove aspas/pontuação nas pontas (ex.: `"Não quero
  *  receber."` → `não quero receber`), pra comparação tolerante a variações
  *  de digitação/formatação que a Meta ou o cliente podem introduzir. */
@@ -543,16 +560,16 @@ function normalizarTexto(s: string): string {
  *  chegar: quick reply de TEMPLATE de marketing (messages[].type="button",
  *  texto em button.text), quick reply de mensagem interativa comum
  *  (interactive.button_reply.title) e texto digitado livremente
- *  (text.body), já que o cliente pode simplesmente escrever a frase. */
+ *  (text.body). Botões continuam por igualdade exata com o título do
+ *  quick reply; texto digitado aceita também as PALAVRAS_OPT_OUT
+ *  (SENTINELA-01 — o template promete "responda SAIR"). */
 function ehOptOut(m: MensagemMeta): boolean {
-  const candidatos = [
-    m.button?.text,
-    m.interactive?.button_reply?.title,
-    m.text?.body,
-  ];
-  return candidatos.some(
-    (c) => !!c && normalizarTexto(c) === TEXTO_BOTAO_OPT_OUT
-  );
+  const botoes = [m.button?.text, m.interactive?.button_reply?.title];
+  if (botoes.some((c) => !!c && normalizarTexto(c) === TEXTO_BOTAO_OPT_OUT)) {
+    return true;
+  }
+  const texto = m.text?.body;
+  return !!texto && PALAVRAS_OPT_OUT.has(normalizarTexto(texto));
 }
 
 /** Extrai o array de `messages` do envelope `entry[].changes[].value.messages`
