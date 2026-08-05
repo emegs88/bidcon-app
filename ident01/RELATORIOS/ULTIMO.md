@@ -1802,3 +1802,127 @@ A parte de ESCRITA (leads-status) fica retida ate medir:
   - as policies de UPDATE de interesses e qual cliente a rota usa.
 
 Sem essas duas, escrever seria apostar que a FK passa e que a RLS deixa.
+
+## 21 — ACESSO-01: dois projetos com nomes trocados, e as duas frentes de código escritas (05/08/2026)
+
+### 21.1 — Correção da §20: eu medi o projeto errado
+
+A §20 fica onde está — canal é append-only, erro apagado é erro que volta. Mas ela
+precisa ser lida com esta correção grudada.
+
+Quando escrevi "`profiles` tem 1 linha" e "`auth.users` tem 4", eu estava medindo o
+projeto `xtvjpnyadcdeadhmzyff`. Não é onde as pessoas criam conta. Os números estão
+certos; a conclusão que eles sugeriam — "quase ninguém tem perfil" — estava errada.
+
+No projeto onde o cadastro realmente acontece são 21 usuários e 21 perfis. Nenhum órfão.
+O trigger funciona.
+
+### 21.2 — A armadilha: o projeto chamado `-prod` não é o de produção
+
+| variável de ambiente | ref do projeto | nome no painel Supabase | o que vive lá |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | `nnvjeijsrwpzsggwqpcu` | `bidcon-plataforma` | **auth de verdade**, `profiles`, `vendas_novas` |
+| `BIDCON_XTV_URL` | `xtvjpnyadcdeadhmzyff` | `bidcon-plataforma-**prod**` | `interesses`, `wa_conversas` |
+
+O projeto com `-prod` no nome **não** é onde a produção autentica. Quem abrir o painel
+procurando "o de produção" vai medir o lado errado — foi exatamente o que eu fiz.
+
+Prova de que são dois: o e-mail `eme.santos123@gmail.com` existe nos dois com **id
+diferente em cada um**.
+
+### 21.3 — Consequência: a FK do autor é cross-project
+
+`interesses.atendido_por` e `wa_conversas.atendente_id` apontam para `profiles(id)` **do
+xtv**. O id da sessão de quem opera o painel vem do **nnv**. São universos de id
+diferentes.
+
+Isso não é teoria: significa que a guarda do `wa-atendente` nunca preenche em produção.
+Ela procura no xtv um id que só existe no nnv, não acha, e grava nulo. Sem erro, sem
+aviso. O registro de quem atendeu simplesmente não acontece.
+
+Por isso o autor terá de ser gravado **por e-mail**, não por id. O e-mail é a única
+chave que atravessa os dois projetos.
+
+### 21.4 — ACESSO-01: o quadro medido
+
+Emerson reportou usuários travados depois de criar conta. O que se mediu:
+
+- O trigger `on_auth_user_created` existe, está ativo (`tgenabled=O`), é `SECURITY
+  DEFINER` com `search_path='public'` e insere em `profiles` com `on conflict do
+  nothing`. **O buraco não é o trigger.**
+- Contas paradas sem confirmar o e-mail, reais: `ys937132@gmail.com` (31/07),
+  `viniciusmoreira192@gmail.com` (22/07), `roberthdeocleciano@gmail.com` (13/07). Mais
+  a conta de teste `teste.verificacao.bidcon@gmail.com` (07/07).
+- Caso à parte: `rafacruz2321@gmail.com` (17/07) — confirmou e mesmo assim nunca entrou.
+  Compatível com o defeito 2 abaixo.
+
+### 21.5 — Defeito 1: o login era mudo
+
+`app/login/page.tsx` colapsava **todo** erro do `signInWithPassword` numa única frase:
+"E-mail ou senha incorretos."
+
+Quem não confirmou o e-mail recebia essa frase. Lia como senha errada. Trocava a senha.
+Recebia a mesma frase. Trocava de novo. O sistema tinha a informação certa na mão — o
+Supabase devolve `email_not_confirmed` — e jogava fora antes de mostrar.
+
+Não é um erro de lógica. É um erro de honestidade: a tela dizia uma coisa que não era a
+verdade que o sistema conhecia.
+
+### 21.6 — Defeito 2: o callback engolia o erro
+
+`app/auth/callback/route.ts` fazia `await supabase.auth.exchangeCodeForSession(code)` e
+seguia para o redirect de sucesso **de qualquer jeito**. Retorno ignorado.
+
+Link expirado, link já usado, código inválido: os três aterrissavam o usuário na home
+sem sessão e sem uma palavra. Visualmente idêntico a ter dado certo. Ele clica no link
+que pediu, chega numa página que parece certa, e não está logado.
+
+### 21.7 — O que foi escrito (frentes 2 e 3)
+
+Autorizado pelo Emerson. Duas frentes de código; a terceira (SMTP) é configuração de
+painel e é mão dele.
+
+| arquivo | + | − | sha256 antes → depois |
+|---|---|---|---|
+| `app/login/page.tsx` | 77 | 2 | `242eb1b4…` → `afb4c40b…` |
+| `app/auth/callback/route.ts` | 14 | 1 | `d54f6225…` → `17470aeb…` |
+
+Frente 2: o caso `email_not_confirmed` passa a ser distinguido e ganha botão "Reenviar
+confirmação" (`supabase.auth.resend`), com o retorno conferido — se o reenvio falhar, a
+tela diz que falhou, não diz "enviado". Qualquer outro erro **continua** virando "E-mail
+ou senha incorretos": mensagem crua de terceiro não vaza pro usuário.
+
+Frente 3: o retorno do `exchangeCodeForSession` passa a ser capturado. Em erro, log no
+servidor e redirect para `/login?erro=link-expirado`, onde a tela mostra o motivo e o
+mesmo botão de reenvio.
+
+**Divergência declarada:** foi pedido detectar por `error.message`. Detecto por
+`error.code === "email_not_confirmed"` primeiro, mensagem como reserva. String de
+terceiro muda sem aviso e a régua morreria muda; o code é o contrato estável.
+
+### 21.8 — O que NÃO está provado
+
+Isto é o que impede esta seção de ser um relatório de vitória:
+
+- **Não passou por typecheck nem por build.** Contei ocorrências com `grep`. Grep não
+  compila nada.
+- **O caminho de erro não foi exercido vivo.** A conta
+  `teste.verificacao.bidcon@gmail.com` existe justamente pra isso, e o teste é no
+  preview, antes da produção.
+- **SMTP: NÃO MEDIDO.** O e-mail de confirmação quem dispara é o Auth do Supabase, não
+  código nosso. Se o SMTP não estiver configurado, as duas frentes acima funcionam
+  perfeitamente e ninguém recebe e-mail nenhum. O conserto de verdade mora no painel.
+- **As três contas reais paradas continuam paradas** depois deste conserto. Ele impede
+  novos travados; não destrava os antigos. Reenviar ou confirmar na mão é decisão do
+  Emerson.
+
+### 21.9 — Regra 7 pela quinta vez, e a mais perigosa até agora
+
+Um comando com `--include=*.ts` sem aspas foi abortado pelo zsh (`no matches found`) e
+dois blocos de busca simplesmente não rodaram. A saída veio vazia.
+
+Vazio ali significava "não há tratamento de confirmação de e-mail no código" — que era
+justamente a conclusão plausível que eu estava a caminho de escrever. O comando quebrado
+não mentiu: ele calou, e o silêncio se parecia com uma resposta.
+
+Régua morta com resultado plausível é o pai do relatório fictício sem mentira.
