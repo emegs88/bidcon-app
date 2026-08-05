@@ -82,7 +82,13 @@ export async function POST(req: Request) {
     `Nome:      ${nome}`,
     `E-mail:    ${email}`,
     `Telefone:  ${telefone}`,
-    `Status:    ${(r.status ?? "").trim() || "(sem status)"}`,
+    // NOTA: linha fixa de propósito. O webhook dispara no INSERT de profiles,
+    // que ocorre no instante do cadastro — nesse momento a confirmação está
+    // sempre pendente, então ler auth.users devolveria "pendente" em 100% dos
+    // casos e inauguraria leitura privilegiada nesta rota sem ganho nenhum.
+    // Revisar se entrar login OAuth (Google), que chega já confirmado, ou se
+    // algum fluxo admin passar a inserir profile de usuário já confirmado.
+    "Confirmação de e-mail: pendente — lembrete automático em 24h se o cliente não clicar.",
     `ID:        ${(r.id ?? "").trim() || "(sem id)"}`,
     "",
     "Aviso interno automático. Não responda a este e-mail.",
