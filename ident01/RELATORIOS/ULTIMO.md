@@ -1734,3 +1734,71 @@ se houver linha, senao deixa nulo e registra o nome onde couber.
   - Entrega da mensagem 99 no aparelho.
   - Semantica de runtime do update().neq().select().
   - GET /api/whatsapp 403 nunca medido antes do deploy.
+
+
+## 20 — Pre-escrita da LEADS-WA-01: CHECK, FK e o autor sem lugar (04/08/2026)
+
+Medicao exigida antes de qualquer escrita, conforme a autorizacao leads-status.
+
+### 20.1 — status nao e enum: e CHECK
+
+  a_col_status = text / udt=text / nullable=NO / default='novo'::text
+  d_enum_valores = ### NAO E TIPO ENUM ###
+  interesses_status_check :: CHECK ((status = ANY (ARRAY['novo','em_atendimento','convertido','descartado'])))
+  g_status_distintos = novo = 37
+  c_CONTROLE_NEGATIVO_col_inexistente = ### AUSENTE ###
+
+Armadilha registrada: a consulta a pg_enum devolveu vazio. Vazio ali NAO significa
+"sem restricao" — significa que a restricao mora em outro lugar. Se eu tivesse
+parado na primeira regua, teria concluido que qualquer texto serve e escrito
+"em atendimento" com espaco, tomando 400 em producao. Foi o segundo caminho
+(pg_constraint) que trouxe os valores.
+
+Valores validos: novo | em_atendimento | convertido | descartado.
+O transito da fatia e novo -> em_atendimento.
+
+### 20.2 — atendido_por E FK para profiles
+
+  b_col_atendido_por = uuid / nullable=YES
+  interesses_atendido_por_fkey :: FOREIGN KEY (atendido_por) REFERENCES profiles(id) ON DELETE SET NULL
+  h_atendido_por_preenchidos = 0
+  i_profiles_total = 1
+
+Confirmado o que a autorizacao previa. Vale a mesma regra do atendente_id da
+PAINEL-WA-01: so grava o id se houver linha em profiles; senao, nulo.
+
+Agravante novo: profiles tem UMA linha. Se o id do gate nao for exatamente essa
+linha, a FK derruba o UPDATE — e como o leads-status escreve em TODAS as linhas do
+grupo, cairiam N linhas juntas, nao uma.
+
+### 20.3 — Nao ha onde registrar o nome do autor
+
+  j_profiles_colunas = id, nome, telefone, email, tipo, status, criado_em
+
+Em wa_conversas existia atendente_nome como plano B quando o perfil faltava. Em
+interesses NAO existe coluna equivalente, e cria-la e migration — proibido pelo
+escopo autorizado.
+
+Consequencia honesta: se o gate nao tiver linha em profiles, atendido_por fica nulo
+e o autor nao fica gravado em lugar nenhum. O leads-status viraria exatamente a
+mentira que veio consertar — o status mudaria e o painel continuaria sem saber quem
+trabalhou. NAO CONTORNAR POR CONTA PROPRIA. Decisao do Emerson.
+
+### 20.4 — RLS ligada em interesses
+
+  k_RLS_interesses = RLS LIGADA
+
+Antes de escrever e preciso saber com qual cliente a rota escreve. Com cliente de
+sessao e sem policy de UPDATE, o update volta "0 linhas alteradas" sem erro — falha
+silenciosa, a pior categoria: o painel diz que marcou e o banco nao mudou.
+
+### 20.5 — Bloqueio declarado
+
+A parte de LEITURA da LEADS-WA-01 (agrupamento, casamento, botoes, aviso) esta
+liberada: nao depende de nada disto.
+
+A parte de ESCRITA (leads-status) fica retida ate medir:
+  - qual e a unica linha de profiles (id e email) e se ela corresponde ao gate;
+  - as policies de UPDATE de interesses e qual cliente a rota usa.
+
+Sem essas duas, escrever seria apostar que a FK passa e que a RLS deixa.
