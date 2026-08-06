@@ -23,6 +23,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { LABEL_TIPO_BEM } from "@/lib/status";
+import { custoEfetivoCarta, fmtCustoEfetivo } from "@/lib/custo-efetivo";
 import { brl, linkWhatsApp } from "@/lib/format";
 import styles from "./detalhe.module.css";
 
@@ -129,6 +130,22 @@ export default async function CartaDetalhePage({
       ? c.valor_parcela * c.qtd_parcelas
       : null;
 
+  // CARROSSEL-OPS-01 extensão (06/08/2026) — POR QUE ESTA LINHA EXISTE.
+  // O card do WhatsApp anuncia "CUSTO AO MÊS 0,65% a.m." e leva pra cá; medido
+  // no HTML de produção, esta página não tinha NENHUM campo de custo (nem
+  // "custo", nem "% a.m.", nem "taxa"). O clique entregava menos do que a arte
+  // prometia. Aqui fechamos isso.
+  // NÚMERO IDÊNTICO AO DO CARD, por construção e não por coincidência: o card
+  // (lib/carrossel-formato) chama esta MESMA `custoEfetivoCarta` sobre as MESMAS
+  // 4 colunas, e seu `pctAoMes` é um re-export de `fmtCustoEfetivo`. Se um dia
+  // alguém trocar a fórmula aqui, o card muda junto — é essa a intenção.
+  // NÃO usamos a coluna `bidcon_custo_am`: ela é um valor gravado no sync e
+  // diverge do calculado em 17 das 2.596 cartas vivas (0,01 p.p.), o que
+  // reintroduziria exatamente a discrepância que esta linha veio corrigir.
+  // `null` quando não há parcela/prazo — nesse caso a linha some, como as
+  // vizinhas, em vez de exibir "—".
+  const custoAm = custoEfetivoCarta(c);
+
   const mensagem =
     `Olá! Tenho interesse na carta de ${tipoLabel.toLowerCase()} (${ref}), ` +
     `crédito de ${brl(c.valor_credito)}. Pode me passar mais informações?`;
@@ -187,6 +204,12 @@ export default async function CartaDetalhePage({
               <div className={styles.row}>
                 <dt>Parcelas restantes</dt>
                 <dd>{c.qtd_parcelas}x</dd>
+              </div>
+            )}
+            {custoAm != null && (
+              <div className={styles.row}>
+                <dt>Custo ao mês</dt>
+                <dd>{fmtCustoEfetivo(custoAm)}</dd>
               </div>
             )}
             {saldoDevedor != null && (
