@@ -21,7 +21,8 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import styles from "./detalhe.module.css";
 
-// Destino do CTA "ver o estoque inteiro". NÃO aponta pra /cartas de propósito:
+// Destino dos DOIS caminhos de saída desta página: o CTA "ver o estoque inteiro"
+// e o "← Cartas" do cabeçalho. NÃO aponta pra /cartas de propósito:
 // medido em 06/08/2026, /cartas faz redirect("/login") quando não há sessão, e
 // o lead que chega por este caminho é anônimo POR CONSTRUÇÃO — veio do carrossel
 // do WhatsApp, sem cadastro. Mandá-lo pra /cartas trocava um 404 por um paredão
@@ -43,7 +44,7 @@ export function CartaForaDaVitrine({
     <>
       <PageHeader
         title="Esta carta já saiu da vitrine"
-        backHref="/cartas"
+        backHref={VITRINE_PUBLICA}
         backLabel="Cartas"
         subtitle="Cotas de consórcio já contempladas. Os valores são da carta; a transferência é feita pela administradora do consórcio."
       />
