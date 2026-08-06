@@ -49,8 +49,11 @@
 //   mesmo formato de payload da Cloud API mas não assina com HMAC, ver
 //   assinaturaValida()/segredoBspValido() abaixo — inválido em qualquer
 //   modo => 401 (com log temporário do motivo, sem vazar segredo/corpo),
-//   nada é processado; 2) ignora eventos
-//   que não sejam `messages` (statuses, echoes — fora de escopo F1);
+//   nada é processado; 2) processa `value.statuses` quando presente
+//   (CARROSSEL-OPS-01 Peça 0 — ver processarStatuses abaixo: reflete o
+//   destino REAL do outbound em wa_mensagens.status_envio e loga o código
+//   de erro da Meta em caso de `failed`); demais eventos que não sejam
+//   `messages` (echoes) continuam ignorados;
 //   3) dedup por wa_message_id; 4) upsert da conversa por telefone + insert
 //   da mensagem (papel='cliente'); 5) Fatia 4-B: opt-out "Não quero
 //   receber" (normalizado) => wa_conversas.opt_out=true — detecta nas três
@@ -308,9 +311,24 @@ export async function POST(req: Request) {
 
   const valor = (evento as Record<string, unknown>)?.entry as unknown;
   const msgs = extrairMensagens(valor);
+
+  // CARROSSEL-OPS-01 Peça 0 — statuses do outbound (sent/delivered/read/
+  // failed). Roda ANTES do early return abaixo de propósito: um recibo de
+  // entrega chega sozinho no payload, sem `messages` nenhum, e era
+  // exatamente por esse early return que ele vinha sendo descartado.
+  // Isolado em try/catch próprio (dentro de processarStatuses) pra que
+  // nenhum dos dois caminhos possa derrubar o outro — statuses e messages
+  // podem vir no mesmo change.
+  const statuses = extrairStatuses(valor);
+  if (statuses.length > 0) {
+    await processarStatuses(statuses);
+  }
+
   if (!msgs || msgs.length === 0) {
-    // statuses (delivery/read receipts) e echoes: fora de escopo F1.
-    return NextResponse.json({ status: "ignorado" });
+    // echoes e demais eventos sem `messages`: fora de escopo F1.
+    return NextResponse.json({
+      status: statuses.length > 0 ? "statuses_processados" : "ignorado",
+    });
   }
 
   const db = createXtvClient();
@@ -584,4 +602,132 @@ function extrairMensagens(entry: unknown): MensagemMeta[] | null {
   const msgs = value?.messages;
   if (!Array.isArray(msgs) || msgs.length === 0) return null;
   return msgs as MensagemMeta[];
+}
+
+// ============================================================================
+// CARROSSEL-OPS-01 Peça 0 — statuses do outbound.
+// ----------------------------------------------------------------------------
+// Motivo (05/08/2026): a Graph ACEITA o envio de template e devolve wamid,
+// mas pode descartar a mensagem depois, de forma assíncrona (ex.: ela não
+// consegue baixar a URL de imagem do header do carrossel). Nesse caso
+// wa_mensagens.status_envio ficava congelado em 'enviado' pra sempre —
+// registrarEnvio (lib/whatsapp/graph.ts) grava no INSERT e nada no projeto
+// jamais atualizava a coluna. Resultado: "aceito" era indistinguível de
+// "entregue" e o código do erro da Meta nunca aparecia em lugar nenhum.
+// Esta peça fecha a cegueira lendo `value.statuses`, que a Meta já mandava
+// e o webhook descartava.
+//
+// status_envio deixa de significar só "a Graph aceitou/recusou na hora" e
+// passa a refletir o destino real. Coluna é `text` puro, sem CHECK
+// (conferido no banco) — 'entregue'/'lida' entram sem migração.
+// ============================================================================
+type StatusMeta = {
+  id?: string;
+  status?: string;
+  errors?: Array<{
+    code?: number;
+    title?: string;
+    message?: string;
+    error_data?: { details?: string };
+  }>;
+};
+
+const STATUS_ENVIO_POR_STATUS_META: Record<string, string> = {
+  sent: "enviado",
+  delivered: "entregue",
+  read: "lida",
+  failed: "falha",
+};
+
+// Progresso normal do outbound. 'falha' fica DE FORA de propósito: é
+// terminal, aplica sempre e nunca é sobrescrita depois (ver aplicação).
+const RANK_STATUS_ENVIO: Record<string, number> = {
+  enviado: 1,
+  entregue: 2,
+  lida: 3,
+};
+
+/** Extrai `entry[].changes[].value.statuses` de TODOS os níveis do envelope
+ *  (a Meta empacota vários recibos num POST só), tolerando ausência de
+ *  qualquer nível — nunca lança. */
+function extrairStatuses(entry: unknown): StatusMeta[] {
+  if (!Array.isArray(entry)) return [];
+  const saida: StatusMeta[] = [];
+  for (const e of entry) {
+    const changes = (e as Record<string, unknown> | undefined)?.changes;
+    if (!Array.isArray(changes)) continue;
+    for (const c of changes) {
+      const value = (c as Record<string, unknown> | undefined)?.value as
+        | Record<string, unknown>
+        | undefined;
+      const sts = value?.statuses;
+      if (Array.isArray(sts)) saida.push(...(sts as StatusMeta[]));
+    }
+  }
+  return saida;
+}
+
+/** Aplica cada recibo em wa_mensagens. Idempotente (status repetido =
+ *  no-op), nunca rebaixa (delivered não volta pra sent) e trata 'falha'
+ *  como terminal. Linha não encontrada pelo wamid = silêncio: recibo de
+ *  mensagem antiga ou enviada por fora deste projeto. try/catch por item —
+ *  um recibo podre não derruba os outros nem o processamento de messages. */
+async function processarStatuses(statuses: StatusMeta[]): Promise<void> {
+  const db = createXtvClient();
+
+  for (const s of statuses) {
+    try {
+      const wamid = s.id;
+      const novo = s.status ? STATUS_ENVIO_POR_STATUS_META[s.status] : undefined;
+      if (!wamid || !novo) continue;
+
+      // Log ANTES da busca de propósito: se a Meta recusou, o código do
+      // erro (131042/131049/...) tem que ficar legível nos runtime logs
+      // mesmo que a linha não exista no banco. É por aqui que a dedução
+      // às cegas acaba. sent/delivered/read não logam (ruído).
+      if (novo === "falha") {
+        console.error(
+          "[wa-status-failed]",
+          JSON.stringify({ wamid, errors: s.errors ?? null })
+        );
+      }
+
+      const { data: linha } = await db
+        .from("wa_mensagens")
+        .select("id, status_envio")
+        .eq("wa_message_id", wamid)
+        .maybeSingle();
+      if (!linha) continue;
+
+      const atual = (linha.status_envio as string | null) ?? null;
+      if (atual === novo) continue; // idempotente
+      if (atual === "falha") continue; // terminal: nada sobrescreve
+
+      if (novo !== "falha") {
+        const rankAtual = atual ? (RANK_STATUS_ENVIO[atual] ?? 0) : 0;
+        if ((RANK_STATUS_ENVIO[novo] ?? 0) <= rankAtual) continue; // nunca rebaixa
+      }
+
+      // `erro` acompanha a falha pra que o diagnóstico caiba numa query só,
+      // sem depender da janela de retenção dos runtime logs — mesma coluna
+      // que registrarEnvio já usa pra falha síncrona (graph.ts).
+      const patch: { status_envio: string; erro?: string } = { status_envio: novo };
+      if (novo === "falha") {
+        const e = s.errors?.[0];
+        const partes = [
+          e?.code != null ? `(#${e.code})` : null,
+          e?.title ?? e?.message ?? null,
+          e?.error_data?.details ?? null,
+        ].filter(Boolean);
+        patch.erro = partes.length > 0 ? partes.join(" ") : "falha_assincrona_sem_detalhe";
+      }
+
+      await db.from("wa_mensagens").update(patch).eq("id", linha.id);
+    } catch (erro) {
+      console.error(
+        "[wa-status] falha ao processar recibo:",
+        erro instanceof Error ? erro.message : String(erro)
+      );
+    }
+  }
 }
