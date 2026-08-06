@@ -8,8 +8,11 @@
 // CTA "Tenho interesse" abre o WhatsApp do atendimento com texto neutro citando a
 // carta. Sem linguagem de promessa/contemplação garantida.
 import { createClient } from "@/lib/supabase-server";
+import { createXtvClient } from "@/lib/supabase-xtv";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { type CartaVitrine } from "@/components/CartaCard";
+import { CartaForaDaVitrine } from "./CartaForaDaVitrine";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -65,7 +68,26 @@ export default async function CartaDetalhePage({
     .eq("status", "disponivel")
     .maybeSingle();
 
-  if (!carta) notFound();
+  // CARROSSEL-OPS-01 Peça 4 — a query acima (RLS anon + `.eq(status,
+  // disponivel)`) devolve vazio em DOIS casos distintos que o 404 seco
+  // confundia: id que nunca existiu e carta que saiu da vitrine. O segundo é o
+  // caso majoritário dos links de carrossel em D+2 (a vitrine é substituída
+  // inteira por rodada de sync). Só aqui, e nunca no caminho `disponivel`
+  // acima, desempatamos com um lookup mínimo por service-role.
+  if (!carta) {
+    const morta = await buscarCartaForaDaVitrine(params.id);
+    if (!morta) notFound(); // id inexistente/uuid inválido: 404 real, como antes.
+    const similares = await buscarSimilares(supabase, morta);
+    return (
+      <AppShell nome={nome}>
+        <CartaForaDaVitrine
+          tipoLabel={LABEL_TIPO_BEM[morta.tipo] ?? morta.tipo}
+          similares={similares}
+        />
+      </AppShell>
+    );
+  }
+
   // PostgREST tipa o embed como array; normalizamos para objeto | null.
   const adm = (carta as { administradora?: unknown }).administradora;
   const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
@@ -170,4 +192,89 @@ export default async function CartaDetalhePage({
       </div>
     </AppShell>
   );
+}
+
+// ============================================================================
+// CARROSSEL-OPS-01 Peça 4 — suporte do ramo "carta fora da vitrine".
+// ============================================================================
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Campos que a vitrine lê pro card. Mantido idêntico ao select de /cartas pra
+// que o MESMO componente (CartaCard) receba exatamente a mesma forma de dado.
+const CAMPOS_CARD =
+  "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, bidcon_agio_150, bidcon_agio_120, bidcon_custo_am, administradora:administradora_id ( nome, aceita_assuncao )";
+
+type CartaMorta = { id: string; tipo: string; valor_credito: number };
+
+/** Lookup MÍNIMO por id, ignorando RLS — a policy anon só enxerga
+ *  `disponivel`, então sem service-role não há como distinguir "saiu da
+ *  vitrine" de "nunca existiu". Servidor apenas (createXtvClient quebra o
+ *  build se importado de Client Component). Lê só 4 colunas: nada de
+ *  entrada/parcela/custo, que estão vencidos e não vão à tela. */
+async function buscarCartaForaDaVitrine(id: string): Promise<CartaMorta | null> {
+  if (!UUID_RE.test(id)) return null; // uuid inválido nem chega ao banco.
+  const db = createXtvClient();
+  const { data } = await db
+    .from("cartas")
+    .select("id, tipo, valor_credito, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data || data.status === "disponivel") return null;
+  return { id: data.id, tipo: data.tipo, valor_credito: data.valor_credito };
+}
+
+/** 3–4 cartas vivas semelhantes. Lidas pelo client COM RLS (mesmo caminho da
+ *  vitrine) e ainda assim com `.eq("status","disponivel")` explícito — o
+ *  filtro nunca é herdado. Faixa ±30% do crédito da carta morta, mesmo tipo;
+ *  sem semelhantes suficientes, completa com o topo geral. */
+async function buscarSimilares(
+  supabase: ReturnType<typeof createClient>,
+  morta: CartaMorta
+): Promise<CartaVitrine[]> {
+  const base = () =>
+    supabase
+      .from("cartas")
+      .select(`${CAMPOS_CARD}, administradora_origem`)
+      .eq("status", "disponivel")
+      .neq("id", morta.id)
+      // Mesma ordenação da vitrine (/cartas), copiada sem alteração.
+      .order("bidcon_agio_150", { ascending: false, nullsFirst: false })
+      .order("valor_credito", { ascending: true });
+
+  const { data: faixa } = await base()
+    .eq("tipo", morta.tipo)
+    .gte("valor_credito", morta.valor_credito * 0.7)
+    .lte("valor_credito", morta.valor_credito * 1.3)
+    .limit(12);
+
+  let brutas = faixa ?? [];
+  if (brutas.length < 3) {
+    const { data: topo } = await base().limit(12);
+    const vistos = new Set(brutas.map((c) => c.id as string));
+    brutas = [...brutas, ...(topo ?? []).filter((c) => !vistos.has(c.id as string))];
+  }
+
+  // Regra da casa: BIDCON_DIRETO primeiro. Partição ESTÁVEL — dentro de cada
+  // bloco a ordem do banco (ágio, depois crédito) é preservada.
+  const direto = brutas.filter((c) => c.administradora_origem === "BIDCON_DIRETO");
+  const resto = brutas.filter((c) => c.administradora_origem !== "BIDCON_DIRETO");
+
+  return [...direto, ...resto].slice(0, 4).map((c) => {
+    const adm = (c as { administradora?: unknown }).administradora;
+    const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
+    return {
+      id: c.id,
+      tipo: c.tipo,
+      valor_credito: c.valor_credito,
+      valor_entrada: c.valor_entrada,
+      valor_parcela: c.valor_parcela,
+      qtd_parcelas: c.qtd_parcelas,
+      bidcon_agio_150: c.bidcon_agio_150,
+      bidcon_agio_120: c.bidcon_agio_120,
+      bidcon_custo_am: c.bidcon_custo_am,
+      administradora: administradora as CartaVitrine["administradora"],
+    };
+  });
 }
