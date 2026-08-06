@@ -1,12 +1,17 @@
-// /cartas/[id] — detalhe de uma carta contemplada disponível.
-// Server Component. PÚBLICA (FATIA SYNC-ID, migration 0048): a query já filtra
-// status='disponivel', e a policy cartas_vitrine_select_anon (RLS) libera esse
-// mesmo recorte pro role anon — não há redirect de login aqui. Isso resolve o
-// destino do botão "Ver carta" do carrossel de marketing do WhatsApp e o gap
+// /cartas/[id] — detalhe de uma carta contemplada.
+// Server Component. PÚBLICA: não há redirect de login aqui, porque este é o
+// destino do botão "Ver carta" do carrossel de marketing do WhatsApp e do gap
 // chat→cadastro (auditoria 2026-07). A ação de RESERVAR continua exigindo
 // login: o botão abaixo leva a /reservar, que mantém seu próprio redirect.
 // CTA "Tenho interesse" abre o WhatsApp do atendimento com texto neutro citando a
 // carta. Sem linguagem de promessa/contemplação garantida.
+//
+// DOIS BANCOS, de propósito (ver medição no comentário longo dentro da função):
+//   • AUTH + `profiles` → createClient()   (projeto nnv, RLS, sessão do usuário)
+//   • ESTOQUE (`cartas`) → createXtvClient() (projeto xtv, service-role)
+// Como o client de estoque é service-role e IGNORA RLS numa página pública,
+// TODA query de carta aqui carrega `.eq("status","disponivel")` explícito e
+// lista as colunas uma a uma. `fornecedor_id` NUNCA entra em select algum.
 import { createClient } from "@/lib/supabase-server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { notFound } from "next/navigation";
@@ -26,7 +31,9 @@ const WA = "5519997561909";
 type CartaDetalhe = {
   id: string;
   tipo: string;
-  numero_externo: string | null;
+  // no xtv esta coluna é `integer`; no nnv era texto. Aceita os dois: só é
+  // interpolada como rótulo (`nº 1234`), nunca usada em cálculo.
+  numero_externo: string | number | null;
   valor_credito: number;
   valor_entrada: number | null;
   valor_parcela: number | null;
@@ -58,8 +65,27 @@ export default async function CartaDetalhePage({
     nome = profile?.nome ?? user.email ?? null;
   }
 
-  // Join SÓ com administradoras (marca pública). NUNCA selecionar fornecedor.
-  const { data: carta } = await supabase
+  // CARROSSEL-OPS-01 Peça 4 (correção A, 06/08/2026) — DE ONDE VEM O ESTOQUE.
+  // Medido em produção: `createClient()` aponta pro projeto de AUTH (nnv), cuja
+  // tabela `cartas` tem 2 linhas de fixture (`1111…`/`2222…`, ambas
+  // `reservada`) e ZERO `disponivel`. O estoque real — 2.584 vivas — mora no
+  // projeto xtv, o mesmo lido por /api/vitrine, /api/atende e pelo montador do
+  // carrossel, e os espaços de uuid são disjuntos. Resultado: TODO link
+  // `/cartas/<uuid>` do carrossel caía em 404, viva ou morta a carta — este
+  // ramo `disponivel` nunca foi alcançável em produção.
+  // Auth e `profiles` continuam no nnv (é lá que eles moram); só a leitura de
+  // ESTOQUE muda de banco.
+  //
+  // CUIDADO: service-role IGNORA RLS e esta página é PÚBLICA. Portanto:
+  //  • `.eq("status","disponivel")` é explícito aqui e NUNCA herdado — sem RLS
+  //    ele é a única coisa que impede servir carta fora da vitrine;
+  //  • o select lista coluna a coluna. NUNCA incluir `fornecedor_id` (existe no
+  //    xtv, com FK própria, e é segredo admin-only). Só `administradoras`, que
+  //    é marca pública do bem.
+  if (!UUID_RE.test(params.id)) notFound(); // id inválido nem chega ao banco.
+
+  const db = createXtvClient();
+  const { data: carta } = await db
     .from("cartas")
     .select(
       "id, tipo, numero_externo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, administradora:administradora_id ( nome, aceita_assuncao )"
@@ -68,16 +94,16 @@ export default async function CartaDetalhePage({
     .eq("status", "disponivel")
     .maybeSingle();
 
-  // CARROSSEL-OPS-01 Peça 4 — a query acima (RLS anon + `.eq(status,
-  // disponivel)`) devolve vazio em DOIS casos distintos que o 404 seco
-  // confundia: id que nunca existiu e carta que saiu da vitrine. O segundo é o
-  // caso majoritário dos links de carrossel em D+2 (a vitrine é substituída
-  // inteira por rodada de sync). Só aqui, e nunca no caminho `disponivel`
-  // acima, desempatamos com um lookup mínimo por service-role.
+  // CARROSSEL-OPS-01 Peça 4 — a query acima devolve vazio em DOIS casos
+  // distintos que o 404 seco confundia: id que nunca existiu e carta que saiu
+  // da vitrine. O segundo é o caso majoritário dos links de carrossel em D+2 (a
+  // vitrine é substituída inteira por rodada de sync). Só aqui, e nunca no
+  // caminho `disponivel` acima, desempatamos com um lookup mínimo sem o filtro
+  // de status.
   if (!carta) {
-    const morta = await buscarCartaForaDaVitrine(params.id);
-    if (!morta) notFound(); // id inexistente/uuid inválido: 404 real, como antes.
-    const similares = await buscarSimilares(supabase, morta);
+    const morta = await buscarCartaForaDaVitrine(db, params.id);
+    if (!morta) notFound(); // id que nunca existiu: 404 real, como antes.
+    const similares = await buscarSimilares(db, morta);
     return (
       <AppShell nome={nome}>
         <CartaForaDaVitrine
@@ -208,14 +234,17 @@ const CAMPOS_CARD =
 
 type CartaMorta = { id: string; tipo: string; valor_credito: number };
 
-/** Lookup MÍNIMO por id, ignorando RLS — a policy anon só enxerga
- *  `disponivel`, então sem service-role não há como distinguir "saiu da
- *  vitrine" de "nunca existiu". Servidor apenas (createXtvClient quebra o
- *  build se importado de Client Component). Lê só 4 colunas: nada de
- *  entrada/parcela/custo, que estão vencidos e não vão à tela. */
-async function buscarCartaForaDaVitrine(id: string): Promise<CartaMorta | null> {
+/** Lookup MÍNIMO por id, SEM o filtro de status — é o único jeito de
+ *  distinguir "saiu da vitrine" de "nunca existiu", já que a query principal
+ *  devolve vazio nos dois casos. Recebe o client de fora (mesmo `db` da query
+ *  principal) pra não abrir uma segunda conexão service-role por request.
+ *  Lê só 4 colunas: nada de entrada/parcela/custo, que estão vencidos e não
+ *  vão à tela. */
+async function buscarCartaForaDaVitrine(
+  db: ReturnType<typeof createXtvClient>,
+  id: string
+): Promise<CartaMorta | null> {
   if (!UUID_RE.test(id)) return null; // uuid inválido nem chega ao banco.
-  const db = createXtvClient();
   const { data } = await db
     .from("cartas")
     .select("id, tipo, valor_credito, status")
@@ -225,16 +254,18 @@ async function buscarCartaForaDaVitrine(id: string): Promise<CartaMorta | null> 
   return { id: data.id, tipo: data.tipo, valor_credito: data.valor_credito };
 }
 
-/** 3–4 cartas vivas semelhantes. Lidas pelo client COM RLS (mesmo caminho da
- *  vitrine) e ainda assim com `.eq("status","disponivel")` explícito — o
- *  filtro nunca é herdado. Faixa ±30% do crédito da carta morta, mesmo tipo;
- *  sem semelhantes suficientes, completa com o topo geral. */
+/** 3–4 cartas vivas semelhantes, lidas do MESMO banco de estoque (xtv) que a
+ *  query principal. `.eq("status","disponivel")` é explícito e obrigatório: o
+ *  client é service-role, IGNORA RLS, e este é o único filtro que impede
+ *  anunciar carta fora da vitrine numa página pública. Faixa ±30% do crédito
+ *  da carta morta, mesmo tipo; sem semelhantes suficientes, completa com o
+ *  topo geral. */
 async function buscarSimilares(
-  supabase: ReturnType<typeof createClient>,
+  db: ReturnType<typeof createXtvClient>,
   morta: CartaMorta
 ): Promise<CartaVitrine[]> {
   const base = () =>
-    supabase
+    db
       .from("cartas")
       .select(`${CAMPOS_CARD}, administradora_origem`)
       .eq("status", "disponivel")
