@@ -25,6 +25,7 @@
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { gerarRespostaWhatsApp, agenteValido } from "@/lib/whatsapp/cerebro";
 import { sendText } from "@/lib/whatsapp/graph";
+import { enviarInstagram } from "@/lib/instagram/graph";
 import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
 import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
 
@@ -105,6 +106,8 @@ async function registrarDescarte(
 
 export type WaJob = {
   conversaId: string;
+  /** Telefone E.164 no canal 'whatsapp'; IGSID no canal 'instagram' — é a
+   *  mesma coluna wa_conversas.telefone nos dois casos (ver migration 0067). */
   telefone: string;
   msgInseridaId: number;
   anexoId: string | null;
@@ -112,7 +115,52 @@ export type WaJob = {
   conversaStatus: string | null;
   agenteAtivo: string | null;
   podeResponder: boolean;
+  /** INSTA-01. Ausente = 'whatsapp'. O webhook do WhatsApp NÃO preenche este
+   *  campo (seu diff é vazio, por exigência da OS) — então todo job vindo de
+   *  lá cai no default e segue por sendText exatamente como antes. */
+  canal?: "whatsapp" | "instagram";
 };
+
+// ----------------------------------------------------------------------------
+// INSTA-01 — único ponto onde o canal importa: o TRANSPORTE.
+// ----------------------------------------------------------------------------
+// Debounce, lock, releitura de status, gate de humano, cérebro, guardrail de
+// compliance e opt-out são idênticos nos dois canais — de propósito: canal
+// não muda regra de negócio, muda por onde a frase sai. Por isso a bifurcação
+// vive aqui, nas duas linhas de envio, e não espalhada pelo fluxo.
+//
+// O default explícito ('whatsapp' quando `canal` é undefined) é o que garante
+// que o comportamento do WhatsApp não muda um byte: mesmos argumentos, mesma
+// função, mesma ordem.
+async function enviarPorCanal(
+  job: WaJob,
+  params: {
+    conversaId: string;
+    texto: string;
+    agente?: string | null;
+    tokensIn?: number | null;
+    tokensOut?: number | null;
+  }
+): Promise<{ ok: boolean; erro?: string }> {
+  if (job.canal === "instagram") {
+    return enviarInstagram({
+      conversaId: params.conversaId,
+      igsid: job.telefone,
+      texto: params.texto,
+      agente: params.agente,
+      tokensIn: params.tokensIn,
+      tokensOut: params.tokensOut,
+    });
+  }
+  return sendText({
+    conversaId: params.conversaId,
+    telefone: job.telefone,
+    texto: params.texto,
+    agente: params.agente,
+    tokensIn: params.tokensIn,
+    tokensOut: params.tokensOut,
+  });
+}
 
 /** Processa a lista de jobs de uma invocação do webhook — chamado via
  *  waitUntil() depois que o ack 200 já foi devolvido pra Meta. Falha em
@@ -199,9 +247,8 @@ async function processarUmJob(
           );
           await registrarDescarte(db, conversaId, resumo, "resumo de extrato");
         } else {
-          await sendText({
+          await enviarPorCanal(job, {
             conversaId,
-            telefone,
             texto: resumo,
             agente: "sistema_extrato",
           });
@@ -295,9 +342,8 @@ async function processarUmJob(
           return;
         }
 
-        await sendText({
+        await enviarPorCanal(job, {
           conversaId,
-          telefone,
           texto: resultado.texto,
           agente: resultado.agenteQueRespondeu,
           tokensIn: resultado.tokensIn,
