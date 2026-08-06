@@ -1926,3 +1926,143 @@ justamente a conclusão plausível que eu estava a caminho de escrever. O comand
 não mentiu: ele calou, e o silêncio se parecia com uma resposta.
 
 Régua morta com resultado plausível é o pai do relatório fictício sem mentira.
+
+## 22 — Reconhecimento de cinco fatias: o que já existia antes de eu escrever (05/08/2026)
+
+Seção de recon. Quase nada de código novo aqui — e é esse o ponto. Cinco fatias foram
+autorizadas e, em quatro delas, a medição achou a peça **já construída**. O trabalho foi
+descobrir isso antes de duplicar.
+
+### 22.1 — ACESSO-02: o recado errado que eu quase dei
+
+A fatia mandava sinalizar ao Emerson que `CRON_SECRET` era env nova, a criar.
+**Ela já existe** — e três crons de produção dependem dela hoje: `sync-cotas` (de hora em
+hora), `backfill-embeddings` e `sentinela/varredura`. Se não existisse na Vercel, os três
+estariam quebrados agora.
+
+Pedir a alguém que crie o que já está criado gasta confiança à toa, e na terceira vez
+vira "esse aí não confere nada".
+
+### 22.2 — Não existe pasta `cron/` nesta casa
+
+Os três crons vivem soltos em `app/api/<nome>/`, com o agendamento em `platform/vercel.json`.
+O caminho `app/api/cron/…` que a fatia pedia inauguraria convenção nova para nada. Corrigido
+para `app/api/lembrete-confirmacao/`.
+
+Segundo achado: `auth.admin.listUsers()` **não aceita filtro** — só `page` e `perPage`. Não dá
+para pedir ao servidor "não confirmados criados entre 24h e 48h". A filtragem é em JS sobre a
+página trazida. Com 21 usuários é irrelevante; quando a base crescer, a primeira página deixa
+de conter todo mundo e o cron passa a ignorar gente **sem errar** — bomba-relógio silenciosa.
+Paginação explícita desde o primeiro dia.
+
+### 22.3 — ACESSO-03: a `lib/mail.ts` já previa esta fatia
+
+O arquivo existe, embrulha o Resend com `fetch` nativo (sem SDK novo) e o cabeçalho dele diz,
+escrito antes de mim: *"Usado por rotas server-side que precisam avisar o admin (ex.: novo
+cadastro)"*.
+
+`POST` cru para a API do Resend foi descartado: dois caminhos de envio significam dois lugares
+para vazar a chave e dois para consertar. Endereços ficam em `MAIL_FROM`/`MAIL_ADMIN`, não
+fixos no código — hardcode tira o endereço do alcance de quem opera.
+
+### 22.4 — O que os zeros do `.env.local` NÃO provam
+
+`MAIL_FROM`, `MAIL_ADMIN`, `RESEND_API_KEY`, `HOOK_SECRET`: todos zero no `.env.local`.
+
+Isso **não** significa que faltam na Vercel. `.env.local` é arquivo de máquina; env de produção
+vive no painel e não passa por aqui. Minha régua não alcança lá. O que os zeros provam é uma
+coisa só, e é operacional: **rodando local, `enviarEmail()` devolve `ok:false` sem tentar
+enviar**. Teste de e-mail nesta máquina não vale como prova de nada.
+
+Reportar "as envs não existem" teria sido relatório fictício sem mentira: número certo, régua
+curta demais para a conclusão.
+
+### 22.5 — Next 14 mata o `waitUntil`
+
+`next ^14.2.5`, `react ^18.3.1`. O `after()` é do Next 15. Não existe aqui, e não vale importar
+dependência nova para enfileirar uma chamada de 300ms. Um e-mail cabe folgado no timeout do
+webhook com `await` direto.
+
+### 22.6 — ANEXO-01: o arquivo é nosso, e os dois cincos que ainda não fecharam
+
+`wa_mensagens` tem **as duas** colunas: `media_id` e `storage_path`. Em 152 mensagens: 5 com
+`media_id`, 5 com `storage_path`. Bucket `wa-extratos`, `publico=false` — privado, como extrato
+bancário exige. `storage.objects` tem 5 objetos.
+
+**Não provei que os dois conjuntos de 5 são o mesmo conjunto.** Se houver uma linha com
+`media_id` e sem `storage_path`, os totais batem e o arquivo daquela pessoa não está nosso —
+URL de mídia da Cloud API expira. Dois números iguais lado a lado parecem uma resposta; são
+uma coincidência até a interseção ser medida.
+
+Se fechar em 5, a fatia é só de leitura e UI, sem item de persistência.
+
+### 22.7 — LEXICO-01: "repasse" sai de cena
+
+Correção de léxico do Emerson, válida em todas as superfícies: o fluxo do vendedor de carta
+contemplada **não é repasse** — é venda de cota na Bidcon (intermediação ou compra direta),
+avaliada pelo Bidcon Price.
+
+Não é cosmética. "Repassar" sugere empurrar uma obrigação adiante; "vender" descreve o que
+acontece. Cliente que entende errado o que está fazendo é reclamação com data marcada.
+
+Registrado, **não tocado** — aguarda token. Primeiro fio: existe `app/api/repasse/route.ts`.
+E a busca terá de cobrir código **e** banco: prompt de agente pode morar em tabela, e grep
+limpo no repositório provaria apenas que a palavra não está no repositório.
+
+### 22.8 — AVALIA-01: a TIR já existe e é canônica
+
+`lib/tir.ts` (`tirMensalMenorRaiz`, `anualEquivalente`), extraída de `analista-grupos`. O
+`custo-efetivo-plano-novo.ts` a importa e carrega escrita a regra permanente — *"toda simulação
+termina em TIR"* — mais a convenção da **menor raiz** quando há mais de uma matematicamente
+válida, e um aviso explícito contra usar percentual nominal no lugar de TIR ausente.
+
+Existe também `lib/comissao.ts` com teste ao lado. Se os 7% já moram lá, a fatia herda a regra:
+número de negócio repetido em dois arquivos é divergência com data marcada.
+
+`cedente`: **zero ocorrências** em `platform/lib` e `platform/app`. Seguro a conclusão — o
+repositório alimenta dois projetos Vercel e o fluxo do vendedor pode ser página fora dessas
+pastas. Zero ali significa "não está onde olhei".
+
+### 22.9 — RESUMO-01: o lugar de gravar já existe, e o resumo é inerte
+
+`cerebro.ts:164` — `if (m.papel === "sistema") continue;`. Medido, não suposto. Resumo gravado
+como `sistema` **não entra no contexto do modelo**: não é cumulativo, não engorda prompt.
+
+`lib/whatsapp/sistema.ts` já faz a gravação, já confere `{error}` explicitamente e já registra
+por escrito que o handoff *"existe desde 20/07 e NUNCA deixou rastro"*.
+
+Correção sobre o modelo: não há "o rápido dos dois". Nas chamadas reais (linhas 409-418 e
+544-553) o cérebro usa `claude-fable-5`, hardcoded. O `claude-sonnet-4-6` aparece só num
+comentário explicando por que a env sugerida pela spec não foi adotada.
+
+Risco levantado antes de escrever: o `sistema_extrato` é gravado com `agente:"sistema_extrato"`,
+mas o **`papel` dele não foi medido**. Se for `sistema`, reusar o montador de histórico do
+cérebro descartaria exatamente o extrato que o resumo precisa ler. O texto sairia plausível e
+cego — e ninguém notaria.
+
+### 22.10 — Um alarme que levantei e não se confirmou
+
+O HEAD mudou sem mim e eu parei tudo antes de escrever. Era commit do próprio Emerson
+(SENTINELA-01), sem relação com o meu código. Confirmado pelo grep **no blob do HEAD**, não no
+disco: o conserto do ACESSO-01 não estava publicado.
+
+Levantei alarme falso. Prefiro assim do que o inverso — e o custo foi um comando.
+
+### 22.11 — Regra 7, sexta aparição: exit code depois de pipe
+
+`GREP_X_EXIT=$(...)` depois de `| head` mede o `head`, não o `grep`. O bloco real e o bloco da
+isca devolveram **o mesmo `0`**. É a sexta vez nesta sessão que um controle por exit code sai
+inútil — padrão, não azar.
+
+Regra operacional nova: **contagem antes do pipe**, nunca exit code depois dele. O que
+discriminou foi o conteúdo — 40 linhas contra nenhuma.
+
+### 22.12 — O que está escrito e NÃO auditado
+
+As frentes 2 e 3 do ACESSO-01 seguem **só no worktree**, deliberadamente fora de `main`:
+push em `main` dispara produção, e a ordem era preview antes de produção.
+
+Elas não passaram por typecheck, não passaram por build e o caminho de erro não foi exercido
+vivo. Enquanto isso não acontecer, o correto é dizer que o ACESSO-01 está **escrito**, não
+consertado. Cinco fatias entraram na fila enquanto essa auditoria não aconteceu; registro isso
+aqui para que a dívida tenha nome e data.
