@@ -17,7 +17,7 @@ import { createXtvClient } from "@/lib/supabase-xtv";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { type CartaVitrine } from "@/components/CartaCard";
-import { CartaForaDaVitrine } from "./CartaForaDaVitrine";
+import { CartaForaDaVitrine, VITRINE_PUBLICA } from "./CartaForaDaVitrine";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -137,7 +137,7 @@ export default async function CartaDetalhePage({
     <AppShell nome={nome}>
       <PageHeader
         title={`Carta de ${tipoLabel}`}
-        backHref="/cartas"
+        backHref={VITRINE_PUBLICA}
         backLabel="Cartas"
         subtitle="Cota de consórcio já contemplada. Os valores são da carta; a transferência da cota é feita pela administradora do consórcio."
       />

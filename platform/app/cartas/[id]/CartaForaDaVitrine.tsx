@@ -21,8 +21,11 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import styles from "./detalhe.module.css";
 
-// Destino dos DOIS caminhos de saída desta página: o CTA "ver o estoque inteiro"
-// e o "← Cartas" do cabeçalho. NÃO aponta pra /cartas de propósito:
+// Destino de TODO caminho de saída de /cartas/[id], nos dois ramos: o CTA "ver o
+// estoque inteiro" e o "← Cartas" do cabeçalho aqui (carta morta), mais o
+// "← Cartas" do cabeçalho da carta viva, que importa esta constante de
+// page.tsx. Exportada pra que a URL exista em UM lugar só.
+// NÃO aponta pra /cartas de propósito:
 // medido em 06/08/2026, /cartas faz redirect("/login") quando não há sessão, e
 // o lead que chega por este caminho é anônimo POR CONSTRUÇÃO — veio do carrossel
 // do WhatsApp, sem cadastro. Mandá-lo pra /cartas trocava um 404 por um paredão
@@ -31,7 +34,7 @@ import styles from "./detalhe.module.css";
 // por scripts/gerar-vitrine.mjs a partir do MESMO estoque (view vw_cartas_publicas
 // no xtv) que alimenta esta página — não são dois catálogos divergentes.
 // `#cotas` é a âncora que o próprio site usa nos seus CTAs internos de vitrine.
-const VITRINE_PUBLICA = "https://www.bidcon.com.br/#cotas";
+export const VITRINE_PUBLICA = "https://www.bidcon.com.br/#cotas";
 
 export function CartaForaDaVitrine({
   tipoLabel,
