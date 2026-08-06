@@ -7,13 +7,24 @@
 // wa_mensagens, mesmo contrato de retorno. O que muda é só o transporte.
 //
 // ENDPOINT (medido na doc oficial em 06/08/2026, não assumido):
-//   POST https://graph.instagram.com/v23.0/me/messages
+//   POST https://graph.instagram.com/v25.0/me/messages
 //   Authorization: Bearer <IG_ACCESS_TOKEN>
 //   { "recipient": { "id": "<IGSID>" }, "message": { "text": "..." } }
 // Host é graph.instagram.com (Instagram API with Instagram Login), NÃO
 // graph.facebook.com. O destinatário é o IGSID — o id que a Meta atribui à
 // pessoa por conta comercial, o mesmo que chega em entry[].messaging[].sender.id
-// no webhook. `me` resolve pra conta dona do token.
+// no webhook.
+//
+// Sobre `me`: os exemplos da doc usam /<IG_ID>/messages, e /me/messages é
+// documentado como equivalente — "/me traduz pro object ID da conta cujo
+// access token está sendo usado". Preferido aqui porque evita guardar o
+// IG_ID numa quarta env que teria que ser mantida em sincronia com o token;
+// se o token mudar de conta, o destino acompanha sozinho.
+//
+// VERSÃO: a doc de 06/08/2026 mostra v25.0. Fica FIXA (não "a mais nova"):
+// a Meta muda comportamento entre versões, e um endpoint que se move sozinho
+// quebra sem deploy nosso. Difere do módulo do WhatsApp (v21.0) de propósito
+// — são produtos e datas de integração diferentes, não um descuido.
 //
 // JANELA: no Instagram só se responde dentro da janela aberta pela mensagem
 // que a pessoa mandou. NÃO existe equivalente a sendTemplate aqui, e é de
@@ -31,7 +42,7 @@
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
 
-const IG_GRAPH_VERSION = "v23.0";
+const IG_GRAPH_VERSION = "v25.0";
 const IG_BASE_URL = `https://graph.instagram.com/${IG_GRAPH_VERSION}/me/messages`;
 
 // Mesmo valor do módulo do WhatsApp: fetch sem timeout fica pendurado
