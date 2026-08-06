@@ -21,6 +21,17 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import styles from "./detalhe.module.css";
 
+// Destino do CTA "ver o estoque inteiro". NÃO aponta pra /cartas de propósito:
+// medido em 06/08/2026, /cartas faz redirect("/login") quando não há sessão, e
+// o lead que chega por este caminho é anônimo POR CONSTRUÇÃO — veio do carrossel
+// do WhatsApp, sem cadastro. Mandá-lo pra /cartas trocava um 404 por um paredão
+// de login, que é o mesmo beco com outra placa.
+// A vitrine estática de www.bidcon.com.br é pública, não exige sessão e é gerada
+// por scripts/gerar-vitrine.mjs a partir do MESMO estoque (view vw_cartas_publicas
+// no xtv) que alimenta esta página — não são dois catálogos divergentes.
+// `#cotas` é a âncora que o próprio site usa nos seus CTAs internos de vitrine.
+const VITRINE_PUBLICA = "https://www.bidcon.com.br/#cotas";
+
 export function CartaForaDaVitrine({
   tipoLabel,
   similares,
@@ -62,7 +73,7 @@ export function CartaForaDaVitrine({
             A vitrine muda várias vezes ao dia. Nenhuma contemplação é
             prometida: são cotas já contempladas sendo transferidas.
           </p>
-          <Button href="/cartas" block>
+          <Button href={VITRINE_PUBLICA} block>
             Ver a vitrine completa
           </Button>
         </Card>
