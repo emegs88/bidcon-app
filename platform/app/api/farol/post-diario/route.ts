@@ -143,6 +143,16 @@ function montarLegenda(c: CartaCarrossel): string {
   );
   linhas.push("");
 
+  // RÓTULO-IA no feed (07/08). O reel declara a IA na PRIMEIRA frase porque lá
+  // o rótulo é ouvido e some; aqui ele fica por escrito e permanente, então o
+  // fim é o lugar certo: no topo empurraria os números para fora da primeira
+  // dobra, que é onde a pessoa decide. Mesma tese, posição diferente porque o
+  // meio é diferente. Passa pelo mesmo `revisarLegenda()` das linhas de cima.
+  linhas.push(
+    "🤖 Publicado pelo assistente IA da Bidcon — atendimento humano no direct quando você quiser."
+  );
+  linhas.push("");
+
   linhas.push(HASHTAGS[c.tipo] ?? HASHTAGS.imovel);
 
   return linhas.join("\n");
