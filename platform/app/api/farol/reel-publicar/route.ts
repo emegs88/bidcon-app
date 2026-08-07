@@ -59,6 +59,9 @@ import { createXtvClient } from "@/lib/supabase-xtv";
 import { autorizadoFarol, revisarLegenda, registrar } from "@/lib/farol/selecao";
 import { chamarGraph } from "@/lib/instagram/publicar";
 import { statusVideo, tituloRender } from "@/lib/heygen";
+import { subirShort } from "@/lib/youtube/upload";
+import { reais, pctAoMes } from "@/lib/carrossel-formato";
+import { LABEL_TIPO_BEM } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -732,7 +735,147 @@ async function publicarContainer(
     video_id: linha.video_id,
     carta_id: linha.carta_id,
   });
+
+  // YOUTUBE-01: o MESMO mp4 vira Short. Depois do IG e fora do caminho crítico
+  // — ver `subirParaYoutube`, que nunca lança e nunca muda o veredito abaixo.
+  await subirParaYoutube(db, linha);
+
   return "publicado";
+}
+
+// ===========================================================================
+// YOUTUBE-01 — o mesmo mp4 como Short do @Bidconoficial
+// AUTORIZADO: Emerson Gomes dos Santos — OS "YOUTUBE-01", 07/08/2026:
+// "após media_publish do IG com sucesso, se env FAROL_YOUTUBE=on: subir o MESMO
+//  mp4 como Short (...). Falha do YouTube NUNCA derruba o fluxo do IG — try/catch
+//  isolado, log [farol-youtube]."
+// ---------------------------------------------------------------------------
+// NASCE DESARMADO. Sem `FAROL_YOUTUBE=on` esta função sai na primeira linha, e
+// o FAROL segue publicando no Instagram como publicava ontem.
+//
+// O IG É O DONO DO VEREDITO. Esta função é `void` de propósito: não devolve
+// nada que possa mudar o `return "publicado"` de cima. O reel JÁ ESTÁ NO AR no
+// Instagram quando ela roda — deixar o YouTube reprovar isso seria contar uma
+// mentira sobre um fato que já aconteceu. Ela captura tudo, registra e cala.
+//
+// IDEMPOTÊNCIA POR `detalhe.yt_video_id`. A fase 2 pode passar de novo pela
+// mesma linha (retomada, disparo manual da validação da OS). Sem esta trava, o
+// mesmo Short subiria duas vezes — e o YouTube, ao contrário da Meta, NÃO
+// deduplica: aceita o upload repetido e cria um segundo vídeo.
+//
+// O MP4 VEM DO NOSSO BUCKET, não do HeyGen. `detalhe.url_hospedada` é estável e
+// sem expiração; a URL do HeyGen vence. Linha legada sem esse campo é pulada com
+// motivo literal, e não com um erro de download meia hora depois.
+// ===========================================================================
+
+/** Tags fixas — mesma família das hashtags do reel, sem o `#`. */
+const TAGS_YOUTUBE = [
+  "consorcio",
+  "carta contemplada",
+  "planejamento",
+  "patrimonio",
+  "bidcon",
+];
+
+const CANAL_YOUTUBE = "https://youtube.com/@Bidconoficial";
+
+/**
+ * Título curto, no formato da OS: "{tipo} de {crédito} · custo {custo} | Bidcon".
+ *
+ * O custo sai de `pctAoMes()`, que já entrega "0,65% a.m." — a OS escreveu
+ * "custo {custo} a.m." com o sufixo à mão, mas repetir o sufixo aqui daria
+ * "0,65% a.m. a.m.". Uso o formatador canônico da casa e o texto renderizado é
+ * exatamente o que a OS pediu. Mesma regra do CLAUDE.md: custo SEMPRE em % a.m.
+ */
+function tituloShort(det: {
+  tipo?: string;
+  credito?: number;
+  custo_am?: number | null;
+}): string {
+  const label = LABEL_TIPO_BEM[det.tipo ?? ""] ?? "Carta contemplada";
+  const credito = typeof det.credito === "number" ? reais(det.credito) : null;
+  const custo = pctAoMes(det.custo_am ?? null);
+
+  const partes = [credito ? `${label} de ${credito}` : label, `custo ${custo}`];
+  return `${partes.join(" · ")} | Bidcon`;
+}
+
+async function subirParaYoutube(db: Db, linha: LinhaReel): Promise<void> {
+  if (process.env.FAROL_YOUTUBE !== "on") return;
+
+  try {
+    const det = (linha.detalhe ?? {}) as {
+      url_hospedada?: string;
+      yt_video_id?: string;
+      tipo?: string;
+      credito?: number;
+      custo_am?: number | null;
+    };
+
+    if (det.yt_video_id) {
+      console.log("[farol-youtube] já subiu, pulando:", {
+        video_id: linha.video_id,
+        yt_video_id: det.yt_video_id,
+      });
+      return;
+    }
+
+    if (!det.url_hospedada) {
+      console.log("[farol-youtube] sem url_hospedada (linha legada), pulando:", {
+        video_id: linha.video_id,
+      });
+      return;
+    }
+
+    const descricao = [linha.legenda ?? "", "", CANAL_YOUTUBE, ""].join("\n");
+
+    const r = await subirShort({
+      url: det.url_hospedada,
+      titulo: tituloShort(det),
+      descricao,
+      tags: TAGS_YOUTUBE,
+    });
+
+    if (!r.ok) {
+      // Erro do YouTube é EVENTO, não sentença: a linha continua 'publicado'
+      // e o `erro` dela não é tocado, porque ele descreve o IG.
+      console.error("[farol-youtube] upload falhou:", {
+        video_id: linha.video_id,
+        erro: r.erro,
+      });
+      await registrar(db, "reel_youtube_falhou", linha.carta_id, null, {
+        video_id: linha.video_id,
+        erro: r.erro,
+      });
+      return;
+    }
+
+    const detalheNovo = { ...(linha.detalhe ?? {}), yt_video_id: r.videoId };
+    await atualizar(db, linha.id, { detalhe: detalheNovo });
+    linha.detalhe = detalheNovo;
+
+    console.log("[farol-youtube] short publicado:", {
+      video_id: linha.video_id,
+      yt_video_id: r.videoId,
+      carta_id: linha.carta_id,
+    });
+    // `post_id` fica NULL de propósito: em `farol_posts` essa coluna significa
+    // "post do Instagram" em todos os outros eventos. O id do YouTube vai no
+    // detalhe, onde não se confunde com o do IG.
+    await registrar(db, "reel_youtube_publicado", linha.carta_id, null, {
+      video_id: linha.video_id,
+      yt_video_id: r.videoId,
+    });
+  } catch (e) {
+    // A rede de segurança final. Se a gravação do `detalhe` falhar, o Short já
+    // está no ar e o id vai para o log — que é a única forma de alguém amarrar
+    // um ao outro à mão. Nada disso volta para o chamador.
+    const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";
+    console.error("[farol-youtube] erro isolado (IG não afetado):", {
+      video_id: linha.video_id,
+      erro,
+    });
+  }
 }
 
 /**
