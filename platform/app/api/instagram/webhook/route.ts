@@ -203,12 +203,15 @@ function tipoEvento(ev: EventoIg): string {
 // FAROL_COMENTA_PUBLICO governa só a resposta pública, separadamente.
 // ============================================================================
 
-/** Texto fixo do direct. Sem número, sem promessa, termina em pergunta. */
+/** Texto fixo do direct. Sem número, sem promessa, termina em pergunta.
+ *  RÓTULO-IA (07/08): declara que é IA na primeira frase — ver reel-texto.ts. */
 const TEXTO_PRIVATE_REPLY =
-  "Oi! Vi seu comentário 👋 Vou te responder por aqui no direct — me conta: você procura carta de imóvel ou de veículo?";
+  "Oi! Sou o assistente IA da Bidcon 👋 Vi seu comentário e te respondo por aqui — me conta: você procura carta de imóvel ou de veículo?";
 
-/** Texto fixo da resposta pública. NUNCA valores/números aqui. */
-const TEXTO_RESPOSTA_PUBLICA = "Te respondemos no direct 💬";
+/** Texto fixo da resposta pública. NUNCA valores/números aqui.
+ *  RÓTULO-IA (07/08): "nosso assistente IA" em vez do "respondemos" plural, que
+ *  lia como equipe humana. */
+const TEXTO_RESPOSTA_PUBLICA = "Nosso assistente IA te respondeu no direct 💬";
 
 /** Prefixo do dedupe. Namespaced pra nunca colidir com um mid real da Meta. */
 const PREFIXO_DEDUPE_COMENTARIO = "igc:";

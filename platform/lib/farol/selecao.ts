@@ -209,10 +209,72 @@ export const TERMOS_PROIBIDOS = [
   "garantido",
 ];
 
+// ---------------------------------------------------------------------------
+// PROMESSA DE CONTEMPLAÇÃO — regra própria, por regex.
+// AUTORIZADO: Emerson Gomes dos Santos — microfatia "RÓTULO-IA + linter", 07/08.
+//
+// POR QUE NÃO ENTRA EM `TERMOS_PROIBIDOS`: aquela lista é substring pura, e a
+// palavra "contemplada" é O PRODUTO — "carta contemplada", "cota contemplada"
+// aparecem em toda legenda e em todo roteiro. Bloquear a palavra mataria o
+// FAROL inteiro. O que é proibido não é a palavra: é a PROMESSA (garantia ou
+// prazo). Por isso a regra olha o que vem GRUDADO nela.
+//
+// LACUNA REAL QUE ISTO FECHA (medida hoje): `TERMOS_PROIBIDOS` tem "garantido"
+// no masculino e NÃO tem "garantida". Logo "contemplação garantida" passava
+// limpo pelo linter até esta linha existir.
+//
+// Cada padrão abaixo é comentado com o que ele pega e o que ele deixa passar
+// de propósito — porque um linter de compliance que ninguém entende é um
+// linter que alguém desliga.
+// ---------------------------------------------------------------------------
+// `\w` em JS é [A-Za-z0-9_] e NÃO cobre acento — medido: /contempl\w*\s+em/
+// não pega "contemplação em 2 semanas", porque `\w*` para no "ç". Esta classe
+// existe só para consertar isso, e é usada onde havia `\w*`.
+const L = "[a-zà-öø-ÿ]";
+
+const PADROES_CONTEMPLACAO: Array<{ nome: string; re: RegExp }> = [
+  // "contemplação garantida", "contemplacao garantido". Fecha a lacuna do
+  // feminino descrita acima.
+  { nome: "contemplacao_garantida", re: /contempla(?:ç|c)(?:ã|a)o\s+garantid[ao]/ },
+
+  // "garantimos a contemplação", "garantia de contemplação" — a mesma promessa
+  // dita pelo outro lado da frase.
+  {
+    nome: "garantia_de_contemplacao",
+    re: new RegExp(`garant${L}*\\s+(?:a\\s+|de\\s+|da\\s+)?contempla`),
+  },
+
+  // "será contemplado", "vai ser contemplada", "estará contemplado" — futuro
+  // afirmativo sobre a pessoa. NÃO pega "foi contemplada" (passado, que é fato).
+  {
+    nome: "futuro_contemplado",
+    re: /(?:ser[áa]|vai\s+ser|v[ãa]o\s+ser|estar[áa]|fica)\s+contemplad[ao]/,
+  },
+
+  // "contemplado em 3 meses", "contemplada em até 90 dias", "contemplação em
+  // 2 semanas". EXIGE unidade de tempo depois do número, de propósito: sem
+  // isso, "contemplada em 2024" (fato passado, legítimo) seria reprovada.
+  {
+    nome: "prazo_de_contemplacao",
+    re: new RegExp(
+      `contempl${L}*\\s+em\\s+(?:at[ée]\\s+)?\\d+\\s*(?:dia|semana|m[eê]s|mes|ano)`
+    ),
+  },
+
+  // "contempla em ..." — verbo no presente prometendo evento futuro. Note que
+  // "contemplada em" NÃO casa aqui (depois de "contempla" vem "d", não espaço),
+  // então o produto continua livre.
+  { nome: "contempla_em", re: /contempla\s+em\b/ },
+];
+
 export function revisarLegenda(texto: string): string | null {
   const t = texto.toLowerCase();
   for (const termo of TERMOS_PROIBIDOS) {
     if (t.includes(termo)) return `termo_proibido:${termo}`;
+  }
+  // Promessa/prazo de contemplação — ver bloco acima.
+  for (const p of PADROES_CONTEMPLACAO) {
+    if (p.re.test(t)) return `promessa_contemplacao:${p.nome}`;
   }
   // Custo tem que aparecer como taxa ao mês, nunca como nominal simples.
   if (t.includes("%") && !t.includes("% a.m.")) return "percentual_sem_ao_mes";

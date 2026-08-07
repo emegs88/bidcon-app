@@ -82,7 +82,11 @@ export function montarRoteiro(c: CartaCarrossel): string {
   }
 
   return [
-    "Oi! Aqui é o porta-voz da Bidcon.",
+    // RÓTULO-IA (07/08): a apresentação declara que é IA. Não é enfeite legal —
+    // é a tese da casa (transparência-primeiro) na única linha em que ela cabe.
+    // Fica na PRIMEIRA frase de propósito: rótulo que aparece no fim é rótulo
+    // que a maioria não ouve.
+    "Oi! Eu sou o porta-voz digital da Bidcon — uma IA a serviço de gente de verdade.",
     `A carta de hoje é de ${c.tipoLabel.toLowerCase()}: ${numeros.join(", ")} —`,
     `custo de ${custoFalado(c.custoAm)}, tudo já calculado.`,
     "O pagamento é protegido por Conta Notarial em cartório:",
