@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/farol/reel-publicar",
-      "schedule": "0 15 * * *"
+      "schedule": "*/10 * * * *"
     }
   ]
 }

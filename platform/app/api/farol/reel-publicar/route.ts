@@ -81,6 +81,13 @@ const JANELA_HORAS = 24;
 /** Quantas linhas pendentes olhar por invocação (checagem de status é barata). */
 const LIMITE_LINHAS = 5;
 
+/**
+ * Idade a partir da qual um container 'publicando' vira suspeito de zumbi.
+ * 20 min é folgado de propósito: o polling normal é de 40s e o ciclo agora é de
+ * 10 min, então um container saudável tem ~30 leituras antes de ser tocado.
+ */
+const IDADE_ZUMBI_MS = 20 * 60 * 1000;
+
 type LinhaReel = {
   id: string;
   carta_id: string | null;
@@ -90,6 +97,7 @@ type LinhaReel = {
   legenda: string | null;
   detalhe: Record<string, unknown> | null;
   criado_em: string;
+  atualizado_em: string | null;
 };
 
 /**
@@ -218,7 +226,9 @@ export async function GET(req: Request) {
   try {
     const { data, error } = await db
       .from("farol_reels")
-      .select("id,carta_id,video_id,container_id,status,legenda,detalhe,criado_em")
+      .select(
+        "id,carta_id,video_id,container_id,status,legenda,detalhe,criado_em,atualizado_em"
+      )
       .in("status", ["renderizando", "pronto", "publicando"])
       .gte("criado_em", desde)
       .order("criado_em", { ascending: true })
@@ -245,10 +255,25 @@ export async function GET(req: Request) {
           olhados.push({ video_id: linha.video_id, resultado: "sem_orcamento" });
           break;
         }
-        const r = await publicarContainer(db, linha, linha.container_id);
-        olhados.push({ video_id: linha.video_id, resultado: r });
-        if (r === "publicado" || r === "falhou") break;
-        continue;
+
+        const z = await checarZumbi(linha, linha.container_id);
+        if (z.zumbi) {
+          // Autocura: zera o container e NÃO dá `continue` — cai no caminho
+          // normal logo abaixo, que relê o HeyGen e recria o container com uma
+          // video_url fresca. A do container velho já expirou; é exatamente por
+          // isso que ele travou.
+          console.warn("[farol-reel] container zumbi resetado", {
+            container_id: linha.container_id,
+            idade_min: z.idadeMin,
+          });
+          await atualizar(db, linha.id, { container_id: null });
+          linha.container_id = null;
+        } else {
+          const r = await publicarContainer(db, linha, linha.container_id);
+          olhados.push({ video_id: linha.video_id, resultado: r });
+          if (r === "publicado" || r === "falhou") break;
+          continue;
+        }
       }
 
       // ---- Estado do render no HeyGen -------------------------------------
@@ -446,6 +471,48 @@ async function publicarContainer(
     carta_id: linha.carta_id,
   });
   return "publicado";
+}
+
+/**
+ * Container zumbi: a linha ficou em 'publicando' com container_id, o tempo
+ * passou e o container da Meta CONTINUA IN_PROGRESS. Foi o que o operador
+ * destravou à mão hoje; aqui vira regra.
+ *
+ * Três recusas deliberadas, porque um reset errado custa um upload e pode
+ * jogar fora um vídeo que ia publicar:
+ *  - idade abaixo do limite: nem chama a Meta (o ciclo de 10 min não pode pagar
+ *    uma requisição por linha a cada passada);
+ *  - leitura ilegível (429, rede, token): NÃO é zumbi — não sei o estado, e não
+ *    saber nunca vira sentença;
+ *  - qualquer code que não seja IN_PROGRESS: devolve o code e o caminho normal
+ *    decide. FINISHED publica; ERROR/EXPIRED viram falha por `esperarContainer`,
+ *    que já registra o code literal. Duas rotas para o mesmo veredito seriam
+ *    duas verdades.
+ *
+ * Abandonar um container NÃO publica nada por acidente: container só vai ao ar
+ * por chamada explícita de `media_publish`, e o abandonado nunca mais recebe uma.
+ */
+async function checarZumbi(
+  linha: LinhaReel,
+  containerId: string
+): Promise<{ zumbi: boolean; code: string; idadeMin: number }> {
+  const base = linha.atualizado_em ?? linha.criado_em;
+  const idadeMs = Date.now() - new Date(base).getTime();
+  const idadeMin = Math.round(idadeMs / 60_000);
+
+  if (!Number.isFinite(idadeMs) || linha.status !== "publicando" || idadeMs < IDADE_ZUMBI_MS) {
+    return { zumbi: false, code: "NAO_CHECADO", idadeMin };
+  }
+
+  const s = await statusContainer(containerId);
+  if (!s.ok) {
+    console.error("[farol-reel] status do container ilegível:", {
+      container_id: containerId,
+      erro: s.erro,
+    });
+    return { zumbi: false, code: "ILEGIVEL", idadeMin };
+  }
+  return { zumbi: s.code === "IN_PROGRESS", code: s.code, idadeMin };
 }
 
 /** Encerra o que passou da janela de 24h — ver header. */
