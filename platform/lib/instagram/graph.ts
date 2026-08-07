@@ -162,6 +162,124 @@ async function chamarInstagram(
   }
 }
 
+// ============================================================================
+// FAROL-COMENTA (INSTA-03) — comentário vira direct.
+// ----------------------------------------------------------------------------
+// Duas chamadas novas, ambas medidas na doc oficial em 06/08/2026:
+//
+//   private reply  POST /<IG_ID>/messages
+//                  { "recipient": { "comment_id": "..." },
+//                    "message":   { "text": "..." } }
+//   resposta púb.  POST /<IG_COMMENT_ID>/replies   (parâmetro `message`)
+//
+// Limites LITERAIS da doc, que moldam o dedupe lá no webhook:
+//   "Only one message can be sent to the commenter"
+//   "The message must be sent within 7 days of the comment was made"
+// Ou seja: uma segunda tentativa no MESMO comentário é recusada pela Meta de
+// qualquer jeito. O dedupe daqui não é otimização, é evitar erro garantido.
+//
+// PERMISSÃO: as duas exigem `instagram_business_manage_comments`, que NÃO é
+// nenhuma das duas que o resto do produto usa (basic + content_publish). Se
+// ela não estiver no token, o erro chega literal no log [farol-comenta] —
+// é por isso que o erro da Graph é repassado inteiro e não normalizado.
+//
+// POR QUE NÃO REUSA chamarInstagram(): aquela função é do caminho de DM e
+// está em produção; a resposta pública tem OUTRA URL e devolve { id } em vez
+// de { message_id }. Mexer na assinatura dela pra caber os dois casos poria
+// o envio do Prosperito em risco por causa de uma feature nova. Então nasce
+// uma função irmã, e chamarInstagram fica byte a byte como estava.
+// ============================================================================
+
+/** POST cru na Graph do IG. Nunca lança; devolve o JSON pra quem chamou
+ *  interpretar (message_id na Messaging API, id em /replies). */
+async function postGraphIg(
+  url: string,
+  corpo: Record<string, unknown>
+): Promise<{ ok: boolean; data?: unknown; erro?: string }> {
+  const token = process.env.IG_ACCESS_TOKEN;
+  if (!token) return { ok: false, erro: "env_ausente(IG_ACCESS_TOKEN)" };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_IG_MS);
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(corpo),
+      signal: controller.signal,
+    });
+    const data: unknown = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      // code + subcode + message literais: é o que distingue "falta permissão"
+      // de "janela de 7 dias fechada" de "já respondi este comentário".
+      const err = (data as {
+        error?: { message?: string; code?: number; error_subcode?: number };
+      })?.error;
+      const partes = [
+        err?.code !== undefined ? `code=${err.code}` : null,
+        err?.error_subcode !== undefined ? `subcode=${err.error_subcode}` : null,
+        err?.message ?? `http_${resp.status}`,
+      ].filter(Boolean);
+      return { ok: false, erro: partes.join(" ").slice(0, 500) };
+    }
+    return { ok: true, data };
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return { ok: false, erro: `timeout_instagram_api(${TIMEOUT_IG_MS}ms)` };
+    }
+    return {
+      ok: false,
+      erro: e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Private reply: manda uma DM endereçada pelo COMENTÁRIO, não pelo IGSID.
+ * É o único jeito de abrir conversa com quem só comentou — fora disso a
+ * janela de 24h nunca abriria e o Prosperito não teria como falar.
+ *
+ * Usa /me/messages (mesma URL do envio normal): `me` traduz pro id da conta
+ * dona do token, e a doc do private reply usa /<IG_ID>/messages — mesmo
+ * endpoint, mesma família. Mantém a promessa do módulo de não depender de
+ * IG_USER_ID no caminho de mensagem.
+ *
+ * NÃO grava em wa_mensagens e NÃO lê opt_out: quem chama (o webhook) já fez
+ * as duas coisas, porque precisa da trava de dedupe ANTES do envio.
+ */
+export async function enviarPrivateReplyInstagram(params: {
+  commentId: string;
+  texto: string;
+}): Promise<{ ok: boolean; messageId?: string; erro?: string }> {
+  const r = await postGraphIg(IG_BASE_URL, {
+    recipient: { comment_id: params.commentId },
+    message: { text: params.texto },
+  });
+  if (!r.ok) return { ok: false, erro: r.erro };
+  return { ok: true, messageId: (r.data as { message_id?: string })?.message_id };
+}
+
+/**
+ * Resposta pública no fio do comentário. Texto curto e SEM número nenhum —
+ * vitrine limpa é regra do feed, e valor em comentário público é a porta de
+ * entrada de comparação fora de contexto.
+ */
+export async function responderComentarioPublico(
+  commentId: string,
+  mensagem: string
+): Promise<{ ok: boolean; id?: string; erro?: string }> {
+  const url = `https://graph.instagram.com/${IG_GRAPH_VERSION}/${commentId}/replies`;
+  const r = await postGraphIg(url, { message: mensagem });
+  if (!r.ok) return { ok: false, erro: r.erro };
+  return { ok: true, id: (r.data as { id?: string })?.id };
+}
+
 async function registrarEnvio(
   db: ReturnType<typeof createXtvClient>,
   params: EnvioBase & {

@@ -49,6 +49,10 @@ import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrarMensagemSistema } from "@/lib/whatsapp/sistema";
 import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
 import { ehTextoOptOut } from "@/lib/opt-out";
+import {
+  enviarPrivateReplyInstagram,
+  responderComentarioPublico,
+} from "@/lib/instagram/graph";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -160,6 +164,237 @@ function tipoEvento(ev: EventoIg): string {
   return "desconhecido";
 }
 
+// ============================================================================
+// FAROL-COMENTA (INSTA-03) — comentário vira direct.
+// AUTORIZADO: Emerson Gomes dos Santos — 06/08/2026 ~22h15.
+// ----------------------------------------------------------------------------
+// CORREÇÃO DE UM "CONTEXTO MEDIDO" DA OS, declarada aqui porque muda o código:
+// a OS afirma que o webhook "já recebe eventos de `comments` e os descarta em
+// [ig-skip]". Medido no código acima: extrairEventos() varre APENAS
+// entry[].messaging[]. Comentário chega em entry[].changes[] com
+// field:"comments" (referência oficial de webhooks do IG, medida em
+// 06/08/2026: value = { id, from{id,username,self_ig_scoped_id},
+// media{id,media_product_type}, text, parent_id, ad_id? }).
+// Logo, num payload de comentário extrairEventos devolve [] e o fluxo morre
+// no `if (eventos.length === 0)` SEM logar [ig-skip] — tipoEvento nem roda.
+// Confirmado nos logs de produção: todo [ig-skip] existente (echo/read/
+// desconhecido) vem de DM. Consequência: um ramo colocado dentro do laço de
+// mensagens NUNCA dispararia. Por isso o extrator abaixo é próprio, e a
+// chamada fica ANTES do early-return — o que também deixa o ramo de messages
+// literalmente intocado (diff = zero linhas alteradas lá dentro).
+//
+// POR QUE PRIVATE REPLY EXISTE: quem comentou nunca mandou DM, então não há
+// janela aberta e enviarInstagram() por IGSID seria recusado. O private reply
+// é o único jeito de abrir a conversa — e, aberta ela, a resposta da pessoa
+// cai no ramo de `messages` e o Prosperito assume sozinho. Zero código extra:
+// é esse o desenho.
+//
+// DEDUPE PELO ÍNDICE, NÃO POR SELECT: a Meta reenvia webhook que demora e
+// permite UM private reply por comentário, para sempre. Um `select` antes do
+// envio tem janela de corrida (dois reenvios simultâneos passam os dois).
+// Então a trava é o UNIQUE wa_mensagens.wa_message_id (medido:
+// wa_mensagens_wa_message_id_key): grava-se `igc:<comment_id>` ANTES de
+// enviar. Quem perder a corrida leva violação de unicidade e desiste. O preço
+// é que uma falha de envio não é retentada automaticamente — e isso é o lado
+// certo do trade: a Meta recusaria a segunda tentativa de qualquer forma.
+//
+// KILL-SWITCH: FAROL_COMENTA. Ausente/qualquer coisa != "on" => o ramo inteiro
+// vira log e nada mais. NASCE DESARMADO: armar é gesto do Emerson na Vercel.
+// FAROL_COMENTA_PUBLICO governa só a resposta pública, separadamente.
+// ============================================================================
+
+/** Texto fixo do direct. Sem número, sem promessa, termina em pergunta. */
+const TEXTO_PRIVATE_REPLY =
+  "Oi! Vi seu comentário 👋 Vou te responder por aqui no direct — me conta: você procura carta de imóvel ou de veículo?";
+
+/** Texto fixo da resposta pública. NUNCA valores/números aqui. */
+const TEXTO_RESPOSTA_PUBLICA = "Te respondemos no direct 💬";
+
+/** Prefixo do dedupe. Namespaced pra nunca colidir com um mid real da Meta. */
+const PREFIXO_DEDUPE_COMENTARIO = "igc:";
+
+type ComentarioIg = {
+  /** id do comentário — é ele que endereça o private reply e o /replies. */
+  id?: string;
+  text?: string;
+  parent_id?: string;
+  from?: { id?: string; username?: string };
+  media?: { id?: string; media_product_type?: string };
+  /** presente em edições/eventos que não são criação de comentário. */
+  verb?: string;
+  /** id da conta que recebeu o evento (entry[].id), carregado junto. */
+  _contaId?: string;
+};
+
+/** Varre entry[].changes[] pegando só field === "comments". */
+function extrairComentarios(corpo: unknown): ComentarioIg[] {
+  const entry = (corpo as { entry?: unknown })?.entry;
+  if (!Array.isArray(entry)) return [];
+  const saida: ComentarioIg[] = [];
+  for (const e of entry) {
+    const changes = (e as { changes?: unknown })?.changes;
+    const contaId = (e as { id?: string })?.id;
+    if (!Array.isArray(changes)) continue;
+    for (const c of changes) {
+      const campo = (c as { field?: string })?.field;
+      if (campo !== "comments") continue;
+      const value = (c as { value?: unknown })?.value;
+      if (!value || typeof value !== "object") continue;
+      saida.push({ ...(value as ComentarioIg), _contaId: contaId });
+    }
+  }
+  return saida;
+}
+
+/** True se o comentário é NOSSO (post/resposta da própria conta). Sem isto,
+ *  a resposta pública que nós mesmos publicamos volta como evento e o ramo
+ *  se auto-alimenta em laço infinito. Compara contra as DUAS fontes do id da
+ *  conta que existem no runtime: a env e o entry[].id do próprio payload. */
+function comentarioProprio(c: ComentarioIg): boolean {
+  const autor = c.from?.id;
+  if (!autor) return false;
+  const envId = process.env.IG_USER_ID;
+  return autor === envId || autor === c._contaId;
+}
+
+/**
+ * Trata os comentários de um payload. Nunca lança: cada comentário tem seu
+ * try/catch, porque um evento ruim não pode derrubar os outros nem o ack.
+ * Roda de forma síncrona antes do ack de propósito — são no máximo duas
+ * chamadas à Graph e, se a Meta reenviar por demora, o dedupe segura.
+ */
+async function tratarComentarios(comentarios: ComentarioIg[]): Promise<void> {
+  if (process.env.FAROL_COMENTA !== "on") {
+    console.log("[ig-skip] comments (desarmado):", comentarios.length);
+    return;
+  }
+
+  const db = createXtvClient();
+  const respondePublico = process.env.FAROL_COMENTA_PUBLICO === "on";
+
+  for (const c of comentarios) {
+    try {
+      const commentId = typeof c.id === "string" ? c.id : "";
+      const autor = typeof c.from?.id === "string" ? c.from.id : "";
+
+      if (!commentId) {
+        console.log("[farol-comenta] ignorado: comentario_sem_id");
+        continue;
+      }
+      // Edição/remoção não é comentário novo — nada a responder.
+      if (c.verb && c.verb !== "add") {
+        console.log("[farol-comenta] ignorado: verb =", c.verb);
+        continue;
+      }
+      if (comentarioProprio(c)) {
+        console.log("[farol-comenta] ignorado: comentario_proprio");
+        continue;
+      }
+      if (!autor) {
+        console.log("[farol-comenta] ignorado: comentario_sem_autor");
+        continue;
+      }
+
+      // --- conversa (mesmo par telefone/canal do ramo de mensagens) --------
+      const { data: conversa, error: errConversa } = await db
+        .from("wa_conversas")
+        .upsert(
+          { telefone: autor, canal: "instagram" },
+          { onConflict: "telefone,canal", ignoreDuplicates: false }
+        )
+        .select("id, opt_out")
+        .single();
+
+      if (errConversa || !conversa) {
+        console.error(
+          "[farol-comenta] falha na conversa:",
+          errConversa?.message ?? "sem_retorno"
+        );
+        continue;
+      }
+
+      // LGPD: quem pediu SAIR não recebe nem private reply. Canal não muda regra.
+      if (conversa.opt_out === true) {
+        console.log("[farol-comenta] ignorado: opt_out");
+        continue;
+      }
+
+      // --- trava atômica: quem gravar primeiro é quem responde -------------
+      const chaveDedupe = `${PREFIXO_DEDUPE_COMENTARIO}${commentId}`;
+      const { data: linha, error: errInsert } = await db
+        .from("wa_mensagens")
+        .insert({
+          conversa_id: conversa.id,
+          papel: "prosperito",
+          agente: "farol-comenta",
+          conteudo: TEXTO_PRIVATE_REPLY,
+          wa_message_id: chaveDedupe,
+          status_envio: "enviando",
+        })
+        .select("id")
+        .single();
+
+      if (errInsert) {
+        // 23505 = unique_violation => este comentário já foi tratado.
+        console.log(
+          "[farol-comenta] ignorado: ja_respondido ou insert recusado:",
+          errInsert.code ?? errInsert.message
+        );
+        continue;
+      }
+
+      // --- private reply (o coração da fatia) ------------------------------
+      const envio = await enviarPrivateReplyInstagram({
+        commentId,
+        texto: TEXTO_PRIVATE_REPLY,
+      });
+
+      await db
+        .from("wa_mensagens")
+        .update({
+          status_envio: envio.ok ? "enviado" : "falha",
+          erro: envio.ok ? null : (envio.erro ?? null),
+        })
+        .eq("id", linha.id);
+
+      if (!envio.ok) {
+        console.error("[farol-comenta] private reply recusado:", {
+          comment_id: commentId,
+          erro: envio.erro,
+        });
+        continue; // sem direct, resposta pública prometeria o que não houve
+      }
+
+      console.log("[farol-comenta] direct enviado:", {
+        comment_id: commentId,
+        conversa_id: conversa.id,
+        message_id: envio.messageId ?? null,
+      });
+
+      // --- resposta pública (opcional, governada por env própria) ----------
+      if (!respondePublico) continue;
+      const publica = await responderComentarioPublico(
+        commentId,
+        TEXTO_RESPOSTA_PUBLICA
+      );
+      if (!publica.ok) {
+        // Falhar aqui NÃO desfaz o direct, que é o que importa.
+        console.error("[farol-comenta] resposta pública recusada:", {
+          comment_id: commentId,
+          erro: publica.erro,
+        });
+      } else {
+        console.log("[farol-comenta] resposta pública:", publica.id ?? null);
+      }
+    } catch (e) {
+      console.error(
+        "[farol-comenta] erro tratando comentário:",
+        e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido"
+      );
+    }
+  }
+}
+
 // --- POST -------------------------------------------------------------------
 export async function POST(req: Request) {
   const corpoBruto = await req.text();
@@ -186,6 +421,17 @@ export async function POST(req: Request) {
   if (objeto !== "instagram") {
     console.log("[ig-skip] object inesperado:", JSON.stringify(objeto ?? null));
     return NextResponse.json({ status: "ignorado" });
+  }
+
+  // FAROL-COMENTA: comentário chega em entry[].changes[], NÃO em
+  // entry[].messaging[] — então tem que ser tratado aqui, antes do
+  // early-return abaixo, que devolveria "ignorado" sem nem logar. Colocado
+  // fora do laço de mensagens de propósito: aquele bloco segue intocado.
+  // (Se o payload só tiver comentário, a resposta ainda sai como "ignorado";
+  //  o corpo é cosmético — a Meta só olha o 200.)
+  const comentarios = extrairComentarios(evento);
+  if (comentarios.length > 0) {
+    await tratarComentarios(comentarios);
   }
 
   const eventos = extrairEventos(evento);
