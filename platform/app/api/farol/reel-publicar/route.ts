@@ -62,7 +62,13 @@ import { statusVideo, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/**
+ * 180s, e não os 60 de antes: o caminho caro agora é orçamento (45s) + download
+ * do mp4 (45s) + upload pro bucket (~20s) + polling do container (40s) = 150s de
+ * pior caso. 60s garantiria timeout no meio do upload — e um upload cortado ao
+ * meio é a única forma de esta rota gravar uma URL que não toca.
+ */
+export const maxDuration = 180;
 
 /** Mesma versão da Graph que lib/instagram/publicar.ts — um produto, uma versão. */
 const IG_GRAPH_VERSION = "v25.0";
@@ -72,8 +78,21 @@ const TIMEOUT_IG_MS = 15_000;
 const POLL_MAX_MS = 40_000;
 const POLL_PASSO_MS = 5_000;
 
-/** Só entra no caminho caro se ainda couber o polling inteiro com folga. */
-const ORCAMENTO_MS = 12_000;
+/**
+ * Só entra no caminho caro se ainda couber o trabalho inteiro com folga. Subiu
+ * de 12s para 45s junto com o maxDuration: o caminho caro deixou de ser "um
+ * POST + polling" e passou a incluir baixar e subir dezenas de MB.
+ */
+const ORCAMENTO_MS = 45_000;
+
+/** Bucket público do xtv onde o mp4 do reel passa a morar. */
+const BUCKET_VIDEOS = "farol-videos";
+
+/** Teto defensivo: reel de ~31s em 1080p dá 10–25MB. 80MB é absurdo, logo é bug. */
+const TETO_VIDEO_BYTES = 80 * 1024 * 1024;
+
+/** Timeout do download do mp4 no HeyGen. Ver a conta no maxDuration. */
+const TIMEOUT_VIDEO_MS = 45_000;
 
 /** Container da Meta expira em 24h — ver header. */
 const JANELA_HORAS = 24;
@@ -161,6 +180,92 @@ async function atualizar(
     .update({ ...campos, atualizado_em: new Date().toISOString() })
     .eq("id", id);
   if (error) console.error("[farol-reel] falha atualizando farol_reels:", error.message);
+}
+
+/**
+ * Cria o bucket se ainda não existir. Idempotente de propósito: "já existe" é
+ * SUCESSO, não erro — a rota roda a cada 10 min e não pode depender de alguém
+ * ter clicado no painel do Supabase antes.
+ */
+async function garantirBucket(db: Db): Promise<void> {
+  const { error } = await db.storage.createBucket(BUCKET_VIDEOS, {
+    public: true,
+    fileSizeLimit: TETO_VIDEO_BYTES,
+    allowedMimeTypes: ["video/mp4"],
+  });
+  if (error && !/exist/i.test(error.message)) {
+    throw new Error(`bucket_falhou: ${error.message}`);
+  }
+}
+
+/**
+ * Baixa o mp4 do HeyGen e o guarda em casa, devolvendo a URL pública.
+ *
+ * POR QUE ISTO EXISTE — medido em produção hoje, não suposto: a URL do HeyGen é
+ * presignada e expira, e a Meta DEDUPLICA a criação do container pelo objeto —
+ * a mesma video_url devolveu sempre o MESMO container_id (17878184478684841),
+ * estacionado em IN_PROGRESS por mais de uma hora. Com a URL de terceiro, o
+ * container zumbi era imortal: a autocura resetava, pedia outro, e a Meta
+ * devolvia o mesmo. Hospedar mata os três problemas de uma vez — a URL fica
+ * estável, é rápida (mesma região do banco) e é NOVA a cada objeto, então o
+ * dedupe da Meta não tem em que se agarrar.
+ *
+ * BENEFÍCIO LATERAL, registrado a pedido da coordenação: este mp4 é o asset
+ * oficial para repost manual no TikTok enquanto a auditoria deles não sai. Ele
+ * não é subproduto do Instagram — é o arquivo, e mora num endereço estável.
+ *
+ * Nunca lança para o laço: devolve erro literal, e o chamador decide.
+ */
+async function hospedarVideo(
+  db: Db,
+  videoId: string,
+  videoUrl: string
+): Promise<{ ok: true; url: string } | { ok: false; erro: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_VIDEO_MS);
+  try {
+    await garantirBucket(db);
+
+    const resp = await fetch(videoUrl, { signal: ctrl.signal });
+    if (!resp.ok) return { ok: false, erro: `download_http_${resp.status}` };
+
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    // Zero byte é o modo silencioso de falhar de URL expirada: 200 com corpo
+    // vazio. Subir isso publicaria um reel quebrado no perfil público.
+    if (bytes.byteLength === 0) return { ok: false, erro: "download_vazio" };
+    if (bytes.byteLength > TETO_VIDEO_BYTES) {
+      return { ok: false, erro: `download_grande(${bytes.byteLength}b)` };
+    }
+
+    // `upsert` + nome derivado do video_id = idempotência do objeto: rodar duas
+    // vezes reescreve o mesmo arquivo, nunca cria um segundo.
+    const path = `${videoId}.mp4`;
+    const up = await db.storage.from(BUCKET_VIDEOS).upload(path, bytes, {
+      contentType: "video/mp4",
+      upsert: true,
+    });
+    if (up.error) return { ok: false, erro: `upload_falhou: ${up.error.message}` };
+
+    const { data } = db.storage.from(BUCKET_VIDEOS).getPublicUrl(path);
+    if (!data?.publicUrl) return { ok: false, erro: "sem_url_publica" };
+
+    console.log("[farol-reel] vídeo hospedado:", {
+      video_id: videoId,
+      bytes: bytes.byteLength,
+      url: data.publicUrl,
+    });
+    return { ok: true, url: data.publicUrl };
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return { ok: false, erro: `timeout_download(${TIMEOUT_VIDEO_MS}ms)` };
+    }
+    return {
+      ok: false,
+      erro: e instanceof Error ? e.message.slice(0, 300) : "erro_desconhecido",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -256,15 +361,29 @@ export async function GET(req: Request) {
           break;
         }
 
-        const z = await checarZumbi(linha, linha.container_id);
+        // Container LEGADO = criado com a URL expirável do HeyGen, antes desta
+        // fatia. Reconhecido pela ausência de `url_hospedada` no detalhe, e não
+        // por um id chumbado no código: o 17878184478684841 é o caso de hoje,
+        // a condição é a regra. Esses containers não melhoram com o tempo —
+        // são exatamente os que a Meta devolve iguais para sempre — então a
+        // espera de 20 min não compra informação nenhuma e é dispensada.
+        const detAtual = (linha.detalhe ?? {}) as { url_hospedada?: string };
+        const legado = !detAtual.url_hospedada;
+
+        const z = await checarZumbi(linha, linha.container_id, legado);
         if (z.zumbi) {
           // Autocura: zera o container e NÃO dá `continue` — cai no caminho
-          // normal logo abaixo, que relê o HeyGen e recria o container com uma
-          // video_url fresca. A do container velho já expirou; é exatamente por
-          // isso que ele travou.
+          // normal logo abaixo, que relê o HeyGen, HOSPEDA o mp4 e só então
+          // pede um container novo.
+          // CORRIGINDO A PREMISSA ORIGINAL desta autocura, que a medição de
+          // 07/08 refutou: não bastava "recriar com video_url fresca". Com a
+          // URL do HeyGen, a Meta devolvia o MESMO container — o reset girava
+          // em falso a cada 10 min. O que realmente quebra o ciclo é a URL ser
+          // NOSSA e nova; o reset sozinho nunca resolveu nada.
           console.warn("[farol-reel] container zumbi resetado", {
             container_id: linha.container_id,
             idade_min: z.idadeMin,
+            motivo: legado ? "sem_url_hospedada" : "idade",
           });
           await atualizar(db, linha.id, { container_id: null });
           linha.container_id = null;
@@ -334,6 +453,15 @@ export async function GET(req: Request) {
         continue;
       }
 
+      // `pronto` sem URL não sai de `lerStatus`, mas o tipo permite — e daqui
+      // pra frente a URL é obrigatória. Estreita aqui, uma vez, em vez de `!`
+      // espalhado adiante.
+      if (!s.data.videoUrl) {
+        console.error("[farol-reel] pronto sem video_url:", { video_id: linha.video_id });
+        olhados.push({ video_id: linha.video_id, resultado: "sem_video_url" });
+        continue;
+      }
+
       // ---- Pronto: caminho caro. Orçamento e reclamação antes da Meta ------
       if (Date.now() - inicio > ORCAMENTO_MS) {
         olhados.push({ video_id: linha.video_id, resultado: "sem_orcamento" });
@@ -356,11 +484,39 @@ export async function GET(req: Request) {
         break;
       }
 
-      // A URL do HeyGen é presignada e EXPIRA — por isso ela é usada aqui, na
-      // mesma invocação em que foi lida, e nunca guardada para depois.
+      // ---- Hospedagem: o mp4 passa a morar em casa -------------------------
+      // Reaproveita o que já estiver hospedado (o objeto é idempotente por
+      // video_id), para que uma republicação não pague o download de novo.
+      const detPre = (linha.detalhe ?? {}) as { url_hospedada?: string };
+      let urlPublica = detPre.url_hospedada ?? null;
+      if (!urlPublica) {
+        const h = await hospedarVideo(db, linha.video_id, s.data.videoUrl);
+        if (!h.ok) {
+          // Falha de hospedagem NÃO condena o render: a linha fica 'publicando'
+          // com container_id nulo e o próximo ciclo tenta de novo do zero.
+          // `break` e não `continue` porque esta invocação já gastou o
+          // orçamento pesado — insistir noutra linha convida o timeout.
+          console.error("[farol-reel] hospedagem falhou:", {
+            video_id: linha.video_id,
+            erro: h.erro,
+          });
+          olhados.push({ video_id: linha.video_id, resultado: "hospedagem_falhou" });
+          break;
+        }
+        urlPublica = h.url;
+        // Grava ANTES de criar o container, pelo mesmo motivo da trava (3): se
+        // a invocação morrer no meio, a próxima reaproveita o upload em vez de
+        // refazê-lo — e é este campo que distingue container novo de legado.
+        const detalheNovo = { ...(linha.detalhe ?? {}), url_hospedada: urlPublica };
+        await atualizar(db, linha.id, { detalhe: detalheNovo });
+        linha.detalhe = detalheNovo;
+      }
+
+      // A Meta recebe a NOSSA URL: estável, sem expiração e distinta por objeto
+      // — que é o que quebra o dedupe de container medido hoje.
       const container = await chamarGraph("media", {
         media_type: "REELS",
-        video_url: s.data.videoUrl,
+        video_url: urlPublica,
         caption: legenda,
         share_to_feed: true,
       });
@@ -494,13 +650,17 @@ async function publicarContainer(
  */
 async function checarZumbi(
   linha: LinhaReel,
-  containerId: string
+  containerId: string,
+  ignorarIdade: boolean
 ): Promise<{ zumbi: boolean; code: string; idadeMin: number }> {
   const base = linha.atualizado_em ?? linha.criado_em;
   const idadeMs = Date.now() - new Date(base).getTime();
   const idadeMin = Math.round(idadeMs / 60_000);
 
-  if (!Number.isFinite(idadeMs) || linha.status !== "publicando" || idadeMs < IDADE_ZUMBI_MS) {
+  // `ignorarIdade` dispensa a ESPERA, nunca a checagem de estado logo abaixo:
+  // um container legado que já esteja FINISHED tem que publicar, não morrer.
+  const idadeOk = Number.isFinite(idadeMs) && idadeMs >= IDADE_ZUMBI_MS;
+  if (linha.status !== "publicando" || (!ignorarIdade && !idadeOk)) {
     return { zumbi: false, code: "NAO_CHECADO", idadeMin };
   }
 
