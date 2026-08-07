@@ -16,6 +16,14 @@
     {
       "path": "/api/farol/post-diario",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/farol/reel-render",
+      "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/farol/reel-publicar",
+      "schedule": "0 15 * * *"
     }
   ]
 }

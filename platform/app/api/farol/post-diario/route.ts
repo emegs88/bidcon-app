@@ -66,108 +66,36 @@
 // Conta Notarial descrita como ela é, sem "risco zero". O template abaixo
 // cumpre isso — e `revisarLegenda()` verifica antes de publicar, para que uma
 // edição futura no texto não vire um post irregular no perfil público.
+//
+// ---------------------------------------------------------------------------
+// EXTRAÇÃO (FAROL-REEL-01, 06/08/2026): o guard, a data em São Paulo, a memória
+// de 14 dias, a busca de candidatos, a escolha, a trava de compliance e o
+// `registrar()` saíram DESTE arquivo e viraram lib/farol/selecao.ts, porque a
+// OS do reel manda usar "a MESMA lib de seleção do FAROL-POST" — e ela não
+// existia. MUDANÇA DE ENDEREÇO, NÃO DE COMPORTAMENTO: o corpo foi levado
+// literal, incluindo strings de erro e prefixo de log. O que sobra aqui é o que
+// é só desta rota: o template da legenda e o fluxo do post de feed.
 // ============================================================================
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { publicarCartaNoFeed } from "@/lib/instagram/publicar";
 import {
-  CAMPOS_VITRINE,
-  normalizarCarta,
+  autorizadoFarol,
+  hojeSP,
+  publicadasRecentemente,
+  escolherCartaDoDia,
+  revisarLegenda,
+  registrar,
+} from "@/lib/farol/selecao";
+import {
   reais,
   pctAoMes,
   type CartaCarrossel,
-  type LinhaVitrine,
 } from "@/lib/carrossel-formato";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const TZ = "America/Sao_Paulo";
-
-/** Dias sem repetir a mesma carta. Regra da OS. */
-const JANELA_REPETICAO_DIAS = 14;
-
-/** Quantos candidatos mais baratos puxar da view antes do cálculo canônico. */
-const LIMITE_CANDIDATOS = 80;
-
-/** Espelha `autorizado()` de app/api/sentinela/varredura/route.ts — ver header. */
-function autorizado(req: Request): boolean {
-  const secret = process.env.FAROL_SECRET || process.env.CRON_SECRET;
-  if (!secret) return false; // sem secret configurado => não roda
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
-/** Dia do mês e "é segunda?" no fuso de São Paulo — ver header. */
-function hojeSP(): { data: string; dia: number; segunda: boolean } {
-  const agora = new Date();
-  // en-CA devolve YYYY-MM-DD, que é ordenável e não ambíguo.
-  const data = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(agora);
-  const semana = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ,
-    weekday: "short",
-  }).format(agora);
-  return { data, dia: Number(data.slice(8, 10)), segunda: semana === "Mon" };
-}
-
-/** Cartas já publicadas na janela — a memória que impede repetir. */
-async function publicadasRecentemente(
-  db: ReturnType<typeof createXtvClient>
-): Promise<Set<string>> {
-  const desde = new Date(
-    Date.now() - JANELA_REPETICAO_DIAS * 24 * 60 * 60 * 1000
-  ).toISOString();
-  const { data, error } = await db
-    .from("farol_posts")
-    .select("carta_id")
-    .eq("acao", "post_publicado")
-    .gte("criado_em", desde);
-  if (error) {
-    // Falha de leitura NÃO pode virar "pode repetir tudo": sem a memória, o
-    // FAROL poderia postar a mesma carta dois dias seguidos. Propaga.
-    throw new Error(`farol_posts_ilegivel: ${error.message}`);
-  }
-  const ids = new Set<string>();
-  for (const l of (data ?? []) as { carta_id: string | null }[]) {
-    if (l.carta_id) ids.add(l.carta_id);
-  }
-  return ids;
-}
-
-/**
- * Busca candidatos na view (mais baratos primeiro pelo `custo_am` da view),
- * remove os repetidos, recalcula o custo pelo canônico e devolve ordenado.
- */
-async function candidatos(
-  db: ReturnType<typeof createXtvClient>,
-  filtro: { tipo?: string; exclusiva?: boolean },
-  excluidos: Set<string>
-): Promise<CartaCarrossel[]> {
-  let q = db
-    .from("vw_vitrine_viva")
-    .select(CAMPOS_VITRINE)
-    .order("custo_am", { ascending: true, nullsFirst: false })
-    .limit(LIMITE_CANDIDATOS);
-  if (filtro.tipo) q = q.eq("tipo", filtro.tipo);
-  if (filtro.exclusiva) q = q.eq("exclusiva", true);
-
-  const { data, error } = await q;
-  if (error) throw new Error(`vitrine_ilegivel: ${error.message}`);
-
-  return ((data ?? []) as LinhaVitrine[])
-    .map(normalizarCarta)
-    .filter((c): c is CartaCarrossel => c !== null)
-    .filter((c) => !excluidos.has(c.id))
-    // custoAm null = a carta não tem parcela/prazo utilizáveis. O card e a
-    // legenda mostrariam "—" no lugar do número principal. Fora.
-    .filter((c) => c.custoAm != null)
-    .sort((a, b) => (a.custoAm as number) - (b.custoAm as number));
-}
 
 // ---------------------------------------------------------------------------
 // Legenda
@@ -220,51 +148,10 @@ function montarLegenda(c: CartaCarrossel): string {
   return linhas.join("\n");
 }
 
-/**
- * Trava determinística de compliance (NÃO é IA). Só pode disparar se alguém
- * editar o template acima — que é exatamente o ponto: o dia em que a legenda
- * for reescrita às pressas, o post não sai em vez de sair irregular.
- * Lista literal do CLAUDE.md.
- */
-const TERMOS_PROIBIDOS = [
-  "investimento",
-  "investidor",
-  "rendimento",
-  "lucro",
-  "cdi",
-  "risco zero",
-  "100% seguro",
-  "garantido",
-];
-
-function revisarLegenda(texto: string): string | null {
-  const t = texto.toLowerCase();
-  for (const termo of TERMOS_PROIBIDOS) {
-    if (t.includes(termo)) return `termo_proibido:${termo}`;
-  }
-  // Custo tem que aparecer como taxa ao mês, nunca como nominal simples.
-  if (t.includes("%") && !t.includes("% a.m.")) return "percentual_sem_ao_mes";
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 
-/** Grava no diário do FAROL. Nunca derruba a rota: log é log. */
-async function registrar(
-  db: ReturnType<typeof createXtvClient>,
-  acao: string,
-  carta_id: string | null,
-  post_id: string | null,
-  detalhe: Record<string, unknown>
-): Promise<void> {
-  const { error } = await db
-    .from("farol_posts")
-    .insert({ acao, carta_id, post_id, detalhe });
-  if (error) console.error("[farol] falha gravando farol_posts:", error.message);
-}
-
 export async function GET(req: Request) {
-  if (!autorizado(req)) {
+  if (!autorizadoFarol(req)) {
     return NextResponse.json({ erro: "nao_autorizado" }, { status: 401 });
   }
 
@@ -278,38 +165,16 @@ export async function GET(req: Request) {
   const { data: hoje, dia, segunda } = hojeSP();
 
   try {
-    const excluidos = await publicadasRecentemente(db);
+    // Memória com ["post_publicado"] — exatamente a mesma lista de antes da
+    // extração, para que o comportamento desta rota não mude. Ver header.
+    const excluidos = await publicadasRecentemente(db, ["post_publicado"]);
 
     // ---- Escolha da carta -------------------------------------------------
-    const tipoDoDia = dia % 2 === 1 ? "imovel" : "veiculo";
-    const tipoAlternativo = tipoDoDia === "imovel" ? "veiculo" : "imovel";
-
-    let escolhida: CartaCarrossel | null = null;
-    let motivoEscolha = "";
-
-    // Segunda: exclusiva fura fila (qualquer tipo). Se não houver exclusiva
-    // elegível, o dia segue a regra normal — sem post especial, sem erro.
-    if (segunda) {
-      const exclusivas = await candidatos(db, { exclusiva: true }, excluidos);
-      if (exclusivas.length > 0) {
-        escolhida = exclusivas[0];
-        motivoEscolha = "exclusiva_segunda";
-      }
-    }
-
-    if (!escolhida) {
-      const doTipo = await candidatos(db, { tipo: tipoDoDia }, excluidos);
-      if (doTipo.length > 0) {
-        escolhida = doTipo[0];
-        motivoEscolha = `tipo_do_dia:${tipoDoDia}`;
-      } else {
-        const doOutro = await candidatos(db, { tipo: tipoAlternativo }, excluidos);
-        if (doOutro.length > 0) {
-          escolhida = doOutro[0];
-          motivoEscolha = `tipo_alternativo:${tipoAlternativo}`;
-        }
-      }
-    }
+    const {
+      carta: escolhida,
+      motivo: motivoEscolha,
+      tipoDoDia,
+    } = await escolherCartaDoDia(db, { dia, segunda, excluidos });
 
     if (!escolhida) {
       console.log("[farol] sem carta elegível hoje:", { data: hoje, tipoDoDia });
