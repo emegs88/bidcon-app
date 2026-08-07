@@ -88,8 +88,17 @@ const ORCAMENTO_MS = 45_000;
 /** Bucket público do xtv onde o mp4 do reel passa a morar. */
 const BUCKET_VIDEOS = "farol-videos";
 
-/** Teto defensivo: reel de ~31s em 1080p dá 10–25MB. 80MB é absurdo, logo é bug. */
-const TETO_VIDEO_BYTES = 80 * 1024 * 1024;
+/**
+ * Teto defensivo: reel de ~31s em 1080p dá 10–25MB. Acima disto é bug, não vídeo.
+ *
+ * ERA 80MB e isso QUEBROU o primeiro tique (20:10:08 de 07/08): o valor ia
+ * também como `fileSizeLimit` do bucket, e o projeto tem um limite GLOBAL de
+ * upload menor que isso — o `createBucket` inteiro voltou
+ * "The object exceeded the maximum allowed size" e o bucket nunca nasceu.
+ * 45MB fica sob qualquer teto global de projeto e ainda dá ~2x de folga sobre o
+ * maior reel plausível. O limite agora vive SÓ aqui, no código (ver garantirBucket).
+ */
+const TETO_VIDEO_BYTES = 45 * 1024 * 1024;
 
 /** Timeout do download do mp4 no HeyGen. Ver a conta no maxDuration. */
 const TIMEOUT_VIDEO_MS = 45_000;
@@ -188,11 +197,14 @@ async function atualizar(
  * ter clicado no painel do Supabase antes.
  */
 async function garantirBucket(db: Db): Promise<void> {
-  const { error } = await db.storage.createBucket(BUCKET_VIDEOS, {
-    public: true,
-    fileSizeLimit: TETO_VIDEO_BYTES,
-    allowedMimeTypes: ["video/mp4"],
-  });
+  // SÓ `public: true`, de propósito — mesmo formato do único bucket que a casa
+  // já tem (`wa-extratos`, medido: file_size_limit e allowed_mime_types nulos).
+  // Passar `fileSizeLimit` maior que o teto global do projeto faz o createBucket
+  // falhar por inteiro, que foi exatamente o que derrubou o tique das 20:10.
+  // O teto de tamanho e o tipo do arquivo já são garantidos aqui no código
+  // (TETO_VIDEO_BYTES antes do upload, contentType fixo em video/mp4) — repetir
+  // isso na config do bucket não comprava segurança nova e custou uma rodada.
+  const { error } = await db.storage.createBucket(BUCKET_VIDEOS, { public: true });
   if (error && !/exist/i.test(error.message)) {
     throw new Error(`bucket_falhou: ${error.message}`);
   }
