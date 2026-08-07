@@ -167,7 +167,18 @@ export async function publicarCartaNoFeed(params: {
     };
   }
 
-  const imageUrl = `${HOST_PUBLICO}/api/card-image/${cartaId}`;
+  // VISUAL-KIT-APLICADO-01 (06/08/2026 ~23h30): `?formato=feed` = 1080×1080.
+  // Sem ele, sai o card do WhatsApp (1200×630). O Instagram ACEITA 1.91:1 no
+  // feed — o post inaugural provou —, mas o GRID do perfil é quadrado e corta
+  // as laterais: o crédito, que é a única coisa que faz alguém parar de rolar,
+  // some. E o kit v3 nunca aparece. O quadrado resolve os dois.
+  //
+  // ISTO MUDA TAMBÉM A ARTE DA ROTA MANUAL /api/instagram/publicar, que chama
+  // esta mesma função. É intencional, e é o certo: as duas publicam no MESMO
+  // feed, e um grid com duas proporções diferentes seria pior do que qualquer
+  // uma das duas sozinha. Declarado porque a OS anterior exigia diff funcional
+  // zero naquela rota — este é o único ponto em que ela muda, e por decisão.
+  const imageUrl = `${HOST_PUBLICO}/api/card-image/${cartaId}?formato=feed`;
 
   // ---- 2. Container ------------------------------------------------------
   const container = await chamarGraph("media", {
