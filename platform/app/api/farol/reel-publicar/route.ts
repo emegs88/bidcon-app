@@ -60,6 +60,7 @@ import { autorizadoFarol, revisarLegenda, registrar } from "@/lib/farol/selecao"
 import { chamarGraph } from "@/lib/instagram/publicar";
 import { statusVideo, tituloRender } from "@/lib/heygen";
 import { subirShort } from "@/lib/youtube/upload";
+import { publicarVideo } from "@/lib/tiktok/upload";
 import { reais, pctAoMes } from "@/lib/carrossel-formato";
 import { LABEL_TIPO_BEM } from "@/lib/status";
 
@@ -740,6 +741,13 @@ async function publicarContainer(
   // — ver `subirParaYoutube`, que nunca lança e nunca muda o veredito abaixo.
   await subirParaYoutube(db, linha);
 
+  // TIKTOK-01: o MESMO mp4, terceira casa. Roda DEPOIS do YouTube e é
+  // igualmente inofensiva ao veredito. A ordem importa por um motivo só: o
+  // `subirParaYoutube` acima sincroniza `linha.detalhe` em memória depois de
+  // gravar, então o spread aqui embaixo preserva o `yt_video_id` em vez de
+  // sobrescrevê-lo com uma cópia velha do objeto.
+  await subirParaTiktok(db, linha);
+
   return "publicado";
 }
 
@@ -872,6 +880,107 @@ async function subirParaYoutube(db: Db, linha: LinhaReel): Promise<void> {
     // um ao outro à mão. Nada disso volta para o chamador.
     const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";
     console.error("[farol-youtube] erro isolado (IG não afetado):", {
+      video_id: linha.video_id,
+      erro,
+    });
+  }
+}
+
+// ===========================================================================
+// TIKTOK-01 — o mesmo mp4 no perfil @bidcon
+// AUTORIZADO: Emerson Gomes dos Santos — OS "TIKTOK-01", 07/08/2026:
+// "após publicar no IG, se FAROL_TIKTOK=on: subir o MESMO mp4 → gravar
+//  tt_publish_id no detalhe. Idempotente (pular se já existe). Falha do TikTok
+//  NUNCA derruba IG/YouTube — try/catch isolado, log [farol-tiktok]."
+// ---------------------------------------------------------------------------
+// NASCE DESARMADO. Sem `FAROL_TIKTOK=on` esta função sai na primeira linha.
+//
+// TRÊS PLATAFORMAS, TRÊS SILÊNCIOS INDEPENDENTES. Esta função é irmã gêmea da
+// `subirParaYoutube` e a semelhança é deliberada: `void`, try/catch total,
+// idempotência por campo do `detalhe`, erro vira evento em `farol_posts` e
+// nunca sentença. O IG continua sendo o dono do veredito; o YouTube, que já
+// rodou acima, também não é afetado por nada daqui — são três caminhos que só
+// compartilham o arquivo mp4.
+//
+// IDEMPOTÊNCIA POR `detalhe.tt_publish_id`. Vale a mesma advertência do
+// YouTube: o TikTok não deduplica, aceita o mesmo arquivo de novo e cria um
+// segundo post.
+//
+// O QUE É GRAVADO É O `publish_id`, NÃO O ID DO POST. Medido: o Direct Post é
+// assíncrono do lado do TikTok — o `init` devolve `publish_id` e a publicação
+// termina depois, em outro tempo. O id público (`publicaly_available_post_id`)
+// só existe quando a moderação libera, e esperar por ele aqui seguraria a fase
+// 2 por tempo indeterminado. O `publish_id` é a chave que consulta o desfecho
+// via `consultarStatus()`; é o que existe para gravar no momento em que estamos.
+//
+// A LEGENDA É A MESMA DO IG. Ela já passou pelo `revisarLegenda()` antes do
+// render e de novo antes do Instagram: mesma fala, mesma alfândega. O teto de
+// 2200 runas do TikTok é aplicado dentro da lib.
+// ===========================================================================
+async function subirParaTiktok(db: Db, linha: LinhaReel): Promise<void> {
+  if (process.env.FAROL_TIKTOK !== "on") return;
+
+  try {
+    const det = (linha.detalhe ?? {}) as {
+      url_hospedada?: string;
+      tt_publish_id?: string;
+      tipo?: string;
+      credito?: number;
+      custo_am?: number | null;
+    };
+
+    if (det.tt_publish_id) {
+      console.log("[farol-tiktok] já subiu, pulando:", {
+        video_id: linha.video_id,
+        tt_publish_id: det.tt_publish_id,
+      });
+      return;
+    }
+
+    if (!det.url_hospedada) {
+      console.log("[farol-tiktok] sem url_hospedada (linha legada), pulando:", {
+        video_id: linha.video_id,
+      });
+      return;
+    }
+
+    // Legenda do IG; se ela não existir (linha antiga), o título curto do Short
+    // é melhor do que um post sem texto nenhum.
+    const titulo = linha.legenda?.trim() || tituloShort(det);
+
+    const r = await publicarVideo({ url: det.url_hospedada, titulo });
+
+    if (!r.ok) {
+      console.error("[farol-tiktok] publicação falhou:", {
+        video_id: linha.video_id,
+        erro: r.erro,
+      });
+      await registrar(db, "reel_tiktok_falhou", linha.carta_id, null, {
+        video_id: linha.video_id,
+        erro: r.erro,
+      });
+      return;
+    }
+
+    const detalheNovo = { ...(linha.detalhe ?? {}), tt_publish_id: r.publishId };
+    await atualizar(db, linha.id, { detalhe: detalheNovo });
+    linha.detalhe = detalheNovo;
+
+    console.log("[farol-tiktok] post enviado:", {
+      video_id: linha.video_id,
+      tt_publish_id: r.publishId,
+      carta_id: linha.carta_id,
+      privacidade: process.env.TT_PRIVACY ?? "SELF_ONLY",
+    });
+    // `post_id` NULL pelo mesmo motivo do YouTube: em `farol_posts` essa coluna
+    // significa "post do Instagram" em todos os outros eventos.
+    await registrar(db, "reel_tiktok_publicado", linha.carta_id, null, {
+      video_id: linha.video_id,
+      tt_publish_id: r.publishId,
+    });
+  } catch (e) {
+    const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";
+    console.error("[farol-tiktok] erro isolado (IG/YouTube não afetados):", {
       video_id: linha.video_id,
       erro,
     });
