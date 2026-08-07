@@ -82,11 +82,16 @@ export function montarRoteiro(c: CartaCarrossel): string {
   }
 
   return [
-    // RÓTULO-IA (07/08): a apresentação declara que é IA. Não é enfeite legal —
-    // é a tese da casa (transparência-primeiro) na única linha em que ela cabe.
-    // Fica na PRIMEIRA frase de propósito: rótulo que aparece no fim é rótulo
-    // que a maioria não ouve.
-    "Oi! Eu sou o porta-voz digital da Bidcon — uma IA a serviço de gente de verdade.",
+    // RÓTULO-IA revertido na FALA (07/08, ~11h50, ordem do Emerson depois de
+    // assistir ao render: "não precisa falar que é uma IA"). A declaração comia
+    // os 3 primeiros segundos, que é onde a retenção do reel se decide.
+    //
+    // O rótulo NÃO foi abandonado — só saiu do áudio. Continua escrito em três
+    // lugares: legenda do post de feed, private reply e resposta pública do
+    // FAROL-COMENTA. Se um dia a fala precisar declarar de novo (art. 50 do AI
+    // Act mira exatamente avatar sintético), o lugar barato é a legenda do
+    // reel, não a primeira frase.
+    "Oi! Aqui é o porta-voz da Bidcon.",
     `A carta de hoje é de ${c.tipoLabel.toLowerCase()}: ${numeros.join(", ")} —`,
     `custo de ${custoFalado(c.custoAm)}, tudo já calculado.`,
     "O pagamento é protegido por Conta Notarial em cartório:",
