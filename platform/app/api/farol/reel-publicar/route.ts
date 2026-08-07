@@ -58,7 +58,7 @@ import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { autorizadoFarol, revisarLegenda, registrar } from "@/lib/farol/selecao";
 import { chamarGraph } from "@/lib/instagram/publicar";
-import { statusVideo } from "@/lib/heygen";
+import { statusVideo, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -252,10 +252,18 @@ export async function GET(req: Request) {
       }
 
       // ---- Estado do render no HeyGen -------------------------------------
-      const tipoAvatar = String(
-        (linha.detalhe as { avatar_tipo?: string } | null)?.avatar_tipo ?? "avatar"
-      );
-      const s = await statusVideo(linha.video_id, tipoAvatar);
+      const det = (linha.detalhe ?? {}) as {
+        avatar_tipo?: string;
+        data?: string;
+        tipo?: string;
+      };
+      const tipoAvatar = String(det.avatar_tipo ?? "avatar");
+      // Título = chave de resgate quando o id guardado não resolve (404 do
+      // HeyGen). Reconstruído do `detalhe` que a PRÓPRIA fase 1 gravou, pela
+      // mesma função que a fase 1 usa para montá-lo. Se o detalhe não tiver os
+      // campos, vai `null` e o comportamento é o de antes: 404 vira pendente.
+      const titulo = det.data && det.tipo ? tituloRender(det.data, det.tipo) : null;
+      const s = await statusVideo(linha.video_id, tipoAvatar, titulo);
       if (!s.ok) {
         // Falha de LEITURA não condena o render: pode ser 429 ou rede. Espera.
         console.error("[farol-reel] status do vídeo ilegível:", {
@@ -264,6 +272,18 @@ export async function GET(req: Request) {
         });
         olhados.push({ video_id: linha.video_id, resultado: `status_ilegivel` });
         continue;
+      }
+
+      if (s.data.idResolvido && s.data.idResolvido !== linha.video_id) {
+        // O estado veio pelo resgate por título: o HeyGen conhece este vídeo
+        // por OUTRO id. Registro e sigo publicando — o id guardado continua
+        // sendo a chave de idempotência desta linha (UNIQUE), e reescrevê-lo
+        // no meio do laço mexeria nessa chave sem necessidade. Trocar de chave
+        // é decisão do Emerson, não efeito colateral de uma leitura.
+        console.warn("[farol-reel] id divergente (resgatado por título):", {
+          guardado: linha.video_id,
+          heygen: s.data.idResolvido,
+        });
       }
 
       if (s.data.estado === "falhou") {

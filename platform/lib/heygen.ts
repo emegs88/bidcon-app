@@ -297,7 +297,84 @@ export type StatusVideo = {
   videoUrl: string | null;
   bruto: string;
   erro: string | null;
+  /**
+   * O id que a API REALMENTE reconhece para este vídeo. Igual ao pedido no
+   * caminho normal; diferente quando o estado só foi obtido pelo resgate por
+   * título. Existe para que a fase 2 possa DIZER que o id guardado divergiu,
+   * em vez de o silêncio virar diagnóstico errado no dia seguinte.
+   */
+  idResolvido: string | null;
 };
+
+/**
+ * Título do render. É a única chave HUMANA do vídeo — aparece no painel do
+ * HeyGen — e, desde 07/08, também a chave de resgate quando o `video_id`
+ * guardado não resolve (ver `statusVideo`). Mora aqui, exportado, porque duas
+ * rotas precisam produzir a MESMA string byte a byte: quem grava (fase 1) e
+ * quem procura (fase 2). Duas cópias do template seriam duas verdades.
+ */
+export function tituloRender(data: string, tipo: string): string {
+  return `bidcon ${data} ${tipo}`;
+}
+
+function corpo(bruto: unknown): Record<string, unknown> {
+  return ((bruto as { data?: Record<string, unknown> })?.data ?? {}) as Record<
+    string,
+    unknown
+  >;
+}
+
+/**
+ * Traduz um `VideoDetail` da v3 (ou o corpo equivalente do legado) para o
+ * formato normalizado. Extraído para função porque agora há DOIS caminhos de
+ * leitura (id e título) e eles têm de concordar — se um dia divergirem, a
+ * fase 2 publica com regras diferentes dependendo de qual respondeu.
+ */
+function lerStatus(
+  d: Record<string, unknown>,
+  idResolvido: string | null
+): StatusVideo {
+  const bruto = String(d.status ?? "").toLowerCase();
+  const videoUrl = primeiro(d, "video_url", "captioned_video_url");
+  const erro =
+    primeiro(d, "failure_message", "error") ??
+    (d.error && typeof d.error === "object"
+      ? primeiro(d.error as Record<string, unknown>, "message", "detail")
+      : null);
+
+  if (bruto === "completed" || bruto === "success") {
+    // "completed" sem URL não é pronto — é resposta incompleta. Espera.
+    return videoUrl
+      ? { estado: "pronto", videoUrl, bruto, erro: null, idResolvido }
+      : { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido };
+  }
+  if (bruto === "failed" || bruto === "error") {
+    return { estado: "falhou", videoUrl: null, bruto, erro, idResolvido };
+  }
+  return { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido };
+}
+
+/**
+ * Resgate por título: GET /v3/videos?title=<substring> (List Videos, medido no
+ * OpenAPI — devolve `VideoDetail` completo, com `id`, `status` e `video_url`).
+ *
+ * A doc diz SUBSTRING; a comparação aqui é EXATA e o resultado tem de ser
+ * único. Com zero não há o que ler; com dois ou mais eu não sei qual é o nosso,
+ * e publicar o vídeo errado num perfil público é pior do que esperar mais um
+ * ciclo. Ambíguo devolve erro, e erro de leitura nunca condena o render.
+ */
+async function acharPorTitulo(
+  titulo: string
+): Promise<Resposta<Record<string, unknown>>> {
+  const q = new URLSearchParams({ title: titulo, limit: "100" });
+  const r = await get(`/v3/videos?${q.toString()}`);
+  if (!r.ok) return r;
+  const exatos = comoLista(r.data, "videos").filter(
+    (v) => String(v.title ?? "").trim() === titulo.trim()
+  );
+  if (exatos.length !== 1) return { ok: false, erro: `titulo_ambiguo(${exatos.length})` };
+  return { ok: true, data: exatos[0] };
+}
 
 /**
  * Estado do render. v3: GET /v3/videos/{id} → data.status ∈
@@ -311,31 +388,38 @@ export type StatusVideo = {
  */
 export async function statusVideo(
   videoId: string,
-  tipo: string
+  tipo: string,
+  titulo?: string | null
 ): Promise<Resposta<StatusVideo>> {
-  const r = usaLegado(tipo)
-    ? await get(`/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`)
-    : await get(`/v3/videos/${encodeURIComponent(videoId)}`);
-  if (!r.ok) return r;
-
-  const d = ((r.data as { data?: Record<string, unknown> })?.data ??
-    {}) as Record<string, unknown>;
-  const bruto = String(d.status ?? "").toLowerCase();
-  const videoUrl = primeiro(d, "video_url", "captioned_video_url");
-  const erro =
-    primeiro(d, "failure_message", "error") ??
-    (d.error && typeof d.error === "object"
-      ? primeiro(d.error as Record<string, unknown>, "message", "detail")
-      : null);
-
-  if (bruto === "completed" || bruto === "success") {
-    // "completed" sem URL não é pronto — é resposta incompleta. Espera.
-    return videoUrl
-      ? { ok: true, data: { estado: "pronto", videoUrl, bruto, erro: null } }
-      : { ok: true, data: { estado: "processando", videoUrl: null, bruto, erro: null } };
+  if (usaLegado(tipo)) {
+    const r = await get(`/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`);
+    if (!r.ok) return r;
+    return { ok: true, data: lerStatus(corpo(r.data), videoId) };
   }
-  if (bruto === "failed" || bruto === "error") {
-    return { ok: true, data: { estado: "falhou", videoUrl: null, bruto, erro } };
-  }
-  return { ok: true, data: { estado: "processando", videoUrl: null, bruto, erro: null } };
+
+  const r = await get(`/v3/videos/${encodeURIComponent(videoId)}`);
+  if (r.ok) return { ok: true, data: lerStatus(corpo(r.data), videoId) };
+
+  // ---- Resgate (07/08) ------------------------------------------------------
+  // MEDIDO em produção: o render de 07/08 foi criado por POST /v3/videos, que
+  // devolveu `df4b877…` (32 hex), e meia hora depois GET /v3/videos/df4b877…
+  // respondeu `code=video_not_found`. A doc da v3 diz que o 404 dela é
+  // `code=not_found` e que o id tem a forma `v_abc123def456`. Ou seja: o id que
+  // guardamos não é o id que o recurso /v3/videos reconhece — não é a URL que
+  // está errada, é a chave.
+  //
+  // A doc oferece exatamente uma saída para isso, e é a que uso: List Videos
+  // filtra por título, e nosso título é único por dia e por tipo. Só vale para
+  // 404. 401 é chave, 429 é cota, timeout é rede — nesses, insistir por outro
+  // caminho gasta orçamento e atrasa a leitura verdadeira do ciclo seguinte.
+  if (!r.erro.startsWith("http_404") || !titulo) return r;
+
+  const achado = await acharPorTitulo(titulo);
+  // Resgate frustrado devolve o 404 ORIGINAL, não o erro do resgate: o 404 é o
+  // diagnóstico que precisa aparecer no log.
+  if (!achado.ok) return r;
+  return {
+    ok: true,
+    data: lerStatus(achado.data, primeiro(achado.data, "id", "video_id")),
+  };
 }

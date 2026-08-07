@@ -60,7 +60,7 @@ import {
   registrar,
 } from "@/lib/farol/selecao";
 import { montarRoteiro, montarLegendaReel } from "@/lib/farol/reel-texto";
-import { dispararRender } from "@/lib/heygen";
+import { dispararRender, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -177,7 +177,9 @@ export async function GET(req: Request) {
       avatarId,
       voiceId,
       tipo: tipoAvatar,
-      titulo: `bidcon ${hoje} ${carta.tipo}`,
+      // Mesma função que a fase 2 usa para procurar. Era template literal aqui;
+      // virou chave de resgate lá — duas cópias seriam duas verdades.
+      titulo: tituloRender(hoje, carta.tipo),
     });
 
     if (!r.ok) {
