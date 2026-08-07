@@ -116,6 +116,24 @@ const LIMITE_LINHAS = 5;
  */
 const IDADE_ZUMBI_MS = 20 * 60 * 1000;
 
+/**
+ * Limiar MAIOR para container criado com a NOSSA URL hospedada.
+ *
+ * Medido em 07/08: com a URL própria o dedupe da Meta continua valendo — resetar
+ * e pedir de novo devolveu o MESMO id. Então, para estes, o reset por idade não
+ * é resgate: é roleta. E a conta tem contexto — a conta do Instagram estreou
+ * ontem e este é o primeiro REEL dela; demora legítima é a hipótese mais barata
+ * antes de acusar travamento. 60 min dá seis leituras de ciclo antes de tocar.
+ */
+const IDADE_ZUMBI_HOSPEDADO_MS = 60 * 60 * 1000;
+
+/**
+ * Campos pedidos ao container. `status` é o verboso — é ali que a Meta escreve a
+ * RECLAMAÇÃO por extenso quando há uma; `status_code` é só a palavra seca.
+ * Pedimos os dois porque um código sem frase não diagnostica nada.
+ */
+const CAMPOS_CONTAINER = "id,status,status_code";
+
 type LinhaReel = {
   id: string;
   carta_id: string | null;
@@ -132,15 +150,20 @@ type LinhaReel = {
  * GET no container da Meta. Existe aqui, e não na lib, pelo motivo do header.
  * Nunca lança; erro da Graph repassado literal (code/subcode/message).
  */
+type LeituraContainer =
+  | { ok: true; code: string; bruto: unknown }
+  | { ok: false; erro: string; bruto: unknown };
+
 async function statusContainer(
-  containerId: string
-): Promise<{ ok: true; code: string } | { ok: false; erro: string }> {
+  containerId: string,
+  campos: string = CAMPOS_CONTAINER
+): Promise<LeituraContainer> {
   const token = process.env.IG_ACCESS_TOKEN;
-  if (!token) return { ok: false, erro: "env_ausente(IG_ACCESS_TOKEN)" };
+  if (!token) return { ok: false, erro: "env_ausente(IG_ACCESS_TOKEN)", bruto: null };
 
   const url =
     `https://graph.instagram.com/${IG_GRAPH_VERSION}/${containerId}` +
-    `?fields=status_code`;
+    `?fields=${encodeURIComponent(campos)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_IG_MS);
   try {
@@ -153,22 +176,37 @@ async function statusContainer(
       const err = (data as {
         error?: { message?: string; code?: number; error_subcode?: number };
       })?.error;
+
+      // REDE DE SEGURANÇA do campo verboso: se a Graph recusar por causa de um
+      // campo (code 100 é "campo inválido/inexistente"), relê pedindo SÓ o
+      // `status_code`, que é o conjunto que esta rota já usava e que está
+      // medido em produção. Instrumentar não pode custar a leitura de estado —
+      // ficar cego ao container é pior do que ficar sem a frase da Meta.
+      if (campos !== "status_code" && err?.code === 100) {
+        console.warn("[farol-reel] campos do container recusados, relendo seco:", {
+          campos,
+          erro: err?.message,
+        });
+        return statusContainer(containerId, "status_code");
+      }
+
       const partes = [
         err?.code !== undefined ? `code=${err.code}` : null,
         err?.error_subcode !== undefined ? `subcode=${err.error_subcode}` : null,
         err?.message ?? `http_${resp.status}`,
       ].filter(Boolean);
-      return { ok: false, erro: partes.join(" ").slice(0, 500) };
+      return { ok: false, erro: partes.join(" ").slice(0, 500), bruto: data };
     }
     const code = (data as { status_code?: string })?.status_code;
-    return { ok: true, code: String(code ?? "DESCONHECIDO") };
+    return { ok: true, code: String(code ?? "DESCONHECIDO"), bruto: data };
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      return { ok: false, erro: `timeout_instagram_api(${TIMEOUT_IG_MS}ms)` };
+      return { ok: false, erro: `timeout_instagram_api(${TIMEOUT_IG_MS}ms)`, bruto: null };
     }
     return {
       ok: false,
       erro: e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido",
+      bruto: null,
     };
   } finally {
     clearTimeout(timer);
@@ -311,8 +349,27 @@ async function esperarContainer(
 > {
   const limite = Date.now() + POLL_MAX_MS;
   let ultimo = "SEM_LEITURA";
+  let primeira = true;
   while (Date.now() < limite) {
     const s = await statusContainer(containerId);
+
+    // A RESPOSTA INTEIRA, uma vez por tique — não um campo escolhido por mim.
+    // Motivo: até agora esta rota só sabia dizer "IN_PROGRESS" porque só
+    // perguntava `status_code`. Se a Meta está reclamando de alguma coisa (o
+    // fetch do vídeo, o codec, a duração), a frase vem no campo `status`, e
+    // nenhum relatório meu vale mais do que ela. Uma vez por tique e não por
+    // leitura: são até 8 polls por invocação e 8 cópias do mesmo objeto seriam
+    // ruído, não instrumentação.
+    if (primeira) {
+      primeira = false;
+      console.log("[farol-reel] container_status_bruto:", {
+        container_id: containerId,
+        ok: s.ok,
+        resposta: s.bruto,
+        ...(s.ok ? {} : { erro: s.erro }),
+      });
+    }
+
     if (!s.ok) return { fim: "falhou", erro: `status_container: ${s.erro}` };
     ultimo = s.code;
     // Valores medidos na doc de Content Publishing da Meta:
@@ -382,7 +439,11 @@ export async function GET(req: Request) {
         const detAtual = (linha.detalhe ?? {}) as { url_hospedada?: string };
         const legado = !detAtual.url_hospedada;
 
-        const z = await checarZumbi(linha, linha.container_id, legado);
+        // Container hospedado espera 60 min, não 20. Ver IDADE_ZUMBI_HOSPEDADO_MS:
+        // para ele o reset não é resgate, porque a Meta devolve o mesmo id.
+        const limiteMs = legado ? IDADE_ZUMBI_MS : IDADE_ZUMBI_HOSPEDADO_MS;
+
+        const z = await checarZumbi(linha, linha.container_id, legado, limiteMs);
         if (z.zumbi) {
           // Autocura: zera o container e NÃO dá `continue` — cai no caminho
           // normal logo abaixo, que relê o HeyGen, HOSPEDA o mp4 e só então
@@ -395,9 +456,18 @@ export async function GET(req: Request) {
           console.warn("[farol-reel] container zumbi resetado", {
             container_id: linha.container_id,
             idade_min: z.idadeMin,
+            limite_min: Math.round(limiteMs / 60_000),
             motivo: legado ? "sem_url_hospedada" : "idade",
           });
-          await atualizar(db, linha.id, { container_id: null });
+          // Guarda o id ABANDONADO para poder reconhecer o dedupe lá embaixo:
+          // se a Meta devolver este mesmo id no lugar de um novo, o reset foi
+          // roleta e queremos que isso fique escrito, não deduzido.
+          const detReset = {
+            ...(linha.detalhe ?? {}),
+            container_anterior: linha.container_id,
+          };
+          await atualizar(db, linha.id, { container_id: null, detalhe: detReset });
+          linha.detalhe = detReset;
           linha.container_id = null;
         } else {
           const r = await publicarContainer(db, linha, linha.container_id);
@@ -549,11 +619,35 @@ export async function GET(req: Request) {
         break;
       }
 
+      // ---- Anti-roleta: a Meta devolveu o MESMO container? -----------------
+      // Se devolveu, o reset não resgatou nada — só girou. Fica registrado no
+      // log E no detalhe, para o próximo ciclo saber sem precisar deduzir.
+      const detPos = (linha.detalhe ?? {}) as { container_anterior?: string };
+      const idNovo = String(container.id ?? "");
+      const dedupou = !!detPos.container_anterior && detPos.container_anterior === idNovo;
+
+      const detalheFinal: Record<string, unknown> = { ...(linha.detalhe ?? {}) };
+      delete detalheFinal.container_anterior;
+      if (dedupou) {
+        console.warn("[farol-reel] dedupe_confirmado", { container_id: idNovo });
+        // Carimbo NOVO a cada confirmação, e não o primeiro preservado. Se
+        // guardasse o primeiro, a idade já nasceria vencida no tique seguinte e
+        // a roleta voltaria a girar de 10 em 10 min — exatamente o que esta
+        // regra existe para impedir. Renovando, o próximo reset só é possível
+        // depois do limiar CHEIO contado daqui.
+        detalheFinal.dedupe_confirmado_em = new Date().toISOString();
+      } else {
+        // Id diferente: o dedupe se soltou. O relógio volta ao normal.
+        delete detalheFinal.dedupe_confirmado_em;
+      }
+
       // GRAVA O CONTAINER ANTES DE PUBLICAR — trava (3) do header.
       await atualizar(db, linha.id, {
         status: "publicando",
         container_id: container.id,
+        detalhe: detalheFinal,
       });
+      linha.detalhe = detalheFinal;
 
       const r = await publicarContainer(db, linha, container.id as string);
       olhados.push({ video_id: linha.video_id, resultado: r });
@@ -663,15 +757,22 @@ async function publicarContainer(
 async function checarZumbi(
   linha: LinhaReel,
   containerId: string,
-  ignorarIdade: boolean
+  ignorarIdade: boolean,
+  limiteMs: number
 ): Promise<{ zumbi: boolean; code: string; idadeMin: number }> {
-  const base = linha.atualizado_em ?? linha.criado_em;
+  // ÂNCORA DO RELÓGIO. `atualizado_em` é empurrado por QUALQUER escrita na
+  // linha — inclusive pelo próprio reset, que recria o container e re-carimba.
+  // Então "idade" nunca foi idade do container: era tempo desde a última
+  // mexida. Quando o dedupe já foi confirmado, o relógio passa a contar do
+  // instante dessa confirmação, que é um fato do container e não da fila.
+  const det = (linha.detalhe ?? {}) as { dedupe_confirmado_em?: string };
+  const base = det.dedupe_confirmado_em ?? linha.atualizado_em ?? linha.criado_em;
   const idadeMs = Date.now() - new Date(base).getTime();
   const idadeMin = Math.round(idadeMs / 60_000);
 
   // `ignorarIdade` dispensa a ESPERA, nunca a checagem de estado logo abaixo:
   // um container legado que já esteja FINISHED tem que publicar, não morrer.
-  const idadeOk = Number.isFinite(idadeMs) && idadeMs >= IDADE_ZUMBI_MS;
+  const idadeOk = Number.isFinite(idadeMs) && idadeMs >= limiteMs;
   if (linha.status !== "publicando" || (!ignorarIdade && !idadeOk)) {
     return { zumbi: false, code: "NAO_CHECADO", idadeMin };
   }
