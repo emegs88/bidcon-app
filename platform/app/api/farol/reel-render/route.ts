@@ -42,6 +42,14 @@
 // (a MESMA trava determinística do post de feed) mede o roteiro E a legenda
 // aqui, e a fase 2 mede a legenda de novo antes de mandar pra Meta.
 //
+// O TEXTO PODE VIR DE FORA (FAROL-ESCUTA-01, 08/08/2026). Desde essa fatia,
+// esta rota primeiro procura a pauta 'nova' do dia em `farol_pauta` — escrita
+// às 10h por um modelo com pesquisa de tendências — e só cai nos
+// `montarRoteiro()`/`montarLegendaReel()` determinísticos se não achar, se a
+// carta divergir, ou se o linter reprovar. NADA no caminho do template mudou:
+// sem pauta, este arquivo se comporta exatamente como antes. A pauta é
+// acessório, não requisito — ver o bloco "Texto" mais abaixo.
+//
 // A LEGENDA É MONTADA E GUARDADA AGORA, não na fase 2. Meia hora depois a carta
 // pode ter sido vendida e sumido da `vw_vitrine_viva` — e aí a fase 2 teria um
 // vídeo pronto e nenhum número pra escrever embaixo. Guardando, o reel publica
@@ -154,10 +162,76 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, renderizou: false, motivo: "sem_carta" });
     }
 
-    // ---- Textos + compliance ANTES do render ------------------------------
-    const roteiro = montarRoteiro(carta);
-    const legenda = montarLegendaReel(carta);
+    // ---- Texto: pauta do dia (FAROL-ESCUTA-01) ou template ----------------
+    // A pauta é OPCIONAL POR CONSTRUÇÃO. Não achou linha 'nova' do dia — porque
+    // FAROL_PAUTA está desarmado, porque o cron das 10h falhou, porque o linter
+    // reprovou o texto do modelo, ou porque a carta divergiu — e este bloco
+    // inteiro não faz nada: os dois `montar*()` de sempre escrevem o texto e o
+    // caminho antigo é bit a bit o de hoje.
+    //
+    // `carta_id` NO FILTRO É A TRAVA QUE IMPORTA. A pauta das 10h narra os
+    // números de uma carta específica. Entre lá e aqui o post-diario (11h)
+    // queima uma carta e a vitrine pode ter mudado, então a carta escolhida
+    // agora pode não ser a mesma. Usar a pauta nesse caso seria narrar crédito
+    // e parcela de uma carta que não é a anunciada. Divergiu, cai no template —
+    // e a pauta fica 'nova', visível no banco como pauta escrita e não usada.
+    let roteiro = "";
+    let legenda = "";
+    let pautaUsada: { id: string; formula: string } | null = null;
 
+    const { data: pautas, error: errPauta } = await db
+      .from("farol_pauta")
+      .select("id,formula,roteiro,legenda,hashtags")
+      .eq("dia", hoje)
+      .eq("status", "nova")
+      .eq("carta_id", carta.id)
+      .limit(1);
+
+    if (errPauta) {
+      // Pauta ilegível NÃO derruba o reel: ela é acessório, não requisito.
+      // Loga e segue no template — o comportamento de antes desta fatia.
+      console.error(
+        "[farol-reel] farol_pauta ilegível (segue no template):",
+        errPauta.message
+      );
+    }
+
+    const pauta = pautas?.[0];
+    if (pauta?.roteiro && pauta?.legenda) {
+      const tags: string[] = Array.isArray(pauta.hashtags) ? pauta.hashtags : [];
+      const legendaPauta =
+        tags.length > 0 ? `${pauta.legenda}\n\n${tags.join(" ")}` : pauta.legenda;
+
+      // Segunda medição, sobre o texto FINAL. A pauta já passou pelo linter às
+      // 10h, mas o que sai daqui não é exatamente o que entrou lá (as hashtags
+      // vêm coladas na legenda). Medir de novo é barato e determinístico.
+      const ruim = revisarLegenda(pauta.roteiro) ?? revisarLegenda(legendaPauta);
+      if (ruim) {
+        // O show não para: marca a pauta e cai no template. Não devolvo erro,
+        // porque um texto ruim do modelo não pode custar o reel do dia.
+        console.error("[farol-reel] pauta reprovada na 2ª medição:", ruim);
+        const { error: errRep } = await db
+          .from("farol_pauta")
+          .update({ status: "reprovada", motivo_linter: ruim })
+          .eq("id", pauta.id);
+        if (errRep) {
+          console.error("[farol-reel] falha marcando pauta reprovada:", errRep.message);
+        }
+      } else {
+        roteiro = pauta.roteiro;
+        legenda = legendaPauta;
+        pautaUsada = { id: pauta.id, formula: pauta.formula };
+      }
+    }
+
+    if (!pautaUsada) {
+      roteiro = montarRoteiro(carta);
+      legenda = montarLegendaReel(carta);
+    }
+
+    // ---- Compliance ANTES do render (linha INALTERADA) --------------------
+    // Roda sobre o texto que venceu, seja qual for. No caminho do template é
+    // literalmente a mesma medição de sempre, sobre os mesmos dois textos.
     const reprovado = revisarLegenda(roteiro) ?? revisarLegenda(legenda);
     if (reprovado) {
       console.error("[farol-reel] texto reprovado no compliance:", reprovado);
@@ -207,6 +281,12 @@ export async function GET(req: Request) {
         custo_am: carta.custoAm,
         escolha: motivoEscolha,
         avatar_tipo: tipoAvatar,
+        // Aditivo e opcional: `detalhe` é jsonb, então dizer QUAL fôrma gerou
+        // este reel não custa migração. É o dado que o FAROL-METRICAS-01 vai
+        // precisar para saber quais fôrmas retêm e quais devem morrer.
+        ...(pautaUsada
+          ? { pauta_id: pautaUsada.id, formula: pautaUsada.formula }
+          : { fonte_texto: "template" }),
       },
     });
 
@@ -229,6 +309,25 @@ export async function GET(req: Request) {
       );
     }
 
+    // ---- Pauta consumida --------------------------------------------------
+    // DEPOIS do insert, de propósito. Marcar antes significaria queimar a pauta
+    // num render que ainda pode falhar — e um disparo manual de resgate cairia
+    // no template sem motivo. Se este update falhar, a pauta fica 'nova' tendo
+    // sido usada; é um erro de contabilidade auditável (o roteiro está gravado
+    // em `farol_reels`), não um erro de produção.
+    if (pautaUsada) {
+      const { error: errUso } = await db
+        .from("farol_pauta")
+        .update({ status: "usada" })
+        .eq("id", pautaUsada.id);
+      if (errUso) {
+        console.error("[farol-reel] pauta usada mas NÃO marcada:", {
+          pauta_id: pautaUsada.id,
+          erro: errUso.message,
+        });
+      }
+    }
+
     console.log("[farol-reel] render disparado:", {
       data: hoje,
       video_id: r.data.videoId,
@@ -236,6 +335,7 @@ export async function GET(req: Request) {
       tipo: carta.tipo,
       custo_am: carta.custoAm,
       escolha: motivoEscolha,
+      texto: pautaUsada ? `pauta:${pautaUsada.formula}` : "template",
     });
 
     return NextResponse.json({
@@ -244,6 +344,8 @@ export async function GET(req: Request) {
       video_id: r.data.videoId,
       carta_id: carta.id,
       escolha: motivoEscolha,
+      texto: pautaUsada ? "pauta" : "template",
+      formula: pautaUsada?.formula ?? null,
     });
   } catch (e) {
     const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";

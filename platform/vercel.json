@@ -14,6 +14,10 @@
       "schedule": "0 12,18 * * *"
     },
     {
+      "path": "/api/farol/pauta",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/farol/post-diario",
       "schedule": "0 14 * * *"
     },
