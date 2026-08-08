@@ -132,6 +132,20 @@ const IDADE_ZUMBI_MS = 20 * 60 * 1000;
 const IDADE_ZUMBI_HOSPEDADO_MS = 60 * 60 * 1000;
 
 /**
+ * Idade a partir da qual uma linha ainda 'renderizando' vira suspeita de estar
+ * presa num id fantasma — e o `statusVideo` passa a tentar TAMBÉM o resgate por
+ * título. Nome próprio, e não reuso do IDADE_ZUMBI_MS: aquele mede container da
+ * Meta, este mede render do HeyGen. Coincidirem em 20 min hoje é coincidência
+ * de grandeza, não parentesco — amarrá-los faria um ajuste num mexer no outro.
+ *
+ * 20 min é folgado: o reel de ~31s renderiza em poucos minutos e o ciclo é de
+ * 10 min, então um render saudável entrega antes de chegar aqui. O caso que
+ * motivou o limiar passou de TRÊS HORAS lendo "renderizando" com o vídeo pronto
+ * no painel (08/08, 11h48).
+ */
+const IDADE_ESTAGNADA_MS = 20 * 60 * 1000;
+
+/**
  * Campos pedidos ao container. `status` é o verboso — é ali que a Meta escreve a
  * RECLAMAÇÃO por extenso quando há uma; `status_code` é só a palavra seca.
  * Pedimos os dois porque um código sem frase não diagnostica nada.
@@ -493,7 +507,15 @@ export async function GET(req: Request) {
       // mesma função que a fase 1 usa para montá-lo. Se o detalhe não tiver os
       // campos, vai `null` e o comportamento é o de antes: 404 vira pendente.
       const titulo = det.data && det.tipo ? tituloRender(det.data, det.tipo) : null;
-      const s = await statusVideo(linha.video_id, tipoAvatar, titulo);
+      // Idade da LINHA, ancorada em `criado_em` — o instante do disparo do
+      // render. Não em `atualizado_em`: qualquer escrita na fila empurra aquele
+      // carimbo, e uma linha estagnada que fosse tocada por outro motivo
+      // rejuvenesceria e nunca alcançaria o limiar. `criado_em` só anda para
+      // frente. Passar disso arma o resgate por título mesmo sem 404 (ver
+      // `resgatarSeEstagnado` em lib/heygen.ts).
+      const idadeLinhaMs = Date.now() - new Date(linha.criado_em).getTime();
+      const estagnada = Number.isFinite(idadeLinhaMs) && idadeLinhaMs >= IDADE_ESTAGNADA_MS;
+      const s = await statusVideo(linha.video_id, tipoAvatar, titulo, estagnada);
       if (!s.ok) {
         // Falha de LEITURA não condena o render: pode ser 429 ou rede. Espera.
         console.error("[farol-reel] status do vídeo ilegível:", {
