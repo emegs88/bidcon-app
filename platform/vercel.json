@@ -24,6 +24,10 @@
     {
       "path": "/api/farol/reel-publicar",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/farol/yt-comenta",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

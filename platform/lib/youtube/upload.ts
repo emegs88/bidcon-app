@@ -84,8 +84,32 @@ const URL_CONSENTIMENTO = "https://accounts.google.com/o/oauth2/v2/auth";
 const URL_TOKEN = "https://oauth2.googleapis.com/token";
 const URL_UPLOAD = "https://www.googleapis.com/upload/youtube/v3/videos";
 
-/** Escopo mínimo: só subir. Não lê canal, não apaga, não edita o que já existe. */
+/** Escopo mínimo do upload: só subir. Não lê canal, não apaga, não edita. */
 export const ESCOPO_UPLOAD = "https://www.googleapis.com/auth/youtube.upload";
+
+/**
+ * Escopo das respostas públicas (YT-COMENTA-01). MEDIDO na doc de
+ * `comments.insert`: é o ÚNICO escopo aceito por aquele endpoint — não existe
+ * um "youtube.comments" estreito. `force-ssl` é largo (lê e escreve o canal),
+ * e é largo porque o Google decidiu assim, não porque nós pedimos demais.
+ */
+export const ESCOPO_COMENTARIO = "https://www.googleapis.com/auth/youtube.force-ssl";
+
+/**
+ * O QUE O /oauth/start PEDE. Os dois de uma vez, por decisão do Emerson
+ * (07/08/2026): "ESCOPO vira lista com os dois ... usados no /oauth/start".
+ *
+ * POR QUE OS DOIS NUMA CONSENT SÓ. O canal JÁ FOI autorizado hoje com
+ * `youtube.upload` — existe um refresh_token vivo em produção e o Short de
+ * amanhã roda com ele. Esta reautorização SUBSTITUI aquele token, não estreia.
+ * Pedir os dois juntos faz o Emerson passar pela tela do Google UMA vez em vez
+ * de duas, e o token resultante serve às duas fatias.
+ *
+ * ATENÇÃO OPERACIONAL: enquanto o `YT_REFRESH_TOKEN` em produção for o antigo
+ * (só upload), `comments.insert` devolve 403 `insufficientPermissions`. O
+ * upload continua funcionando o tempo todo — os escopos não se atrapalham.
+ */
+export const ESCOPOS = [ESCOPO_UPLOAD, ESCOPO_COMENTARIO] as const;
 
 /**
  * Precisa bater LETRA POR LETRA com o que estiver no Google Cloud Console —
@@ -225,7 +249,10 @@ export function urlConsentimento(state: string): Resultado<{ url: string }> {
     client_id: cfg.id,
     redirect_uri: REDIRECT_URI,
     response_type: "code",
-    scope: ESCOPO_UPLOAD,
+    // Separador é ESPAÇO — medido na doc de OAuth do Google, e o
+    // URLSearchParams cuida do encode. Vírgula é o separador do TikTok, não
+    // deste; trocar um pelo outro dá `invalid_scope` sem dizer por quê.
+    scope: ESCOPOS.join(" "),
     access_type: "offline", // sem isto não existe refresh_token
     prompt: "consent", // força o refresh_token a vir de novo numa reautorização
     include_granted_scopes: "true",
@@ -273,8 +300,15 @@ export async function trocarCodigo(
   }
 }
 
-/** access_token novo a partir do refresh_token. Vale ~1h; não vale a pena cachear. */
-async function accessToken(): Promise<Resultado<{ token: string }>> {
+/**
+ * access_token novo a partir do refresh_token. Vale ~1h; não vale a pena cachear.
+ *
+ * EXPORTADO em YT-COMENTA-01 (era privado): `lib/youtube/comentarios.ts` precisa
+ * do MESMO token, do MESMO refresh, com a MESMA renovação. Duplicar esta função
+ * criaria dois lugares para consertar quando o Google mudar o endpoint, e um
+ * deles seria esquecido.
+ */
+export async function accessToken(): Promise<Resultado<{ token: string }>> {
   const cfg = envs();
   if (!cfg) return { ok: false, erro: "env_ausente(YT_CLIENT_ID/YT_CLIENT_SECRET)" };
   const refresh = process.env.YT_REFRESH_TOKEN;
