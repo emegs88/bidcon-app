@@ -95,6 +95,7 @@ import {
   formulaDoTemplate,
 } from "@/lib/farol/reel-texto";
 import { formulaPorId, type Formula, type Persona } from "@/lib/farol/formulas";
+import { statusConsumivelDaPauta } from "@/lib/farol/painel";
 import { dispararRender, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
@@ -281,7 +282,11 @@ export async function GET(req: Request) {
     // queima uma carta e a vitrine pode ter mudado, então a carta escolhida
     // agora pode não ser a mesma. Usar a pauta nesse caso seria narrar crédito
     // e parcela de uma carta que não é a anunciada. Divergiu, cai no template —
-    // e a pauta fica 'nova', visível no banco como pauta escrita e não usada.
+    // e a pauta fica no estado em que estava, visível no banco como pauta
+    // escrita e não usada. (Dizia "fica 'nova'"; com o PAINEL-FAROL-01 o estado
+    // consumível passou a ser configurável, então o nome literal do estado
+    // depende de `FAROL_PAUTA_APROVA`. O fato — pauta intacta e não consumida —
+    // é o mesmo nos dois casos.)
     let roteiro = "";
     let legenda = "";
     let pautaUsada: { id: string; formula: string } | null = null;
@@ -289,11 +294,18 @@ export async function GET(req: Request) {
     // sabe QUEM fala (FAROL-DUPLA-01). Fica `null` no roteiro clássico.
     let formulaUsada: Formula | null = null;
 
+    // O ESTADO CONSUMÍVEL É CONFIGURÁVEL, e o default é o de sempre.
+    // `statusConsumivelDaPauta()` devolve 'nova' — literalmente o filtro que
+    // estava escrito aqui — enquanto `FAROL_PAUTA_APROVA` estiver desarmada.
+    // Com ela on, passa a exigir 'aprovada', e uma pauta que ninguém aprovou
+    // simplesmente não é encontrada: cai no template, que é o MESMO caminho de
+    // degradação que este bloco já tinha para pauta ausente. Nenhum estado novo
+    // de erro foi inventado — a ausência já era um caso previsto.
     const { data: pautas, error: errPauta } = await db
       .from("farol_pauta")
       .select("id,formula,roteiro,legenda,hashtags")
       .eq("dia", hoje)
-      .eq("status", "nova")
+      .eq("status", statusConsumivelDaPauta())
       .eq("carta_id", carta.id)
       .limit(1);
 

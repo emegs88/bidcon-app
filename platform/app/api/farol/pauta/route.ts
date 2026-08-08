@@ -67,6 +67,7 @@ import {
 import { formulaDoDia } from "@/lib/farol/formulas";
 import { ouvirTendencias, escreverPauta } from "@/lib/farol/pauta";
 import { blocoSaber } from "@/lib/farol/saber";
+import { statusInicialDaPauta } from "@/lib/farol/painel";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -259,12 +260,20 @@ export async function GET(req: Request) {
       });
     }
 
-    // ---- Aprovada ---------------------------------------------------------
+    // ---- Aprovada pelo LINTER ---------------------------------------------
+    // "Aprovada" aqui sempre significou "passou na régua de compliance" — a
+    // máquina. PAINEL-FAROL-01 acrescenta uma segunda porta, HUMANA, e ela é
+    // opcional: `statusInicialDaPauta()` devolve 'nova' (o fluxo de hoje, bit a
+    // bit) enquanto `FAROL_PAUTA_APROVA` não estiver on, e
+    // 'aguardando_aprovacao' quando estiver. Nenhum outro comportamento deste
+    // arquivo muda — inclusive o caminho 'reprovada' logo acima, que continua
+    // sendo veredito do linter e não passa por humano nenhum.
+    const statusInicial = statusInicialDaPauta();
     const { error: errIns } = await db.from("farol_pauta").insert({
       ...base,
       roteiro: texto.roteiro,
       legenda: texto.legenda,
-      status: "nova",
+      status: statusInicial,
     });
 
     if (errIns) {
@@ -282,6 +291,7 @@ export async function GET(req: Request) {
       formula: formula.id,
       escolha: motivoEscolha,
       fontes: escuta.fontes.length,
+      status: statusInicial,
     });
 
     console.log("[farol-pauta] pauta escrita:", {
@@ -289,12 +299,13 @@ export async function GET(req: Request) {
       formula: formula.id,
       carta_id: carta.id,
       fontes: escuta.fontes.length,
+      status: statusInicial,
     });
 
     return NextResponse.json({
       ok: true,
       escreveu: true,
-      status: "nova",
+      status: statusInicial,
       formula: formula.id,
       carta_id: carta.id,
       fontes: escuta.fontes.length,
