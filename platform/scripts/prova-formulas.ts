@@ -7,9 +7,18 @@
 // palavras. Não é código de produção e nada aqui roda em request: é o jeito de
 // não descobrir um texto reprovado às 11h30, com a HeyGen já cobrada.
 //
-// RÉGUA DE DURAÇÃO: o roteiro clássico tem 88 palavras e rendeu 31 segundos de
-// vídeo — ~170 palavras por minuto. Divida o contador por 2,84 para ter os
-// segundos. Mantenha esta bancada verde ao mexer nas fôrmas.
+// RÉGUA DE DURAÇÃO — CORRIGIDA em 08/08 (FAROL-AULA-01, medição 1).
+// A régua anterior (~170 ppm) vinha de UMA amostra lembrada de cabeça. Refiz a
+// medição lendo o átomo `mvhd` dos mp4 REAIS hospedados no bucket:
+//
+//   reel 07/08  df4b877…   90 palavras → 31,49 s  → 171,5 ppm
+//   reel 08/08  82572f4…   82 palavras → 32,81 s  → 149,9 ppm
+//   agregado               172 palavras → 64,30 s → 160,5 ppm
+//
+// Vale a AGREGADA: ~160 palavras/min = 2,68 palavras/segundo. Divida o contador
+// por 2,68. A régua velha subestimava a duração em ~6% — ou seja, as fôrmas são
+// mais LONGAS do que eu declarei no READY da FORMULAS-02.
+// Mantenha esta bancada verde ao mexer nas fôrmas.
 // ============================================================================
 import { FORMULAS } from "@/lib/farol/formulas";
 import { roteiroDaFormula, montarLegendaReel } from "@/lib/farol/reel-texto";
