@@ -46,6 +46,34 @@ import { formulaDoDia, type Formula } from "@/lib/farol/formulas";
  *   1250000 -> "1 milhão e 250 mil reais"
  *   255300  -> "255 mil e 300 reais"
  *   890     -> "890 reais"
+ *   2385990 -> "2 milhões, 385 mil e 990 reais"   <- as TRÊS classes
+ *   1000000 -> "1 milhão DE reais"                <- milhão redondo pede "de"
+ *
+ * A COLAGEM DAS CLASSES É VÍRGULA, E O " e " SÓ ANTES DA ÚLTIMA.
+ * AUTORIZADO: Emerson Gomes dos Santos — decisão 3 da coordenação de 08/08/2026:
+ * "corrigir a colagem — '2 milhões, 385 mil e 990 reais'".
+ * A versão anterior colava tudo com " e " e produzia "2 milhões e 385 mil e 990
+ * reais". Isso não é como a língua fala, e o defeito só APARECE quando as três
+ * classes existem ao mesmo tempo — por isso passou: as cartas medidas até aqui
+ * caíam em duas classes (1.132.000 -> "1 milhão e 132 mil"). A carta de
+ * R$ 2.385.990 do Itaú, que entrou na bancada das fôrmas, é a que revelou.
+ *
+ * NÃO uso Intl.ListFormat: ele colaria "2 milhões, 385 mil e 990" igual, mas
+ * carrega dependência de locale de runtime para uma regra de três casos que eu
+ * quero LER no arquivo. Aqui a regra está escrita.
+ *
+ * ---------------------------------------------------------------------------
+ * SEGUNDO CONSERTO, ALÉM DA LETRA DA DECISÃO 3 — DECLARADO. Medindo o defeito
+ * da colagem eu achei outro na MESMA linha de retorno: o milhão redondo saía
+ * "1 milhão reais" / "2 milhões reais". Em português o "de" só cai quando vem
+ * outra classe atrás ("1 milhão e 132 mil reais"); terminando no milhão, é
+ * "1 milhão de reais". Crédito redondo de R$ 1.000.000 é dos mais comuns em
+ * imóvel, então isso ia ao ar falado errado. Emerson: se preferir que eu ande
+ * só pela letra da ordem, é reverter estas duas linhas e o teste correspondente.
+ *
+ * LIMITE DECLARADO: não existe classe de BILHÃO aqui. R$ 2.385.990.000 sairia
+ * "2385 milhões...". Não implementei porque nenhuma carta chega perto e prefiro
+ * o limite escrito a um código que finge cobrir uma faixa que nunca vi.
  */
 export function valorFalado(n: number): string {
   const v = Math.round(n);
@@ -61,7 +89,23 @@ export function valorFalado(n: number): string {
   if (milhares > 0) partes.push(`${milhares} mil`);
   if (unidades > 0) partes.push(String(unidades));
 
-  return `${partes.join(" e ")} reais`;
+  // "de reais" só quando o número TERMINA no milhão — ver header.
+  const terminaNoMilhao = milhoes > 0 && milhares === 0 && unidades === 0;
+  return `${colarClasses(partes)} ${terminaNoMilhao ? "de reais" : "reais"}`;
+}
+
+/**
+ * Cola as classes do número: vírgula entre todas, " e " só antes da última.
+ *   ["990"]                        -> "990"
+ *   ["1 milhão", "132 mil"]        -> "1 milhão e 132 mil"
+ *   ["2 milhões", "385 mil", "990"] -> "2 milhões, 385 mil e 990"
+ * Separada de `valorFalado` porque é a regra que a decisão 3 mandou consertar —
+ * quero que ela tenha nome, e que o teste consiga apontar para ela.
+ */
+function colarClasses(partes: string[]): string {
+  if (partes.length <= 1) return partes[0] ?? "";
+  const ultima = partes[partes.length - 1];
+  return `${partes.slice(0, -1).join(", ")} e ${ultima}`;
 }
 
 /** "0,65% a.m." -> "0,65 por cento ao mês". Derivado do canônico — ver header. */
