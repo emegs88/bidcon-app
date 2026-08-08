@@ -68,6 +68,7 @@ import {
   registrar,
 } from "@/lib/farol/selecao";
 import { montarRoteiro, montarLegendaReel } from "@/lib/farol/reel-texto";
+import { statusConsumivelDaPauta } from "@/lib/farol/painel";
 import { dispararRender, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
@@ -179,11 +180,18 @@ export async function GET(req: Request) {
     let legenda = "";
     let pautaUsada: { id: string; formula: string } | null = null;
 
+    // O ESTADO CONSUMÍVEL É CONFIGURÁVEL, e o default é o de sempre.
+    // `statusConsumivelDaPauta()` devolve 'nova' — literalmente o filtro que
+    // estava escrito aqui — enquanto `FAROL_PAUTA_APROVA` estiver desarmada.
+    // Com ela on, passa a exigir 'aprovada', e uma pauta que ninguém aprovou
+    // simplesmente não é encontrada: cai no template, que é o MESMO caminho de
+    // degradação que este bloco já tinha para pauta ausente. Nenhum estado novo
+    // de erro foi inventado — a ausência já era um caso previsto.
     const { data: pautas, error: errPauta } = await db
       .from("farol_pauta")
       .select("id,formula,roteiro,legenda,hashtags")
       .eq("dia", hoje)
-      .eq("status", "nova")
+      .eq("status", statusConsumivelDaPauta())
       .eq("carta_id", carta.id)
       .limit(1);
 

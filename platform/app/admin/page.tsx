@@ -95,6 +95,7 @@ export default async function AdminPainel() {
           <Button href="/admin/processos" variant="ghost" size="sm">Processos</Button>
           <Button href="/admin/cartas" variant="ghost" size="sm">Cartas</Button>
           <Button href="/admin/comissoes" variant="ghost" size="sm">Comissões</Button>
+          <Button href="/admin/farol" variant="ghost" size="sm">FAROL</Button>
         </nav>
       </div>
     </AppShell>
