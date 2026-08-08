@@ -377,6 +377,53 @@ async function acharPorTitulo(
 }
 
 /**
+ * RESGATE POR ESTAGNAÇÃO (08/08) — a segunda cara do mesmo defeito.
+ *
+ * MEDIDO em produção: o render de 08/08 disparado às 11h48 estava PRONTO no
+ * painel do HeyGen e a fase 2 leu "renderizando" por três horas. O resgate por
+ * título já existia, mas só armava em 404 — e aqui o id fantasma
+ * (`82572f46a7714dcda209e9ecc33a7c3f`) NÃO dá 404: ele responde 200 com
+ * `processing` para sempre. Ou seja: 404 nunca foi a doença, era um dos
+ * sintomas. A doença é o id guardado não ser o id do recurso — e ele pode
+ * mentir tanto sumindo quanto respondendo.
+ *
+ * Então o gatilho passa a ser o COMPORTAMENTO, não o código HTTP: status
+ * não-pronto + linha velha demais para ainda estar renderizando = vale
+ * perguntar pelo título, que é a chave humana e verdadeira.
+ *
+ * A DEFENSIVA CONTINUA INTEIRA, e é ela que separa isto de um chute:
+ *  - sem `titulo` ou sem `estagnado`, nem chama — render novo tem que ter o
+ *    direito de demorar, e uma requisição por linha por tique custa cota;
+ *  - `acharPorTitulo` exige resultado ÚNICO e comparação EXATA: 0 ou 2+
+ *    devolve erro e aqui mantém o status original, porque publicar o vídeo
+ *    errado num perfil público é pior do que esperar outro ciclo;
+ *  - só ADOTA o resgate se ele vier `pronto` (completed COM url). Resgate
+ *    que também está processando não é notícia — o original já dizia isso.
+ *
+ * Nunca piora o veredito: no pior caso devolve exatamente o que entrou.
+ */
+async function resgatarSeEstagnado(
+  porId: StatusVideo,
+  videoId: string,
+  titulo: string | null | undefined,
+  estagnado: boolean | undefined
+): Promise<StatusVideo> {
+  if (porId.estado === "pronto" || !estagnado || !titulo) return porId;
+
+  const achado = await acharPorTitulo(titulo);
+  if (!achado.ok) return porId;
+
+  const porTitulo = lerStatus(achado.data, primeiro(achado.data, "id", "video_id"));
+  if (porTitulo.estado !== "pronto") return porId;
+
+  console.warn("[farol-reel] resgate por estagnação", {
+    id_guardado: videoId,
+    id_heygen: porTitulo.idResolvido,
+  });
+  return porTitulo;
+}
+
+/**
  * Estado do render. v3: GET /v3/videos/{id} → data.status ∈
  * pending|processing|completed|failed (enum medido no OpenAPI), com
  * `video_url`, `duration` e `failure_code`/`failure_message`.
@@ -385,11 +432,17 @@ async function acharPorTitulo(
  * Qualquer estado DESCONHECIDO é tratado como "processando", nunca como
  * "pronto": no pior caso o reel espera mais um ciclo; o contrário publicaria
  * uma URL vazia no perfil público.
+ *
+ * `estagnado` é a resposta do CHAMADOR à pergunta "esta linha já é velha
+ * demais para ainda estar renderizando?". Mora fora daqui porque idade é fato
+ * da fila (`farol_reels`), não da API — esta lib não conhece banco. Ver o
+ * bloco "Resgate por estagnação" no corpo.
  */
 export async function statusVideo(
   videoId: string,
   tipo: string,
-  titulo?: string | null
+  titulo?: string | null,
+  estagnado?: boolean
 ): Promise<Resposta<StatusVideo>> {
   if (usaLegado(tipo)) {
     const r = await get(`/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`);
@@ -398,9 +451,15 @@ export async function statusVideo(
   }
 
   const r = await get(`/v3/videos/${encodeURIComponent(videoId)}`);
-  if (r.ok) return { ok: true, data: lerStatus(corpo(r.data), videoId) };
+  if (r.ok) {
+    const porId = lerStatus(corpo(r.data), videoId);
+    return { ok: true, data: await resgatarSeEstagnado(porId, videoId, titulo, estagnado) };
+  }
 
-  // ---- Resgate (07/08) ------------------------------------------------------
+  // ---- Resgate por 404 (07/08) ----------------------------------------------
+  // O OUTRO sintoma da mesma doença — o irmão deste é `resgatarSeEstagnado`,
+  // logo acima, para quando o id fantasma responde 200 em vez de sumir.
+  //
   // MEDIDO em produção: o render de 07/08 foi criado por POST /v3/videos, que
   // devolveu `df4b877…` (32 hex), e meia hora depois GET /v3/videos/df4b877…
   // respondeu `code=video_not_found`. A doc da v3 diz que o 404 dela é
