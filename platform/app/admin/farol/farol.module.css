@@ -1,0 +1,280 @@
+/* ============================================================================
+   /admin/farol — PAINEL-FAROL-01.
+
+   Herda os tokens de app/globals.css (--surface, --border, --text-muted,
+   --brand, --warn…). Nenhuma cor literal nova é introduzida: esta tela tem de
+   parecer as outras do admin, inclusive no tema claro, que o portal suporta.
+   Ver o desvio declarado do item 5 no header de page.tsx.
+
+   --mono-painel é a única adição: pilha monoespaçada do SISTEMA, sem webfont.
+   Ela serve o ponto real do "IBM Plex Mono nos números" — id de vídeo, de
+   container e de post são lidos caractere a caractere, e proporcional
+   atrapalha isso —, sem custar um download render-blocking na área logada.
+   ============================================================================ */
+.grid3 {
+  --mono-painel: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.cardTitulo {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+.subtitulo {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ---- Pares rótulo/valor --------------------------------------------------- */
+.campos {
+  display: grid;
+  gap: 8px;
+}
+.campo {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.campoRotulo {
+  color: var(--text-muted);
+}
+.campoValor {
+  color: var(--text-soft);
+}
+/* `overflow-wrap: anywhere` porque id do HeyGen tem 32 hex sem separador: sem
+   isso ele estoura a coluna e empurra o layout inteiro. */
+.campoValorMono {
+  color: var(--text-soft);
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.vazio {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.textoErro {
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+.erroLeitura {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  color: var(--warn);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Preview do mp4 ------------------------------------------------------- */
+/* Reel é 9:16. Teto de altura para o vídeo não empurrar os campos para fora da
+   dobra num card estreito. */
+.preview {
+  width: 100%;
+  max-height: 320px;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 12px;
+}
+
+/* ---- Texto da pauta ------------------------------------------------------- */
+.texto {
+  margin-top: 4px;
+}
+.corpoTexto {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-soft);
+  white-space: pre-wrap;
+}
+.hashtags {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--brand);
+  overflow-wrap: anywhere;
+}
+.fontes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.fontes a {
+  color: var(--brand);
+  overflow-wrap: anywhere;
+}
+.tema {
+  color: var(--text-muted);
+}
+
+/* ---- Ações ---------------------------------------------------------------- */
+.acoesWrap {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.aviso {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.aviso code {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+}
+.erroAcao {
+  margin: 0;
+  font-size: 12px;
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+
+/* A caixa de confirmação nominal é visualmente distinta de propósito: ela é o
+   último passo antes de algo ir a um perfil público. */
+.confirmacao {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.formEdicao {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.rotuloCampo {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Resposta crua do disparo — é a saída da rota, não uma paráfrase dela. */
+.resposta {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Cada linha travada é um bloco fechado: sem a moldura, os pares rótulo/valor
+   de duas linhas diferentes viram uma lista contínua e o botão de destravar
+   fica ambíguo sobre a qual delas pertence — num gesto que abandona container,
+   ambiguidade é o defeito, não o estilo. */
+.travada {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+/* ---- Histórico ------------------------------------------------------------ */
+/* A tabela rola dentro do próprio contêiner; a página nunca rola na horizontal. */
+.tabelaWrap {
+  --mono-painel: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 720px;
+}
+.tabela th,
+.tabela td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.tabela th {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tabela td {
+  color: var(--text-soft);
+}
+.tabela tr:last-child td {
+  border-bottom: none;
+}
+.colMono {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  white-space: nowrap;
+}
+.colMotivo {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .campo {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
