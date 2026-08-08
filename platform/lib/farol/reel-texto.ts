@@ -38,6 +38,7 @@
 // fatia é determinística de ponta a ponta.
 // ============================================================================
 import { reais, pctAoMes, type CartaCarrossel } from "@/lib/carrossel-formato";
+import { formulaDoDia, type Formula } from "@/lib/farol/formulas";
 
 /**
  * Valor em reais na forma que se FALA. Exato até o real (ver header):
@@ -74,7 +75,7 @@ export function custoFalado(custoAm: number | null): string {
  * virarem "zero reais": um porta-voz que anuncia "entrada de zero reais" soa
  * como erro, e a carta sem entrada é justamente a boa notícia.
  */
-export function montarRoteiro(c: CartaCarrossel): string {
+function roteiroClassico(c: CartaCarrossel): string {
   const numeros: string[] = [`crédito de ${valorFalado(c.credito)}`];
   if (c.entrada > 0) numeros.push(`entrada de ${valorFalado(c.entrada)}`);
   if (c.parcelas > 0 && c.parcela > 0) {
@@ -113,11 +114,15 @@ const HASHTAGS_REEL: Record<string, string> = {
  * Notarial pela voz; ler a mesma coisa embaixo só empurra o CTA para fora da
  * primeira dobra.
  */
-export function montarLegendaReel(c: CartaCarrossel): string {
+function legendaClassica(c: CartaCarrossel, selo = false): string {
   const linhas: string[] = [];
 
   linhas.push(`Carta contemplada · ${c.tipoLabel}`);
   if (c.administradora) linhas.push(c.administradora);
+  // SELO DE EXCLUSIVIDADE (decisão 3 de 08/08): a exclusividade se expressa
+  // AQUI, na legenda, e nunca forçando o tema do roteiro. Ver header de
+  // formulas.ts para a regra que foi eliminada em favor deste selo.
+  if (selo && c.exclusiva) linhas.push("Carta exclusiva Bidcon");
   linhas.push("");
 
   // `reais()` é o MESMO formatador do post de feed e do card. O reel não pode
@@ -135,4 +140,178 @@ export function montarLegendaReel(c: CartaCarrossel): string {
   linhas.push(HASHTAGS_REEL[c.tipo] ?? HASHTAGS_REEL.imovel);
 
   return linhas.join("\n");
+}
+
+// ===========================================================================
+// EIXO DAS POSSIBILIDADES (FAROL-FORMULAS-02) — os 8 roteiros determinísticos
+// ---------------------------------------------------------------------------
+// POR QUE O TEXTO MORA AQUI E NÃO EM formulas.ts. O roteiro precisa de
+// `valorFalado()` e `custoFalado()`, que moram neste arquivo; e este arquivo
+// precisa de `formulaDoDia()`, que mora em formulas.ts. Se o texto literal
+// fosse escrito lá, os dois módulos se importariam em círculo. A divisão é:
+// formulas.ts é DADO E INSTRUÇÃO (o que dizer), reel-texto.ts é TEXTO (como se
+// diz). Quem escreve pela IA (a ESCUTA) lê a instrução; quem escreve pelo
+// template lê daqui.
+//
+// NENHUM DOS OITO ABRE COM SAUDAÇÃO OU COM A CARTA. Todos abrem pelo `gancho`
+// da fôrma — literal, sem parafrasear — e só chegam nos números no fecho, como
+// PROVA. Essa é a estrutura obrigatória da OS, e é ela que muda o eixo.
+//
+// LINTER: nenhum destes textos contém o caractere "%", porque o custo falado
+// sai por `custoFalado()` ("por cento ao mês"). A regra de percentual de
+// `revisarLegenda()` passa por ausência, não por sorte — mas os oito são
+// medidos pelo linter antes de qualquer publicação, mesmo assim.
+// ===========================================================================
+
+/**
+ * Os números da carta na forma FALADA, como prova no fecho.
+ *
+ * DUAS LARGURAS, POR MEDIÇÃO (08/08, antes do commit). O roteiro clássico que
+ * está no ar tem 88 palavras e rendeu um vídeo de 31 segundos — ou seja, ~170
+ * palavras por minuto na voz que usamos. Com essa régua, a prova COMPLETA de
+ * uma carta de R$ 2,3 milhões custa 45 palavras, ~16 segundos, sozinha. Uma
+ * fôrma de alvo 15s fecharia em 31s: o dobro do que ela declara.
+ *
+ * Então as fôrmas curtas (alvo <= 20s) falam só o CRÉDITO. A carta continua
+ * aparecendo como prova, que é o que a OS exige; entrada e parcelas continuam
+ * escritas na legenda e na página da carta, que é onde a pessoa decide. O
+ * ganho não é só de retenção: a HeyGen cobra por duração, e são 30 renders/mês.
+ */
+function provaFalada(c: CartaCarrossel, curta = false): string {
+  const partes: string[] = [`crédito de ${valorFalado(c.credito)}`];
+  if (curta) return partes[0];
+  if (c.entrada > 0) partes.push(`entrada de ${valorFalado(c.entrada)}`);
+  if (c.parcelas > 0 && c.parcela > 0) {
+    partes.push(`${c.parcelas} parcelas de ${valorFalado(c.parcela)}`);
+  }
+  return partes.join(", ");
+}
+
+/** Fôrma curta: fecha enxuto. Ver `provaFalada`. */
+function ehCurta(f: Formula): boolean {
+  return f.duracao_alvo <= 20;
+}
+
+/**
+ * A frase de custo. VAZIA quando o custo não é exibível: preferimos calar do
+ * que falar "custo de traço". `pctAoMes(null)` devolve "—", e um TTS lendo isso
+ * produz silêncio ou ruído — nos dois casos, um vídeo estragado.
+ */
+function custoFrase(c: CartaCarrossel, curta = false): string {
+  if (c.custoAm == null) return "";
+  const cauda = curta ? "" : ", tudo já calculado";
+  return ` Custo de ${custoFalado(c.custoAm)}${cauda}.`;
+}
+
+/** O fecho comum: prova + custo + CTA da fôrma. */
+function fecho(c: CartaCarrossel, f: Formula): string {
+  const curta = ehCurta(f);
+  return `Hoje tem ${provaFalada(c, curta)}.${custoFrase(c, curta)} ${f.cta}`;
+}
+
+type Roteirista = (c: CartaCarrossel, f: Formula) => string;
+
+const ROTEIROS: Record<string, Roteirista> = {
+  P1: (c, f) =>
+    [
+      f.gancho,
+      "Esse dinheiro não volta e não virou patrimônio.",
+      "A carta contemplada é crédito já liberado: compra o imóvel à vista e troca o aluguel por parcela de uma coisa que fica sua.",
+      fecho(c, f),
+    ].join(" "),
+
+  P2: (c, f) =>
+    [
+      f.gancho,
+      "Quem já tem financiamento pode usar o crédito da carta para quitar o saldo devedor e passar a pagar a parcela do consórcio.",
+      "É troca de dívida, com o custo escrito na frente para você comparar com o seu contrato.",
+      fecho(c, f),
+    ].join(" "),
+
+  P3: (c, f) =>
+    [
+      f.gancho,
+      "Quem compra à vista negocia de um jeito; quem depende de aprovação de banco negocia de outro.",
+      "A carta contemplada é isso: crédito liberado para fechar à vista.",
+      fecho(c, f),
+    ].join(" "),
+
+  P4: (c, f) =>
+    [
+      f.gancho,
+      "Empresa também adquire carta de crédito.",
+      c.tipo === "veiculo"
+        ? "Dá para montar frota com planejamento, em vez de comprar apertado no dia em que o veículo para."
+        : "Dá para trocar o aluguel comercial por sede própria, com o crédito na mão para comprar à vista.",
+      fecho(c, f),
+    ].join(" "),
+
+  P5: (c, f) =>
+    [
+      f.gancho,
+      "Terreno, construção, reforma e ampliação também entram.",
+      "É o uso que a maior parte das pessoas não sabe que existe.",
+      fecho(c, f),
+    ].join(" "),
+
+  P6: (c, f) =>
+    [
+      f.gancho,
+      "A cota que você já pagou tem valor de mercado agora.",
+      "E o pagamento é protegido por Conta Notarial em cartório: o valor só é liberado ao vendedor depois da aprovação da administradora.",
+      `Esse estoque gira todo dia — hoje tem ${provaFalada(c, true)}.${custoFrase(c, true)} ${f.cta}`,
+    ].join(" "),
+
+  P7: (c, f) =>
+    [
+      f.gancho,
+      "Para quem roda o dia inteiro, o carro não é luxo: é ferramenta de trabalho.",
+      "Chegar com o crédito na mão muda a condição de compra.",
+      fecho(c, f),
+    ].join(" "),
+
+  P8: (c, f) =>
+    [
+      f.gancho,
+      "Mito: consórcio é ficar esperando sorteio.",
+      "Verdade: a carta contemplada já passou por essa etapa — o que você adquire é o crédito liberado.",
+      fecho(c, f),
+    ].join(" "),
+};
+
+/**
+ * Roteiro de uma fôrma específica. Exportado para que o linter e o relatório de
+ * aprovação possam renderizar as oito sem passar pelo kill-switch.
+ * Fôrma sem roteirista cai no clássico em vez de devolver vazio.
+ */
+export function roteiroDaFormula(c: CartaCarrossel, f: Formula): string {
+  const r = ROTEIROS[f.id];
+  return r ? r(c, f) : roteiroClassico(c);
+}
+
+// ---------------------------------------------------------------------------
+// AS DUAS PORTAS PÚBLICAS — atrás do kill-switch FAROL_FORMULAS
+// ---------------------------------------------------------------------------
+// DOUTRINA DA CASA (Emerson, 08/08): fatia que MUTA caminho vivo nasce atrás de
+// env própria. Estas duas funções são o caminho vivo do reel diário. Com
+// `FAROL_FORMULAS` desarmada elas devolvem, byte a byte, o que devolviam antes
+// desta fatia — o diff funcional é ZERO até alguém armar a env.
+//
+// `dia` é opcional para não quebrar quem ainda chama com um argumento só. Sem
+// `dia` não há fôrma do dia, e portanto não há o que trocar: cai no clássico.
+
+/** Roteiro falado do reel. Ver bloco acima sobre o kill-switch. */
+export function montarRoteiro(c: CartaCarrossel, dia?: string): string {
+  if (process.env.FAROL_FORMULAS !== "on" || !dia) return roteiroClassico(c);
+  return roteiroDaFormula(c, formulaDoDia(dia, c.exclusiva, c.tipo));
+}
+
+/**
+ * Legenda do reel. A fôrma NÃO muda a legenda — os números são os mesmos e o
+ * CTA escrito continua o mesmo. O que a env liga aqui é só o selo de
+ * exclusividade (decisão 3), que é onde a exclusividade passou a morar.
+ */
+export function montarLegendaReel(c: CartaCarrossel, dia?: string): string {
+  void dia;
+  return legendaClassica(c, process.env.FAROL_FORMULAS === "on");
 }

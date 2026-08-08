@@ -160,8 +160,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, escreveu: false, motivo: "sem_carta" });
     }
 
-    // ---- Fôrma do dia (rotação determinística; exclusiva força F1) --------
-    const formula = formulaDoDia(hoje, carta.exclusiva);
+    // ---- Fôrma do dia -----------------------------------------------------
+    // Rotação determinística DENTRO das fôrmas que fecham no tipo da carta. Sem
+    // o terceiro argumento, um dia de "sair do aluguel" aterrissaria no crédito
+    // de um carro — o irmão gêmeo do bug da carta divergente. Ver formulas.ts.
+    // `carta.exclusiva` não é mais usado na escolha (a exceção foi eliminada em
+    // 08/08); a exclusividade virou selo de legenda.
+    const formula = formulaDoDia(hoje, carta.exclusiva, carta.tipo);
 
     // ---- 1ª chamada: a escuta --------------------------------------------
     const escuta = await ouvirTendencias();

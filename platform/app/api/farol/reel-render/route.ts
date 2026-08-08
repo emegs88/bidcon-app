@@ -225,8 +225,11 @@ export async function GET(req: Request) {
     }
 
     if (!pautaUsada) {
-      roteiro = montarRoteiro(carta);
-      legenda = montarLegendaReel(carta);
+      // `hoje` entrou na assinatura em 08/08 (FAROL-FORMULAS-02): é ele que
+      // escolhe a fôrma do dia quando FAROL_FORMULAS=on. Com a env desarmada o
+      // argumento é ignorado e estas duas linhas devolvem o texto de sempre.
+      roteiro = montarRoteiro(carta, hoje);
+      legenda = montarLegendaReel(carta, hoje);
     }
 
     // ---- Compliance ANTES do render (linha INALTERADA) --------------------
