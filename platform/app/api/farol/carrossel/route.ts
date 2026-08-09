@@ -50,14 +50,14 @@
 // republicar a tabela da semana passada como se fosse a desta.
 //
 // ---------------------------------------------------------------------------
-// DECISÃO DECLARADA — O CARROSSEL NÃO USA A MEMÓRIA DE 14 DIAS.
+// DECISÃO DECLARADA — O CARROSSEL NÃO USA A MEMÓRIA ANTI-REPETIÇÃO.
 // `publicadasRecentemente()` existe para o post diário não repetir carta. Aqui
 // ela seria um erro: a promessa do formato é "as melhores da semana", e uma
 // carta ótima ficaria de fora só porque virou post na terça. O leitor não sabe
 // nem se importa com o que foi postado antes; ele quer a tabela certa. Então
-// `excluidos` entra VAZIO, de propósito. Consequência real: uma carta pode
-// aparecer no post do dia e no carrossel de sábado. Aceito — é reforço, não
-// repetição.
+// a memória entra VAZIA (`memoriaVazia()`), de propósito. Consequência real:
+// uma carta pode aparecer no post do dia e no carrossel de sábado. Aceito — é
+// reforço, não repetição.
 //
 // COLISÃO DE CRON DECLARADA: `post-diario` roda "0 14 * * *", TODO dia, sábado
 // inclusive. O cron desta rota, pedido pela OS, é sábado 14:00 UTC — o MESMO
@@ -78,6 +78,7 @@ import {
   autorizadoFarol,
   hojeSP,
   candidatos,
+  memoriaVazia,
   revisarLegenda,
   registrar,
 } from "@/lib/farol/selecao";
@@ -155,8 +156,8 @@ export async function GET(req: Request) {
     }
 
     // ---- Seleção: as 6 melhores, intercalando os tipos -------------------
-    // `excluidos` VAZIO de propósito — ver header.
-    const vazio = new Set<string>();
+    // Memória VAZIA de propósito — ver header.
+    const vazio = memoriaVazia();
     const [imoveis, veiculos] = await Promise.all([
       candidatos(db, { tipo: "imovel" }, vazio),
       candidatos(db, { tipo: "veiculo" }, vazio),

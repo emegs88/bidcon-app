@@ -28,10 +28,13 @@
 // SELEÇÃO DA CARTA DO DIA (determinística, sem IA — regra da OS):
 //   1. fonte = `vw_vitrine_viva`, a MESMA que /api/card-image lê. Se a carta
 //      não está nela, a arte devolveria 404 e a Meta recusaria o container.
-//   2. exclui cartas publicadas nos últimos 14 dias (memória em farol_posts).
+//   2. exclui cartas publicadas na janela DO TIPO delas — 14 dias para imóvel,
+//      7 para veículo (memória em farol_posts). Ver `JANELA_REPETICAO_DIAS`.
 //   3. alterna tipo por dia: ímpar = imóvel, par = veículo. Sem estoque
 //      daquele tipo, cai pro outro.
-//   4. escolhe o MENOR custo ao mês.
+//   4. filtra pelo TETO de custo do tipo e escolhe a de maior ALAVANCAGEM
+//      (crédito por real de parcela). Ver lib/farol/selecao.ts. Até 09/08/2026
+//      este passo era "escolhe o MENOR custo ao mês".
 //   5. exclusiva fura fila 1× por semana, na segunda.
 //
 // "DIA" É EM SÃO PAULO, NÃO EM UTC. O cron roda 14:00 UTC = 11:00 BRT, então
@@ -42,13 +45,18 @@
 //
 // CUSTO: `custoEfetivoCarta` via `normalizarCarta` (lib/carrossel-formato.ts) —
 // a MESMA função que a página /cartas/<uuid>, destino do clique, usa. A view
-// tem uma coluna `custo_am` pronta, e ela é usada aqui APENAS no ORDER BY, pra
-// puxar um punhado de candidatos baratos em vez das 2.573 linhas. O vencedor é
-// decidido pelo cálculo canônico, sobre os candidatos. Isso é seguro porque a
-// divergência medida entre os dois é de no máximo 0,01 p.p. (17 cartas em
-// 2.596): nenhuma carta fora do topo-80 por `custo_am` pode ser a mais barata
-// de verdade. Se um dia a view divergir mais, o pior caso é escolher a segunda
-// carta mais barata — nunca uma carta errada ou indisponível.
+// tem uma coluna `custo_am` pronta, usada só para PRÉ-FILTRAR (um `lte` no
+// teto + `ORDER BY`) em vez de trazer as 2.582 linhas. Quem decide é o cálculo
+// canônico, em memória.
+//
+// ESTE PARÁGRAFO FOI REESCRITO EM 09/08/2026 PORQUE O ARGUMENTO ANTIGO CAIU.
+// Ele dizia: "nenhuma carta fora do topo-80 por `custo_am` pode ser a mais
+// barata de verdade" — verdadeiro enquanto o ranking ERA o custo. Com o ranking
+// por alavancagem, a melhor carta pode estar em qualquer posição da faixa
+// elegível, e o topo-80 viraria um recorte arbitrário. Por isso o limite subiu
+// para 500 e o teto passou a ser filtrado no banco. A divergência medida entre
+// a coluna da view e o canônico é de no máximo 0,005047 p.p. (medida hoje sobre
+// as 1.926 linhas com custo), coberta pela folga de 0,01 do `lte`.
 //
 // ---------------------------------------------------------------------------
 // LEGENDA — PENDÊNCIA HONESTA. A OS pede "template fixo no padrão da legenda
@@ -69,7 +77,7 @@
 //
 // ---------------------------------------------------------------------------
 // EXTRAÇÃO (FAROL-REEL-01, 06/08/2026): o guard, a data em São Paulo, a memória
-// de 14 dias, a busca de candidatos, a escolha, a trava de compliance e o
+// da janela, a busca de candidatos, a escolha, a trava de compliance e o
 // `registrar()` saíram DESTE arquivo e viraram lib/farol/selecao.ts, porque a
 // OS do reel manda usar "a MESMA lib de seleção do FAROL-POST" — e ela não
 // existia. MUDANÇA DE ENDEREÇO, NÃO DE COMPORTAMENTO: o corpo foi levado
@@ -177,14 +185,14 @@ export async function GET(req: Request) {
   try {
     // Memória com ["post_publicado"] — exatamente a mesma lista de antes da
     // extração, para que o comportamento desta rota não mude. Ver header.
-    const excluidos = await publicadasRecentemente(db, ["post_publicado"]);
+    const memoria = await publicadasRecentemente(db, ["post_publicado"]);
 
     // ---- Escolha da carta -------------------------------------------------
     const {
       carta: escolhida,
       motivo: motivoEscolha,
       tipoDoDia,
-    } = await escolherCartaDoDia(db, { dia, segunda, excluidos });
+    } = await escolherCartaDoDia(db, { dia, segunda, memoria });
 
     if (!escolhida) {
       console.log("[farol] sem carta elegível hoje:", { data: hoje, tipoDoDia });

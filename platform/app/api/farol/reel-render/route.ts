@@ -249,16 +249,18 @@ export async function GET(req: Request) {
     // ---- Carta do dia (MESMA lib do FAROL-POST) ---------------------------
     // A memória inclui `reel_publicado`: um reel não repete carta que já virou
     // reel. Inclui também `post_publicado` porque a carta do post de feed das
-    // 14h já foi mostrada hoje — o reel das 14h30 mostra a PRÓXIMA mais barata,
-    // e o perfil ganha duas cartas por dia em vez da mesma duas vezes.
-    const excluidos = await publicadasRecentemente(db, [
+    // 14h já foi mostrada hoje — o reel das 14h30 mostra a PRÓXIMA da fila da
+    // regra da casa, e o perfil ganha duas cartas por dia em vez da mesma duas
+    // vezes. ("Próxima mais barata" até 09/08/2026; hoje a fila é ordenada por
+    // alavancagem dentro do teto de custo — ver lib/farol/selecao.ts.)
+    const memoria = await publicadasRecentemente(db, [
       "post_publicado",
       "reel_publicado",
     ]);
     const { carta, motivo: motivoEscolha, tipoDoDia } = await escolherCartaDoDia(db, {
       dia,
       segunda,
-      excluidos,
+      memoria,
     });
 
     if (!carta) {

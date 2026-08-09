@@ -3,6 +3,10 @@
 // AUTORIZADO: Emerson Gomes dos Santos — OS "FAROL-VISUAL-02", 09/08/2026:
 // "as 6 melhores cartas da vitrine (menor custo ao mês, alternando
 //  imóvel/veículo), uma por slide, no formato feed".
+// SUPERSEDIDO EM PARTE — Emerson, 09/08/2026, NOVA REGRA DE SELEÇÃO: "melhor"
+// deixou de ser "menor custo" e passou a ser MAIOR ALAVANCAGEM (crédito por
+// real de parcela) DENTRO do teto de custo do tipo. A alternância imóvel/
+// veículo e as 6 cartas continuam como a VISUAL-02 pediu.
 // ----------------------------------------------------------------------------
 // POR QUE ISTO NÃO MORA NA ROTA: a intercalação e a legenda são as duas coisas
 // desta fatia que dá para ERRAR EM SILÊNCIO — um carrossel com 5 imóveis e 1
@@ -15,13 +19,14 @@ import {
   pctAoMes,
   type CartaCarrossel,
 } from "@/lib/carrossel-formato";
+import { compararPelaRegra } from "@/lib/farol/selecao";
 
 /** Slides de carta. 1 capa + 6 cartas + 1 CTA = 8 filhos, teto da Meta é 10. */
 export const CARTAS_POR_CARROSSEL = 6;
 
 /**
- * Intercala os dois tipos, um de cada vez, sempre pegando o mais barato ainda
- * disponível de cada lado. As listas ENTRAM já ordenadas por custo canônico
+ * Intercala os dois tipos, um de cada vez, sempre pegando o melhor ainda
+ * disponível de cada lado. As listas ENTRAM já ordenadas pela regra da casa
  * (é o que `candidatos()` devolve).
  *
  * QUANDO UM LADO ACABA, o outro completa. A alternância é um objetivo estético
@@ -30,9 +35,16 @@ export const CARTAS_POR_CARROSSEL = 6;
  * futuro pode secar um deles, e aí é melhor um carrossel de 6 imóveis do que um
  * carrossel de 3 slides.
  *
- * COMEÇA PELO MAIS BARATO DOS DOIS, não por um tipo fixo: o slide 2 (primeiro
- * depois da capa) é o que mais gente vê, e ele tem que ser o melhor número que
- * a semana tem — não "o melhor imóvel porque imóvel vem primeiro no alfabeto".
+ * COMEÇA PELO MELHOR DOS DOIS, não por um tipo fixo: o slide 2 (primeiro depois
+ * da capa) é o que mais gente vê, e ele tem que ser a melhor carta que a semana
+ * tem — não "o melhor imóvel porque imóvel vem primeiro no alfabeto".
+ *
+ * QUEM DECIDE "MELHOR" É `compararPelaRegra`, a MESMA função que ordena o post
+ * diário, o reel e o story. Até 09/08/2026 esta linha comparava `custoAm` na
+ * mão; com a regra nova isso passaria a divergir do resto do FAROL — o
+ * carrossel abriria pela carta mais barata enquanto o post do dia sairia com a
+ * de maior alavancagem. Duas peças da mesma vitrine dizendo "a melhor é esta"
+ * sobre cartas diferentes é exatamente a incoerência que a OS proíbe.
  */
 export function intercalar(
   imoveis: CartaCarrossel[],
@@ -43,12 +55,11 @@ export function intercalar(
   let i = 0;
   let v = 0;
 
-  // `custoAm` já vem não-nulo de `candidatos()`, que filtra os nulos. O `?? Infinity`
-  // é cinto de segurança para quem chamar esta função com outra lista.
-  const custo = (c: CartaCarrossel) => c.custoAm ?? Infinity;
-  let vezDoImovel =
-    (imoveis[0] ? custo(imoveis[0]) : Infinity) <=
-    (veiculos[0] ? custo(veiculos[0]) : Infinity);
+  // Lado vazio perde: sem carta para comparar, a vez é do outro.
+  let vezDoImovel: boolean;
+  if (!imoveis[0]) vezDoImovel = false;
+  else if (!veiculos[0]) vezDoImovel = true;
+  else vezDoImovel = compararPelaRegra(imoveis[0], veiculos[0]) <= 0;
 
   while (fila.length < quantidade && (i < imoveis.length || v < veiculos.length)) {
     if (vezDoImovel && i < imoveis.length) {
@@ -79,8 +90,13 @@ export function montarLegendaCarrossel(cartas: CartaCarrossel[]): string {
 
   linhas.push("A tabela da semana");
   linhas.push("");
+  // A frase MUDOU em 09/08/2026 junto com a regra de seleção. Dizia "as cartas
+  // com o menor custo ao mês", e depois da regra nova isso seria simplesmente
+  // falso: a ordem passou a ser por crédito por real de parcela, dentro do teto
+  // de custo. Legenda que descreve um critério que o código não usa é a pior
+  // espécie de erro — ninguém consegue auditar pela peça publicada.
   linhas.push(
-    "As cartas contempladas com o menor custo ao mês do nosso estoque agora. Arraste para ver todas."
+    "As cartas contempladas que entregam mais crédito por real de parcela no nosso estoque agora, todas dentro do nosso teto de custo. Arraste para ver todas."
   );
   linhas.push("");
 

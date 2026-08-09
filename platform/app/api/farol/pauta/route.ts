@@ -136,7 +136,7 @@ export async function GET(req: Request) {
     // palpite educado, não uma garantia — se o post falhar, ou se a vitrine
     // mudar entre 10h e 11h30, a carta diverge. Por isso o reel-render tem a
     // trava final: só consome pauta cujo `carta_id` bate com a carta dele.
-    const excluidos = await publicadasRecentemente(db, [
+    const memoria = await publicadasRecentemente(db, [
       "post_publicado",
       "reel_publicado",
     ]);
@@ -146,15 +146,18 @@ export async function GET(req: Request) {
       const { carta: doPost } = await escolherCartaDoDia(db, {
         dia,
         segunda,
-        excluidos: memoriaPost,
+        memoria: memoriaPost,
       });
-      if (doPost) excluidos.add(doPost.id);
+      // Carimbo AGORA: a carta do post ainda não existe em farol_posts, e é
+      // como se ela tivesse acabado de sair. Assim fica fora de qualquer
+      // janela, seja a de 7 dias ou a de 14.
+      if (doPost) memoria.set(doPost.id, Date.now());
     }
 
     const { carta, motivo: motivoEscolha, tipoDoDia } = await escolherCartaDoDia(db, {
       dia,
       segunda,
-      excluidos,
+      memoria,
     });
 
     if (!carta) {
