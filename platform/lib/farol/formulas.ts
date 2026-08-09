@@ -88,10 +88,47 @@
 // todo, o que o fecho fala é decisão editorial, e as duas estavam amarradas num
 // campo só. Hoje `prova: "so_credito"` são exatamente P3, P6 e P7 — as mesmas
 // três de antes, agora por declaração e não por aritmética.
+//
+// ---------------------------------------------------------------------------
+// A PERSONA — quem FALA cada fôrma (FAROL-DUPLA-01, decisão 6 de 08/08)
+// ---------------------------------------------------------------------------
+// AUTORIZADO: Emerson Gomes dos Santos — "dados duros/dinheiro/segurança →
+// Porta-voz; vida/casa/sonho/cotidiano/captação → Valentina".
+//
+// A regra foi aplicada sobre o `objetivo` de cada fôrma, que é o eixo editorial
+// dela, e não sobre palavras soltas do texto. Fica 4 × 4:
+//
+//   PORTA-VOZ (dado duro)          VALENTINA (vida)
+//   P2 trocar_divida_cara          P1 moradia_propria
+//   P3 poder_de_compra             P5 construir_ampliar
+//   P4 patrimonio_empresa          P6 captacao
+//   P8 quebra_de_objecao           P7 ferramenta_de_renda
+//
+// O ÚNICO CASO QUE CONFLITA, DECLARADO: P6 CEDENTE. O objetivo dela é
+// `captacao`, que a ordem manda para a Valentina; mas o corpo do roteiro cita a
+// Conta Notarial, que é SEGURANÇA e a ordem manda para o Porta-voz. Resolvi
+// pelo objetivo, porque é ele que define com quem o vídeo fala (aqui, quem TEM
+// cota parada e quer vender) — a Conta Notarial ali é mecanismo de apoio, não o
+// assunto. Emerson: se preferir P6 no Porta-voz, é trocar UMA linha.
+//
+// ISTO NÃO MUDA UMA VÍRGULA DO TEXTO. Nenhuma das oito fôrmas se identifica na
+// fala — todas abrem pelo `gancho`. Quem se identifica é o roteiro CLÁSSICO
+// ("Oi! Aqui é o porta-voz da Bidcon", reel-texto.ts), e é justamente por isso
+// que o caminho sem fôrma nunca pode ser da Valentina: ela se apresentaria como
+// "o porta-voz". Essa trava é estrutural, não uma checagem — sem fôrma não há
+// campo `persona` para ler, e o resolvedor cai no Porta-voz.
 // ============================================================================
 
 /** Em que tipo de carta a fôrma consegue aterrissar. */
 export type TipoBem = "imovel" | "veiculo";
+
+/**
+ * Quem fala a fôrma. Ver "A PERSONA" no header.
+ * `porta_voz` é o avatar de sempre (HEYGEN_AVATAR_ID/HEYGEN_VOICE_ID);
+ * `valentina` é a segunda persona (HEYGEN_AVATAR_ID_2/HEYGEN_VOICE_ID_2), que
+ * só é usada com `FAROL_DUPLA=on`.
+ */
+export type Persona = "porta_voz" | "valentina";
 
 export type Formula = {
   /** Estável e curto: vira valor de coluna em farol_pauta e chave de métrica. */
@@ -109,6 +146,11 @@ export type Formula = {
    * INFERIDO de `duracao_alvo` e agora é declarado.
    */
   prova: "so_credito" | "completa";
+  /**
+   * Quem fala esta fôrma. Ver "A PERSONA" no header. Só tem efeito com
+   * `FAROL_DUPLA=on`; desarmada, TODAS falam pelo Porta-voz de sempre.
+   */
+  persona: Persona;
   /** A possibilidade que a fôrma ataca. Orienta o ângulo, não o texto. */
   objetivo: string;
   /** Tipos de carta em que o fecho faz sentido. Ver header. */
@@ -130,6 +172,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "SAIR DO ALUGUEL",
     duracao_alvo: 40, // LONGA — medido: 104 palavras / 2,68 = 38,8s (imóvel)
     prova: "completa",
+    persona: "valentina", // casa/sonho
     objetivo: "moradia_propria",
     tipos: ["imovel"],
     gancho:
@@ -143,6 +186,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "QUITAR FINANCIAMENTO",
     duracao_alvo: 40, // LONGA — medido: 105 pal / 39,2s imóvel; 102 / 38,1s veículo
     prova: "completa",
+    persona: "porta_voz", // dinheiro/dívida
     objetivo: "trocar_divida_cara",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -156,6 +200,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "PODER DE COMPRA À VISTA",
     duracao_alvo: 25, // CURTA — medido: 67 pal / 25,0s imóvel; 66 / 24,6s veículo
     prova: "so_credito",
+    persona: "porta_voz", // dinheiro/negociação
     objetivo: "poder_de_compra",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -169,6 +214,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "EMPRESA / CNPJ",
     duracao_alvo: 32, // MÉDIA — medido: 82 pal / 30,6s imóvel; 79 / 29,5s veículo
     prova: "completa",
+    persona: "porta_voz", // dado duro/B2B
     objetivo: "patrimonio_empresa",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -182,6 +228,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "OBRA, TERRENO, REFORMA",
     duracao_alvo: 32, // MÉDIA — medido: 74 palavras / 27,6s (imóvel)
     prova: "completa",
+    persona: "valentina", // casa/sonho
     objetivo: "construir_ampliar",
     tipos: ["imovel"],
     gancho: "O crédito não é só para casa pronta.",
@@ -197,6 +244,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "CEDENTE",
     duracao_alvo: 32, // MÉDIA — medido: 81 pal / 30,2s imóvel; 80 / 29,9s veículo
     prova: "so_credito",
+    persona: "valentina", // captação — ver "O ÚNICO CASO QUE CONFLITA" no header
     objetivo: "captacao",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -210,6 +258,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "CARRO DE TRABALHO",
     duracao_alvo: 25, // CURTA — medido: 62 palavras / 23,1s (veículo)
     prova: "so_credito",
+    persona: "valentina", // cotidiano/trabalho
     objetivo: "ferramenta_de_renda",
     tipos: ["veiculo"],
     gancho:
@@ -223,6 +272,7 @@ export const FORMULAS: readonly Formula[] = [
     nome: "MITO × VERDADE",
     duracao_alvo: 32, // MÉDIA — medido: 78 pal / 29,1s imóvel; 75 / 28,0s veículo
     prova: "completa",
+    persona: "porta_voz", // dado duro/objeção
     objetivo: "quebra_de_objecao",
     tipos: ["imovel", "veiculo"],
     gancho: "Consórcio é sorteio? A contemplada já passou por isso.",

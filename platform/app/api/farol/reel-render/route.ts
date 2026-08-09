@@ -28,8 +28,30 @@
 //   4. já rendeu hoje? (banco)      — teto diário, ANTES de gastar crédito
 //   5. carta do dia   (banco)
 //   6. compliance     (código)      — texto reprovado NÃO vira render
-//   7. render         (HeyGen, $$)  — a única linha que custa
+//   7. elenco         (código)      — quem fala; não custa e não pode falhar
+//   8. render         (HeyGen, $$)  — a única linha que custa
 // Nenhuma dessas travas é cara depois da que vem antes dela.
+//
+// ---------------------------------------------------------------------------
+// A SEGUNDA PERSONA (FAROL-DUPLA-01, decisão 6 da coordenação de 08/08)
+// ---------------------------------------------------------------------------
+// AUTORIZADO: Emerson Gomes dos Santos — "persona por fôrma, kill-switch
+// FAROL_DUPLA desarmado, persona gravada no detalhe, envs HEYGEN_AVATAR_ID_2 /
+// HEYGEN_VOICE_ID_2".
+//
+// A persona é campo da FÔRMA (ver "A PERSONA" em lib/farol/formulas.ts), não
+// desta rota. Aqui só se traduz fôrma -> par avatar/voz, em `escalar()`. Por
+// isso o passo 7 é de graça: é leitura de um campo e de duas envs.
+//
+// O DIFF FUNCIONAL É ZERO ATÉ ALGUÉM ARMAR `FAROL_DUPLA`. Desarmada, `escalar()`
+// devolve os mesmos `avatarId`/`voiceId`/`tipo` que a trava 3 leu, e o único
+// resto desta fatia é uma chave a mais no jsonb `detalhe` (`persona:
+// "porta_voz"`) — que é a descrição verdadeira do que já acontece hoje.
+//
+// E ELA DEPENDE DE OUTRA ENV: sem `FAROL_FORMULAS=on` não há fôrma, e sem fôrma
+// não há persona. Ou seja, armar `FAROL_DUPLA` sozinha não muda nada. Isso é
+// consequência, não descuido: o roteiro clássico se apresenta na primeira frase
+// como "o porta-voz da Bidcon", então ele tem que sair na voz do Porta-voz.
 //
 // TETO DIÁRIO: uma carta por dia, uma linha por dia. `FAROL_REEL_QTD` existe no
 // blueprint FAROL-CRIATIVO para subir isso com rampa medida (1/dia na semana 1,
@@ -67,7 +89,12 @@ import {
   revisarLegenda,
   registrar,
 } from "@/lib/farol/selecao";
-import { montarRoteiro, montarLegendaReel } from "@/lib/farol/reel-texto";
+import {
+  montarRoteiro,
+  montarLegendaReel,
+  formulaDoTemplate,
+} from "@/lib/farol/reel-texto";
+import { formulaPorId, type Formula, type Persona } from "@/lib/farol/formulas";
 import { dispararRender, tituloRender } from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +106,69 @@ function tetoDiario(): number {
   const bruto = Number(process.env.FAROL_REEL_QTD ?? "1");
   if (!Number.isFinite(bruto) || bruto < 1) return 1;
   return Math.min(Math.floor(bruto), 4); // 4 é o teto do blueprint
+}
+
+/** Quem fala, e com que avatar/voz. Ver o bloco DUPLA-01 no header. */
+type Elenco = {
+  persona: Persona;
+  avatarId: string;
+  voiceId: string;
+  tipo: string;
+  /** A fôrma pedia Valentina, faltou env da 2ª persona e caiu no Porta-voz. */
+  fallback: boolean;
+};
+
+/**
+ * Escala a persona do render.
+ *
+ * TRÊS PORTAS FECHADAS, NESTA ORDEM — e qualquer uma delas devolve o Porta-voz
+ * de sempre, com os MESMOS ids que esta rota já usava:
+ *   1. `FAROL_DUPLA` desarmada  — a fatia inteira não existe;
+ *   2. fôrma nula ou de Porta-voz — inclui TODO o caminho do roteiro clássico,
+ *      que se apresenta como "o porta-voz da Bidcon" na primeira frase e
+ *      portanto nunca pode sair na voz da Valentina;
+ *   3. envs da 2ª persona ausentes.
+ *
+ * O CASO 3 É FALLBACK, NÃO ERRO — e isso é uma escolha, declarada. Faltar
+ * `HEYGEN_AVATAR_ID_2` com a dupla armada poderia derrubar o reel do dia (é o
+ * que a trava 3 faz com as envs do Porta-voz). Preferi o reel na voz certa da
+ * casa a nenhum reel: o vídeo do dia vale mais que a persona dele. Para o erro
+ * não virar silêncio, ele sai em `console.error` E fica gravado no `detalhe` da
+ * linha como `persona_fallback` — ou seja, é auditável no banco, não só no log.
+ */
+function escalar(
+  f: Formula | null,
+  base: { avatarId: string; voiceId: string; tipo: string }
+): Elenco {
+  const portaVoz: Elenco = { persona: "porta_voz", ...base, fallback: false };
+
+  if (process.env.FAROL_DUPLA !== "on") return portaVoz;
+  if (f?.persona !== "valentina") return portaVoz;
+
+  const avatarId = process.env.HEYGEN_AVATAR_ID_2;
+  const voiceId = process.env.HEYGEN_VOICE_ID_2;
+  if (!avatarId || !voiceId) {
+    const faltando = [!avatarId && "HEYGEN_AVATAR_ID_2", !voiceId && "HEYGEN_VOICE_ID_2"]
+      .filter(Boolean)
+      .join(",");
+    console.error("[farol-reel] FAROL_DUPLA=on e env da 2ª persona ausente:", {
+      formula: f.id,
+      faltando,
+      caiu_em: "porta_voz",
+    });
+    return { ...portaVoz, fallback: true };
+  }
+
+  // `HEYGEN_AVATAR_TIPO_2` NÃO herda o tipo do Porta-voz de propósito: o
+  // primário pode estar em `talking_photo` (caminho v2 legado) e isso não diz
+  // nada sobre a Valentina, que é photo avatar e vai pela v3. Padrão "avatar".
+  return {
+    persona: "valentina",
+    avatarId,
+    voiceId,
+    tipo: process.env.HEYGEN_AVATAR_TIPO_2 ?? "avatar",
+    fallback: false,
+  };
 }
 
 /** Início do dia de hoje em São Paulo, em ISO — a régua da contagem diária. */
@@ -178,6 +268,9 @@ export async function GET(req: Request) {
     let roteiro = "";
     let legenda = "";
     let pautaUsada: { id: string; formula: string } | null = null;
+    // Qual fôrma gerou este texto — vindo da pauta ou do template. É só ela que
+    // sabe QUEM fala (FAROL-DUPLA-01). Fica `null` no roteiro clássico.
+    let formulaUsada: Formula | null = null;
 
     const { data: pautas, error: errPauta } = await db
       .from("farol_pauta")
@@ -221,6 +314,9 @@ export async function GET(req: Request) {
         roteiro = pauta.roteiro;
         legenda = legendaPauta;
         pautaUsada = { id: pauta.id, formula: pauta.formula };
+        // `formula` é texto livre no banco: uma pauta antiga, ou de uma fôrma
+        // renomeada, devolve null aqui — e null vira Porta-voz, que é o certo.
+        formulaUsada = formulaPorId(pauta.formula);
       }
     }
 
@@ -230,6 +326,10 @@ export async function GET(req: Request) {
       // argumento é ignorado e estas duas linhas devolvem o texto de sempre.
       roteiro = montarRoteiro(carta, hoje);
       legenda = montarLegendaReel(carta, hoje);
+      // MESMA função que `montarRoteiro` consulta por dentro, e não uma segunda
+      // cópia da regra: com `FAROL_FORMULAS` desarmada devolve null, o roteiro
+      // é o clássico e a persona é o Porta-voz — as três coisas de acordo.
+      formulaUsada = formulaDoTemplate(carta, hoje);
     }
 
     // ---- Compliance ANTES do render (linha INALTERADA) --------------------
@@ -248,12 +348,23 @@ export async function GET(req: Request) {
       );
     }
 
-    // ---- Render (a única linha que custa) ---------------------------------
-    const r = await dispararRender({
-      roteiro,
+    // ---- Elenco: quem fala (FAROL-DUPLA-01) -------------------------------
+    // DEPOIS do compliance e ANTES do render: trocar de avatar não muda o
+    // texto, então medir o texto primeiro continua sendo o mais barato. Com
+    // `FAROL_DUPLA` desarmada, `escalar()` devolve exatamente os três valores
+    // que a trava 3 já tinha lido — o diff funcional é zero.
+    const elenco = escalar(formulaUsada, {
       avatarId,
       voiceId,
       tipo: tipoAvatar,
+    });
+
+    // ---- Render (a única linha que custa) ---------------------------------
+    const r = await dispararRender({
+      roteiro,
+      avatarId: elenco.avatarId,
+      voiceId: elenco.voiceId,
+      tipo: elenco.tipo,
       // Mesma função que a fase 2 usa para procurar. Era template literal aqui;
       // virou chave de resgate lá — duas cópias seriam duas verdades.
       titulo: tituloRender(hoje, carta.tipo),
@@ -283,13 +394,24 @@ export async function GET(req: Request) {
         credito: carta.credito,
         custo_am: carta.custoAm,
         escolha: motivoEscolha,
-        avatar_tipo: tipoAvatar,
+        avatar_tipo: elenco.tipo,
+        // QUEM FALOU, gravado na linha (ordem do Emerson na decisão 6). Sem a
+        // dupla armada isto é sempre "porta_voz", que é a verdade de hoje —
+        // então a coluna já nasce preenchida e comparável quando a dupla ligar.
+        persona: elenco.persona,
+        ...(elenco.fallback ? { persona_fallback: "env_2_ausente" } : {}),
         // Aditivo e opcional: `detalhe` é jsonb, então dizer QUAL fôrma gerou
         // este reel não custa migração. É o dado que o FAROL-METRICAS-01 vai
         // precisar para saber quais fôrmas retêm e quais devem morrer.
         ...(pautaUsada
           ? { pauta_id: pautaUsada.id, formula: pautaUsada.formula }
-          : { fonte_texto: "template" }),
+          : {
+              fonte_texto: "template",
+              // Aditivo e só existe com FAROL_FORMULAS=on: até aqui o caminho
+              // do template não dizia QUAL fôrma tinha usado, e sem isso a
+              // persona gravada acima ficaria sem par para conferência.
+              ...(formulaUsada ? { formula: formulaUsada.id } : {}),
+            }),
       },
     });
 
@@ -339,6 +461,7 @@ export async function GET(req: Request) {
       custo_am: carta.custoAm,
       escolha: motivoEscolha,
       texto: pautaUsada ? `pauta:${pautaUsada.formula}` : "template",
+      persona: elenco.persona,
     });
 
     return NextResponse.json({
@@ -348,7 +471,8 @@ export async function GET(req: Request) {
       carta_id: carta.id,
       escolha: motivoEscolha,
       texto: pautaUsada ? "pauta" : "template",
-      formula: pautaUsada?.formula ?? null,
+      formula: pautaUsada?.formula ?? formulaUsada?.id ?? null,
+      persona: elenco.persona,
     });
   } catch (e) {
     const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";

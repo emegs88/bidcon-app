@@ -360,10 +360,27 @@ export function roteiroDaFormula(c: CartaCarrossel, f: Formula): string {
 // `dia` é opcional para não quebrar quem ainda chama com um argumento só. Sem
 // `dia` não há fôrma do dia, e portanto não há o que trocar: cai no clássico.
 
+/**
+ * Qual fôrma o template VAI usar — ou `null` quando ele cai no clássico.
+ *
+ * Nasceu na FAROL-DUPLA-01 (08/08) porque a rota de render precisa saber QUEM
+ * fala, e quem fala é campo da fôrma. A alternativa era a rota repetir a
+ * condição do kill-switch e chamar `formulaDoDia()` por conta própria — duas
+ * cópias da mesma decisão, que é como elas divergem. Aqui a condição está
+ * escrita UMA vez e `montarRoteiro()` passou a ler dela.
+ *
+ * É consulta pura: não monta texto, não escreve nada, e devolve `null` sempre
+ * que o roteiro for o clássico — inclusive com `FAROL_FORMULAS` desarmada.
+ */
+export function formulaDoTemplate(c: CartaCarrossel, dia?: string): Formula | null {
+  if (process.env.FAROL_FORMULAS !== "on" || !dia) return null;
+  return formulaDoDia(dia, c.exclusiva, c.tipo);
+}
+
 /** Roteiro falado do reel. Ver bloco acima sobre o kill-switch. */
 export function montarRoteiro(c: CartaCarrossel, dia?: string): string {
-  if (process.env.FAROL_FORMULAS !== "on" || !dia) return roteiroClassico(c);
-  return roteiroDaFormula(c, formulaDoDia(dia, c.exclusiva, c.tipo));
+  const f = formulaDoTemplate(c, dia);
+  return f ? roteiroDaFormula(c, f) : roteiroClassico(c);
 }
 
 /**
