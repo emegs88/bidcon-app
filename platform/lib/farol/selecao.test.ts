@@ -89,6 +89,58 @@ test("camada 2 · crédito maior sozinho NÃO vence se a parcela cresce junto", 
 // CAMADA 3 — desempate. Só roda quando a 2 empata.
 // ---------------------------------------------------------------------------
 
+test("BANDA · o caso real b8328a93 × 7f251b5a — R$ 10 não vencem 0,02 p.p.", () => {
+  // O caso que criou a banda, com os números medidos na vitrine de 09/08/2026.
+  // As duas são Bradesco, imóvel, mesma parcela (878) e créditos separados por
+  // R$ 10 num total de R$ 361 mil. Sem banda, b8328a93 liderava a vitrine por
+  // 0,0028% de alavancagem, apesar de custar 0,02 p.p. a mais ao mês.
+  // Se alguém remover a banda, este teste cai — e é para cair.
+  const b8328a93 = carta({ id: "b8328a93", credito: 361_500, parcela: 878, custoAm: 0.49 });
+  const _7f251b5a = carta({ id: "7f251b5a", credito: 361_490, parcela: 878, custoAm: 0.47 });
+
+  const delta = (alavancagem(b8328a93) - alavancagem(_7f251b5a)) / alavancagem(b8328a93);
+  assert.ok(delta > 0, "b8328a93 tem MESMO a alavancagem maior — o caso é esse");
+  assert.ok(delta < 0.0001, "a diferença é ruído: menos de 0,01% relativo");
+
+  assert.ok(
+    compararPelaRegra(_7f251b5a, b8328a93) < 0,
+    "dentro da banda de 0,5% quem manda é o menor custo, não R$ 10 de crédito"
+  );
+  assert.deepEqual(
+    [b8328a93, _7f251b5a].sort(compararPelaRegra).map((c) => c.id),
+    ["7f251b5a", "b8328a93"]
+  );
+});
+
+test("BANDA · diferença REAL de alavancagem continua vencendo o custo", () => {
+  // A banda não pode virar "custo manda de novo". 5% de diferença de
+  // alavancagem está muito fora da grade de 0,5% e tem que decidir sozinha,
+  // mesmo contra uma carta bem mais barata.
+  const alavancada = carta({ id: "alav", credito: 315_000, parcela: 2_500, custoAm: 0.95 }); // 126
+  const barata = carta({ id: "barata", credito: 300_000, parcela: 2_500, custoAm: 0.30 }); //   120
+  assert.ok(compararPelaRegra(alavancada, barata) < 0, "5% de alavancagem é sinal, não ruído");
+});
+
+test("BANDA · a ordem é transitiva — grade, não vizinhança", () => {
+  // A razão de a banda ser uma grade logarítmica e não um "|a−b| < 0,5%".
+  // Com vizinhança, três cartas escadinha (cada uma 0,4% acima da anterior)
+  // produzem A~B, B~C, A≠C — comparador inconsistente, e o `sort` do V8
+  // devolve ordem que depende do tamanho do array. Aqui a ordem tem que ser a
+  // mesma independentemente de como o array chegou.
+  const base = 120;
+  const escada = [0, 0.004, 0.008, 0.012, 0.016].map((d, i) =>
+    carta({ id: `e${i}`, credito: Math.round(300_000 * (1 + d)), parcela: 2_500, custoAm: 0.5 - i * 0.01 })
+  );
+  assert.ok(alavancagem(escada[0]) >= base);
+
+  const ordem = (arr: typeof escada) => arr.sort(compararPelaRegra).map((c) => c.id).join(",");
+  const direto = ordem([...escada]);
+  const invertido = ordem([...escada].reverse());
+  const embaralhado = ordem([escada[2], escada[0], escada[4], escada[1], escada[3]]);
+  assert.equal(direto, invertido, "a ordem mudou com a entrada — comparador inconsistente");
+  assert.equal(direto, embaralhado, "a ordem mudou com a entrada — comparador inconsistente");
+});
+
 test("camada 3a · empate na alavancagem, ganha o menor custo ao mês", () => {
   const cara = carta({ id: "cara", custoAm: 0.8 });
   const barata = carta({ id: "barata", custoAm: 0.4 });
@@ -147,6 +199,9 @@ test("camada 1 · cada tipo é medido pelo teto DELE", () => {
   assert.equal(dentroDoTeto(carta({ tipo: "imovel", custoAm: 1.2 })), false);
   assert.equal(dentroDoTeto(carta({ tipo: "veiculo", custoAm: 1.2 })), true);
   assert.equal(dentroDoTeto(carta({ tipo: "veiculo", custoAm: 1.9 })), false);
+  // 1,64% a.m. era o TOPO de veículo enquanto o teto foi 1,85 — foi essa carta
+  // publicável ao lado de uma de 0,30% que motivou baixar o teto para 1,50.
+  assert.equal(dentroDoTeto(carta({ tipo: "veiculo", custoAm: 1.64 })), false);
 });
 
 test("camada 1 · o teto é inclusivo — carta exatamente no limite disputa", () => {
@@ -173,7 +228,9 @@ test("os tetos e a folga do banco são os números medidos", () => {
   // Estes três números vieram de medição, não de gosto. Se alguém mexer neles
   // sem refazer a medição, este teste é o lugar onde a conversa recomeça.
   assert.equal(TETO_CUSTO_AM.imovel, 1.0);
-  assert.equal(TETO_CUSTO_AM.veiculo, 1.85);
+  // Veículo baixou de 1,85 para 1,50 em 09/08/2026 — decisão de marca sobre a
+  // faixa publicável, com o ranking intacto. Ver o comentário de TETO_CUSTO_AM.
+  assert.equal(TETO_CUSTO_AM.veiculo, 1.5);
   // Maior desvio medido entre a coluna `custo_am` da view (2 casas) e o cálculo
   // canônico: 0,005047 p.p. A folga tem que cobrir isso com sobra e ainda ser
   // pequena perto do teto — senão ela deixaria de ser folga e viraria um teto

@@ -90,19 +90,22 @@ export const LIMITE_CANDIDATOS = 500;
 //   1. FILTRO (não é ranking): custo ao mês <= o teto do tipo. Carta cara não
 //      disputa, por melhor que seja a alavancagem dela.
 //   2. RANKING: ALAVANCAGEM = crédito / parcela. Quanto de crédito o cliente
-//      leva por cada real de parcela mensal. Maior vence.
+//      leva por cada real de parcela mensal. Maior vence — respeitada a BANDA
+//      DE EMPATE de 0,5% (ver `BANDA_EMPATE`, autorizada em 09/08/2026).
 //   3. DESEMPATE: menor custo ao mês; empate persistente, maior crédito.
 //
 // ----------------------------------------------------------------------------
-// DIVERGÊNCIA DECLARADA — OS TETOS NÃO EXISTIAM.
-// A OS diz "o teto do tipo JÁ DEFINIDO na casa (PRICE-01)". Procurei antes de
+// ORIGEM DOS TETOS — REGISTRO MANTIDO A PEDIDO DA COORDENAÇÃO (09/08/2026).
+// A OS dizia "o teto do tipo JÁ DEFINIDO na casa (PRICE-01)". Procurei antes de
 // escrever: `grep` em todo o repo e busca nas funções do Postgres do xtv. Não
 // há nenhuma constante de 1,00% / 1,85% em lugar nenhum, e "PRICE-01" no
 // acervo é outra coisa — é a pendência de custo do trigger `trg_bidcon_price`
-// (47 solves de TIR por linha), não um teto de vitrine. Então estes tetos
-// NASCEM AQUI, com os números que a OS mandou. Não é "reuso", é criação, e
-// prefiro dizer isso a deixar parecer que herdei um número que ninguém
-// escreveu.
+// (47 solves de TIR por linha), não um teto de vitrine.
+// A coordenação confirmou depois que os números SÃO regra de casa do PRICE-01
+// (custo ao mês máximo aceito na vitrine) e mandou manter este parágrafo como
+// está: no que diz respeito ao CÓDIGO, eles nascem aqui. É origem, não reuso —
+// e quem for auditar daqui a um ano tem direito de saber que o número não veio
+// de outra linha do repositório.
 //
 // ----------------------------------------------------------------------------
 // O QUE A ALAVANCAGEM NÃO VÊ — LIMITE HONESTO DA MÉTRICA.
@@ -116,10 +119,22 @@ export const LIMITE_CANDIDATOS = 500;
 // sair um card com entrada alta.
 // ---------------------------------------------------------------------------
 
-/** Teto de custo ao mês (% a.m.) por tipo de bem. Camada 1 da regra. */
+/**
+ * Teto de custo ao mês (% a.m.) por tipo de bem. Camada 1 da regra.
+ *
+ * VEÍCULO BAIXOU DE 1,85 PARA 1,50 EM 09/08/2026, por decisão de marca, não de
+ * cálculo. O ranking por alavancagem não mudou; mudou a FAIXA que a vitrine
+ * defende. Motivo registrado: com o teto em 1,85 o topo de veículo saía a 1,64%
+ * a.m. no mesmo dia em que existia 0,30% no estoque, e a Bidcon estampa o custo
+ * ao mês no card — a conta fechava e a percepção não.
+ *
+ * Este é o botão certo para mexer quando o custo publicado incomodar. Apertar
+ * aqui tira carta cara da disputa sem tocar em como as sobreviventes são
+ * ordenadas; mexer na camada 2 mudaria o que "melhor carta" significa.
+ */
 export const TETO_CUSTO_AM: Record<string, number> = {
   imovel: 1.0,
-  veiculo: 1.85,
+  veiculo: 1.5,
 };
 
 /**
@@ -145,12 +160,59 @@ export function alavancagem(c: Pick<CartaCarrossel, "credito" | "parcela">): num
 const EPS = 1e-9;
 
 /**
+ * BANDA DE EMPATE DA CAMADA 2 — autorizada em 09/08/2026.
+ *
+ * O CASO QUE A CRIOU (medido na vitrine de hoje): b8328a93 venceu 7f251b5a por
+ * alavancagem 411,731207 contra 411,719818 — 0,0028% de diferença, vinda de
+ * R$ 10 a mais de crédito num crédito de R$ 361 mil. Esses R$ 10 decidiram o
+ * topo da vitrine ANTES que o desempate por custo pudesse pesar os 0,02 p.p.
+ * de diferença real entre as duas. Ruído ganhando de sinal.
+ *
+ * Sem banda, o desempate por custo era letra morta na prática: alavancagem é
+ * float contínuo, e empate exato só acontece em cartas duplicadas.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE ISTO É UMA FAIXA QUANTIZADA E NÃO UMA VIZINHANÇA DE 0,5%.
+ * A implementação óbvia — "se |a−b|/a < 0,5%, empatou" — NÃO É TRANSITIVA: A
+ * empata com B, B empata com C, e A perde de C. Comparador não-transitivo faz
+ * `Array.prototype.sort` produzir ordem que depende do algoritmo do motor e do
+ * tamanho do array. A vitrine de sábado sairia diferente da de segunda com o
+ * mesmo estoque, e ninguém conseguiria reproduzir o bug. Regra determinística
+ * não pode depender da versão do V8.
+ *
+ * Então a banda é uma GRADE: cada carta cai numa faixa logarítmica de passo
+ * 0,5%, e a comparação é entre faixas. Isso é transitivo por construção (é uma
+ * ordem sobre inteiros) e reproduzível em qualquer motor.
+ *
+ * O PREÇO, dito por inteiro: duas cartas separadas por menos de 0,5% podem
+ * cair em faixas vizinhas se houver uma linha da grade entre elas — nesse caso
+ * elas NÃO empatam. Não dá para ter tolerância relativa e transitividade ao
+ * mesmo tempo; qualquer versão transitiva é uma quantização, e toda
+ * quantização tem borda. O que importa é a escala: o passo da grade (0,5%) é
+ * ~180x maior que o ruído que motivou a mudança (0,0028%), então o caso da OS
+ * fica resolvido com folga, e o resíduo é uma borda estreita em vez de uma
+ * ordem instável.
+ */
+export const BANDA_EMPATE = 0.005;
+
+/**
+ * A faixa (bucket) de alavancagem. Inteiro, para a comparação ser exata.
+ * Alavancagem 0 (carta sem parcela) tem faixa própria, a pior de todas — e
+ * finita, senão `faixa(b) - faixa(a)` daria NaN quando as duas fossem 0.
+ */
+function faixaAlavancagem(v: number): number {
+  if (!(v > 0)) return -Number.MAX_SAFE_INTEGER;
+  return Math.floor(Math.log(v) / Math.log(1 + BANDA_EMPATE));
+}
+
+/**
  * O comparador das três camadas (o filtro da camada 1 é aplicado antes, em
  * `dentroDoTeto`). Ordena do melhor para o pior — `.sort()` direto.
  */
 export function compararPelaRegra(a: CartaCarrossel, b: CartaCarrossel): number {
-  const alav = alavancagem(b) - alavancagem(a); // maior alavancagem vence
-  if (Math.abs(alav) > EPS) return alav;
+  // Camada 2 — maior alavancagem vence, dentro da grade de 0,5%.
+  const faixa = faixaAlavancagem(alavancagem(b)) - faixaAlavancagem(alavancagem(a));
+  if (faixa !== 0) return faixa;
 
   const custoA = a.custoAm ?? Infinity;
   const custoB = b.custoAm ?? Infinity;
