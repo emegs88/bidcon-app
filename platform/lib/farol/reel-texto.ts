@@ -210,16 +210,19 @@ function legendaClassica(c: CartaCarrossel, selo = false): string {
 /**
  * Os números da carta na forma FALADA, como prova no fecho.
  *
- * DUAS LARGURAS, POR MEDIÇÃO (08/08, antes do commit). O roteiro clássico que
- * está no ar tem 88 palavras e rendeu um vídeo de 31 segundos — ou seja, ~170
- * palavras por minuto na voz que usamos. Com essa régua, a prova COMPLETA de
- * uma carta de R$ 2,3 milhões custa 45 palavras, ~16 segundos, sozinha. Uma
- * fôrma de alvo 15s fecharia em 31s: o dobro do que ela declara.
+ * DUAS LARGURAS, POR MEDIÇÃO. A régua desta nota estava ERRADA e foi refeita em
+ * 08/08 (FAROL-AULA-01, medição 1): eu tinha escrito "~170 palavras por minuto"
+ * a partir de UMA amostra lembrada de cabeça. Medindo o átomo `mvhd` dos dois
+ * mp4 REAIS que foram ao ar — 90 palavras/31,49s e 82 palavras/32,81s — a régua
+ * agregada é 160,5 ppm, ou 2,68 palavras por segundo. A antiga subestimava a
+ * duração em ~6%.
  *
- * Então as fôrmas curtas (alvo <= 20s) falam só o CRÉDITO. A carta continua
- * aparecendo como prova, que é o que a OS exige; entrada e parcelas continuam
- * escritas na legenda e na página da carta, que é onde a pessoa decide. O
- * ganho não é só de retenção: a HeyGen cobra por duração, e são 30 renders/mês.
+ * Com a régua certa, a prova COMPLETA de uma carta de R$ 2,3 milhões custa 45
+ * palavras, ~17 segundos, sozinha. Por isso as fôrmas de `prova: "so_credito"`
+ * falam só o CRÉDITO. A carta continua aparecendo como prova, que é o que a OS
+ * exige; entrada e parcelas continuam escritas na legenda e na página da carta,
+ * que é onde a pessoa decide. O ganho não é só de retenção: a HeyGen cobra por
+ * duração (US$0,05/s no Photo Avatar) e são 30 renders/mês.
  */
 function provaFalada(c: CartaCarrossel, curta = false): string {
   const partes: string[] = [`crédito de ${valorFalado(c.credito)}`];
@@ -231,9 +234,22 @@ function provaFalada(c: CartaCarrossel, curta = false): string {
   return partes.join(", ");
 }
 
-/** Fôrma curta: fecha enxuto. Ver `provaFalada`. */
+/**
+ * Fôrma que fecha enxuto. Ver `provaFalada`.
+ *
+ * ISTO ERA `f.duracao_alvo <= 20` E VIROU UM CAMPO. AUTORIZADO: decisão 2 da
+ * coordenação de 08/08 ("alvos passam a ser os valores medidos"). Enquanto os
+ * alvos eram chutes redondos (15/20/30/35), a duração por acaso separava as
+ * curtas. Com os alvos medidos, ela não separa mais: P6 CEDENTE fecha só com o
+ * crédito e mesmo assim mede 30,2s — mais que P5 (27,6s) e P8 (29,1s), que
+ * falam a carta inteira. Se eu tivesse só trocado os números, P6 teria virado
+ * "completa" no silêncio e passado a falar entrada e parcelas.
+ *
+ * Duração é consequência do texto todo; o que o fecho fala é decisão editorial.
+ * Eram duas coisas amarradas num campo só, e agora são dois campos.
+ */
 function ehCurta(f: Formula): boolean {
-  return f.duracao_alvo <= 20;
+  return f.prova === "so_credito";
 }
 
 /**

@@ -357,7 +357,15 @@ function systemRedacao(f: Formula): string {
     "",
     "FORMATO DO VÍDEO:",
     `- fôrma do dia: ${f.id} — ${f.nome} (${f.objetivo})`,
-    `- duração alvo: até ${f.duracao_alvo} segundos de fala, nunca mais que 35`,
+    // TETO em duas camadas: o da fôrma (medido, 25/32/40) e o teto duro de 40.
+    // Antes o teto duro era 35, escrito quando as fôrmas ainda declaravam alvos
+    // chutados; com os alvos medidos (decisão 2 de 08/08), P1 e P2 medem ~39s e
+    // 35 passaria a REPROVAR o próprio template. A régua está escrita junto para
+    // o modelo poder contar palavras em vez de estimar segundos no escuro.
+    `- duração alvo: até ${f.duracao_alvo} segundos de fala, nunca mais que 40`,
+    `- régua medida: ~2,68 palavras por segundo, ou seja no máximo ${Math.floor(
+      f.duracao_alvo * 2.68
+    )} palavras`,
     `- gancho (modelo, pode reescrever mantendo o ângulo): ${f.gancho}`,
     `- esqueleto: ${f.esqueleto}`,
     `- CTA (modelo, uma ação só): ${f.cta}`,

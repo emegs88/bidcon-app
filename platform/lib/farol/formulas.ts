@@ -46,6 +46,48 @@
 // O parâmetro `exclusiva` continua na assinatura de `formulaDoDia()`, sem uso
 // na escolha, para não quebrar quem já chama com dois argumentos (a ESCUTA). A
 // exclusividade é lida direto de `carta.exclusiva` por quem monta a legenda.
+//
+// ---------------------------------------------------------------------------
+// A RÉGUA — os alvos deixaram de ser chute (decisão 2, coordenação 08/08)
+// ---------------------------------------------------------------------------
+// Os oito `duracao_alvo` originais (15/20/30/35) eram números redondos escritos
+// antes de existir vídeo para medir. Em 08/08 eu li o átomo `mvhd` dos dois mp4
+// REAIS que foram ao ar:
+//
+//   reel 07/08  df4b877…   90 palavras → 31,49 s → 171,5 ppm
+//   reel 08/08  82572f4…   82 palavras → 32,81 s → 149,9 ppm
+//   agregado              172 palavras → 64,30 s → 160,5 ppm = 2,68 pal/s
+//
+// Rodando o template com a carta real do Itaú (R$ 2.385.990) e a do Bradesco
+// (R$ 1.132.000), cada fôrma mede:
+//
+//   P3  67/66 pal → 25,0 / 24,6 s      P8  78/75 pal → 29,1 / 28,0 s
+//   P7  62    pal → 23,1 s             P6  81/80 pal → 30,2 / 29,9 s
+//   P5  74    pal → 27,6 s             P4  82/79 pal → 30,6 / 29,5 s
+//   P1 104    pal → 38,8 s             P2 105/102 pal → 39,2 / 38,1 s
+//
+// AUTORIZADO por Emerson nas faixas de 08/08: curtas <= 25s, médias <= 32s,
+// longas <= 40s. `duracao_alvo` agora é o TETO da faixa em que a fôrma mede, e
+// o valor medido fica no comentário ao lado — teto e medição escritos juntos,
+// para ninguém precisar confiar na memória de nenhum dos dois.
+//
+// A DECISÃO QUE **NÃO** FOI TOMADA: encurtar as fôrmas. P1 e P2 medem ~39s e
+// ficam coladas no teto. O número falado NÃO sai do áudio (é promessa da marca,
+// decisão 2), então o único jeito de encurtá-las seria cortar mecanismo — e
+// isso é escolha editorial do Emerson, não minha.
+//
+// ---------------------------------------------------------------------------
+// A PROVA — o que o FECHO fala, separado de quanto ele dura
+// ---------------------------------------------------------------------------
+// `ehCurta()` (lib/farol/reel-texto.ts) decidia isso com `duracao_alvo <= 20`.
+// Funcionava por COINCIDÊNCIA, enquanto os alvos eram redondos. Com os alvos
+// medidos a coincidência morre: P6 CEDENTE fecha só com o crédito e mede 30,2s
+// — mais que P5 (27,6s) e P8 (29,1s), que falam a carta inteira. Trocar só os
+// números faria P6 virar "completa" em silêncio e passar a falar entrada e
+// parcelas. Por isso nasceu o campo `prova`: duração é consequência do texto
+// todo, o que o fecho fala é decisão editorial, e as duas estavam amarradas num
+// campo só. Hoje `prova: "so_credito"` são exatamente P3, P6 e P7 — as mesmas
+// três de antes, agora por declaração e não por aritmética.
 // ============================================================================
 
 /** Em que tipo de carta a fôrma consegue aterrissar. */
@@ -55,8 +97,18 @@ export type Formula = {
   /** Estável e curto: vira valor de coluna em farol_pauta e chave de métrica. */
   id: string;
   nome: string;
-  /** Segundos de fala. Curtas 7-15s (alcance); explicativas 30-45s. */
+  /**
+   * TETO de segundos de fala, nas faixas de 08/08: curtas <= 25, médias <= 32,
+   * longas <= 40. Ver "A RÉGUA" no header. É TETO, não meta — o template mede
+   * abaixo dele, e o valor MEDIDO está no comentário de cada fôrma.
+   */
   duracao_alvo: number;
+  /**
+   * Quanto da carta o FECHO fala: "so_credito" fala só o crédito; "completa"
+   * fala crédito + entrada + parcelas. Ver "A PROVA" no header — isto era
+   * INFERIDO de `duracao_alvo` e agora é declarado.
+   */
+  prova: "so_credito" | "completa";
   /** A possibilidade que a fôrma ataca. Orienta o ângulo, não o texto. */
   objetivo: string;
   /** Tipos de carta em que o fecho faz sentido. Ver header. */
@@ -76,7 +128,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P1",
     nome: "SAIR DO ALUGUEL",
-    duracao_alvo: 30,
+    duracao_alvo: 40, // LONGA — medido: 104 palavras / 2,68 = 38,8s (imóvel)
+    prova: "completa",
     objetivo: "moradia_propria",
     tipos: ["imovel"],
     gancho:
@@ -88,7 +141,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P2",
     nome: "QUITAR FINANCIAMENTO",
-    duracao_alvo: 35,
+    duracao_alvo: 40, // LONGA — medido: 105 pal / 39,2s imóvel; 102 / 38,1s veículo
+    prova: "completa",
     objetivo: "trocar_divida_cara",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -100,7 +154,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P3",
     nome: "PODER DE COMPRA À VISTA",
-    duracao_alvo: 15,
+    duracao_alvo: 25, // CURTA — medido: 67 pal / 25,0s imóvel; 66 / 24,6s veículo
+    prova: "so_credito",
     objetivo: "poder_de_compra",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -112,7 +167,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P4",
     nome: "EMPRESA / CNPJ",
-    duracao_alvo: 35,
+    duracao_alvo: 32, // MÉDIA — medido: 82 pal / 30,6s imóvel; 79 / 29,5s veículo
+    prova: "completa",
     objetivo: "patrimonio_empresa",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -124,7 +180,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P5",
     nome: "OBRA, TERRENO, REFORMA",
-    duracao_alvo: 30,
+    duracao_alvo: 32, // MÉDIA — medido: 74 palavras / 27,6s (imóvel)
+    prova: "completa",
     objetivo: "construir_ampliar",
     tipos: ["imovel"],
     gancho: "O crédito não é só para casa pronta.",
@@ -134,8 +191,12 @@ export const FORMULAS: readonly Formula[] = [
   },
   {
     id: "P6",
+    // A fôrma que provou que duração não é conteúdo: fecha SÓ com o crédito
+    // (era `duracao_alvo <= 20`), mas é a mais falada das curtas — 30,2s, acima
+    // de P5 e P8, que falam a carta inteira. Ver "A PROVA" no header.
     nome: "CEDENTE",
-    duracao_alvo: 20,
+    duracao_alvo: 32, // MÉDIA — medido: 81 pal / 30,2s imóvel; 80 / 29,9s veículo
+    prova: "so_credito",
     objetivo: "captacao",
     tipos: ["imovel", "veiculo"],
     gancho:
@@ -147,7 +208,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P7",
     nome: "CARRO DE TRABALHO",
-    duracao_alvo: 15,
+    duracao_alvo: 25, // CURTA — medido: 62 palavras / 23,1s (veículo)
+    prova: "so_credito",
     objetivo: "ferramenta_de_renda",
     tipos: ["veiculo"],
     gancho:
@@ -159,7 +221,8 @@ export const FORMULAS: readonly Formula[] = [
   {
     id: "P8",
     nome: "MITO × VERDADE",
-    duracao_alvo: 30,
+    duracao_alvo: 32, // MÉDIA — medido: 78 pal / 29,1s imóvel; 75 / 28,0s veículo
+    prova: "completa",
     objetivo: "quebra_de_objecao",
     tipos: ["imovel", "veiculo"],
     gancho: "Consórcio é sorteio? A contemplada já passou por isso.",
