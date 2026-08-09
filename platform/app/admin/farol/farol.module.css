@@ -76,6 +76,15 @@
   color: var(--warn);
   overflow-wrap: anywhere;
 }
+/* Link recíproco para /admin/farol/dashboard (PAINEL-DASHBOARD-01). */
+.linkIrmao {
+  margin: 0;
+  font-size: 13px;
+}
+.linkIrmao a {
+  color: var(--brand);
+}
+
 .erroLeitura {
   margin: 0 0 10px;
   padding: 8px 10px;

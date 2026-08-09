@@ -47,6 +47,7 @@
 // ponto real do "IBM Plex Mono nos números" — id de vídeo, container e post são
 // para conferir caractere a caractere, e proporcional atrapalha isso.
 // ============================================================================
+import Link from "next/link";
 import { exigirAdminConsolePagina } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { AppShell } from "@/components/AppShell";
@@ -482,6 +483,14 @@ export default async function AdminFarol() {
               {armado ? "FAROL armado" : "FAROL desarmado"}
             </span>
           </div>
+          {/* O link recíproco pedido pela OS. Fica JUNTO dos cards de hoje, e
+              não perdido no rodapé, porque a pergunta "e no mês, como foi?"
+              nasce exatamente aqui — olhando o dia e querendo o contexto. */}
+          <p className={styles.linkIrmao}>
+            <Link href="/admin/farol/dashboard">
+              sala de controle — leitura de 30 dias, gráficos e custo →
+            </Link>
+          </p>
           <div className={styles.grid3}>
             <CardPost linha={post} erro={estado.posts.erro} />
             <CardReel linha={reel} erro={estado.reels.erro} />

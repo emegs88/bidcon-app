@@ -8,8 +8,32 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --tsconfig tsconfig.test.json --test lib/comissao.test.ts lib/data-br.test.ts lib/ia.guardrail.test.ts lib/simulador-disal.test.tsx lib/disal/custo-efetivo-plano-novo.test.ts lib/farol/painel.test.ts lib/farol/reel-texto.test.ts lib/farol/responde.test.ts lib/farol/saber.test.ts lib/farol/score.test.ts lib/farol/segmentos.test.ts lib/reserve/0017.test.ts lib/reserve/repasse-pricing.test.ts lib/reserve/reserve.test.ts lib/simulador/engine.test.ts lib/simulador/otimizador.test.ts lib/whatsapp/cerebro.test.ts"
+    "test": "tsx --tsconfig tsconfig.test.json --test \"lib/**/*.test.ts\" \"lib/**/*.test.tsx\""
   },
+  "_test": [
+    "AUTORIZADO: Emerson — OS PAINEL-DASHBOARD-01, 09/08/2026: 'transformar a",
+    "lista em GLOB nesta fatia — ja mordeu tres vezes'.",
+    "",
+    "O QUE ERA. Ate aqui o script listava os 17 arquivos de teste um a um. Uma",
+    "lista de arquivos so descreve a verdade no dia em que foi escrita: criar um",
+    "*.test.ts novo e NAO edita-la faz o arquivo simplesmente nao rodar. Sem erro,",
+    "sem aviso, sem contagem menor — o total continua subindo por causa dos outros",
+    "e ninguem percebe. Foi o que aconteceu na fatia do fuso: 12 testes novos",
+    "passavam quando rodados sozinhos e a suite seguia dizendo 283. Teste que nao",
+    "roda e pior que teste nenhum, porque compra confianca sem entregar cobertura.",
+    "",
+    "POR QUE AS ASPAS SAO OBRIGATORIAS. Quem expande o `**` aqui e o Node, nao a",
+    "shell. `npm run` executa o script em `sh`, e `sh` nao tem globstar: sem as",
+    "aspas ele passaria o literal `lib/**/*.test.ts` como um unico caminho, que",
+    "nao casa com nada, e a suite rodaria ZERO teste alegando sucesso. Com aspas o",
+    "padrao chega intacto ao runner do Node (>= 21), que faz a descoberta",
+    "recursiva. Medido: 295 testes pelo glob, exatamente os mesmos 295 da lista",
+    "explicita que ele substitui.",
+    "",
+    "SAO DOIS PADROES porque ha um teste .tsx (lib/simulador-disal.test.tsx). Um",
+    "glob so de .ts o deixaria de fora — que e precisamente o defeito que esta",
+    "linha existe para eliminar."
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/ssr": "^0.5.2",

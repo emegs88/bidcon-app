@@ -1,0 +1,372 @@
+/* ============================================================================
+   /admin/farol/dashboard — PAINEL-DASHBOARD-01, a sala de controle.
+
+   HERDA OS TOKENS de app/globals.css e NÃO introduz cor literal nenhuma.
+   Não é preciosismo: o portal tem tema claro e tema de alto contraste
+   (`[data-theme]` em globals.css). Um `#34d399` cravado aqui viraria verde
+   ilegível sobre branco no tema claro e furaria o alto contraste inteiro, onde
+   a paleta é substituída em bloco. O desvio visual em relação à OS (que cita
+   navy #0A0E1A / IBM Plex Mono / Space Grotesk — os tokens da LANDING, não os
+   do portal) já foi declarado no header de ../page.tsx e vale igual aqui.
+
+   --mono-painel é a mesma pilha monoespaçada DO SISTEMA usada em ../farol.module.css.
+   Ela serve o ponto real do "IBM Plex Mono nos números" da OS — placar
+   alinhado, dígito com largura fixa — sem baixar webfont render-blocking numa
+   área logada. Está declarada em .pagina para valer em toda a árvore da tela.
+   ============================================================================ */
+.pagina {
+  --mono-painel: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  display: grid;
+  gap: 28px;
+}
+
+/* ---- Cabeçalho e navegação recíproca -------------------------------------- */
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.titulo {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text);
+}
+.sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 68ch;
+}
+.linkIrmao {
+  font-size: 13px;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ---- Seção ---------------------------------------------------------------- */
+.secao {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.secaoHead {
+  display: grid;
+  gap: 4px;
+}
+.secaoTitulo {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+/* A fonte de cada seção fica NA seção, não num rodapé de página: quem lê um
+   número precisa saber de onde ele veio sem rolar até o fim. */
+.secaoFonte {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.secaoFonte code {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+/* ---- Estado vazio --------------------------------------------------------- */
+/* A borda TRACEJADA é o recado: "reservado", não "quebrado". Um card apagado
+   com "sem dados" em cinza é indistinguível de uma falha de carregamento e
+   ensina o operador a ignorar aquela região da tela para sempre. */
+.vazio {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.vazioPorque {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.vazioTag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  vertical-align: 1px;
+}
+.vazioDestrava {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.vazioDestrava strong {
+  color: var(--text-soft);
+}
+
+/* ---- Placar (números grandes) --------------------------------------------- */
+.placar {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: start;
+}
+.numeroBloco {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.numeroRotulo {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+/* `font-variant-numeric: tabular-nums` mantém a largura do dígito estável: sem
+   isso, quatro placares lado a lado dançam quando um deles muda de 9 para 10. */
+.numeroValor {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--text);
+}
+/* O `n` da regra da OS. Discreto, mas SEMPRE presente abaixo de 10 — é o que
+   impede "100% de sucesso" de significar "3 de 3" sem avisar. */
+.numeroN {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.numeroRodape {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---- Figuras (SVG) -------------------------------------------------------- */
+.figura {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+/* Altura FIXA, largura 100%: com `preserveAspectRatio="none"` no SVG, é a caixa
+   CSS que manda no formato. Sem altura fixa, um SVG sem proporção intrínseca
+   colapsaria para zero em alguns navegadores. */
+.svgBarras,
+.svgLinha {
+  display: block;
+  width: 100%;
+  height: 180px;
+  overflow: visible;
+}
+/* `non-scaling-stroke` em tudo que é traço: a distorção x≠y do
+   `preserveAspectRatio="none"` deixaria a espessura variando com a inclinação
+   do segmento — a linha ficaria grossa no trecho horizontal e fina no vertical. */
+.eixo {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+/* O trilho do dia vazio. Precisa ser visível o bastante para o olho contar os
+   dias parados e apagado o bastante para não competir com a barra real. */
+.trilho {
+  fill: var(--border);
+}
+.tracoLinha {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+/* Linha de comprimento zero + linecap redondo = ponto perfeitamente circular,
+   com diâmetro igual a esta espessura, medida em pixels de tela. Ver o porquê
+   no comentário de LinhaTemporal em Graficos.tsx. */
+.marcador {
+  stroke-width: 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---- Legenda -------------------------------------------------------------- */
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.legendaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legendaCor {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+.legendaEixo {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+/* ---- Funil ---------------------------------------------------------------- */
+.funil {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.funilEtapa {
+  display: grid;
+  gap: 6px;
+}
+.funilCabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.funilRotulo {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.funilNumero {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--text);
+}
+.funilConversao {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.funilTrilho {
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+/* `min-width` para a etapa de valor 1 num funil que começa em 100 ainda
+   DESENHAR: uma barra de 1% de largura arredonda para zero pixel e a etapa
+   sumiria da tela justamente quando a queda é a informação. */
+.funilBarra {
+  height: 100%;
+  min-width: 2px;
+  background: var(--brand);
+}
+
+/* ---- Tabela-ranking ------------------------------------------------------- */
+.tabelaWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 520px;
+}
+.tabela th,
+.tabela td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.tabela th {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tabela td {
+  color: var(--text-soft);
+}
+.tabela tr:last-child td {
+  border-bottom: none;
+}
+.colNum {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ---- Duas colunas (porta-voz × Valentina) --------------------------------- */
+.duasColunas {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* ---- Rodapé de estimativa ------------------------------------------------- */
+/* Exigência explícita da OS na seção 4: declarar que o custo é ESTIMATIVA a
+   partir da tabela pública, não fatura. Fica com a mesma borda tracejada do
+   estado vazio porque é o mesmo tipo de aviso: "isto não é medição de fonte
+   primária". */
+.rodapeEstimativa {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.rodapeEstimativa code {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.erroLeitura {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  color: var(--warn);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .svgBarras,
+  .svgLinha {
+    height: 140px;
+  }
+  .numeroValor {
+    font-size: 24px;
+  }
+}
