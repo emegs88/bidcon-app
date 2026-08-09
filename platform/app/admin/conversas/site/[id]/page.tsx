@@ -8,22 +8,13 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ConversaAcoes } from "../../ConversaAcoes";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import styles from "../../conversas.module.css";
 
 export const dynamic = "force-dynamic";
 
-function dataHora(v: string | null): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local foi APAGADA — omitia `timeZone` e carimbava UTC na Vercel.
+// Ver lib/data-br.ts.
 
 // papel: 'cliente' | 'agente' | 'sistema'.
 function bolhaClasse(papel: string): string {
@@ -91,7 +82,7 @@ export default async function AdminConversaSite({
             {m.conteudo}
             <span className={styles.bolhaMeta}>
               {m.papel}
-              {m.agente ? ` · ${m.agente}` : ""} · {dataHora(m.criado_em as string)}
+              {m.agente ? ` · ${m.agente}` : ""} · {dataHoraAnoBR(m.criado_em as string)}
             </span>
           </li>
         ))}

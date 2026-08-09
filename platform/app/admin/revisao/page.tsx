@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { RevisaoCartaAcoes } from "./RevisaoCartaAcoes";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import styles from "./revisao.module.css";
 
 export const dynamic = "force-dynamic";
@@ -41,12 +42,12 @@ function brl(v: number | null): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function dataHora(v: string | null): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+// A `dataHora` local foi APAGADA, não corrigida: ela chamava `toLocaleString`
+// sem `timeZone`, o que carimba o fuso do processo — UTC na Vercel. Esta tela é
+// Server Component, então "detectada em" mostrava três horas a mais. Ver
+// lib/data-br.ts. Apagar em vez de consertar é de propósito: enquanto a versão
+// local existisse, ela continuaria sendo o caminho mais curto para a próxima
+// linha desta tela.
 
 export default async function RevisaoPage() {
   const { nome } = await exigirAdminConsolePagina();
@@ -101,7 +102,7 @@ export default async function RevisaoPage() {
                       {c.tipo ?? "—"} · entrada {brl(c.valor_entrada)} · parcela {brl(c.valor_parcela)} ·{" "}
                       {c.qtd_parcelas ?? "—"}x · {adm ?? "—"} · fornecedor {fornecedor} · ref. {c.numero_externo ?? "—"}
                     </span>
-                    <span className={styles.meta}>detectada em {dataHora(c.bidcon_price_em)}</span>
+                    <span className={styles.meta}>detectada em {dataHoraAnoBR(c.bidcon_price_em)}</span>
                   </div>
                 </div>
                 <RevisaoCartaAcoes

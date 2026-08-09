@@ -27,6 +27,7 @@
 // publica errado); aqui ninguém publica, só se olha.
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { diaBR } from "@/lib/data-br";
 import { hojeSP } from "@/lib/farol/selecao";
 
 type Db = ReturnType<typeof createXtvClient>;
@@ -200,9 +201,14 @@ export async function lerPautas(db: Db, dias = JANELA_PAINEL_DIAS): Promise<Bloc
   // `dia` é `date`, não timestamptz — o corte é por data civil, e a data civil
   // do FAROL é a de São Paulo. Cortar por UTC mostraria a pauta de hoje como
   // "amanhã" durante a madrugada.
-  const limite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  //
+  // ESTE COMENTÁRIO ESTAVA CERTO E O CÓDIGO ABAIXO DELE ESTAVA ERRADO — era
+  // `.toISOString().slice(0, 10)`, que é exatamente o corte em UTC que o
+  // parágrafo acima manda não fazer. Efeito medido: entre 21h e meia-noite de
+  // São Paulo o limite pulava um dia para a frente, e a pauta mais antiga da
+  // janela sumia da tela por três horas, toda noite. Mesma causa do defeito da
+  // coluna Hora; corrigido junto, em 09/08.
+  const limite = diaBR(Date.now() - dias * 24 * 60 * 60 * 1000) ?? "";
   const { data, error } = await db
     .from("farol_pauta")
     .select(

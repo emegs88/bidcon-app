@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import styles from "@/components/area.module.css";
 import det from "./audit.module.css";
 
@@ -45,18 +46,13 @@ const PERIODOS: { chave: string; label: string; dias: number }[] = [
   { chave: "90", label: "90 dias", dias: 90 },
 ];
 
-// Data/hora pt-BR para a trilha (precisamos de hora, não só dia).
-function dataHora(v: string): string {
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local foi APAGADA e a formatação passou para `dataHoraAnoBR`
+// (lib/data-br.ts). Ela dizia "pt-BR" e omitia o `timeZone`, então carimbava o
+// fuso do processo — UTC na Vercel. Numa TRILHA DE AUDITORIA isso é mais grave
+// que numa tela comum: o horário aqui é o registro de quando alguém decidiu
+// verificar, rejeitar ou bloquear um cliente, e ele estava três horas adiantado
+// em toda linha desde sempre. Na virada do ano errava até o ano (teste em
+// lib/data-br.test.ts).
 
 export default async function AdminAuditLogs({
   searchParams,
@@ -174,7 +170,7 @@ export default async function AdminAuditLogs({
                         </div>
                         <span className={det.meta}>
                           {ator ? `por ${ator} · ` : ""}
-                          {dataHora(e.em)}
+                          {dataHoraAnoBR(e.em)}
                         </span>
                         {e.detalhe && (
                           <span className={det.detalhe}>Motivo: {e.detalhe}</span>
