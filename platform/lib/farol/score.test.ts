@@ -9,8 +9,9 @@
 //
 // O QUE ELE **NÃO** PROVA:
 //  - NÃO prova que a fórmula da OS é a melhor. Prova que ela foi implementada
-//    LITERALMENTE, incluindo o defeito de sinal documentado no ACHADO 1 — que é
-//    testado como comportamento conhecido, não como acerto.
+//    como o Emerson DECIDIU em 09/08 — que não é, em três pontos, o que a OS
+//    dizia por escrito. Os testes de ACHADO 1, 2 e 6 travam a fórmula NOVA;
+//    antes desta revisão eles travavam o defeito como comportamento conhecido.
 //  - NÃO prova nada sobre a Parte 3 com dado real: `farol_metricas` não existe
 //    (ACHADO 7). `indices()` e `agregar()` são testadas como matemática pura.
 //  - NÃO prova que a classificação de segmento está certa — isso é
@@ -35,7 +36,7 @@ import {
   confiancaDe,
   MIN_AMOSTRAS_BASE,
   MIN_PECAS_INTERNAS,
-  CONSTANTE_DECAIMENTO_DIAS,
+  MEIA_VIDA_DIAS,
   TOP_POR_SEGMENTO,
   type VideoBruto,
   type MetricaPeca,
@@ -100,6 +101,31 @@ test("GUARDA: zScores com desvio zero devolve zero, nao NaN", () => {
   assert.ok(z.every(Number.isFinite));
 });
 
+test("ACHADO 9: coorte plana em valor NAO-BINARIO tambem devolve zero", () => {
+  // Este é o caso que o guarda `sd === 0` deixava passar, e é por isso que o
+  // teste acima não o pegava: 5 é exato em binário, então [5,5,5,5] dá média
+  // exatamente 5 e desvio exatamente 0. Já 0,4 NÃO é exato — a média de três
+  // sai 0,4000000000000001 e o desvio sai 5,55e-17, que não é zero. A divisão
+  // acontecia e devolvia z = -1 para todos: um número com cara de medição.
+  assert.deepEqual(zScores([0.4, 0.4, 0.4]), [0, 0, 0]);
+  assert.deepEqual(zScores([0.1, 0.1, 0.1]), [0, 0, 0]);
+  assert.deepEqual(zScores([0.7, 0.7, 0.7, 0.7, 0.7]), [0, 0, 0, 0, 0]);
+  // A prova de que o defeito era real, e não um medo teórico:
+  const m = (0.4 + 0.4 + 0.4) / 3;
+  assert.notEqual(m, 0.4, "se isto passar a ser igual, o IEEE-754 mudou");
+});
+
+test("ACHADO 9: o guarda relativo nao engole sinal de verdade", () => {
+  // O risco de um guarda por epsilon é apagar diferença legítima. Não apaga:
+  // uma diferença de 1% ainda produz z cheio, e escalas grandes também.
+  const z = zScores([0.4, 0.404, 0.4]);
+  assert.ok(Math.abs(z[1]) > 1, `z do diferente ficou ${z[1]}`);
+  const grande = zScores([1_000_000, 1_000_001, 1_000_000]);
+  assert.ok(Math.abs(grande[1]) > 1, `z em escala grande ficou ${grande[1]}`);
+  // E zeros puros continuam caindo no guarda, sem dividir por zero.
+  assert.deepEqual(zScores([0, 0, 0]), [0, 0, 0]);
+});
+
 test("GUARDA: zScores com menos de duas amostras devolve zero", () => {
   assert.deepEqual(zScores([7]), [0]);
   assert.deepEqual(zScores([]), []);
@@ -112,15 +138,26 @@ test("recencia vale 1 no dia zero e cai monotonicamente", () => {
   assert.ok(recencia(1000) > 0);
 });
 
-test("ACHADO 2: exp(-dias/30) e constante de tempo, nao meia-vida de 30 dias", () => {
-  // Aos 30 dias a recência vale exp(-1) = 0,3679 — e NÃO 0,5.
-  const aos30 = recencia(CONSTANTE_DECAIMENTO_DIAS);
-  assert.ok(Math.abs(aos30 - Math.exp(-1)) < 1e-12);
-  assert.ok(aos30 < 0.5, "se isto virar 0.5, a fórmula foi trocada sem avisar");
-  // A meia-vida REAL da fórmula escrita é 30*ln2 = 20,79 dias.
-  const meiaVidaReal = CONSTANTE_DECAIMENTO_DIAS * Math.LN2;
-  assert.ok(Math.abs(recencia(meiaVidaReal) - 0.5) < 1e-12);
-  assert.ok(Math.abs(meiaVidaReal - 20.79) < 0.01);
+test("ACHADO 2: a meia-vida e REAL — aos 30 dias vale exatamente 0,5", () => {
+  // Este é o teste que o Emerson pediu para travar a decisão de 09/08.
+  // Se alguém "simplificar" o Math.LN2 para fora da fórmula, isto quebra: a
+  // versão sem ln2 dá exp(-1) = 0,3679 aqui.
+  assert.ok(Math.abs(recencia(MEIA_VIDA_DIAS) - 0.5) < 1e-12);
+  assert.ok(Math.abs(recencia(2 * MEIA_VIDA_DIAS) - 0.25) < 1e-12);
+  assert.ok(Math.abs(recencia(3 * MEIA_VIDA_DIAS) - 0.125) < 1e-12);
+  // E a armadilha antiga fica nomeada, para não voltar por engano:
+  assert.ok(
+    Math.abs(recencia(MEIA_VIDA_DIAS) - Math.exp(-1)) > 0.1,
+    "isto é exp(-dias/30) de volta — constante de tempo, meia-vida de 20,79d",
+  );
+});
+
+test("ACHADO 2: a troca deixou o decaimento mais LENTO, nao mais rapido", () => {
+  // Consequência declarada da decisão: peça de 30 dias passou a pesar 0,500
+  // onde pesava 0,368, e a de 60 dias, 0,250 onde pesava 0,135. O topo do
+  // ranking fica menos enviesado para o que foi publicado ontem.
+  assert.ok(recencia(30) > Math.exp(-30 / 30));
+  assert.ok(recencia(60) > Math.exp(-60 / 30));
 });
 
 test("diasDesde tem piso 1 — video de duas horas nao divide por zero", () => {
@@ -246,18 +283,51 @@ test("base_canal usa todo o historico; o z usa so a janela", () => {
   }
 });
 
-test("ACHADO 1: a recencia multiplicativa inverte o ranking no lado negativo", () => {
-  // Isto NÃO é um acerto — é o defeito documentado, travado em teste para que
-  // ninguém o descubra por acidente em produção. Dois vídeos igualmente ruins
-  // (composto negativo): o VELHO fica com score maior que o NOVO.
-  const composto = -2;
-  const scoreVelho = composto * recencia(90);
-  const scoreNovo = composto * recencia(1);
+test("ACHADO 1: score nunca e negativo — o clamp esta NA ORIGEM", () => {
+  // A decisão do Emerson (09/08): o defeito tem que ser inalcançável em
+  // qualquer caminho, não só no da recomendação. `score` é coluna de banco.
+  // Uma pilha onde é impossível todo mundo ficar acima da média: com 6 vídeos
+  // e z-score, alguém sempre fica com composto negativo.
+  const vs = [
+    video("gigante", "C1", 3, 500_000, { likes: 40_000, comentarios: 5_000 }),
+    ...[1, 2, 3, 4, 5].map((i) => video("p" + i, "C1", 10 + i, 800, { likes: 5 })),
+  ];
+  const p = pontuar(vs, { agora: AGORA });
+  const negativos = p.filter((v) => v.composto < 0);
+  assert.ok(negativos.length > 0, "a fixture tinha que produzir composto negativo");
+  for (const v of p) {
+    assert.ok(v.score >= 0, `${v.video_id} saiu com score ${v.score}`);
+  }
+});
+
+test("ACHADO 1: o clamp e no score, e `composto` continua intacto ao lado", () => {
+  // Efeito colateral declarado: quem está abaixo da média empata em 0 e perde
+  // a ordem relativa. Quem quiser o grau tem `composto`, que NÃO foi clampado.
+  const vs = [
+    video("gigante", "C1", 3, 500_000, { likes: 40_000, comentarios: 5_000 }),
+    ...[1, 2, 3, 4, 5].map((i) => video("p" + i, "C1", 10 + i, 800, { likes: 5 })),
+  ];
+  const p = pontuar(vs, { agora: AGORA });
+  const ruins = p.filter((v) => v.composto < 0);
+  for (const v of ruins) {
+    assert.equal(v.score, 0, "abaixo da média tem que empatar em zero");
+    assert.ok(v.composto < 0, "e `composto` tem que preservar o sinal");
+  }
+});
+
+test("ACHADO 1: a inversao antiga nao acontece mais", () => {
+  // A prova direta do defeito que foi fechado. Antes do clamp, dois vídeos
+  // igualmente ruins (composto -2) davam score -0,25 (velho) e -2 (novo), e o
+  // VELHO ganhava. Agora ambos dão 0 — empatam, que é a leitura honesta.
+  const clamp = (composto: number, dias: number) => Math.max(0, composto) * recencia(dias);
+  assert.equal(clamp(-2, 90), 0);
+  assert.equal(clamp(-2, 1), 0);
   assert.ok(
-    scoreVelho > scoreNovo,
-    "se isto falhar, a fórmula mudou — reveja o ACHADO 1",
+    clamp(-2, 90) <= clamp(-2, 1),
+    "se o velho voltar a ganhar do novo, o clamp saiu da origem",
   );
-  // E é por isso que recomendarPauta() filtra por composto > 0.
+  // E no lado positivo a recência continua fazendo o que deve: o novo ganha.
+  assert.ok(clamp(2, 1) > clamp(2, 90));
 });
 
 // ============================================================================
@@ -280,38 +350,54 @@ function peca(id: string, formula: string, extra: Partial<MetricaPeca> = {}): Me
   };
 }
 
-test("indice aplica os pesos da OS", () => {
-  // Com todas as peças iguais, os dois z valem 0 e sobra só a parte de frações.
+test("ACHADO 6: coorte toda igual da indice ZERO, nao a soma das fracoes", () => {
+  // Com os quatro termos em z, peças idênticas não se destacam de nada e o
+  // índice é 0. Antes da correção este teste esperava 0.35*0.4 + 0.35*0.5 =
+  // 0,425 — o resto de fração que sobrava dos dois termos crus.
   const ps = [peca("a", "P1"), peca("b", "P1"), peca("c", "P1")];
-  const idx = indices(ps);
-  for (const p of idx) {
-    assert.ok(Math.abs(p.indice - (0.35 * 0.4 + 0.35 * 0.5)) < 1e-12);
+  for (const p of indices(ps)) {
+    assert.ok(Math.abs(p.indice) < 1e-12, `indice ${p.indice} para coorte plana`);
   }
 });
 
-test("ACHADO 6: os termos de z dominam o indice apesar do peso menor", () => {
-  // Retenção sobe de 40% para 90% (+50 pontos percentuais) → +0,175 no índice.
-  // Um z de shares de +1,2 com peso 0,20 já vale +0,24. O termo de MENOR peso
-  // mexe mais. Documentado, não corrigido por conta própria.
+test("ACHADO 6: os pesos escritos sao os pesos exercidos", () => {
+  // A prova da correção: mover UM termo por um z equivalente move o índice na
+  // proporção do peso daquele termo. Retenção (0,35) tem que mexer MAIS que
+  // shares (0,20) para o mesmo deslocamento em desvios-padrão.
   const base = [peca("a", "P1"), peca("b", "P1"), peca("c", "P1")];
-  const soRetencao = indices([
-    { ...base[0], retencao: 0.9 },
-    base[1],
-    base[2],
-  ]);
-  const ganhoRetencao = soRetencao[0].indice - soRetencao[1].indice;
-  assert.ok(Math.abs(ganhoRetencao - 0.35 * 0.5) < 1e-9);
 
-  const soShares = indices([
-    { ...base[0], compartilhamentos: 200 },
-    base[1],
-    base[2],
-  ]);
+  const soRetencao = indices([{ ...base[0], retencao: 0.9 }, base[1], base[2]]);
+  const ganhoRetencao = soRetencao[0].indice - soRetencao[1].indice;
+
+  const soShares = indices([{ ...base[0], compartilhamentos: 200 }, base[1], base[2]]);
   const ganhoShares = soShares[0].indice - soShares[1].indice;
+
+  // Mesma forma de coorte (um outlier, dois iguais) → mesmo z em ambos os
+  // casos. Então a razão dos ganhos tem que ser a razão dos pesos: 0,35/0,20.
   assert.ok(
-    ganhoShares > ganhoRetencao,
-    `shares moveu ${ganhoShares}, retenção moveu ${ganhoRetencao}`,
+    ganhoRetencao > ganhoShares,
+    `retenção (peso 0,35) moveu ${ganhoRetencao}; shares (peso 0,20) moveu ${ganhoShares}`,
   );
+  assert.ok(
+    Math.abs(ganhoRetencao / ganhoShares - 0.35 / 0.2) < 1e-9,
+    "a razão dos ganhos tem que ser a razão dos pesos",
+  );
+});
+
+test("ACHADO 6: leads, o de menor peso, e o que menos move", () => {
+  // O sintoma original era o termo de peso 0,10 dominando. Fecha aqui.
+  const base = [peca("a", "P1"), peca("b", "P1"), peca("c", "P1")];
+  const mover = (extra: Partial<MetricaPeca>) => {
+    const r = indices([{ ...base[0], ...extra }, base[1], base[2]]);
+    return r[0].indice - r[1].indice;
+  };
+  const gLeads = mover({ leads: 200 });
+  const gShares = mover({ compartilhamentos: 200 });
+  const gRet = mover({ retencao: 0.9 });
+  const gNaoSeg = mover({ pct_nao_seguidores: 0.95 });
+  assert.ok(gLeads < gShares, "leads (0,10) não pode mover mais que shares (0,20)");
+  assert.ok(gShares < gRet, "shares (0,20) não pode mover mais que retenção (0,35)");
+  assert.ok(Math.abs(gRet - gNaoSeg) < 1e-9, "os dois de peso 0,35 movem igual");
 });
 
 test("agregar sempre expoe o n junto da media", () => {

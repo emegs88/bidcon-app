@@ -154,6 +154,19 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
     "divida do imovel",
     "sair do financiamento",
     "trocar financiamento",
+    // Sugestões do Emerson (09/08), aceitas — com UMA alteração declarada.
+    "juros altos",
+    "cet",
+    "tabela price",
+    "financiamento imobiliario",
+    // Ele sugeriu "sac" solto. NÃO entrou assim: "SAC" é, antes de tudo,
+    // Serviço de Atendimento ao Consumidor, e num nicho cheio de reclamação
+    // de administradora ("SAC da administradora", "reclamei no SAC") o termo
+    // arrastaria vídeo de atendimento para dentro de FINANCIAMENTO. A
+    // fronteira de palavra não protege disso — o termo casa certo, o sentido
+    // é que é outro. Entra só nas formas em que só pode ser amortização.
+    "tabela sac",
+    "sistema sac",
   ],
 
   // P3 é "PODER DE COMPRA À VISTA" — o vocabulário é o da NEGOCIAÇÃO à vista,
@@ -191,6 +204,10 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
     "galpao",
     "mei",
     "microempresa",
+    // Sugestões do Emerson (09/08), aceitas.
+    "loja propria",
+    "escritorio proprio",
+    "expandir a empresa",
   ],
 
   OBRA_TERRENO: [
@@ -221,17 +238,39 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
   // caso mais comum do segmento (medido: o teste de amostra do CEDENTE caiu em
   // `null`). Por isso as conjugações estão listadas explicitamente abaixo.
   //
-  // "carta contemplada" também faltava — é o termo mais corrente do nicho
-  // inteiro. Entra como FRASE, e não como "contemplada" solta, porque
-  // "como ser contemplado" é vocabulário genérico de consórcio e cairia aqui
-  // por engano; a frase "carta contemplada" é do mercado secundário, que é
-  // exatamente este segmento.
+  // O CRITÉRIO DESTA LISTA, depois da revisão do Emerson (09/08): só entra
+  // termo que PROVA INTENÇÃO DE VENDER. Eu tinha posto "carta contemplada" e
+  // "cartas contempladas" aqui, argumentando que a frase (diferente de
+  // "contemplada" solta) seria do mercado secundário. Está errado, e o
+  // contraexemplo é curto: "como COMPRAR carta contemplada" é título de quem
+  // quer COMPRAR — o oposto exato deste segmento — e cairia aqui. A frase é
+  // genérica do nicho inteiro, então saiu.
+  //
+  // E faltava a forma mais óbvia de todas: "VENDO" é literalmente a primeira
+  // palavra do anúncio real de cedente ("VENDO carta contemplada de 300 mil").
+  // O infinitivo e o passado estavam listados; o presente, que é o do anúncio,
+  // não. Corrigido abaixo.
   CEDENTE: [
+    // presente — a forma do anúncio.
+    // O POSSESSIVO ENTRA NO MEIO E QUEBRA A FRASE: "vendo cota" NÃO casa
+    // "vendo MINHA cota", porque o casamento é de frase literal. Medido — o
+    // teste do anúncio real caiu em `null` com a lista sem os possessivos. Por
+    // isso cada forma aparece com e sem "minha/meu".
+    "vendo carta",
+    "vendo cota",
+    "vendo consorcio",
+    "vendo minha carta",
+    "vendo minha cota",
+    "vendo meu consorcio",
+    "vendo carta contemplada",
+    "quero vender",
+    "quero vender minha cota",
+    // infinitivo
     "vender cota",
     "vender consorcio",
     "vender carta",
     "vender minha cota",
-    // conjugações reais de título
+    // passado — a forma do depoimento
     "vendi minha carta",
     "vendi a carta",
     "vendi minha cota",
@@ -239,18 +278,18 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
     "desisti do consorcio",
     "desistiu do consorcio",
     "quem desistiu",
+    // cessão e saída
     "ceder cota",
     "cessao de cota",
     "cedente",
     "transferir cota",
     "transferencia de cota",
+    "passar a carta",
     "desistir do consorcio",
     "sair do consorcio",
     "cancelar consorcio",
     "cancelamento de consorcio",
     "carta a venda",
-    "carta contemplada",
-    "cartas contempladas",
     "repasse de consorcio",
     "repasse de carta",
   ],
@@ -272,6 +311,12 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
     "motorista de app",
     "uber",
     "carro novo",
+    // Sugestões do Emerson (09/08), aceitas. São o vocabulário de quem compra
+    // veículo COMO FERRAMENTA DE TRABALHO — que é o que a P7 fala.
+    "entregador",
+    "frete",
+    "moto zero",
+    "aplicativo de transporte",
   ],
 
   // O mais largo. Só ganha por contagem — ver PRIORIDADE.
@@ -300,6 +345,29 @@ export const TERMOS: Readonly<Record<Segmento, readonly string[]>> = {
     "e furada",
     "taxa de administracao",
     "fundo de reserva",
+    // Vocabulário nº1 do vídeo de mito do nicho (Emerson, 09/08). São os
+    // MECANISMOS do consórcio: quem digita "lance embutido" ou "assembleia"
+    // está atrás de explicação, não de compra — que é exatamente a P8.
+    "sorteio",
+    "lance",
+    "lance embutido",
+    "contemplacao",
+    "assembleia",
+    "autofinanciamento",
+    "consorcio vale a pena",
+    "consorcio ou financiamento",
+    // MARCADORES DE COMPARAÇÃO. Não são enfeite: sem eles, "Consórcio ou
+    // financiamento: qual escolher" perdia para FINANCIAMENTO. O título casa
+    // "consorcio ou financiamento" (1 acerto aqui) e "financiamento" (1 acerto
+    // lá) — empate, e no empate a PRIORIDADE entrega a FINANCIAMENTO, que vem
+    // antes. Título de comparação SEMPRE contém o termo do outro segmento;
+    // é da natureza dele. Estes marcadores são o que desempata pela contagem.
+    // Ver ACHADO 10 no READY: a contagem trata frase específica e palavra
+    // genérica como um acerto cada, e isso é estrutural, não deste título.
+    "qual e melhor",
+    "qual escolher",
+    "vale mais a pena",
+    "diferenca entre",
   ],
 };
 
