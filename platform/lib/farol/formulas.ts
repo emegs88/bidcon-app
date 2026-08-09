@@ -58,23 +58,28 @@
 //   reel 08/08  82572f4…   82 palavras → 32,81 s → 149,9 ppm
 //   agregado              172 palavras → 64,30 s → 160,5 ppm = 2,68 pal/s
 //
-// Rodando o template com a carta real do Itaú (R$ 2.385.990) e a do Bradesco
-// (R$ 1.132.000), cada fôrma mede:
-//
-//   P3  67/66 pal → 25,0 / 24,6 s      P8  78/75 pal → 29,1 / 28,0 s
-//   P7  62    pal → 23,1 s             P6  81/80 pal → 30,2 / 29,9 s
-//   P5  74    pal → 27,6 s             P4  82/79 pal → 30,6 / 29,5 s
-//   P1 104    pal → 38,8 s             P2 105/102 pal → 39,2 / 38,1 s
-//
 // AUTORIZADO por Emerson nas faixas de 08/08: curtas <= 25s, médias <= 32s,
 // longas <= 40s. `duracao_alvo` agora é o TETO da faixa em que a fôrma mede, e
 // o valor medido fica no comentário ao lado — teto e medição escritos juntos,
 // para ninguém precisar confiar na memória de nenhum dos dois.
 //
-// A DECISÃO QUE **NÃO** FOI TOMADA: encurtar as fôrmas. P1 e P2 medem ~39s e
-// ficam coladas no teto. O número falado NÃO sai do áudio (é promessa da marca,
-// decisão 2), então o único jeito de encurtá-las seria cortar mecanismo — e
-// isso é escolha editorial do Emerson, não minha.
+// AS DUAS PONTAS DA RÉGUA (coordenação, 09/08, item 4 — regra permanente).
+// As duas amostras acima DISCORDAM 14%: 171,5 e 149,9 ppm. A agregada é a
+// melhor estimativa central, mas nenhum vídeo sai na média — cada um sai numa
+// das pontas, conforme avatar, voz e pontuação, e desde a DUPLA-01 são DUAS
+// vozes. Ordem da coordenação: "toda duração declarada carrega a ponta lenta
+// ao lado da média. Folga menor que o erro da régua não é folga."
+//
+// Logo, os comentários de medição abaixo trazem os DOIS números: a régua média
+// (2,68 pal/s) e a ponta lenta (2,50 pal/s). Quem alterar uma fôrma tem que
+// olhar a segunda, não a primeira — é ela que decide se o teto se sustenta.
+// A bancada (scripts/prova-formulas.ts) imprime as duas em toda linha.
+//
+// A DECISÃO QUE **NÃO** FOI MAIS PRECISA SER TOMADA: encurtar P1 e P2. Elas
+// mediam ~39s de um teto de 40s enquanto o fecho recitava a carta inteira. O
+// fecho curto universal de 09/08 tirou 20 palavras de cada uma sem tocar em
+// mecanismo nenhum, e as duas caíram para ~31s. O dilema "cortar mecanismo ou
+// estourar o teto" era falso: o que sobrava era número, não argumento.
 //
 // ---------------------------------------------------------------------------
 // A PROVA — o FECHO CURTO virou UNIVERSAL, e o campo `prova` morreu com isso
@@ -199,8 +204,24 @@ export const FORMULAS: readonly Formula[] = [
   },
   {
     id: "P3",
+    // O TETO DESTA FÔRMA SUBIU DE 25s PARA 32s. AUTORIZADO: coordenação, 09/08
+    // — "o teto de 25s era arbitrário da coordenação e você provou que P3 é
+    // fôrma de ARGUMENTO, não de anúncio rápido — errado estava o teto, não o
+    // texto. Nenhuma palavra do desenvolvimento aprovado é cortada."
+    //
+    // O que a bancada mostrou: mesmo DEPOIS do fecho curto, P3 media 25,0s
+    // contra teto de 25s — folga 0,0 — e estourava por 1,8s na ponta lenta da
+    // régua. Ela era a única fôrma que o fecho curto não conseguia salvar,
+    // porque já era curta antes dele (já tinha `prova: "so_credito"`).
+    //
+    // A alternativa era cortar 6 palavras de um desenvolvimento aprovado. A
+    // coordenação preferiu corrigir o teto, e a razão é boa: P3 não vende uma
+    // carta, ela explica por que comprador à vista negocia diferente. Isso é
+    // trabalho de argumento, e argumento não cabe numa faixa desenhada para
+    // anúncio. P7 continua em 25s porque lá o teto descreve a fôrma.
     nome: "PODER DE COMPRA À VISTA",
-    duracao_alvo: 25, // CURTA — medido: 67 pal / 25,0s imóvel; 66 / 24,6s veículo
+    duracao_alvo: 32, // MÉDIA — medido: 67 pal / 25,0s imóvel; 66 / 24,6s veículo
+    //                   ponta lenta (2,50 pal/s): 26,8s / 26,4s — cabe nas duas
     persona: "porta_voz", // dinheiro/negociação
     objetivo: "poder_de_compra",
     tipos: ["imovel", "veiculo"],

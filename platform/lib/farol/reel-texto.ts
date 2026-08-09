@@ -334,7 +334,14 @@ const ROTEIROS: Record<string, Roteirista> = {
     [
       f.gancho,
       "A cota que você já pagou tem valor de mercado agora.",
-      "E o pagamento é protegido por Conta Notarial em cartório: o valor só é liberado ao vendedor depois da aprovação da administradora.",
+      // O "E" inicial desta frase foi CORTADO em 09/08. AUTORIZADO nominalmente
+      // pela coordenação: "P6/Imóvel: autorizado o corte de 1 palavra para
+      // folga real na voz lenta". Escolhi a conjunção e não uma palavra do
+      // conteúdo porque a descrição da Conta Notarial é canônica da casa (o
+      // esqueleto manda citá-la assim) e a dúvida de quem vende é justamente o
+      // pagamento — encurtar ali seria pagar o segundo com a única frase que
+      // responde a objeção da fôrma.
+      "O pagamento é protegido por Conta Notarial em cartório: o valor só é liberado ao vendedor depois da aprovação da administradora.",
       // A única fôrma que não abre o fecho com "Hoje tem": aqui a carta do dia
       // é prova de que o estoque GIRA, que é o que interessa a quem vende.
       fecho(c, f, "Esse estoque gira todo dia — hoje tem"),
