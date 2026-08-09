@@ -37,12 +37,14 @@
 // linha — e é decisão dele, não minha.
 //
 // ---------------------------------------------------------------------------
-// A REGRA (inalterada, repetida aqui porque agora mora aqui):
+// A REGRA:
 //   1. fonte = `vw_vitrine_viva`, a MESMA que /api/card-image lê;
 //   2. exclui cartas já usadas nos últimos 14 dias (memória em farol_posts);
 //   3. alterna tipo por dia: ímpar = imóvel, par = veículo; sem estoque, cai
 //      no outro;
-//   4. escolhe o MENOR custo ao mês, pelo cálculo canônico;
+//   4. FILTRO por teto de custo + RANKING por ALAVANCAGEM — ver o bloco
+//      "NOVA REGRA DE SELEÇÃO" logo abaixo das constantes. Até 09/08/2026 este
+//      passo era só "o menor custo ao mês";
 //   5. exclusiva fura fila 1× por semana, na segunda.
 // "Dia" é em São Paulo, não em UTC — senão `getDate()` no runtime da Vercel
 // inverte imóvel/veículo sozinho e ninguém mexeu em nada.
@@ -62,8 +64,111 @@ const TZ = "America/Sao_Paulo";
 /** Dias sem repetir a mesma carta. Regra da OS. */
 export const JANELA_REPETICAO_DIAS = 14;
 
-/** Quantos candidatos mais baratos puxar da view antes do cálculo canônico. */
-export const LIMITE_CANDIDATOS = 80;
+/**
+ * Quantos candidatos puxar da view antes do cálculo canônico.
+ *
+ * SUBIU DE 80 PARA 500 EM 09/08/2026, E ISSO NÃO É COSMÉTICO — era um defeito
+ * que a regra nova expôs. Enquanto o ranking ERA "menor custo", pegar as 80
+ * mais baratas e escolher a primeira dava a resposta certa: a nº 81 nunca
+ * ganharia de qualquer uma das 80. Com o ranking por ALAVANCAGEM isso deixa de
+ * valer — a carta de melhor alavancagem pode estar em qualquer posição da faixa
+ * elegível. MEDIDO HOJE: 278 imóveis e 42 veículos passam no teto de custo.
+ * Com o limite em 80, 198 imóveis elegíveis JAMAIS entrariam na disputa, e o
+ * "melhor da vitrine" seria na verdade "o melhor entre os 80 mais baratos".
+ * 500 cobre a população elegível de hoje com folga; o PostgREST corta em 1000
+ * de qualquer jeito, então este número é um teto de segurança, não a peneira.
+ */
+export const LIMITE_CANDIDATOS = 500;
+
+// ---------------------------------------------------------------------------
+// NOVA REGRA DE SELEÇÃO — AUTORIZADO: Emerson Gomes dos Santos, 09/08/2026:
+// "sempre usar cartas de menor taxa, menor parcela e maior crédito".
+//
+// Os três critérios brigam: maior crédito quase sempre traz maior parcela. A
+// OS já resolve a briga e eu implementei a resolução dela, em três camadas:
+//
+//   1. FILTRO (não é ranking): custo ao mês <= o teto do tipo. Carta cara não
+//      disputa, por melhor que seja a alavancagem dela.
+//   2. RANKING: ALAVANCAGEM = crédito / parcela. Quanto de crédito o cliente
+//      leva por cada real de parcela mensal. Maior vence.
+//   3. DESEMPATE: menor custo ao mês; empate persistente, maior crédito.
+//
+// ----------------------------------------------------------------------------
+// DIVERGÊNCIA DECLARADA — OS TETOS NÃO EXISTIAM.
+// A OS diz "o teto do tipo JÁ DEFINIDO na casa (PRICE-01)". Procurei antes de
+// escrever: `grep` em todo o repo e busca nas funções do Postgres do xtv. Não
+// há nenhuma constante de 1,00% / 1,85% em lugar nenhum, e "PRICE-01" no
+// acervo é outra coisa — é a pendência de custo do trigger `trg_bidcon_price`
+// (47 solves de TIR por linha), não um teto de vitrine. Então estes tetos
+// NASCEM AQUI, com os números que a OS mandou. Não é "reuso", é criação, e
+// prefiro dizer isso a deixar parecer que herdei um número que ninguém
+// escreveu.
+//
+// ----------------------------------------------------------------------------
+// O QUE A ALAVANCAGEM NÃO VÊ — LIMITE HONESTO DA MÉTRICA.
+// `credito / parcela` IGNORA A ENTRADA. Duas cartas com o mesmo crédito e a
+// mesma parcela empatam na alavancagem mesmo que uma exija R$ 5 mil de entrada
+// e a outra R$ 80 mil. Quem protege esse flanco é a camada 1: a entrada entra
+// no cálculo do custo ao mês (saldo = crédito − entrada), e uma entrada
+// desproporcional empurra o custo para cima até estourar o teto. Ou seja: a
+// entrada não ordena, mas ELIMINA. Registrado porque é o ponto onde a métrica
+// pedida pode surpreender, e a hora de dizer isso é agora, não no dia em que
+// sair um card com entrada alta.
+// ---------------------------------------------------------------------------
+
+/** Teto de custo ao mês (% a.m.) por tipo de bem. Camada 1 da regra. */
+export const TETO_CUSTO_AM: Record<string, number> = {
+  imovel: 1.0,
+  veiculo: 1.85,
+};
+
+/**
+ * Folga usada só na consulta ao banco. MEDIDO: a coluna `custo_am` da view vem
+ * arredondada em 2 casas, e o maior desvio dela contra o cálculo canônico é
+ * 0,005047 (medido sobre as 1.926 linhas da vitrine hoje). Filtrar no banco
+ * pelo teto exato descartaria carta que o canônico ainda aprovaria. 0,01 cobre
+ * o desvio medido com quase o dobro de margem. A peneira que VALE é a canônica,
+ * aplicada depois em memória — esta aqui só evita trazer o estoque inteiro.
+ */
+export const MARGEM_TETO_VIEW = 0.01;
+
+/**
+ * Alavancagem: crédito por real de parcela. Camada 2 da regra.
+ * Parcela ausente devolve 0 (perde de todas) em vez de Infinity — uma carta
+ * sem parcela conhecida não pode liderar a vitrine por falta de dado.
+ */
+export function alavancagem(c: Pick<CartaCarrossel, "credito" | "parcela">): number {
+  return c.parcela > 0 ? c.credito / c.parcela : 0;
+}
+
+/** Empate em float. Comparar `===` em divisão é como não ter desempate. */
+const EPS = 1e-9;
+
+/**
+ * O comparador das três camadas (o filtro da camada 1 é aplicado antes, em
+ * `dentroDoTeto`). Ordena do melhor para o pior — `.sort()` direto.
+ */
+export function compararPelaRegra(a: CartaCarrossel, b: CartaCarrossel): number {
+  const alav = alavancagem(b) - alavancagem(a); // maior alavancagem vence
+  if (Math.abs(alav) > EPS) return alav;
+
+  const custoA = a.custoAm ?? Infinity;
+  const custoB = b.custoAm ?? Infinity;
+  if (Math.abs(custoA - custoB) > EPS) return custoA - custoB; // menor custo
+
+  return b.credito - a.credito; // maior crédito
+}
+
+/**
+ * Camada 1. Tipo sem teto cadastrado PASSA, de propósito: se amanhã nascer um
+ * `tipo` novo na vitrine, o certo é ele aparecer e alguém decidir o teto dele —
+ * não sumir em silêncio de todas as peças do FAROL no dia do deploy.
+ */
+export function dentroDoTeto(c: CartaCarrossel): boolean {
+  const teto = TETO_CUSTO_AM[c.tipo];
+  if (teto == null) return true;
+  return c.custoAm != null && c.custoAm <= teto;
+}
 
 /**
  * Guard do FAROL. Espelha `autorizado()` de app/api/sentinela/varredura.
@@ -120,17 +225,30 @@ export async function publicadasRecentemente(
 }
 
 /**
- * Busca candidatos na view (mais baratos primeiro pelo `custo_am` da view),
- * remove os repetidos, recalcula o custo pelo canônico e devolve ordenado.
+ * Busca candidatos na view, remove os repetidos, recalcula o custo pelo
+ * canônico, APLICA O TETO e devolve ordenado pela regra das três camadas.
+ *
+ * A consulta continua ordenando por `custo_am` no banco — não porque essa é a
+ * ordem final (não é mais), mas porque com o `lte` ela garante que, se algum
+ * dia a população elegível passar de LIMITE_CANDIDATOS, o que sobrar de fora
+ * sejam as MAIS CARAS da faixa, e não uma fatia arbitrária.
  */
 export async function candidatos(
   db: Db,
   filtro: { tipo?: string; exclusiva?: boolean },
   excluidos: Set<string>
 ): Promise<CartaCarrossel[]> {
+  // Teto no banco: com tipo conhecido, o dele; sem tipo (ramo da exclusiva, que
+  // varre imóvel e veículo juntos), o MAIOR dos dois — apertar aqui cortaria
+  // veículo legítimo antes de o canônico opinar. A peneira exata vem depois.
+  const tetoConsulta =
+    (filtro.tipo ? TETO_CUSTO_AM[filtro.tipo] : Math.max(...Object.values(TETO_CUSTO_AM))) ??
+    Math.max(...Object.values(TETO_CUSTO_AM));
+
   let q = db
     .from("vw_vitrine_viva")
     .select(CAMPOS_VITRINE)
+    .lte("custo_am", tetoConsulta + MARGEM_TETO_VIEW)
     .order("custo_am", { ascending: true, nullsFirst: false })
     .limit(LIMITE_CANDIDATOS);
   if (filtro.tipo) q = q.eq("tipo", filtro.tipo);
@@ -146,7 +264,11 @@ export async function candidatos(
     // custoAm null = a carta não tem parcela/prazo utilizáveis. O card e a
     // legenda mostrariam "—" no lugar do número principal. Fora.
     .filter((c) => c.custoAm != null)
-    .sort((a, b) => (a.custoAm as number) - (b.custoAm as number));
+    // Camada 1 — o teto, agora pelo custo CANÔNICO (a coluna da view é só a
+    // pré-filtragem barata; quem decide é este cálculo).
+    .filter(dentroDoTeto)
+    // Camadas 2 e 3 — alavancagem, depois custo, depois crédito.
+    .sort(compararPelaRegra);
 }
 
 export type EscolhaDoDia = {

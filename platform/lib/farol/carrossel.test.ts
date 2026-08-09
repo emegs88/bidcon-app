@@ -14,37 +14,57 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { intercalar, montarLegendaCarrossel, CARTAS_POR_CARROSSEL } from "./carrossel";
-import { revisarLegenda } from "./selecao";
+import { revisarLegenda, alavancagem } from "./selecao";
 import type { CartaCarrossel } from "@/lib/carrossel-formato";
 
-/** Carta mínima para o teste. Só os campos que as duas funções olham. */
-function carta(id: string, tipo: "imovel" | "veiculo", custoAm: number): CartaCarrossel {
+/**
+ * Carta mínima para o teste. Só os campos que as duas funções olham.
+ *
+ * `credito` e `parcela` ENTRARAM COMO PARÂMETRO EM 09/08/2026 e isso não é
+ * detalhe. Até aqui a fábrica fixava 300.000 e 2.500 em TODA carta, o que dava
+ * alavancagem 120 para todo mundo: com a regra nova, o ranking empatava sempre
+ * e quem decidia era o desempate por custo. Os testes continuariam verdes com a
+ * camada de alavancagem inteiramente morta — passariam a testar a regra ANTIGA
+ * usando o comparador NOVO, que é o pior tipo de teste verde.
+ */
+function carta(
+  id: string,
+  tipo: "imovel" | "veiculo",
+  custoAm: number,
+  credito = 300_000,
+  parcela = 2_500
+): CartaCarrossel {
   return {
     id,
     tipo,
     tipoLabel: tipo === "imovel" ? "Imóvel" : "Veículo",
     administradora: "Teste",
-    credito: 300_000,
+    credito,
     entrada: 90_000,
-    parcela: 2_500,
+    parcela,
     parcelas: 120,
     custoAm,
     exclusiva: false,
   };
 }
 
-// As listas chegam ORDENADAS por custo — é o contrato de `candidatos()`.
+// As listas chegam ORDENADAS PELA REGRA DA CASA — é o contrato de
+// `candidatos()`: filtro por teto de custo, ranking por alavancagem
+// (crédito ÷ parcela), desempate por menor custo e depois maior crédito.
+// Repare que dentro de cada lista a alavancagem CAI enquanto o custo SOBE: é
+// assim que a vitrine se comporta de verdade, e é o que impede este arquivo de
+// passar por acaso caso alguém troque um critério pelo outro.
 const IMOVEIS = [
-  carta("i1", "imovel", 0.40),
-  carta("i2", "imovel", 0.45),
-  carta("i3", "imovel", 0.50),
-  carta("i4", "imovel", 0.55),
+  carta("i1", "imovel", 0.40, 400_000, 2_000), // alavancagem 200
+  carta("i2", "imovel", 0.45, 360_000, 2_000), //              180
+  carta("i3", "imovel", 0.50, 320_000, 2_000), //              160
+  carta("i4", "imovel", 0.55, 300_000, 2_000), //              150
 ];
 const VEICULOS = [
-  carta("v1", "veiculo", 0.42),
-  carta("v2", "veiculo", 0.47),
-  carta("v3", "veiculo", 0.52),
-  carta("v4", "veiculo", 0.57),
+  carta("v1", "veiculo", 0.42, 380_000, 2_000), // alavancagem 190
+  carta("v2", "veiculo", 0.47, 340_000, 2_000), //              170
+  carta("v3", "veiculo", 0.52, 310_000, 2_000), //              155
+  carta("v4", "veiculo", 0.57, 280_000, 2_000), //              140
 ];
 
 test("intercalar: 6 slides, 3 de cada tipo, alternando", () => {
@@ -56,13 +76,29 @@ test("intercalar: 6 slides, 3 de cada tipo, alternando", () => {
   );
 });
 
-test("intercalar: começa pelo mais barato dos dois, não por um tipo fixo", () => {
-  // Aqui o veículo mais barato ganha do imóvel mais barato. O slide 2 do
-  // carrossel — o primeiro depois da capa — tem que ser ele.
-  const veiculosBaratos = [carta("v1", "veiculo", 0.30), ...VEICULOS];
-  const fila = intercalar(IMOVEIS, veiculosBaratos);
-  assert.equal(fila[0].id, "v1");
+test("intercalar: começa por quem vence a REGRA DA CASA, não por um tipo fixo", () => {
+  // O nome deste teste dizia "mais barato" até 09/08/2026. Não diz mais, e a
+  // carta escolhida mostra por quê: v0 é a MAIS CARA do conjunto (0,90% a.m.
+  // contra 0,40% do i1) e mesmo assim abre o carrossel, porque entrega 250 de
+  // crédito por real de parcela contra 200 do imóvel. Sob a regra antiga ela
+  // perderia; sob a regra nova ela é o destaque. Se alguém reverter a
+  // comparação para o custo, este é o teste que cai.
+  const v0 = carta("v0", "veiculo", 0.90, 500_000, 2_000); // alavancagem 250
+  assert.ok(alavancagem(v0) > alavancagem(IMOVEIS[0]));
+  assert.ok(v0.custoAm! > IMOVEIS[0].custoAm!, "o caso perde a graça se v0 for o mais barato");
+
+  const fila = intercalar(IMOVEIS, [v0, ...VEICULOS]);
+  assert.equal(fila[0].id, "v0");
   assert.equal(fila[0].tipo, "veiculo");
+});
+
+test("intercalar: o slide de abertura é o MESMO que a regra escolheria sozinha", () => {
+  // A coerência de vitrine que a OS exige: o carrossel não pode abrir com uma
+  // carta e o post do dia sair com outra. Como as duas passam pelo mesmo
+  // comparador, a primeira carta da fila tem que ser a de melhor colocação
+  // entre TODAS as candidatas, ignorando a alternância.
+  const todas = [...IMOVEIS, ...VEICULOS].sort((a, b) => alavancagem(b) - alavancagem(a));
+  assert.equal(intercalar(IMOVEIS, VEICULOS)[0].id, todas[0].id);
 });
 
 test("intercalar: quando um lado acaba, o outro completa sem deixar buraco", () => {
