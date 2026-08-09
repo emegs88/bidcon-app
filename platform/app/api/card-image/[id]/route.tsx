@@ -74,6 +74,7 @@
 // COMPLIANCE: nenhuma data de contemplação, nenhuma palavra de rendimento;
 // custo sempre "% a.m.". O rodapé cita a Conta Notarial sem prometer risco zero.
 // ============================================================================
+import type { ReactElement } from "react";
 import { ImageResponse } from "next/og";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import {
@@ -503,6 +504,154 @@ function Story({ carta }: { carta: CartaCarrossel }) {
 }
 
 // ---------------------------------------------------------------------------
+// SLIDES FIXOS DO CARROSSEL — 1080×1080, texto cravado, ZERO número.
+// FAROL-VISUAL-02, 09/08/2026. Só existem no `?formato=feed`, porque o carrossel
+// do Instagram é quadrado; `?formato=story&slide=capa` cai no card normal.
+//
+// POR QUE ELES NÃO LEEM O BANCO (é a razão de existirem como ramo próprio, e
+// não como mais um `if` depois da consulta): a Meta busca a arte de CADA filho
+// no momento em que cria o container. Se a capa dependesse de uma carta e essa
+// carta fosse vendida ou reservada entre a montagem da URL e o fetch da Meta,
+// a view devolveria 404, o filho seria recusado e — pela regra da própria OS —
+// o CARROSSEL INTEIRO seria abortado. Um slide de texto fixo não tem motivo
+// nenhum para depender de estoque vivo. Tirar o banco daqui não é economia de
+// query: é remover uma causa de falha do conjunto.
+//
+// O uuid no caminho continua EXIGIDO e é IGNORADO aqui — as duas coisas ao
+// mesmo tempo, e não é descuido. MEDIDO: o guard de formato de uuid roda ANTES
+// deste ramo (linha ~765), então `/api/card-image/capa?slide=capa` devolve 404.
+// Deixei assim de propósito: afrouxar o guard para aceitar uma segunda forma de
+// caminho daria a esta rota pública mais uma superfície para guardar, em troca
+// de nada. Quem chama manda um uuid sintético de zeros
+// (`UUID_SLIDE_FIXO`, em lib/instagram/publicar.ts), que passa no guard e nunca
+// chega ao banco. Um uuid de carta de verdade também funcionaria, mas mentiria
+// no log: sugeriria que aquele slide fala daquela carta, e ele não fala.
+//
+// SEM NÚMERO, por ordem — e isso também os deixa fora do alcance da regra de
+// compliance do "% a.m.": não há percentual para formatar errado.
+// ---------------------------------------------------------------------------
+
+/** Moldura comum dos dois slides fixos: navy, marca no canto de sempre. */
+function Fixo({
+  olho,
+  titulo,
+  linhas,
+  rodape,
+}: {
+  olho: string;
+  titulo: string;
+  linhas: string[];
+  rodape: string;
+}) {
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1080px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        backgroundColor: NAVY,
+        padding: `${MARGEM}px`,
+        fontFamily: FONT_TITULO,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <Marca tamanho={22} />
+        <Assinatura altura={8} margemTopo={28} />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            fontSize: 28,
+            letterSpacing: 4,
+            color: AZUL_CLARO,
+            fontFamily: FONT_TITULO,
+          }}
+        >
+          {olho}
+        </div>
+        <div
+          style={{
+            fontSize: 92,
+            color: "#FFFFFF",
+            lineHeight: 1.05,
+            marginTop: 12,
+            fontFamily: FONT_TITULO,
+          }}
+        >
+          {titulo}
+        </div>
+        {/* Cada linha é um nó filho ÚNICO de texto — ver a armadilha do satori
+            no header. Nada de `{a} {b}` na mesma div. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            marginTop: 40,
+            gap: "14px",
+          }}
+        >
+          {linhas.map((t) => (
+            <div
+              key={t}
+              style={{ display: "flex", fontSize: 34, color: CINZA_TEXTO }}
+            >
+              {t}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: 26,
+          color: AZUL_CLARO,
+          fontFamily: FONT_TITULO,
+        }}
+      >
+        {rodape}
+      </div>
+    </div>
+  );
+}
+
+/** Slide 1 do carrossel semanal. */
+function Capa() {
+  return (
+    <Fixo
+      olho="TODA SEMANA"
+      titulo="A tabela da semana"
+      linhas={[
+        "As cartas contempladas com o menor",
+        "custo ao mês do nosso estoque agora.",
+        "Arraste para o lado →",
+      ]}
+      rodape="Pagamento protegido por Conta Notarial"
+    />
+  );
+}
+
+/** Último slide do carrossel semanal. */
+function Cta() {
+  return (
+    <Fixo
+      olho="GOSTOU DE ALGUMA?"
+      titulo="A carta completa está no link da bio"
+      linhas={[
+        "Salve este post para consultar depois.",
+        "Prefere conversar? Chama no direct.",
+        "A tabela muda toda semana.",
+      ]}
+      rodape="Pagamento protegido por Conta Notarial"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // PADRÃO — 1200×630. NÃO MEXER: é o card do WhatsApp já em produção. Qualquer
 // alteração aqui (inclusive registrar fontes) muda os bytes do PNG.
 // ---------------------------------------------------------------------------
@@ -624,9 +773,22 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   // Valor desconhecido cai no default de propósito — ver header.
-  const pedido = new URL(req.url).searchParams.get("formato")?.toLowerCase();
+  const busca = new URL(req.url).searchParams;
+  const pedido = busca.get("formato")?.toLowerCase();
   const formato: Formato =
     pedido === "feed" ? "feed" : pedido === "story" ? "story" : "padrao";
+
+  // ---- SLIDES FIXOS (capa/CTA do carrossel) — ANTES do banco. Ver bloco. ----
+  // `slide` desconhecido é ignorado em silêncio, na mesma doutrina do `formato`:
+  // quem faz este GET é o servidor da Meta, e ele não tem para quem reclamar
+  // de um 400.
+  const pedidoSlide = busca.get("slide")?.toLowerCase();
+  if (formato === "feed" && (pedidoSlide === "capa" || pedidoSlide === "cta")) {
+    return await renderKit(pedidoSlide === "capa" ? <Capa /> : <Cta />, {
+      width: 1080,
+      height: 1080,
+    });
+  }
 
   let carta;
   try {
@@ -668,6 +830,21 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       ? { width: 1080, height: 1080 }
       : { width: 1080, height: 1920 };
 
+  return await renderKit(elemento, medidas);
+}
+
+/**
+ * Render com as fontes do kit e queda para a stack padrão.
+ * EXTRAÍDO em 09/08/2026 (FAROL-VISUAL-02) para que os slides fixos do carrossel
+ * usem exatamente este caminho em vez de uma segunda cópia dele. Corpo levado
+ * LITERAL do GET, incluindo o comentário abaixo — mudança de endereço, não de
+ * comportamento. Uma segunda cópia era o jeito garantido de a cicatriz ser
+ * consertada num lugar e não no outro.
+ */
+async function renderKit(
+  elemento: ReactElement,
+  medidas: { width: number; height: number }
+): Promise<Response> {
   const fontes = await fontesDoKit();
 
   // POR QUE ESTE RAMO EXISTE (cicatriz, não paranoia): quando o satori não

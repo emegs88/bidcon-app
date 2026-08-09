@@ -109,11 +109,93 @@ export async function chamarGraph(
 }
 
 /** O que a view devolve pro log de sucesso. */
-type CartaPublicada = {
+export type CartaPublicada = {
   tipo?: string | null;
   credito?: number | null;
   administradora?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// EXTRAÇÕES DA FAROL-VISUAL-02 (09/08/2026) — story e carrossel precisam das
+// MESMAS três coisas que o post de feed já fazia inline aqui dentro. Os corpos
+// abaixo saíram de `publicarCartaNoFeed` LITERAIS (mesmas mensagens, mesmos
+// logs, mesmo retry de 3s) e ela passou a chamá-los. DIFF FUNCIONAL DAS ROTAS
+// ATUAIS = ZERO — é a mesma doutrina que criou este arquivo.
+//
+// Por que extrair em vez de o story chamar `chamarGraph` por conta própria: o
+// retry de 3s do media_publish não é detalhe, é a cobertura do caso em que a
+// Meta ainda está baixando a imagem. Um story sem esse retry falharia de vez em
+// quando, de um jeito que parece intermitência de rede e não regra faltando.
+// ---------------------------------------------------------------------------
+
+/** URL pública da arte. Host fixo de produção — ver header. */
+export function urlCard(cartaId: string, query: string): string {
+  return `${HOST_PUBLICO}/api/card-image/${cartaId}${query}`;
+}
+
+/**
+ * Uuid sintético dos slides de texto fixo (capa e CTA do carrossel).
+ * O gerador exige formato de uuid no caminho ANTES de olhar o `?slide=`, e os
+ * slides fixos não leem o banco — então este valor passa no guard e morre ali.
+ * Zeros, e não o id de uma carta real, porque um id real mentiria no log.
+ */
+export const UUID_SLIDE_FIXO = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * A carta está viva na vitrine? Mesma fonte que a arte lê — por isso
+ * "carta_indisponivel" fica honesto em vez de virar um 404 na image_url
+ * disfarçado de erro da Graph.
+ */
+export async function lerCartaViva(
+  cartaId: string
+): Promise<
+  | { ok: true; carta: CartaPublicada }
+  | { ok: false; motivo: "falha_consulta" | "carta_indisponivel"; erro: string }
+> {
+  const db = createXtvClient();
+  const { data, error } = await db
+    .from("vw_vitrine_viva")
+    .select(CAMPOS_CARTA)
+    .eq("id", cartaId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[ig-publicar] falha lendo a carta:", error.message);
+    return {
+      ok: false,
+      motivo: "falha_consulta",
+      erro: `falha_consulta: ${error.message}`,
+    };
+  }
+  if (!data) {
+    // Não existe, não está disponível, não é contemplada, crédito zerado ou
+    // está reservada. Qualquer um destes faria a image_url devolver 404.
+    return {
+      ok: false,
+      motivo: "carta_indisponivel",
+      erro: "carta_indisponivel",
+    };
+  }
+  return { ok: true, carta: data as CartaPublicada };
+}
+
+/**
+ * Publica um container já criado, com UMA segunda tentativa após 3s.
+ * Container de IMAGEM costuma nascer pronto, mas a Meta não garante: quando
+ * ela ainda está baixando a imagem, o media_publish responde erro transitório.
+ * Uma segunda tentativa depois de 3s cobre esse caso sem virar loop. Falhou
+ * duas vezes, devolve o erro literal — o container fica lá, não vira post.
+ */
+export async function publicarContainer(
+  creationId: string
+): Promise<RespostaGraph> {
+  let publicado = await chamarGraph("media_publish", { creation_id: creationId });
+  if (!publicado.ok) {
+    await new Promise((r) => setTimeout(r, 3000));
+    publicado = await chamarGraph("media_publish", { creation_id: creationId });
+  }
+  return publicado;
+}
 
 export type ResultadoPublicacao =
   | { ok: true; postId: string; carta: CartaPublicada }
@@ -140,32 +222,17 @@ export async function publicarCartaNoFeed(params: {
   const { cartaId, legenda } = params;
 
   // ---- 1. A carta está viva? (mesma fonte que a arte — ver header) ---------
-  const db = createXtvClient();
-  const { data: carta, error: errCarta } = await db
-    .from("vw_vitrine_viva")
-    .select(CAMPOS_CARTA)
-    .eq("id", cartaId)
-    .maybeSingle();
-
-  if (errCarta) {
-    console.error("[ig-publicar] falha lendo a carta:", errCarta.message);
-    return {
-      ok: false,
-      motivo: "falha_consulta",
-      erro: `falha_consulta: ${errCarta.message}`,
-      status: 500,
-    };
+  // O corpo desta checagem mora agora em `lerCartaViva`. Os dois ramos de falha
+  // continuam devolvendo os MESMOS motivos e os MESMOS status (500 e 409) — o
+  // status é o que a rota manual escreve no HTTP, e mexer nele quebraria o
+  // contrato dela.
+  const viva = await lerCartaViva(cartaId);
+  if (!viva.ok) {
+    return viva.motivo === "falha_consulta"
+      ? { ok: false, motivo: "falha_consulta", erro: viva.erro, status: 500 }
+      : { ok: false, motivo: "carta_indisponivel", erro: "carta_indisponivel", status: 409 };
   }
-  if (!carta) {
-    // Não existe, não está disponível, não é contemplada, crédito zerado ou
-    // está reservada. Qualquer um destes faria a image_url devolver 404.
-    return {
-      ok: false,
-      motivo: "carta_indisponivel",
-      erro: "carta_indisponivel",
-      status: 409,
-    };
-  }
+  const carta = viva.carta;
 
   // VISUAL-KIT-APLICADO-01 (06/08/2026 ~23h30): `?formato=feed` = 1080×1080.
   // Sem ele, sai o card do WhatsApp (1200×630). O Instagram ACEITA 1.91:1 no
@@ -178,7 +245,7 @@ export async function publicarCartaNoFeed(params: {
   // feed, e um grid com duas proporções diferentes seria pior do que qualquer
   // uma das duas sozinha. Declarado porque a OS anterior exigia diff funcional
   // zero naquela rota — este é o único ponto em que ela muda, e por decisão.
-  const imageUrl = `${HOST_PUBLICO}/api/card-image/${cartaId}?formato=feed`;
+  const imageUrl = urlCard(cartaId, "?formato=feed");
 
   // ---- 2. Container ------------------------------------------------------
   const container = await chamarGraph("media", {
@@ -200,15 +267,9 @@ export async function publicarCartaNoFeed(params: {
   }
 
   // ---- 3. Publicar -------------------------------------------------------
-  // Container de IMAGEM costuma nascer pronto, mas a Meta não garante: quando
-  // ela ainda está baixando a imagem, o media_publish responde erro transitório.
-  // Uma segunda tentativa depois de 3s cobre esse caso sem virar loop. Falhou
-  // duas vezes, devolve o erro literal — o container fica lá, não vira post.
-  let publicado = await chamarGraph("media_publish", { creation_id: container.id });
-  if (!publicado.ok) {
-    await new Promise((r) => setTimeout(r, 3000));
-    publicado = await chamarGraph("media_publish", { creation_id: container.id });
-  }
+  // O retry de 3s mora agora em `publicarContainer` — mesmo número de
+  // tentativas, mesma espera, mesma ordem.
+  const publicado = await publicarContainer(container.id as string);
 
   if (!publicado.ok) {
     console.error("[ig-publicar] publicação recusada:", {
@@ -228,10 +289,12 @@ export async function publicarCartaNoFeed(params: {
   console.log("[ig-publicar] publicado:", {
     post_id: publicado.id,
     carta_id: cartaId,
-    tipo: (carta as CartaPublicada).tipo ?? null,
-    administradora: (carta as CartaPublicada).administradora ?? null,
-    credito: (carta as CartaPublicada).credito ?? null,
+    // Os `as CartaPublicada` que existiam aqui sumiram porque `lerCartaViva` já
+    // devolve o tipo; o que sai no log é byte a byte o mesmo.
+    tipo: carta.tipo ?? null,
+    administradora: carta.administradora ?? null,
+    credito: carta.credito ?? null,
   });
 
-  return { ok: true, postId: publicado.id as string, carta: carta as CartaPublicada };
+  return { ok: true, postId: publicado.id as string, carta };
 }
