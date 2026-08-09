@@ -2,12 +2,20 @@
 // para haver um único ponto de import nas telas, sem duplicar a regra de moeda.
 export { brl } from "./status";
 
-export function dataBR(v: string | number | Date | null | undefined): string {
-  if (v == null) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR");
-}
+// `dataBR` REEXPORTADA de lib/data-br.ts, pelo mesmo motivo do `brl` acima: um
+// ponto de import só, sem duplicar a regra.
+//
+// A versão que morava aqui tinha o defeito de fuso da OS de 09/08 — era
+// `d.toLocaleDateString("pt-BR")`, sem `timeZone`, portanto no fuso do processo
+// (UTC na Vercel). Como só mostra a DATA, o erro não aparecia como três horas:
+// aparecia como UM DIA A MAIS, e só entre 21h e meia-noite de São Paulo. É o
+// que /parceiro/comissoes, /parceiro/indicacoes, /admin/comissoes e
+// /admin/processos/[id] — todas Server Components, medido — exibiam nessas três
+// horas. Numa data de comissão isso não é cosmético.
+//
+// O formato na tela NÃO muda: "08/08/2026" antes e depois (medido). Só o
+// instante muda.
+export { dataBR } from "./data-br";
 
 // Mensagem neutra (sem promessa) para o CTA de WhatsApp da vitrine.
 export function linkWhatsApp(numero: string, texto: string): string {

@@ -14,22 +14,17 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ConversaAcoes } from "../../ConversaAcoes";
 import { ResponderWhatsApp } from "../../ResponderWhatsApp";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import styles from "../../conversas.module.css";
 
 export const dynamic = "force-dynamic";
 
-function dataHora(v: string | null): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local foi APAGADA — omitia `timeZone` e carimbava UTC na Vercel.
+// Ver lib/data-br.ts. Nesta tela o defeito tinha consequência operacional: a
+// frase "Janela de 24h aberta até HH:MM" é o que decide se dá pra responder
+// livre ou se precisa de template. O CÁLCULO da janela sempre esteve certo (é
+// aritmética de instantes, imune a fuso); era só a EXIBIÇÃO que adiantava três
+// horas — o operador lia um prazo maior do que tinha.
 
 // wa_papel: 'cliente' | 'prosperito' | 'humano' | 'sistema'. Visualmente
 // tratamos 'prosperito' e 'humano' como bolha "agente" (lado direito).
@@ -76,8 +71,8 @@ export default async function AdminConversaWhatsApp({
     marco === null
       ? "Esta conversa não tem mensagem do cliente — a janela de 24h nunca abriu."
       : janelaAberta
-        ? `Janela de 24h aberta até ${dataHora(new Date(marco + JANELA_MS).toISOString())}.`
-        : `Janela de 24h fechada desde ${dataHora(new Date(marco + JANELA_MS).toISOString())}.`;
+        ? `Janela de 24h aberta até ${dataHoraAnoBR(new Date(marco + JANELA_MS).toISOString())}.`
+        : `Janela de 24h fechada desde ${dataHoraAnoBR(new Date(marco + JANELA_MS).toISOString())}.`;
 
   return (
     <AppShell nome={nome} equipeAdminConsole>
@@ -122,7 +117,7 @@ export default async function AdminConversaWhatsApp({
             {m.conteudo}
             <span className={styles.bolhaMeta}>
               {m.papel}
-              {m.agente ? ` · ${m.agente}` : ""} · {dataHora(m.criado_em as string)}
+              {m.agente ? ` · ${m.agente}` : ""} · {dataHoraAnoBR(m.criado_em as string)}
               {m.status_envio === "falha" ? (
                 <span className={styles.falha}>
                   {" "}

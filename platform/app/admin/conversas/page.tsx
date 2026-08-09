@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConversasSubNav } from "./ConversasSubNav";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import areaStyles from "@/components/area.module.css";
 import styles from "./conversas.module.css";
 
@@ -35,18 +36,10 @@ type LinhaConversa = {
   fonteAtividade: "mensagem" | "registro";
 };
 
-function dataHora(v: string | null): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local foi APAGADA — chamava `toLocaleString` sem `timeZone` e
+// carimbava UTC na Vercel. Ver lib/data-br.ts. Aqui o efeito se somava ao
+// defeito já documentado abaixo: a lista dizia "última mensagem em 09:43"
+// quando a mensagem foi às 06:43, e o operador prioriza por essa hora.
 
 function statusInfo(
   canal: Canal,
@@ -227,8 +220,8 @@ export default async function AdminConversas({
                     <span className={styles.meta}>
                       {l.telefone ?? "—"} ·{" "}
                       {l.fonteAtividade === "mensagem"
-                        ? `última mensagem em ${dataHora(l.ultimaAtividade)}`
-                        : `registro criado/atualizado em ${dataHora(l.ultimaAtividade)}`}
+                        ? `última mensagem em ${dataHoraAnoBR(l.ultimaAtividade)}`
+                        : `registro criado/atualizado em ${dataHoraAnoBR(l.ultimaAtividade)}`}
                     </span>
                   </div>
                   <Badge tone={info.tone}>{info.label}</Badge>

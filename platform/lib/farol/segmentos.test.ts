@@ -145,6 +145,66 @@ test("mais acertos ganha de menos acertos, mesmo com prioridade contraria", () =
 });
 
 // ----------------------------------------------------------------------------
+// AS DECISÕES DE VOCABULÁRIO DO EMERSON (09/08) — travadas uma a uma
+// ----------------------------------------------------------------------------
+// Vocabulário é a única parte do FAROL que teste nenhum JULGA: nenhum teste
+// sabe se "frete" pertence a VEICULO. O que dá para travar é o CONTRAEXEMPLO —
+// a frase concreta que provou que um termo estava errado. Essas ficam aqui,
+// para que o termo não volte por engano numa revisão futura.
+
+test("CEDENTE nao captura quem quer COMPRAR carta contemplada", () => {
+  // O contraexemplo do Emerson, literal. Enquanto "carta contemplada" era termo
+  // de CEDENTE, este título caía no segmento de QUEM VENDE — o oposto exato de
+  // quem o escreveu. Cair em `null` (e ir para a IA) é infinitamente melhor que
+  // cair no segmento invertido: null custa uma chamada, invertido custa a peça.
+  const c = classificarPorRegra("Como comprar carta contemplada com desconto");
+  assert.notEqual(c.segmento, "CEDENTE");
+});
+
+test("CEDENTE captura VENDO, a primeira palavra do anuncio real", () => {
+  for (const titulo of [
+    "VENDO carta contemplada de 300 mil, aceito proposta",
+    "Vendo minha cota de consorcio de imovel",
+    "Quero vender minha cota, alguem sabe como?",
+    "Como passar a carta para outra pessoa",
+  ]) {
+    const c = classificarPorRegra(titulo);
+    assert.equal(c.segmento, "CEDENTE", `"${titulo}" caiu em ${c.segmento}`);
+  }
+});
+
+test("CEDENTE nao tem mais os termos genericos do nicho", () => {
+  for (const generico of ["carta contemplada", "cartas contempladas"]) {
+    assert.ok(
+      !TERMOS.CEDENTE.includes(generico),
+      `"${generico}" voltou para CEDENTE — leia o contraexemplo do "como comprar"`,
+    );
+  }
+});
+
+test("EDUCACAO_MITOS captura o vocabulario de MECANISMO do consorcio", () => {
+  for (const titulo of [
+    "O que e lance embutido e como usar",
+    "Como funciona a assembleia e o sorteio do consorcio",
+    "Consorcio ou financiamento: qual escolher",
+    "Autofinanciamento e a mesma coisa que consorcio?",
+  ]) {
+    const c = classificarPorRegra(titulo);
+    assert.equal(c.segmento, "EDUCACAO_MITOS", `"${titulo}" caiu em ${c.segmento}`);
+  }
+});
+
+test("FINANCIAMENTO nao tem 'sac' solto — so nas formas de amortizacao", () => {
+  // Desvio declarado da sugestão do Emerson. "SAC" sozinho é, antes de tudo,
+  // Serviço de Atendimento ao Consumidor, e num nicho cheio de reclamação de
+  // administradora ele arrastaria vídeo de atendimento para FINANCIAMENTO.
+  assert.ok(!TERMOS.FINANCIAMENTO.includes("sac"));
+  assert.ok(TERMOS.FINANCIAMENTO.includes("tabela sac"));
+  const c = classificarPorRegra("Liguei no SAC da administradora e ninguem atendeu");
+  assert.notEqual(c.segmento, "FINANCIAMENTO");
+});
+
+// ----------------------------------------------------------------------------
 // A CAMADA 2 — só o que ela DESCARTA é testável sem rede
 // ----------------------------------------------------------------------------
 

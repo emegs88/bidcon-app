@@ -35,21 +35,40 @@
 //   Entre dois vídeos igualmente ruins, o VELHO ganha do novo. Se algum dia a
 //   lista de um segmento só tiver vídeos abaixo da média da janela, o topo
 //   seria ocupado pelo lixo mais antigo.
-//   O QUE FOI FEITO: a fórmula ficou como está (é a especificação autorizada) e
-//   a recomendação ganhou uma PORTA DE ELEGIBILIDADE — só entra no top-5 quem
-//   tem `composto > 0`, isto é, quem está acima da média da própria janela.
-//   Isso torna o defeito inalcançável no caminho de decisão sem reescrever a
-//   fórmula por conta própria. E é semanticamente melhor de qualquer forma:
-//   "abaixo da média dos concorrentes" não é evidência de pauta nenhuma.
+//   O QUE FOI FEITO (decisão do Emerson, 09/08): CLAMPAR NA ORIGEM.
+//     score = max(0, composto) * recencia
+//   A primeira versão desta fatia trancou o defeito só na porta da
+//   `recomendarPauta()` (`composto > 0`). O Emerson recusou: "o defeito tem que
+//   ser inalcançável em QUALQUER caminho, não só no da decisão". Ele está
+//   certo, e a razão é concreta — `score` é COLUNA DE BANCO. Ela vai ser lida
+//   por painel, por consulta manual, por relatório e por código que ainda não
+//   existe, e nenhum desses caminhos passa pela porta da recomendação. Trancar
+//   só a porta deixava o número errado gravado, esperando quem o lesse direto.
+//   A porta `composto > 0` CONTINUA na recomendação: ela não é redundante, é
+//   outra coisa. O clamp impede que negativo VIRE POSITIVO na ordenação; a
+//   porta impede que um vídeo de score zero (abaixo da média da própria janela)
+//   seja apresentado como evidência de pauta.
+//   EFEITO COLATERAL DECLARADO: todo vídeo abaixo da média da janela agora tem
+//   score exatamente 0 — eles empatam entre si, e a ordem relativa DENTRO desse
+//   grupo se perde. É perda deliberada: é informação que não queríamos.
 //
-// ACHADO 2 — `exp(-dias/30)` NÃO É MEIA-VIDA DE 30 DIAS.
-//   O comentário da OS diz "30 dias = meia-vida". A fórmula escrita é uma
-//   CONSTANTE DE TEMPO de 30 dias: aos 30 dias ela vale exp(-1) = 0,3679, não
-//   0,5. A meia-vida real da fórmula escrita é 30 × ln2 = 20,79 dias.
-//   Meia-vida verdadeira de 30 dias seria `exp(-ln2 * dias / 30)`.
-//   O QUE FOI FEITO: implementada a FÓRMULA, não a legenda — porque é a fórmula
-//   que estava no bloco de código. A constante está isolada em
-//   `CONSTANTE_DECAIMENTO_DIAS`, então trocar a intenção é mudar uma linha.
+// ACHADO 2 — A LEGENDA ERA A INTENÇÃO; A FÓRMULA ESTAVA ERRADA.
+//   A OS trazia `recencia = exp(-dias / 30)` com o comentário "30 dias =
+//   meia-vida". Os dois não batem: `exp(-dias/30)` é uma CONSTANTE DE TEMPO de
+//   30 dias, que aos 30 dias vale exp(-1) = 0,3679 e não 0,5 — meia-vida real
+//   de 30 × ln2 = 20,79 dias. A primeira versão implementou a fórmula e
+//   reportou a divergência.
+//   O EMERSON DECIDIU (09/08): a legenda era a intenção — meia-vida de 30 dias
+//   de verdade. A fórmula passou a ser
+//     recencia = exp(-ln2 * dias / 30)
+//   e agora o nome e o número dizem a mesma coisa: aos 30 dias vale exatamente
+//   0,5, aos 60 vale 0,25. `MEIA_VIDA_DIAS` é a constante, e um teste trava
+//   `recencia(30) === 0.5` — se alguém trocar a fórmula de volta sem avisar, o
+//   teste cai em vez de o ranking mudar em silêncio.
+//   O QUE ISSO MUDA NA PRÁTICA: o decaimento ficou MAIS LENTO. Vídeo de 30 dias
+//   pesava 0,368 e passa a pesar 0,500; o de 60 dias pesava 0,135 e passa a
+//   0,250. A janela de recomendação é de 30 dias, então o efeito é justamente
+//   nas bordas dela — material antigo perdeu menos força do que perdia antes.
 //
 // ACHADO 3 — `comentarios` NÃO EXISTE EM `farol_videos`.
 //   `engajamento = (likes + comentarios) / max(1, views)` precisa da coluna, e
@@ -76,14 +95,27 @@
 //   `duracao_alvo` (o teto que o render obedece) continua vindo da fôrma;
 //   `duracao_mercado_s` sai como EVIDÊNCIA, filtrado a durações plausíveis de
 //   formato curto, e NUNCA é usado para render.
+//   Resolução aprovada integralmente pelo Emerson em 09/08, com um pedido:
+//   SINAL REGISTRADO PARA REVISITAR — na simulação de dados sintéticos, o
+//   segmento FINANCIAMENTO deu `duracao_mercado_s = 81` contra os 40s da fôrma
+//   P2, a maior distância entre régua nossa e mercado em toda a tabela. Pode
+//   ser que 40s seja curto para esse segmento. NÃO se mexe na fôrma por causa
+//   disto: mediana alheia não é métrica nossa. Reabrir quando FAROL-METRICAS-01
+//   der retenção medida de peças P2 — se a retenção cair no fim dos 40s, o
+//   sinal virou evidência; se não cair, era só o formato do YouTube.
 //
-// ACHADO 6 — O `indice` DA PARTE 3 SOMA GRANDEZAS DE UNIDADES DIFERENTES.
+// ACHADO 6 — O `indice` DA PARTE 3 SOMAVA GRANDEZAS DE UNIDADES DIFERENTES.
 //   `0.35*retencao + 0.35*pct_nao_seguidores + 0.20*z(shares+saves) + 0.10*z(leads)`
-//   soma frações (0..1) com z-scores (≈ -3..+3). Com retenção de 41%, o termo
-//   vale 0,35 × 0,41 = 0,14; o termo de z, com peso menor (0,20), alcança ±0,6.
-//   Os termos de menor peso DOMINAM o índice. Implementado literalmente, com o
-//   achado declarado — e ele está dormente enquanto a partida a frio valer,
-//   porque com menos de 10 peças medidas o interno não decide nada.
+//   somava frações (0..1) com z-scores (≈ -3..+3). Com retenção de 41%, o termo
+//   valia 0,35 × 0,41 = 0,14; o termo de z, com peso MENOR (0,20), alcançava
+//   ±0,6. Os termos de menor peso DOMINAVAM o índice, e o peso escrito na OS
+//   não era o peso exercido.
+//   DECISÃO DO EMERSON (09/08): corrigir agora, "para acordar certo" — os
+//   QUATRO termos entram como z-score dentro da coorte. Foi feito em
+//   `indices()`. Custo declarado: `indice` passa a ser uma medida RELATIVA à
+//   coorte ("quanto esta peça se destacou das outras"), não absoluta; comparar
+//   índice entre coortes diferentes não quer dizer nada, exatamente como já
+//   valia para o `score` externo (ACHADO 8).
 //
 // ACHADO 7 — A PARTE 3 NÃO TEM FONTE DE DADO. `farol_metricas` não existe em
 //   lugar nenhum do repositório (medido por varredura) e FAROL-METRICAS-01 não
@@ -142,9 +174,12 @@ export const JANELA_Z_DIAS = 90;
  *  recomendação quer atualidade. */
 export const JANELA_RECOMENDACAO_DIAS = 30;
 
-/** O 30 de `exp(-dias/30)`. Ver ACHADO 2: é constante de tempo, e a meia-vida
- *  efetiva dela é 20,79 dias. */
-export const CONSTANTE_DECAIMENTO_DIAS = 30;
+/** MEIA-VIDA de verdade, em dias: aos 30 dias a recência vale exatamente 0,5;
+ *  aos 60, 0,25. Ver ACHADO 2 — a OS escrevia `exp(-dias/30)` com a legenda
+ *  "30 dias = meia-vida", e as duas coisas não batiam (aquela fórmula é
+ *  constante de tempo, de meia-vida 20,79 dias). Emerson decidiu em 09/08 que
+ *  a legenda era a intenção, então a fórmula é que mudou. */
+export const MEIA_VIDA_DIAS = 30;
 
 /** Quantos vídeos por segmento entram na evidência. */
 export const TOP_POR_SEGMENTO = 5;
@@ -219,18 +254,46 @@ export function desvioPadrao(valores: readonly number[]): number | null {
  * silencioso num `sort`, onde ele não é maior nem menor que nada, e embaralha o
  * ranking sem erro nenhum no log. Nestes casos todo mundo recebe 0, que é a
  * leitura honesta: "ninguém se destaca desta coorte".
+ *
+ * ACHADO 9 — O GUARDA `sd === 0` ERA LITERAL DEMAIS. Medido: `[0.4, 0.4, 0.4]`
+ * não dá desvio zero. A média sai 0,4000000000000001 (0,4 não existe em ponto
+ * flutuante binário; a soma de três acumula o erro), e o desvio sai
+ * 5,55e-17 — pequeno, mas `!== 0`. Aí a divisão acontece, e o erro de
+ * arredondamento, dividido por si mesmo, vira **z = -1 para TODOS**. Coorte
+ * perfeitamente plana produzia "todo mundo um desvio abaixo da média", que não
+ * é só errado: é um número com cara de medição.
+ *
+ * Não é NaN, não é Infinity, não estoura nada — passou por baixo de todos os
+ * outros guardas. Apareceu porque a correção do ACHADO 6 pôs retenção (que
+ * chega em frações redondas como 0,4) dentro de um z pela primeira vez; no
+ * score externo o mesmo defeito já era alcançável por um canal que publique
+ * com velocidade idêntica, só que ninguém tinha olhado.
+ *
+ * O guarda agora é RELATIVO à escala dos valores. `1e-12` fica quatro ordens
+ * de grandeza acima do erro de arredondamento típico (~1e-16) e muitas ordens
+ * abaixo de qualquer sinal real — nenhuma diferença que importe a esta decisão
+ * mora em 1e-12 relativo.
  */
 export function zScores(valores: readonly number[]): number[] {
   if (valores.length < 2) return valores.map(() => 0);
   const m = media(valores);
   const sd = desvioPadrao(valores);
-  if (m === null || sd === null || sd === 0) return valores.map(() => 0);
+  if (m === null || sd === null) return valores.map(() => 0);
+  const escala = Math.max(Math.abs(m), ...valores.map((n) => (Number.isFinite(n) ? Math.abs(n) : 0)));
+  if (sd <= escala * 1e-12) return valores.map(() => 0);
   return valores.map((n) => (Number.isFinite(n) ? (n - m) / sd : 0));
 }
 
-/** `recencia = exp(-dias / 30)`. Ver ACHADO 2 sobre o nome "meia-vida". */
+/**
+ * `recencia = exp(-ln2 * dias / MEIA_VIDA_DIAS)` — meia-vida REAL de 30 dias.
+ *
+ * Vale 1 no dia 0, exatamente 0,5 aos 30 dias, 0,25 aos 60, 0,125 aos 90. O
+ * `ln2` é o que faz a legenda e a fórmula dizerem a mesma coisa; sem ele a
+ * meia-vida cairia para 20,79 dias (ACHADO 2). Um teste trava `recencia(30)`
+ * em 0,5 para que ninguém "simplifique" o `ln2` de volta para fora.
+ */
 export function recencia(dias: number): number {
-  return Math.exp(-Math.max(0, dias) / CONSTANTE_DECAIMENTO_DIAS);
+  return Math.exp((-Math.LN2 * Math.max(0, dias)) / MEIA_VIDA_DIAS);
 }
 
 /** Idade em dias inteiros, com o piso da OS: "dias = max(1, hoje - publicado_em)".
@@ -407,7 +470,18 @@ export function pontuar(
       base_incompleta,
       composto,
       recencia: rec,
-      score: composto * rec,
+      // ACHADO 1 — clamp NA ORIGEM, por decisão do Emerson (09/08). Sem o
+      // `max(0, ...)` a multiplicação pela recência INVERTE o ranking do lado
+      // negativo: um composto -2 velho (rec 0,125) daria -0,25 e ficaria
+      // ACIMA de um composto -2 de hoje (rec 1,0), que daria -2. `score` é
+      // COLUNA de banco — painel, consulta manual e código que ainda não
+      // existe leem ela sem passar pela trava de `recomendarPauta()`, então
+      // o defeito precisa ser inalcançável aqui, não só lá.
+      // Efeito colateral declarado: todo vídeo abaixo da média da coorte
+      // empata em 0 e perde a ordem relativa entre si. É de propósito —
+      // "abaixo da média" não tem grau que interesse a esta decisão, e quem
+      // quiser o grau tem `composto` intacto ao lado.
+      score: Math.max(0, composto) * rec,
       fora_da_janela,
     };
   });
@@ -442,19 +516,38 @@ export type MetricaPeca = {
 export type PecaIndexada = MetricaPeca & { indice: number };
 
 /**
- * `indice = 0.35*retencao + 0.35*pct_nao_seguidores + 0.20*z(shares+saves) + 0.10*z(leads)`
+ * `indice = 0.35*z(retencao) + 0.35*z(pct_nao_seguidores) + 0.20*z(shares+saves) + 0.10*z(leads)`
  *
- * Os dois z saem da coorte de peças passada na chamada — por isso a função
- * recebe a LISTA e não uma peça: um índice de peça isolada não existe.
+ * OS QUATRO TERMOS SÃO Z-SCORE — decisão do Emerson em 09/08 sobre o ACHADO 6.
+ *
+ * A OS escrevia os dois primeiros termos crus (`0.35*retencao`) e os dois
+ * últimos como z. Isso não soma: retenção e % de não-seguidores são frações
+ * presas em 0..1, então o termo de peso 0,35 varia no máximo 0,35; um z-score
+ * anda de −3 a +3, então o termo de peso 0,10 varia 0,60 — quase o dobro. O
+ * peso menor mandava mais que o maior, e o peso escrito na OS não era o peso
+ * exercido. Com tudo em z, os pesos voltam a significar o que dizem.
+ *
+ * Consequência que vale saber: `indice` deixa de ser "quanto a peça reteve" e
+ * passa a ser "quanto a peça se destacou DESTA coorte". O valor é relativo, e
+ * comparar índice de coortes diferentes não quer dizer nada — como já era o
+ * caso do `score` externo (ACHADO 8).
+ *
+ * Os quatro z saem da coorte passada na chamada — por isso a função recebe a
+ * LISTA e não uma peça: um índice de peça isolada não existe. Coorte de uma
+ * peça só, ou coorte onde todo mundo tem o mesmo valor, dá z = 0 em todos os
+ * termos (guarda do `zScores`) e portanto índice 0 — leitura honesta de
+ * "ninguém se destaca", não um NaN silencioso.
  */
 export function indices(pecas: readonly MetricaPeca[]): PecaIndexada[] {
+  const zRetencao = zScores(pecas.map((p) => num(p.retencao)));
+  const zNaoSeg = zScores(pecas.map((p) => num(p.pct_nao_seguidores)));
   const zEngajo = zScores(pecas.map((p) => num(p.compartilhamentos) + num(p.salvamentos)));
   const zLeads = zScores(pecas.map((p) => num(p.leads)));
   return pecas.map((p, i) => ({
     ...p,
     indice:
-      PESOS_INDICE.retencao * num(p.retencao) +
-      PESOS_INDICE.pct_nao_seguidores * num(p.pct_nao_seguidores) +
+      PESOS_INDICE.retencao * zRetencao[i] +
+      PESOS_INDICE.pct_nao_seguidores * zNaoSeg[i] +
       PESOS_INDICE.shares_saves * zEngajo[i] +
       PESOS_INDICE.leads * zLeads[i],
   }));

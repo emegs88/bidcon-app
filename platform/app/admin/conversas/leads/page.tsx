@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConversasSubNav } from "../ConversasSubNav";
+import { dataHoraAnoBR } from "@/lib/data-br";
 import areaStyles from "@/components/area.module.css";
 import styles from "../conversas.module.css";
 
@@ -79,18 +80,8 @@ type LeadRow = {
   cartaVinculada: boolean;
 };
 
-function dataHora(v: string | null): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local foi APAGADA — omitia `timeZone` e carimbava UTC na Vercel.
+// Ver lib/data-br.ts.
 
 export default async function AdminConversasLeads({
   searchParams,
@@ -204,7 +195,7 @@ export default async function AdminConversasLeads({
                   </div>
                   <span className={styles.meta}>
                     {l.telefone} · origem {l.origem} · {l.metaExtra} · captado em{" "}
-                    {dataHora(l.criadoEm)}
+                    {dataHoraAnoBR(l.criadoEm)}
                   </span>
                 </div>
                 <Badge tone={l.statusTone}>{l.statusLabel}</Badge>

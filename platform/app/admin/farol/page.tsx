@@ -47,6 +47,7 @@
 // ponto real do "IBM Plex Mono nos números" — id de vídeo, container e post são
 // para conferir caractere a caractere, e proporcional atrapalha isso.
 // ============================================================================
+import Link from "next/link";
 import { exigirAdminConsolePagina } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { AppShell } from "@/components/AppShell";
@@ -56,6 +57,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { reais, pctAoMes } from "@/lib/carrossel-formato";
+import { dataHoraBR, diaBR } from "@/lib/data-br";
 import { LABEL_TIPO_BEM } from "@/lib/status";
 import {
   lerEstadoFarol,
@@ -78,17 +80,13 @@ export const dynamic = "force-dynamic";
 // Formatação
 // ---------------------------------------------------------------------------
 
-function dataHora(v: string | null | undefined): string {
-  if (!v) return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A `dataHora` local que ficava aqui foi APAGADA, não corrigida. Ela era
+// `toLocaleString("pt-BR", {...})` sem `timeZone`, o que formata no fuso do
+// PROCESSO — BRT na máquina de quem desenvolve, UTC na Vercel. A tela mostrava
+// 14:00 num post das 11h00 (medido pelo Emerson em 09/08). Apagar em vez de
+// corrigir é de propósito: enquanto existisse uma função de data local nesta
+// tela, a próxima linha de tabela poderia chamá-la. Agora só existe
+// `dataHoraBR`, e ela carrega o fuso junto. Ver lib/data-br.ts.
 
 /** Régua de status do reel — as cinco do 0069, mais o desconhecido. */
 function toneReel(status: string): { tone: "ok" | "info" | "amber" | "muted"; label: string } {
@@ -174,7 +172,7 @@ function CardPost({ linha, erro }: { linha: LinhaPost | null; erro: string | nul
           <Campo rotulo="Custo" valor={pctAoMes(det?.custo_am ?? null)} />
           <Campo rotulo="Escolha" valor={det?.escolha ?? "—"} />
           <Id rotulo="post_id" valor={linha.post_id} />
-          <Campo rotulo="Quando" valor={dataHora(linha.criado_em)} />
+          <Campo rotulo="Quando" valor={dataHoraBR(linha.criado_em)} />
           {det?.erro && <Campo rotulo="Erro" valor={<span className={styles.textoErro}>{det.erro}</span>} />}
           {linha.post_id && (
             <div className={styles.campo}>
@@ -231,8 +229,8 @@ function CardReel({ linha, erro }: { linha: LinhaReel | null; erro: string | nul
             <Id rotulo="post_id (Instagram)" valor={linha.post_id} />
             <Id rotulo="yt_video_id (YouTube)" valor={det?.yt_video_id} />
             <Id rotulo="tt_publish_id (TikTok)" valor={det?.tt_publish_id} />
-            <Campo rotulo="Criada" valor={dataHora(linha.criado_em)} />
-            <Campo rotulo="Última mexida" valor={dataHora(linha.atualizado_em)} />
+            <Campo rotulo="Criada" valor={dataHoraBR(linha.criado_em)} />
+            <Campo rotulo="Última mexida" valor={dataHoraBR(linha.atualizado_em)} />
             {linha.erro && (
               <Campo rotulo="Erro" valor={<span className={styles.textoErro}>{linha.erro}</span>} />
             )}
@@ -389,7 +387,12 @@ function montarHistorico(
     const ok = p.acao.endsWith("_publicado") || p.acao === "pauta_escrita" || p.acao.endsWith("_aprovada");
     linhas.push({
       chave: `post-${p.id}`,
-      dia: p.detalhe?.data ?? p.criado_em.slice(0, 10),
+      // `detalhe.data` já vem em data civil de São Paulo (a rotina grava com
+      // `hojeSP()`). A QUEDA é que estava em outro fuso: `criado_em.slice(0,10)`
+      // corta o ISO, que é UTC. As duas metades da mesma coluna discordavam
+      // entre 21h e meia-noite — a linha com `detalhe.data` caía no dia certo e
+      // a linha sem ele caía no dia seguinte. `diaBR` põe as duas na mesma régua.
+      dia: p.detalhe?.data ?? diaBR(p.criado_em) ?? "—",
       quando: p.criado_em,
       o_que: manual ? "Operação" : "Post",
       estado: {
@@ -405,7 +408,7 @@ function montarHistorico(
     const t = toneReel(r.status);
     linhas.push({
       chave: `reel-${r.id}`,
-      dia: r.detalhe?.data ?? r.criado_em.slice(0, 10),
+      dia: r.detalhe?.data ?? diaBR(r.criado_em) ?? "—",
       quando: r.atualizado_em ?? r.criado_em,
       o_que: "Reel",
       estado: t,
@@ -480,6 +483,14 @@ export default async function AdminFarol() {
               {armado ? "FAROL armado" : "FAROL desarmado"}
             </span>
           </div>
+          {/* O link recíproco pedido pela OS. Fica JUNTO dos cards de hoje, e
+              não perdido no rodapé, porque a pergunta "e no mês, como foi?"
+              nasce exatamente aqui — olhando o dia e querendo o contexto. */}
+          <p className={styles.linkIrmao}>
+            <Link href="/admin/farol/dashboard">
+              sala de controle — leitura de 30 dias, gráficos e custo →
+            </Link>
+          </p>
           <div className={styles.grid3}>
             <CardPost linha={post} erro={estado.posts.erro} />
             <CardReel linha={reel} erro={estado.reels.erro} />
@@ -527,10 +538,10 @@ export default async function AdminFarol() {
                   <div key={r.id} className={styles.travada}>
                     <div className={styles.campos}>
                       <Campo rotulo="Estado" valor={toneReel(r.status).label} />
-                      <Campo rotulo="Dia" valor={r.detalhe?.data ?? r.criado_em.slice(0, 10)} />
+                      <Campo rotulo="Dia" valor={r.detalhe?.data ?? diaBR(r.criado_em) ?? "—"} />
                       <Id rotulo="video_id" valor={r.video_id} />
                       <Id rotulo="container_id" valor={r.container_id} />
-                      <Campo rotulo="Última mexida" valor={dataHora(r.atualizado_em)} />
+                      <Campo rotulo="Última mexida" valor={dataHoraBR(r.atualizado_em)} />
                     </div>
                     <DestravarReel reelId={r.id} containerId={r.container_id as string} />
                   </div>
@@ -583,7 +594,7 @@ export default async function AdminFarol() {
                   {historico.map((l) => (
                     <tr key={l.chave}>
                       <td className={styles.colMono}>{l.dia}</td>
-                      <td className={styles.colMono}>{dataHora(l.quando)}</td>
+                      <td className={styles.colMono}>{dataHoraBR(l.quando)}</td>
                       <td>{l.o_que}</td>
                       <td>
                         <Badge tone={l.estado.tone}>{l.estado.label}</Badge>
