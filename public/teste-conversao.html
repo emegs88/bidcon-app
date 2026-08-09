@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>bidcon · prova de medição</title>
+<!--
+  MEDICAO-ADS-01 · item (d) da ordem: "entregar um jeito de PROVAR com clique
+  real que a conversão registra (uma rota/página de teste ou o passo a passo
+  exato), porque 'instalado' não é 'medindo'."
+
+  DUAS DECISÕES QUE FAZEM ESTA PÁGINA VALER ALGUMA COISA:
+
+  1) Ela carrega o /consent.js DE VERDADE, o mesmo do site. Uma página de teste
+     com uma cópia do código provaria a cópia. Se o consent.js quebrar, esta
+     página quebra junto — que é o comportamento desejado.
+
+  2) Ela escuta `securitypolicyviolation` ANTES de tudo. Esse é o detector do
+     risco que a auditoria levantou: se o CSP bloquear algum host de que a
+     conversão do Ads depende, o bloqueio aparece aqui em vermelho, com o host
+     e a diretiva literais. Sem isso, uma tag bloqueada falha em silêncio e a
+     leitura errada seria "a campanha não converte".
+
+  NÃO INDEXADA: noindex/nofollow no meta e ausente do sitemap.xml. Não é
+  segredo — é ruído fora do índice.
+-->
+<link rel="stylesheet" href="/bidcon-brand.css">
+<script>
+/* Precisa correr ANTES do consent.js para não perder violação nenhuma. */
+window.__cspViolacoes = [];
+document.addEventListener('securitypolicyviolation', function (e) {
+  window.__cspViolacoes.push({
+    diretiva: e.effectiveDirective || e.violatedDirective,
+    bloqueado: e.blockedURI
+  });
+});
+window.__errosDeScript = [];
+window.addEventListener('error', function (e) {
+  if (e && e.target && e.target.tagName === 'SCRIPT') {
+    window.__errosDeScript.push(e.target.src || '(inline)');
+  }
+}, true);
+</script>
+<style>
+  body{margin:0;background:#0A0E1A;color:#f6f6f8;font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.6}
+  .wrap{max-width:820px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:#93A0B8;font-size:14px;margin:0 0 28px}
+  .card{background:#16213A;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:18px 20px;margin:0 0 16px}
+  .card h2{font-size:15px;margin:0 0 12px;letter-spacing:.02em;text-transform:uppercase;color:#93A0B8}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+  td:first-child{color:#93A0B8;width:52%}
+  td:last-child{text-align:right;font-variant-numeric:tabular-nums;word-break:break-all}
+  .sim{color:#39D98A;font-weight:700}
+  .nao{color:#FF6B6B;font-weight:700}
+  .neutro{color:#93A0B8}
+  button{cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;padding:11px 20px;border:none;margin:6px 8px 0 0}
+  .b1{background:#2E7BF0;color:#fff}
+  .b2{background:transparent;color:#f6f6f8;border:1px solid rgba(255,255,255,.22)}
+  #saida{margin-top:14px;font-size:14px;padding:12px 14px;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);display:none}
+  ol{padding-left:20px;font-size:14px;color:#cfd6e4}
+  ol li{margin-bottom:9px}
+  code{background:rgba(255,255,255,.09);padding:1px 6px;border-radius:5px;font-size:13px}
+  .aviso{font-size:13px;color:#93A0B8;border-left:3px solid #2E7BF0;padding-left:12px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Prova de medição</h1>
+  <p class="sub">Página interna. Mede o que o navegador consegue provar — e diz em voz alta o que ele <strong>não</strong> consegue.</p>
+
+  <div class="card">
+    <h2>1 · Configuração</h2>
+    <table id="tConfig"></table>
+    <div class="aviso">Enquanto estes quatro estiverem <span class="nao">não</span>, o site não faz uma única requisição a terceiros. Preencher os IDs em <code>public/consent.js</code> é o que liga a medição.</div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Consentimento e carregamento</h2>
+    <table id="tEstado"></table>
+    <button class="b2" id="btnLimpar">Limpar consentimento e recarregar</button>
+    <div class="aviso">Nada carrega antes do aceite — é a regra (c) da ordem. Limpe e recarregue para ver o banner de novo.</div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Origem do clique</h2>
+    <table id="tOrigem"></table>
+    <div class="aviso">Lido do cookie <code>bidcon_utm</code>, que já existe e alimenta <code>vendas_novas.utm</code>. Esta página só lê. Para testar de verdade, chegue aqui com <code>?gclid=TESTE123&amp;utm_source=google&amp;utm_medium=cpc</code> — mas note: o cookie é <em>first-touch</em> e não é sobrescrito, então limpe-o antes se já houver um.</div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Disparar a conversão</h2>
+    <p class="sub" style="margin:0 0 10px">Chama <code>window.bidconConversaoLead()</code>, a mesma função que a página real usará.</p>
+    <button class="b1" id="btnDisparar">Disparar conversão de teste</button>
+    <div id="saida"></div>
+  </div>
+
+  <div class="card">
+    <h2>5 · Bloqueios de CSP</h2>
+    <table id="tCsp"></table>
+  </div>
+
+  <div class="card">
+    <h2>6 · O que o navegador NÃO prova</h2>
+    <p class="sub" style="margin:0 0 12px">Um <span class="sim">disparado</span> acima significa que o evento entrou no <code>dataLayer</code>. Não significa que o Google recebeu, e tratar um pelo outro é o erro que esta fatia existe para impedir. Para fechar a prova, do lado deles:</p>
+    <ol>
+      <li>No <strong>Google Ads → Ferramentas → Conversões</strong>, abra a ação de conversão. O estado sai de <em>"Sem conversões recentes"</em> e passa a <em>"Gravando conversões"</em> — pode levar até <strong>24 h</strong>. Este é o único carimbo que vale.</li>
+      <li>Rode o <strong>Diagnóstico de tags</strong> (Google Tag Assistant) nesta URL. Ele mostra a tag disparando em tempo real e é o caminho rápido quando algo não chega.</li>
+      <li>Confirme a <strong>rede</strong>: DevTools → Network, filtro <code>conversion</code>. Deve haver requisição para <code>googleadservices.com</code> ou <code>googleads.g.doubleclick.net</code>. Status 200 ou 302 é normal.</li>
+      <li>Faça o teste <strong>com um clique real do anúncio</strong>, não digitando a URL: só um clique verdadeiro carrega o <code>gclid</code> que amarra a conversão à campanha. Com a campanha pausada, use a visualização de anúncio ou aguarde o primeiro clique real.</li>
+      <li>Repita <strong>com bloqueador de anúncios ligado</strong>. Uma parte do público navega assim, e essa perda é estrutural — melhor conhecê-la agora do que descobri-la como "queda de conversão".</li>
+    </ol>
+  </div>
+</div>
+
+<script src="/consent.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function marca(v) { return v ? '<span class="sim">sim</span>' : '<span class="nao">não</span>'; }
+  function linha(rot, val) { return '<tr><td>' + rot + '</td><td>' + val + '</td></tr>'; }
+
+  function pintar() {
+    var m = (typeof window.bidconMedicao === 'function')
+      ? window.bidconMedicao()
+      : null;
+
+    if (!m) {
+      $('tConfig').innerHTML = linha('consent.js carregado', '<span class="nao">não</span>');
+      return;
+    }
+
+    $('tConfig').innerHTML =
+      linha('GA4_ID preenchido', marca(m.ga4_configurado)) +
+      linha('ADS_ID preenchido', marca(m.ads_configurado)) +
+      linha('Rótulo da conversão preenchido', marca(m.rotulo_configurado)) +
+      linha('CLARITY_ID preenchido', marca(m.clarity_configurado));
+
+    var c = m.consentimento;
+    var cor = c === 'granted' ? 'sim' : (c === 'denied' ? 'nao' : 'neutro');
+    $('tEstado').innerHTML =
+      linha('Consentimento', '<span class="' + cor + '">' + c + '</span>') +
+      linha('gtag carregado', marca(m.gtag_carregado)) +
+      linha('Eventos no dataLayer', '<span class="neutro">' + m.dataLayer_eventos + '</span>') +
+      linha('Erros de carregamento de script',
+        window.__errosDeScript.length
+          ? '<span class="nao">' + window.__errosDeScript.join('<br>') + '</span>'
+          : '<span class="neutro">nenhum</span>');
+
+    var params = new URLSearchParams(window.location.search);
+    var o = m.origem_gravada;
+    $('tOrigem').innerHTML =
+      linha('gclid na URL agora', params.get('gclid') ? '<span class="sim">' + params.get('gclid') + '</span>' : '<span class="neutro">ausente</span>') +
+      linha('gclid no cookie (first-touch)', marca(m.gclid_no_cookie)) +
+      linha('Origem gravada', o ? '<span class="neutro">' + JSON.stringify(o) + '</span>' : '<span class="neutro">nenhuma</span>');
+
+    var v = window.__cspViolacoes;
+    $('tCsp').innerHTML = v.length
+      ? v.map(function (x) { return linha('<span class="nao">' + x.diretiva + '</span>', '<span class="nao">' + x.bloqueado + '</span>'); }).join('')
+      : linha('Violações registradas nesta página', '<span class="sim">nenhuma</span>');
+  }
+
+  $('btnDisparar').addEventListener('click', function () {
+    var s = $('saida');
+    s.style.display = 'block';
+    if (typeof window.bidconConversaoLead !== 'function') {
+      s.innerHTML = '<span class="nao">bidconConversaoLead não existe</span> — o /consent.js não carregou.';
+      return;
+    }
+    var r = window.bidconConversaoLead({
+      transaction_id: 'teste-' + Date.now(),
+      value: 0,
+      currency: 'BRL'
+    });
+    var explica = {
+      disparado: 'O evento entrou no dataLayer. Agora confirme no painel do Ads — passo 6.',
+      sem_consentimento: 'Correto e esperado: ninguém aceitou os cookies ainda. Aceite no banner e tente de novo.',
+      sem_rotulo_configurado: 'ADS_CONVERSAO_LEAD está vazio em public/consent.js. O ID da conta sozinho não registra conversão.',
+      gtag_ausente: 'Houve consentimento mas o gtag.js não carregou — veja bloqueios de CSP e erros de script acima.'
+    };
+    s.innerHTML = '<strong class="' + (r === 'disparado' ? 'sim' : 'nao') + '">' + r + '</strong><br>' +
+      (explica[r] || 'Retorno não previsto.');
+    setTimeout(pintar, 150);
+  });
+
+  $('btnLimpar').addEventListener('click', function () {
+    try { localStorage.removeItem('bidcon_consent_v1'); } catch (e) {}
+    window.location.reload();
+  });
+
+  window.addEventListener('load', function () { setTimeout(pintar, 300); });
+  setInterval(pintar, 2000);
+})();
+</script>
+</body>
+</html>
