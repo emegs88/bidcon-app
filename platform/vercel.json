@@ -40,6 +40,14 @@
     {
       "path": "/api/farol/yt-comenta",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/farol/story",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/farol/carrossel",
+      "schedule": "0 14 * * 6"
     }
   ]
 }
