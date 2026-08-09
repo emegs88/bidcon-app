@@ -35,11 +35,28 @@
 // a mesma versão da Graph e o mesmo formato de erro literal. Os dois POSTs
 // (media e media_publish) continuam saindo pela lib compartilhada, sem cópia.
 //
-// POLLING CURTO E COM ORÇAMENTO. A OS pede máx 40s, passo 5s. Além disso, a
-// rota só ENTRA no caminho de container se ainda houver tempo de invocação
-// sobrando (`ORCAMENTO_MS`): começar um polling de 40s aos 50s de execução é
-// como garantir o timeout. Estourou o orçamento, a linha fica 'publicando' e o
-// ciclo seguinte retoma — que é exatamente o desenho de (3).
+// POLLING COM ORÇAMENTO. A rota só ENTRA no caminho de container se ainda
+// houver tempo de invocação sobrando (`ORCAMENTO_MS`): começar um polling aos
+// 50s de execução é como garantir o timeout. Estourou o orçamento, a linha fica
+// 'publicando' e o ciclo seguinte retoma — que é exatamente o desenho de (3).
+//
+// FASE2-B/C (09/08/2026) — A CADÊNCIA E A DESISTÊNCIA MUDARAM. A OS original
+// pedia "máx 40s, passo 5s". Isso foi SUBSTITUÍDO por ordem do Emerson, depois
+// de ele RETIRAR a OS FASE2-CALLBACK ("o mecanismo não existe e você provou que
+// não resolveria" — a Meta não publica webhook, callback nem campo de
+// notificação para status de container; medido em quatro superfícies da doc).
+// O que entrou no lugar:
+//   B · pedir `copyright_check_status` no fields e LOGAR os quatro literais A
+//       CADA consulta — era o único canal de diagnóstico documentado que estava
+//       fechado por escolha nossa;
+//   C · 1 consulta por minuto, no máximo ~5 por container, e DERROTA aos 15min
+//       em vez das 24h da janela. "Se em 15 min não andou, é melhor falhar e
+//       reagendar do que segurar um dia."
+// Os números e a decisão moram em lib/farol/container.ts, sob teste. Aqui só
+// mora o I/O. O que motivou: três dias, três containers — 07/08 publicou 6h40
+// depois, 08/08 expirou em 24h, 09/08 preso desde 12h50 — com o mp4 periciado e
+// impecável. Mil GETs num container que a Meta manda abandonar em cinco minutos
+// é o oposto de diagnóstico.
 //
 // UMA PUBLICAÇÃO POR INVOCAÇÃO. Checar status de vídeo é barato e roda para
 // várias linhas; publicar é caro e para na primeira. Dois reels publicados no
@@ -63,6 +80,18 @@ import { subirShort } from "@/lib/youtube/upload";
 import { publicarVideo } from "@/lib/tiktok/upload";
 import { reais, pctAoMes } from "@/lib/carrossel-formato";
 import { LABEL_TIPO_BEM } from "@/lib/status";
+import {
+  CAMPOS_CONTAINER,
+  DERROTA_MS,
+  POLL_MAX_MS,
+  POLL_PASSO_MS,
+  decidirDerrota,
+  degrauAbaixo,
+  idadeContainerMs,
+  motivoDerrota,
+  resumoContainer,
+  type ResumoContainer,
+} from "@/lib/farol/container";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,9 +107,9 @@ export const maxDuration = 180;
 const IG_GRAPH_VERSION = "v25.0";
 const TIMEOUT_IG_MS = 15_000;
 
-/** Regra da OS: polling curto do container. */
-const POLL_MAX_MS = 40_000;
-const POLL_PASSO_MS = 5_000;
+// A cadência (POLL_PASSO_MS), o teto por invocação (POLL_MAX_MS) e o limiar de
+// derrota (DERROTA_MS) moram em lib/farol/container.ts, sob teste — ver o
+// bloco FASE2-B/C no cabeçalho. Ficavam aqui como 40s/5s.
 
 /**
  * Só entra no caminho caro se ainda couber o trabalho inteiro com folga. Subiu
@@ -113,23 +142,17 @@ const JANELA_HORAS = 24;
 /** Quantas linhas pendentes olhar por invocação (checagem de status é barata). */
 const LIMITE_LINHAS = 5;
 
-/**
- * Idade a partir da qual um container 'publicando' vira suspeito de zumbi.
- * 20 min é folgado de propósito: o polling normal é de 40s e o ciclo agora é de
- * 10 min, então um container saudável tem ~30 leituras antes de ser tocado.
- */
-const IDADE_ZUMBI_MS = 20 * 60 * 1000;
-
-/**
- * Limiar MAIOR para container criado com a NOSSA URL hospedada.
- *
- * Medido em 07/08: com a URL própria o dedupe da Meta continua valendo — resetar
- * e pedir de novo devolveu o MESMO id. Então, para estes, o reset por idade não
- * é resgate: é roleta. E a conta tem contexto — a conta do Instagram estreou
- * ontem e este é o primeiro REEL dela; demora legítima é a hipótese mais barata
- * antes de acusar travamento. 60 min dá seis leituras de ciclo antes de tocar.
- */
-const IDADE_ZUMBI_HOSPEDADO_MS = 60 * 60 * 1000;
+// OS DOIS LIMIARES DE ZUMBI FORAM REMOVIDOS PELA FASE2-C, e o motivo fica
+// escrito porque apagar constante sem dizer por quê é como esconder decisão:
+//   · IDADE_ZUMBI_HOSPEDADO_MS (60 min) virou INALCANÇÁVEL. A derrota chega aos
+//     15 min e tira a linha de 'publicando', então nenhum container hospedado
+//     sobrevive até os 60. Deixar a constante ali seria deixar escrito um
+//     caminho que nunca mais roda — código morto que se lê como regra viva.
+//   · IDADE_ZUMBI_MS (20 min) nunca foi lido de verdade: o único chamador que
+//     restou é o container LEGADO, e ele já entrava com `ignorarIdade = true`.
+//     Medi antes de apagar; era um número que ninguém consultava.
+// O `checarZumbi` continua existindo, só que agora exclusivamente para o legado
+// — ver o comentário na retomada.
 
 /**
  * Idade a partir da qual uma linha ainda 'renderizando' vira suspeita de estar
@@ -145,12 +168,7 @@ const IDADE_ZUMBI_HOSPEDADO_MS = 60 * 60 * 1000;
  */
 const IDADE_ESTAGNADA_MS = 20 * 60 * 1000;
 
-/**
- * Campos pedidos ao container. `status` é o verboso — é ali que a Meta escreve a
- * RECLAMAÇÃO por extenso quando há uma; `status_code` é só a palavra seca.
- * Pedimos os dois porque um código sem frase não diagnostica nada.
- */
-const CAMPOS_CONTAINER = "id,status,status_code";
+// CAMPOS_CONTAINER agora vem da lib e inclui `copyright_check_status` (item B).
 
 type LinhaReel = {
   id: string;
@@ -195,17 +213,26 @@ async function statusContainer(
         error?: { message?: string; code?: number; error_subcode?: number };
       })?.error;
 
-      // REDE DE SEGURANÇA do campo verboso: se a Graph recusar por causa de um
-      // campo (code 100 é "campo inválido/inexistente"), relê pedindo SÓ o
-      // `status_code`, que é o conjunto que esta rota já usava e que está
-      // medido em produção. Instrumentar não pode custar a leitura de estado —
-      // ficar cego ao container é pior do que ficar sem a frase da Meta.
-      if (campos !== "status_code" && err?.code === 100) {
-        console.warn("[farol-reel] campos do container recusados, relendo seco:", {
-          campos,
-          erro: err?.message,
-        });
-        return statusContainer(containerId, "status_code");
+      // REDE DE SEGURANÇA, agora em ESCADA (FASE2-B): se a Graph recusar o
+      // conjunto por causa de um campo (code 100 é "campo inválido/
+      // inexistente"), desce UM degrau e relê — não despenca até o piso.
+      //
+      // O DEFEITO QUE ISTO CONSERTA ERA MEU: antes caía direto para
+      // `status_code`. Se a Meta recusasse o `copyright_check_status` que
+      // acabou de entrar, perderíamos junto o `status` verboso — a FRASE da
+      // reclamação —, que não tem culpa nenhuma e é justamente o que
+      // diagnostica. Perder um campo é o preço de pedir um campo novo; perder
+      // dois é bug. Os degraus estão em lib/farol/container.ts, sob teste.
+      if (err?.code === 100) {
+        const abaixo = degrauAbaixo(campos);
+        if (abaixo) {
+          console.warn("[farol-reel] campos do container recusados, descendo um degrau:", {
+            campos,
+            proximo: abaixo,
+            erro: err?.message,
+          });
+          return statusContainer(containerId, abaixo);
+        }
       }
 
       const partes = [
@@ -356,37 +383,53 @@ async function reclamar(db: Db, linha: LinhaReel): Promise<boolean> {
 
 /**
  * Espera o container ficar FINISHED. Devolve o veredito ou 'demorou' — que NÃO
- * é falha: é "tenta no próximo ciclo", e é o caso comum de vídeo grande.
+ * é falha aqui dentro: é "quem chama decide", e quem chama agora tem a régua de
+ * derrota (FASE2-C). Este laço não olha idade e não escreve no banco.
+ *
+ * `tetoMs` é o teto DESTA invocação, não do container. Entra por parâmetro
+ * porque o chamador sabe quanto tempo de invocação ainda sobra e este laço não.
+ *
+ * GARANTIA DE UMA LEITURA: mesmo com `tetoMs = 0` o laço lê UMA vez antes de
+ * sair. É o que permite ao chamador pedir "só me dá o estado atual" para
+ * declarar derrota com dado fresco, sem gastar um minuto de sono para isso — e
+ * sem precisar de uma segunda função que chamasse a Meta de outro jeito.
  */
 async function esperarContainer(
-  containerId: string
+  containerId: string,
+  tetoMs: number = POLL_MAX_MS
 ): Promise<
   | { fim: "pronto" }
   | { fim: "falhou"; erro: string }
-  | { fim: "demorou"; ultimo: string }
+  | { fim: "demorou"; ultimo: string; resumo: ResumoContainer }
 > {
-  const limite = Date.now() + POLL_MAX_MS;
+  const limite = Date.now() + tetoMs;
   let ultimo = "SEM_LEITURA";
-  let primeira = true;
-  while (Date.now() < limite) {
-    const s = await statusContainer(containerId);
+  let resumo: ResumoContainer = resumoContainer(null);
 
-    // A RESPOSTA INTEIRA, uma vez por tique — não um campo escolhido por mim.
-    // Motivo: até agora esta rota só sabia dizer "IN_PROGRESS" porque só
-    // perguntava `status_code`. Se a Meta está reclamando de alguma coisa (o
-    // fetch do vídeo, o codec, a duração), a frase vem no campo `status`, e
-    // nenhum relatório meu vale mais do que ela. Uma vez por tique e não por
-    // leitura: são até 8 polls por invocação e 8 cópias do mesmo objeto seriam
-    // ruído, não instrumentação.
-    if (primeira) {
-      primeira = false;
-      console.log("[farol-reel] container_status_bruto:", {
-        container_id: containerId,
-        ok: s.ok,
-        resposta: s.bruto,
-        ...(s.ok ? {} : { erro: s.erro }),
-      });
-    }
+  for (;;) {
+    const s = await statusContainer(containerId);
+    resumo = resumoContainer(s.bruto);
+
+    // A RESPOSTA INTEIRA, A CADA CONSULTA — item B da OS, literal: "LOGAR os
+    // quatro literais a cada consulta, no container_status_bruto que já
+    // existe". Antes era só na PRIMEIRA leitura do laço, e a justificativa era
+    // que 8 cópias por invocação seriam ruído. O item C tirou essa
+    // justificativa do mapa: com passo de 60s e teto de 90s são DUAS leituras
+    // por invocação. Duas linhas de log por invocação não é ruído — é a série
+    // temporal que mostra se `copyright_check_status` mexe ou fica parado, que
+    // é exatamente a pergunta em aberto sobre o avatar sintético falando.
+    console.log("[farol-reel] container_status_bruto:", {
+      container_id: containerId,
+      ok: s.ok,
+      resposta: s.bruto,
+      // Os quatro literais também DESTRINCHADOS, e não só dentro do objeto
+      // cru: é o que permite achar por texto no log do Vercel sem depender de
+      // como ele resolve imprimir um objeto aninhado.
+      status_code: resumo.status_code,
+      copyright_check_status: resumo.copyright_check_status,
+      status: resumo.status,
+      ...(s.ok ? {} : { erro: s.erro }),
+    });
 
     if (!s.ok) return { fim: "falhou", erro: `status_container: ${s.erro}` };
     ultimo = s.code;
@@ -396,9 +439,15 @@ async function esperarContainer(
     if (s.code === "ERROR" || s.code === "EXPIRED") {
       return { fim: "falhou", erro: `container_${s.code.toLowerCase()}` };
     }
+
+    // Só dorme se o sono INTEIRO couber no teto. A versão anterior testava o
+    // relógio no topo do laço e por isso dormia 60s para depois descobrir que
+    // não tinha mais tempo de ler — um minuto de invocação paga do bolso do
+    // upload que vem depois.
+    if (Date.now() + POLL_PASSO_MS >= limite) break;
     await new Promise((r) => setTimeout(r, POLL_PASSO_MS));
   }
-  return { fim: "demorou", ultimo };
+  return { fim: "demorou", ultimo, resumo };
 }
 
 export async function GET(req: Request) {
@@ -457,11 +506,19 @@ export async function GET(req: Request) {
         const detAtual = (linha.detalhe ?? {}) as { url_hospedada?: string };
         const legado = !detAtual.url_hospedada;
 
-        // Container hospedado espera 60 min, não 20. Ver IDADE_ZUMBI_HOSPEDADO_MS:
-        // para ele o reset não é resgate, porque a Meta devolve o mesmo id.
-        const limiteMs = legado ? IDADE_ZUMBI_MS : IDADE_ZUMBI_HOSPEDADO_MS;
-
-        const z = await checarZumbi(linha, linha.container_id, legado, limiteMs);
+        // FASE2-C: a checagem de zumbi ficou EXCLUSIVA do legado.
+        // Para o container HOSPEDADO ela não existe mais, e isso é ganho duplo:
+        //   · o reset por idade nunca foi resgate para ele — medido em 07/08, a
+        //     Meta devolve o MESMO id, então resetar era roleta;
+        //   · a régua que resolve o caso dele agora é a DERROTA aos 15 min, que
+        //     roda dentro do `publicarContainer` e chega MUITO antes dos 60 min
+        //     que este ramo esperava. O ramo virou inalcançável — e um caminho
+        //     inalcançável que continua escrito é uma regra falsa.
+        // De quebra some um GET por ciclo: o `checarZumbi` fazia leitura
+        // própria do container, separada da leitura do polling.
+        const z = legado
+          ? await checarZumbi(linha, linha.container_id)
+          : { zumbi: false, code: "NAO_CHECADO", idadeMin: 0 };
         if (z.zumbi) {
           // Autocura: zera o container e NÃO dá `continue` — cai no caminho
           // normal logo abaixo, que relê o HeyGen, HOSPEDA o mp4 e só então
@@ -474,8 +531,8 @@ export async function GET(req: Request) {
           console.warn("[farol-reel] container zumbi resetado", {
             container_id: linha.container_id,
             idade_min: z.idadeMin,
-            limite_min: Math.round(limiteMs / 60_000),
-            motivo: legado ? "sem_url_hospedada" : "idade",
+            code: z.code,
+            motivo: "sem_url_hospedada",
           });
           // Guarda o id ABANDONADO para poder reconhecer o dedupe lá embaixo:
           // se a Meta devolver este mesmo id no lugar de um novo, o reset foi
@@ -490,7 +547,14 @@ export async function GET(req: Request) {
         } else {
           const r = await publicarContainer(db, linha, linha.container_id);
           olhados.push({ video_id: linha.video_id, resultado: r });
-          if (r === "publicado" || r === "falhou") break;
+          // 'derrota' entra aqui junto de 'falhou' porque é a MESMA espécie de
+          // desfecho: a linha saiu de 'publicando' e virou 'falhou' no banco.
+          // O nome é separado só para o log dizer QUAL das duas mortes foi —
+          // a que a Meta declarou (ERROR/EXPIRED) ou a que nós declaramos aos
+          // 15 min. Se ficasse fora desta lista, o laço continuaria para a
+          // próxima linha depois de já ter gasto o orçamento inteiro numa
+          // sondagem, que é exatamente o gasto que a FASE2-C veio cortar.
+          if (r === "publicado" || r === "falhou" || r === "derrota") break;
           continue;
         }
       }
@@ -719,15 +783,77 @@ async function publicarContainer(
   linha: LinhaReel,
   containerId: string
 ): Promise<string> {
-  const espera = await esperarContainer(containerId);
+  // Se o container JÁ passou da idade de derrota, não gasta minuto sondando:
+  // pede uma leitura só (teto 0 ainda garante UMA), para declarar a derrota com
+  // dado fresco em vez de com o último code que sobrou de outra invocação.
+  const idadeAntes = idadeContainerMs(linha, Date.now());
+  const jaVencido = Number.isFinite(idadeAntes) && idadeAntes >= DERROTA_MS;
+  const espera = await esperarContainer(containerId, jaVencido ? 0 : POLL_MAX_MS);
 
   if (espera.fim === "demorou") {
-    // Não é falha. A linha fica 'publicando' com container_id, e o próximo
-    // ciclo entra direto pela retomada.
+    // ---- FASE2-C: a régua da DERROTA ------------------------------------
+    // Aqui, e não numa varredura à parte, por dois motivos medidos: (a) a
+    // leitura fresca do container ACABOU de acontecer no `esperarContainer`,
+    // então declarar derrota não custa nenhuma chamada extra à Meta; (b) é o
+    // único ponto do código por onde passam TODOS os containers em espera —
+    // caminho novo e retomada —, então não há um segundo caminho para a regra
+    // esquecer de cobrir.
+    const idadeMs = idadeContainerMs(linha, Date.now());
+    const idadeMin = Math.round(idadeMs / 60_000);
+    const d = decidirDerrota({ idadeMs, ultimoCode: espera.ultimo });
+
+    if (d.derrota) {
+      const motivo = motivoDerrota(espera.resumo, idadeMin);
+      console.error("[farol-reel] DERROTA declarada:", {
+        video_id: linha.video_id,
+        container_id: containerId,
+        idade_min: idadeMin,
+        limite_min: Math.round(DERROTA_MS / 60_000),
+        status_code: espera.resumo.status_code,
+        copyright_check_status: espera.resumo.copyright_check_status,
+        status: espera.resumo.status,
+      });
+      // O motivo vai para DOIS lugares de propósito: `erro` é a coluna que o
+      // painel já lê (é o que faz a linha aparecer como falha rápida, e não
+      // como "em movimento" mentindo por 24h), e `detalhe.derrota` guarda os
+      // literais separados para o item A da próxima fatia poder comparar
+      // container a container sem ter que fatiar string.
+      await atualizar(db, linha.id, {
+        status: "falhou",
+        erro: motivo,
+        detalhe: {
+          ...(linha.detalhe ?? {}),
+          derrota: {
+            em: new Date().toISOString(),
+            container_id: containerId,
+            idade_min: idadeMin,
+            status_code: espera.resumo.status_code,
+            copyright_check_status: espera.resumo.copyright_check_status,
+            status: espera.resumo.status,
+          },
+        },
+      });
+      await registrar(db, "reel_falhou", linha.carta_id, null, {
+        video_id: linha.video_id,
+        container_id: containerId,
+        erro: motivo,
+      });
+      // NÃO reagenda daqui. Reagendar é trabalho da fase 1, que já escolhe
+      // carta e roteiro do zero no ciclo seguinte — inventar um retry aqui
+      // criaria um segundo dono do "quando nasce um reel", e dois donos da
+      // mesma decisão é como se duplica post.
+      return "derrota";
+    }
+
+    // Ainda dentro do prazo: não é falha. A linha fica 'publicando' com
+    // container_id, e o próximo ciclo entra direto pela retomada.
     console.log("[farol-reel] container ainda processando:", {
       video_id: linha.video_id,
       container_id: containerId,
       ultimo: espera.ultimo,
+      idade_min: idadeMin,
+      falta_min: Math.max(0, Math.round((DERROTA_MS - idadeMs) / 60_000)),
+      copyright_check_status: espera.resumo.copyright_check_status,
     });
     return "container_processando";
   }
@@ -1034,10 +1160,8 @@ async function subirParaTiktok(db: Db, linha: LinhaReel): Promise<void> {
  * passou e o container da Meta CONTINUA IN_PROGRESS. Foi o que o operador
  * destravou à mão hoje; aqui vira regra.
  *
- * Três recusas deliberadas, porque um reset errado custa um upload e pode
+ * Duas recusas deliberadas, porque um reset errado custa um upload e pode
  * jogar fora um vídeo que ia publicar:
- *  - idade abaixo do limite: nem chama a Meta (o ciclo de 10 min não pode pagar
- *    uma requisição por linha a cada passada);
  *  - leitura ilegível (429, rede, token): NÃO é zumbi — não sei o estado, e não
  *    saber nunca vira sentença;
  *  - qualquer code que não seja IN_PROGRESS: devolve o code e o caminho normal
@@ -1045,29 +1169,30 @@ async function subirParaTiktok(db: Db, linha: LinhaReel): Promise<void> {
  *    que já registra o code literal. Duas rotas para o mesmo veredito seriam
  *    duas verdades.
  *
+ * A TERCEIRA RECUSA — a espera por idade — MORREU NA FASE2-C, e o motivo fica
+ * escrito porque tirar uma trava sem dizer por quê é pior do que nunca a ter
+ * posto. Ela existia para o ciclo de 10 min não pagar um GET por linha a cada
+ * passada. Só que o único chamador que restou é o container LEGADO, e ele
+ * sempre entrou aqui com a espera dispensada (`ignorarIdade = true`): o limiar
+ * nunca foi consultado de verdade. Medi antes de apagar. O caso que a idade
+ * protegia — o container hospedado — não passa mais por aqui: quem decide o
+ * destino dele é a DERROTA aos 15 min, dentro do `publicarContainer`.
+ *
+ * O `idadeMin` continua sendo devolvido, agora calculado pela MESMA âncora que
+ * a régua da derrota usa (`idadeContainerMs`, sob teste em lib/farol/container).
+ * Ele não decide nada aqui — é só o número que vai para o log, e ter dois
+ * cálculos de idade no mesmo arquivo era ter duas idades.
+ *
  * Abandonar um container NÃO publica nada por acidente: container só vai ao ar
  * por chamada explícita de `media_publish`, e o abandonado nunca mais recebe uma.
  */
 async function checarZumbi(
   linha: LinhaReel,
-  containerId: string,
-  ignorarIdade: boolean,
-  limiteMs: number
+  containerId: string
 ): Promise<{ zumbi: boolean; code: string; idadeMin: number }> {
-  // ÂNCORA DO RELÓGIO. `atualizado_em` é empurrado por QUALQUER escrita na
-  // linha — inclusive pelo próprio reset, que recria o container e re-carimba.
-  // Então "idade" nunca foi idade do container: era tempo desde a última
-  // mexida. Quando o dedupe já foi confirmado, o relógio passa a contar do
-  // instante dessa confirmação, que é um fato do container e não da fila.
-  const det = (linha.detalhe ?? {}) as { dedupe_confirmado_em?: string };
-  const base = det.dedupe_confirmado_em ?? linha.atualizado_em ?? linha.criado_em;
-  const idadeMs = Date.now() - new Date(base).getTime();
-  const idadeMin = Math.round(idadeMs / 60_000);
+  const idadeMin = Math.round(idadeContainerMs(linha, Date.now()) / 60_000);
 
-  // `ignorarIdade` dispensa a ESPERA, nunca a checagem de estado logo abaixo:
-  // um container legado que já esteja FINISHED tem que publicar, não morrer.
-  const idadeOk = Number.isFinite(idadeMs) && idadeMs >= limiteMs;
-  if (linha.status !== "publicando" || (!ignorarIdade && !idadeOk)) {
+  if (linha.status !== "publicando") {
     return { zumbi: false, code: "NAO_CHECADO", idadeMin };
   }
 
