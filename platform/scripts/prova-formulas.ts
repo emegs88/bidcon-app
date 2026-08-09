@@ -51,7 +51,29 @@ const VEICULO: CartaCarrossel = {
   exclusiva: false,
 };
 
+// Régua medida (ver cabeçalho): 160,5 palavras/min = 2,68 palavras por segundo.
+const PALAVRAS_POR_SEGUNDO = 2.68;
+
+// Abaixo desta folga o roteiro passa, mas passa raspando: qualquer palavra a
+// mais numa próxima edição estoura o teto. Não é reprova — é aviso.
+const FOLGA_MINIMA_S = 2;
+
+/**
+ * POR QUE A BANCADA PASSOU A IMPRIMIR SEGUNDOS.
+ *
+ * Ela contava palavras. Mas o contrato com o Emerson (decisão 2) é em SEGUNDOS
+ * — curtas ≤25s, médias ≤32s, longas ≤40s — e a conversão ficava por conta de
+ * quem lesse a saída. Um número que exige aritmética mental para virar a regra
+ * não é verificação, é matéria-prima de verificação. Foi exatamente assim que
+ * P1 e P2 ficaram a ~39s de um teto de 40s sem que isso aparecesse em lugar
+ * nenhum: 104 palavras não parece perigoso, 38,8s parece.
+ */
+function contarPalavras(texto: string): number {
+  return texto.trim().split(/\s+/).filter(Boolean).length;
+}
+
 let reprovas = 0;
+let raspando = 0;
 
 for (const f of FORMULAS) {
   for (const c of [IMOVEL, VEICULO]) {
@@ -59,10 +81,29 @@ for (const f of FORMULAS) {
     const roteiro = roteiroDaFormula(c, f);
     const veredito = revisarLegenda(roteiro);
     if (veredito) reprovas++;
-    console.log(`\n=== ${f.id} ${f.nome} · ${c.tipoLabel} · ${f.duracao_alvo}s`);
+
+    const palavras = contarPalavras(roteiro);
+    const segundos = palavras / PALAVRAS_POR_SEGUNDO;
+    const folga = f.duracao_alvo - segundos;
+
+    // Estourar o teto é REPROVA, e não observação: a duração é compromisso
+    // assumido, e quem descobre o estouro depois já pagou a HeyGen.
+    let sinal = "OK";
+    if (folga < 0) {
+      reprovas++;
+      sinal = `ESTOUROU por ${(-folga).toFixed(1)}s`;
+    } else if (folga < FOLGA_MINIMA_S) {
+      raspando++;
+      sinal = `RASPANDO — só ${folga.toFixed(1)}s de folga`;
+    }
+
+    console.log(`\n=== ${f.id} ${f.nome} · ${c.tipoLabel} · teto ${f.duracao_alvo}s`);
     console.log(`--- linter: ${veredito ?? "OK"}`);
     console.log(roteiro);
-    console.log(`--- palavras: ${roteiro.split(/\s+/).length}`);
+    console.log(
+      `--- palavras: ${palavras} · duração: ${segundos.toFixed(1)}s ` +
+        `· teto: ${f.duracao_alvo}s · folga: ${folga.toFixed(1)}s · ${sinal}`
+    );
   }
 }
 
@@ -75,3 +116,4 @@ for (const c of [IMOVEL, VEICULO]) {
 }
 
 console.log(`\n\nREPROVAS: ${reprovas}`);
+console.log(`RASPANDO (passou com menos de ${FOLGA_MINIMA_S}s de folga): ${raspando}`);
