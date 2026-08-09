@@ -46,6 +46,32 @@
 - Integrar main em branch já empurrado é **`merge`, nunca `rebase`**: os commits
   são públicos e rebase reescreveria SHA já no servidor.
 
+## Verde local ≠ verde no CI (pós PR #10 vermelho, 09/08)
+- **Comando que depende de expansão muda de significado entre a máquina e o
+  runner.** E não é só shell: a expansão pode vir do zsh, do `sh` ou do PRÓPRIO
+  RUNTIME. No caso que gerou a regra, o `npm test` passava `"lib/**/*.test.ts"`
+  entre aspas — nenhum shell expandia, medido sob `sh -c` com aspas simples — e
+  quem resolvia o padrão era o **test runner do Node, só a partir da v22**.
+  Local Node 24: 346 testes. Runner Node 20: `Could not find
+  '.../lib/**/*.test.ts'`, exit 1, suíte inteira pulada com o tsc passando.
+- A nota no `package.json` **já dizia** "quem expande é o Node (>= 21)" e o
+  `testes.yml` **já fixava** `node-version: 20`. Os dois fatos estavam escritos,
+  um degrau de distância, e ninguém os cruzou. Ao mexer em ferramenta cujo
+  comportamento depende de versão, conferir a versão do runner no mesmo
+  movimento — está no workflow, não é adivinhação.
+- **Validar reproduzindo o runner, não confiando na máquina.** `npx -y node@20`
+  roda a versão do CI aqui. E rodar sob `sh -c '...'` com aspas simples para
+  provar que o conserto não depende de shell nenhum.
+- **Suíte que não acha arquivo tem que FALHAR.** Medido: `--test lib`
+  (diretório) no Node 20 devolve `pass 0` com **exit 0**, porque a descoberta
+  padrão do Node 20 só reconhece .js/.cjs/.mjs. Seria trocar CI vermelho por CI
+  VERDE QUE NÃO RODA NADA — estritamente pior, porque o vermelho ao menos grita.
+  Todo descobridor de teste carrega portão de "zero arquivo = exit 1".
+- Corolário da mesma família: **lista explícita de arquivo de teste é proibida**
+  (arquivo novo nunca roda, em silêncio, e o total sobe por causa dos outros).
+  A descoberta vive em `platform/scripts/testes.mjs`, em Node puro, sem glob
+  (`fs.glob` só existe no Node 22+ e recriaria o mesmo bug) e sem shell.
+
 ## Migrations — regras (pós-incidente 0063/0064, 22/07)
 
 > **Esta seção é APPEND-ONLY. Nunca renumerar uma regra.** Diários, relatórios
