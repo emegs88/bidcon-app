@@ -28,6 +28,24 @@
   presumir que os dois estão sincronizados; conferir schema real
   (information_schema) antes de portar SQL de um pro outro.
 
+## Git — medição de estado (pós-erro de contagem, 09/08)
+- **Ref local de remoto é CACHE, não medição.** `origin/main` só muda quando
+  alguém roda `fetch`; entre um fetch e outro ele aponta para o passado e não
+  avisa. Contagem de commits (à frente/atrás), comparação com `main` e qualquer
+  frase do tipo "o branch está X commits na frente" **só valem depois de
+  `git fetch`** — e o padrão-ouro é conferir contra `git ls-remote`, que lê o
+  servidor e não tem cache nenhum.
+- Erro que gerou a regra: relatei "9 commits à frente do main" lendo
+  `origin/main` parado em `9784f7b`. O main remoto real estava em `4644d93`,
+  porque o **PR #9 já tinha sido mergeado** (merge `1095461`). O número certo era
+  4 à frente e 2 atrás. A OS do Emerson dizia "8", também de cache — os dois
+  lados estavam contando contra um retrato velho.
+- Corolário: "o PR está aberto" também é estado remoto. Sem `gh` instalado nesta
+  máquina, o agente **não consegue** consultar nem abrir PR. Nunca inventar URL
+  de PR; entregar o link de `compare` e dizer que a abertura é manual.
+- Integrar main em branch já empurrado é **`merge`, nunca `rebase`**: os commits
+  são públicos e rebase reescreveria SHA já no servidor.
+
 ## Migrations — regras (pós-incidente 0063/0064, 22/07)
 
 > **Esta seção é APPEND-ONLY. Nunca renumerar uma regra.** Diários, relatórios
