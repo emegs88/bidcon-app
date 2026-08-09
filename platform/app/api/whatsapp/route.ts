@@ -77,6 +77,7 @@ import { waitUntil } from "@vercel/functions";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrarMensagemSistema } from "@/lib/whatsapp/sistema";
 import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
+import { etiquetasDaMensagem } from "@/lib/farol/cedente";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -391,6 +392,27 @@ export async function POST(req: Request) {
       .select("id")
       .single();
     if (errMsg || !msgInserida) continue;
+
+    // ---- Etiqueta de intenção: quem quer VENDER a própria cota --------------
+    // Alimenta a última etapa do funil da sala de controle, que até 09/08 não
+    // tinha fonte nenhuma. Detector é casamento de palavra-chave (ver
+    // lib/farol/cedente.ts) — pista para o atendimento humano chegar primeiro,
+    // nunca fato comercial.
+    //
+    // NUNCA DERRUBA O WEBHOOK. Se a migração 0075 ainda não foi aplicada, o RPC
+    // não existe e devolve erro; se o banco piscar, idem. Nos dois casos o
+    // resultado é log e segue — perder uma etiqueta é aceitável, perder a
+    // resposta ao cliente porque a etiquetagem falhou não é. É por isso que
+    // isto vem DEPOIS do insert da mensagem e não faz parte dele.
+    for (const tag of etiquetasDaMensagem(conteudo)) {
+      const { error: errTag } = await db.rpc("wa_conversa_add_tag", {
+        p_conversa: conversa.id,
+        p_tag: tag,
+      });
+      if (errTag) {
+        console.warn("[wa] etiqueta não gravada:", { tag, erro: errTag.message });
+      }
+    }
 
     // PAINEL-WA-01 item 5 — reabertura. 'encerrado' é arquivo, não bloqueio:
     // cliente que volta a escrever traz a conversa de volta pra fila do bot.

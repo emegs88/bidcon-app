@@ -96,6 +96,20 @@ export type DetalheReel = {
   custo_am?: number | null;
   avatar_tipo?: string;
   formula?: string;
+  /**
+   * A persona REAL da peça (porta_voz | valentina). Estava faltando neste tipo
+   * embora o reel-render a grave desde sempre — medido em 09/08, o reel do dia
+   * tem `"persona":"porta_voz"`. Não confundir com `avatar_tipo`, que é o tipo
+   * de avatar do HeyGen (`photo_avatar`) e não diz quem fala.
+   */
+  persona?: string;
+  /**
+   * Duração do render em segundos, gravada pela fase 2 assim que o HeyGen dá o
+   * vídeo por pronto. É o multiplicando do custo de render na sala de controle.
+   * Ausente em toda peça anterior a 09/08/2026 — a API devolvia e a gente
+   * descartava.
+   */
+  duracao_s?: number;
   pauta_id?: string;
   fonte_texto?: string;
   url_hospedada?: string;

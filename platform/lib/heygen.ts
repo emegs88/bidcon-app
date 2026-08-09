@@ -152,6 +152,27 @@ function primeiro(obj: Record<string, unknown>, ...chaves: string[]): string | n
   return null;
 }
 
+/**
+ * Irmão numérico do `primeiro`. Existe porque `primeiro` só aceita string e
+ * `duration` vem número — passar a duração por ele devolveria `null` sempre, e
+ * o campo nasceria vazio com cara de "a API não mandou".
+ *
+ * Aceita número OU string numérica: JSON de terceiro troca `12.5` por `"12.5"`
+ * sem avisar, e um custo que some quando o provedor muda a serialização é pior
+ * do que um custo que nunca existiu.
+ *
+ * Exige FINITO e POSITIVO. Zero não é medição de duração — é campo em branco
+ * com roupa de número, e um zero aqui viraria "render de graça" na tela.
+ */
+function numeroPositivo(obj: Record<string, unknown>, ...chaves: string[]): number | null {
+  for (const k of chaves) {
+    const v = obj[k];
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
 function comoLista(bruto: unknown, ...caminhos: string[]): Record<string, unknown>[] {
   const raiz = bruto as Record<string, unknown>;
   if (Array.isArray(raiz?.data)) return raiz.data as Record<string, unknown>[];
@@ -304,6 +325,18 @@ export type StatusVideo = {
    * em vez de o silêncio virar diagnóstico errado no dia seguinte.
    */
   idResolvido: string | null;
+  /**
+   * Duração do vídeo em SEGUNDOS, quando a API a declara (só vem com o render
+   * concluído). É o multiplicando do custo de render: sem ela, a sala de
+   * controle não consegue estimar quanto custou a esteira e o bloco de custo
+   * mente por omissão — parece completo somando só o custo de conversa.
+   *
+   * A unidade é a declarada pelo OpenAPI da v3 (`duration`, em segundos). NÃO
+   * confirmei contra cronômetro; o dia em que um reel de 30s aparecer como 30
+   * confirma, e um que apareça como 30000 diz que veio em milissegundo. Por
+   * isso o valor é gravado cru e o rótulo do campo diz a unidade assumida.
+   */
+  duracaoS: number | null;
 };
 
 /**
@@ -336,6 +369,9 @@ function lerStatus(
 ): StatusVideo {
   const bruto = String(d.status ?? "").toLowerCase();
   const videoUrl = primeiro(d, "video_url", "captioned_video_url");
+  // Lido em TODOS os estados, não só no `completed`. Custa nada e o dia em que
+  // a v3 passar a declarar duração antes do fim, a conta de custo já a pega.
+  const duracaoS = numeroPositivo(d, "duration", "duration_seconds");
   const erro =
     primeiro(d, "failure_message", "error") ??
     (d.error && typeof d.error === "object"
@@ -345,13 +381,13 @@ function lerStatus(
   if (bruto === "completed" || bruto === "success") {
     // "completed" sem URL não é pronto — é resposta incompleta. Espera.
     return videoUrl
-      ? { estado: "pronto", videoUrl, bruto, erro: null, idResolvido }
-      : { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido };
+      ? { estado: "pronto", videoUrl, bruto, erro: null, idResolvido, duracaoS }
+      : { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido, duracaoS };
   }
   if (bruto === "failed" || bruto === "error") {
-    return { estado: "falhou", videoUrl: null, bruto, erro, idResolvido };
+    return { estado: "falhou", videoUrl: null, bruto, erro, idResolvido, duracaoS };
   }
-  return { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido };
+  return { estado: "processando", videoUrl: null, bruto, erro: null, idResolvido, duracaoS };
 }
 
 /**

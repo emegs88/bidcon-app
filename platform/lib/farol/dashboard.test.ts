@@ -279,8 +279,19 @@ test("porPlataforma: sem publicacao, SEM_FONTE que aponta as flags", () => {
 // Seção 2 — Funil
 // ---------------------------------------------------------------------------
 
-function conversa(id: string, canal: string | null, criado_em: string): LinhaWaConversa {
-  return { id, canal, criado_em };
+/**
+ * `tags` OMITIDO por padrão de propósito: é exatamente o formato que
+ * `lerConversas` devolve quando a migração 0075 ainda não foi aplicada e a
+ * leitura caiu no plano B. Passar `[]` é outra coisa — é a coluna existindo e
+ * vindo vazia — e os dois casos têm respostas diferentes no funil.
+ */
+function conversa(
+  id: string,
+  canal: string | null,
+  criado_em: string,
+  tags?: string[]
+): LinhaWaConversa {
+  return tags === undefined ? { id, canal, criado_em } : { id, canal, criado_em, tags };
 }
 
 function msg(p: Partial<LinhaWaMensagem> & { criado_em: string }): LinhaWaMensagem {
@@ -329,18 +340,90 @@ test("funil: `status_envio` 'enviando' NAO conta como entregue", () => {
   assert.equal(f[1].medida.estado === "medido" && f[1].medida.valor, 0);
 });
 
-test("funil: 'marcadas cedente' e SEM_FONTE, e aparece na tela mesmo assim", () => {
-  // Medido: wa_conversas.status é o enum ativo|humano|encerrado, não há coluna
-  // de tag, e "cedente" no código é só classificador de texto. Omitir a etapa
-  // faria a pergunta sumir junto com o dado.
-  const f = funil([conversa("c1", "whatsapp", "2026-08-08T13:00:00Z")], []);
-  const ultima = f[f.length - 1];
-  assert.equal(ultima.rotulo, "marcadas cedente");
-  assert.equal(ultima.medida.estado, "sem_fonte");
-  assert.equal(ultima.conversao, null, "sem número não há conversão a calcular");
-  if (ultima.medida.estado === "sem_fonte") {
-    assert.match(ultima.medida.porque, /ativo\|humano\|encerrado/);
+// --- A quinta etapa: 'marcadas cedente' e seus três estados ----------------
+// Ela existe na tela em TODOS eles. Omitir a etapa quando não há dado faria a
+// pergunta sumir junto com a resposta, e ninguém sente falta do que não vê.
+
+const cedenteDe = (f: ReturnType<typeof funil>) => f[f.length - 1];
+
+test("cedente: sem a coluna `tags` no banco, e SEM_FONTE apontando a migracao", () => {
+  // `conversa()` sem o 4º argumento = exatamente o que `lerConversas` devolve
+  // quando o plano B roda porque wa_conversas.tags não existe.
+  const f = funil([conversa("c1", "whatsapp", "2026-08-09T13:00:00Z")], []);
+  const u = cedenteDe(f);
+  assert.equal(u.rotulo, "marcadas cedente");
+  assert.equal(u.medida.estado, "sem_fonte");
+  assert.equal(u.conversao, null, "sem número não há conversão a calcular");
+  if (u.medida.estado === "sem_fonte") {
+    assert.match(u.medida.destrava, /0075/, "o texto tem que dizer O QUE destrava");
   }
+});
+
+test("cedente: coluna existe mas a janela e toda anterior ao detector — SEM_FONTE, nunca 0", () => {
+  // Este é o estado que dá vontade de mostrar "0" e é o mais perigoso de todos:
+  // `tags = {}` numa conversa de julho não quer dizer "não é cedente", quer
+  // dizer "nunca foi examinada". Um 0 aqui seria uma afirmação sobre pessoas
+  // que o detector nunca leu.
+  const f = funil(
+    [
+      conversa("c1", "whatsapp", "2026-08-07T13:00:00Z", []),
+      conversa("c2", "whatsapp", "2026-08-08T13:00:00Z", []),
+    ],
+    []
+  );
+  const u = cedenteDe(f);
+  assert.equal(u.medida.estado, "sem_fonte");
+  if (u.medida.estado === "sem_fonte") {
+    assert.match(u.medida.porque, /detector não implantado/);
+  }
+});
+
+test("cedente: com conversa pos-detector vira MEDIDO, e o `n` conta so as examinaveis", () => {
+  const f = funil(
+    [
+      // Pré-detector: nunca examinadas. Não entram nem no numerador nem no
+      // denominador. Se entrassem no denominador, o painel diria "1 de 4"
+      // quando a verdade medida é "1 de 2".
+      conversa("c1", "whatsapp", "2026-08-07T13:00:00Z", []),
+      conversa("c2", "whatsapp", "2026-08-08T13:00:00Z", []),
+      // Pós-detector: examinadas.
+      conversa("c3", "whatsapp", "2026-08-09T13:00:00Z", ["cedente"]),
+      conversa("c4", "whatsapp", "2026-08-09T14:00:00Z", []),
+    ],
+    []
+  );
+  const u = cedenteDe(f);
+  assert.equal(u.medida.estado, "medido");
+  if (u.medida.estado === "medido") {
+    assert.equal(u.medida.valor, 1);
+    assert.equal(u.medida.n, 2, "o denominador é só quem nasceu com o detector de pé");
+  }
+});
+
+test("cedente: NUNCA mostra taxa de conversao, mesmo virando numero", () => {
+  // A etapa anterior conta a janela inteira e esta conta só o pedaço pós-
+  // detector. A razão entre as duas despencaria no primeiro mês e subiria
+  // sozinha depois, sem nada ter mudado no atendimento.
+  const f = funil(
+    [
+      conversa("c1", "whatsapp", "2026-08-09T13:00:00Z", ["cedente"]),
+      conversa("c2", "whatsapp", "2026-08-09T14:00:00Z", ["cedente"]),
+    ],
+    [msg({ conversa_id: "c1", papel: "cliente", criado_em: "2026-08-09T13:05:00Z" })]
+  );
+  const u = cedenteDe(f);
+  assert.equal(u.medida.estado === "medido" && u.medida.valor, 2);
+  assert.equal(u.conversao, null, "número absoluto é honesto; a razão não seria");
+});
+
+test("cedente: outra etiqueta na mesma conversa nao a torna cedente", () => {
+  // `tags` é um array justamente para caber a próxima etiqueta sem migração
+  // nova. No dia em que existir 'contemplado', esta etapa não pode passar a
+  // contar todo mundo.
+  const f = funil([conversa("c1", "whatsapp", "2026-08-09T13:00:00Z", ["contemplado"])], []);
+  const u = cedenteDe(f);
+  assert.equal(u.medida.estado === "medido" && u.medida.valor, 0);
+  assert.equal(u.medida.estado === "medido" && u.medida.n, 1, "examinada e não bateu é 0 de 1");
 });
 
 test("funil: conversa com DUAS mensagens do cliente conta UMA vez", () => {
@@ -508,16 +591,41 @@ test("serieCusto: mensagem sem token nao entra e nao vira zero mentiroso", () =>
   assert.equal(s[0].usd, 0, "dia sem mensagem é zero medido, e a barra some sozinha");
 });
 
-test("placarCusto: custo de RENDER e sempre SEM_FONTE hoje", () => {
-  // A OS pede "segundos × US$0,05". Não existe duração persistida em lugar
-  // nenhum — a HeyGen devolve `duration` e o StatusVideo não carrega.
-  // Multiplicar por zero segundos daria US$ 0,00, que é um número falso.
+test("placarCusto: sem duracao gravada, render e SEM_FONTE — nunca US$ 0,00", () => {
+  // Peça anterior a 09/08 não tem `duracao_s` e nunca terá: a duração era
+  // descartada na leitura. Multiplicar por zero segundos daria US$ 0,00, que
+  // é um número falso com cara de render de graça.
   const s = serieCusto([msg({ criado_em: "2026-08-08T13:00:00Z", tokens_in: 1000, tokens_out: 100 })], 3, AGORA);
-  const p = placarCusto(s, 2, 5);
+  const p = placarCusto(s, 2, 5, [reel({ criado_em: "2026-08-08T13:00:00Z" })]);
   assert.equal(p.custoRender.estado, "sem_fonte");
   if (p.custoRender.estado === "sem_fonte") {
-    assert.match(p.custoRender.destrava, /StatusVideo/);
+    assert.match(p.custoRender.destrava, /duracao_s|duration/);
   }
+});
+
+test("placarCusto: com duracao gravada, render vira US$ medido (segundos x 0,05)", () => {
+  const s = serieCusto([msg({ criado_em: "2026-08-08T13:00:00Z", tokens_in: 1000, tokens_out: 100 })], 3, AGORA);
+  const p = placarCusto(s, 2, 5, [
+    reel({ criado_em: "2026-08-08T13:00:00Z", detalhe: { duracao_s: 30 } }),
+    reel({ criado_em: "2026-08-07T13:00:00Z", detalhe: { duracao_s: 42 } }),
+    // Peça velha, sem duração: NÃO entra como zero. Se entrasse, o n diria "3"
+    // e o custo médio por peça cairia um terço sem nada ter barateado.
+    reel({ criado_em: "2026-08-06T13:00:00Z" }),
+  ]);
+  assert.equal(p.custoRender.estado, "medido");
+  if (p.custoRender.estado === "medido") {
+    assert.equal(p.custoRender.valor.toFixed(2), "3.60", "(30+42)s × US$0,05");
+    assert.equal(p.custoRender.n, 2, "o n conta só as peças COM duração medida");
+  }
+});
+
+test("placarCusto: duracao zero ou negativa nao e medicao", () => {
+  const s = serieCusto([msg({ criado_em: "2026-08-08T13:00:00Z", tokens_in: 1000, tokens_out: 100 })], 3, AGORA);
+  const p = placarCusto(s, 2, 5, [
+    reel({ criado_em: "2026-08-08T13:00:00Z", detalhe: { duracao_s: 0 } }),
+    reel({ criado_em: "2026-08-07T13:00:00Z", detalhe: { duracao_s: -5 } }),
+  ]);
+  assert.equal(p.custoRender.estado, "sem_fonte", "zero segundo é campo em branco com roupa de número");
 });
 
 test("placarCusto: custo por lead so existe com as DUAS pontas", () => {

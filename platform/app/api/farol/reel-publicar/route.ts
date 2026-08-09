@@ -570,6 +570,26 @@ export async function GET(req: Request) {
         continue;
       }
 
+      // ---- Duração do render: o multiplicando do custo -----------------------
+      // GRAVA AQUI, e não junto com o `detalhe` final lá embaixo, de propósito.
+      // Daqui até o container ainda dá para sair por quatro portas (orçamento,
+      // linha reclamada por outra invocação, legenda reprovada, hospedagem
+      // falhou) e três delas terminam a linha sem nunca mais voltar. O render
+      // JÁ FOI PAGO nesse ponto — o vídeo existe no HeyGen. Deixar a duração
+      // para depois faria o custo sumir exatamente nos reels que falharam
+      // depois de renderizar, que são os mais caros que temos: pagos e não
+      // publicados. O custo tem que doer onde ele acontece.
+      //
+      // Escreve UMA vez por linha (guarda `duracao_s == null`): a fase 2 relê o
+      // status a cada tique, e sem a guarda isto viraria um UPDATE por tique
+      // gravando o mesmo número.
+      const detDur = (linha.detalhe ?? {}) as { duracao_s?: number };
+      if (s.data.duracaoS != null && detDur.duracao_s == null) {
+        const detalheDur = { ...(linha.detalhe ?? {}), duracao_s: s.data.duracaoS };
+        await atualizar(db, linha.id, { detalhe: detalheDur });
+        linha.detalhe = detalheDur;
+      }
+
       // ---- Pronto: caminho caro. Orçamento e reclamação antes da Meta ------
       if (Date.now() - inicio > ORCAMENTO_MS) {
         olhados.push({ video_id: linha.video_id, resultado: "sem_orcamento" });

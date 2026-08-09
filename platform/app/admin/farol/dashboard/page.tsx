@@ -162,7 +162,12 @@ export default async function FarolDashboard() {
     (t, d) => t + d.postsPublicados + d.reelsPublicados,
     0
   );
-  const placarDeCusto = placarCusto(custos, pecasPublicadas, fontes.conversas.dados.length);
+  const placarDeCusto = placarCusto(
+    custos,
+    pecasPublicadas,
+    fontes.conversas.dados.length,
+    fontes.reels.dados
+  );
 
   return (
     <AppShell nome={sessao.nome} tipo="admin">
@@ -451,9 +456,15 @@ export default async function FarolDashboard() {
             contagem de tokens gravada em <code>wa_mensagens</code> multiplicada
             pela tabela de preço pública do <code>gpt-4o-mini</code> lida em
             09/08/2026 (US$ 0,15 por milhão de tokens de entrada, US$ 0,60 de
-            saída). Não inclui render, embeddings nem pauta — nenhuma das três
-            grava medição hoje, e por isso aparecem como sem fonte em vez de
-            somarem zero. Confira sempre contra a fatura do provedor.
+            saída). O <strong>custo de render</strong> é conta separada:
+            duração medida do vídeo × US$ 0,05/s, com a duração gravada em{" "}
+            <code>detalhe.duracao_s</code> desde 09/08/2026 — peças anteriores
+            não têm e nunca terão, porque a duração era descartada na leitura.
+            Os dois <em>não são somados</em>: o custo de token cobre a janela
+            inteira e o de render começa no meio dela, e somar séries de
+            coberturas diferentes daria um total que não descreve nem uma nem
+            outra. Embeddings e pauta continuam sem medição alguma. Confira
+            sempre contra a fatura do provedor.
           </p>
         </Secao>
 

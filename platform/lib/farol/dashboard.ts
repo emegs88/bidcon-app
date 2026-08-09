@@ -47,6 +47,7 @@ import {
   type LinhaPost,
   type LinhaReel,
 } from "@/lib/farol/painel";
+import { DETECTOR_CEDENTE_DESDE, TAG_CEDENTE } from "@/lib/farol/cedente";
 
 // ---------------------------------------------------------------------------
 // O tipo que carrega a honestidade
@@ -334,6 +335,19 @@ export type LinhaWaConversa = {
   id: string;
   canal: string | null;
   criado_em: string;
+  /**
+   * Etiquetas de intenção (hoje só `cedente`), da migração 0075.
+   *
+   * OPCIONAL DE PROPÓSITO, e a opcionalidade CARREGA INFORMAÇÃO: a coluna é
+   * `not null default '{}'`, então uma vez aplicada a migração ela nunca vem
+   * ausente nem nula. `undefined` aqui significa exatamente uma coisa — a
+   * leitura caiu no plano B porque a coluna não existe (ver `lerConversas`) —
+   * e é assim que o funil distingue "nenhuma conversa marcada" de "não há como
+   * marcar". Sem essa distinção a etapa mostraria 0 nos dois casos, e um 0 que
+   * significa "medimos e não achamos" ao lado de um 0 que significa "não
+   * medimos" é a mentira mais barata que esta tela poderia contar.
+   */
+  tags?: string[];
 };
 
 export type LinhaWaMensagem = {
@@ -365,15 +379,68 @@ export type EtapaFunil = {
 };
 
 /**
- * O funil de conteúdo→negócio. Quatro etapas medidas e uma que não existe.
+ * A quinta etapa do funil, isolada porque é a única com mais de um jeito de não
+ * ter resposta. Ver o bloco de `funil()` para os três estados e o porquê.
  *
- * A quinta etapa que a OS pede — "marcadas `cedente`" — NÃO TEM FONTE, e isto
- * está medido, não suposto: `wa_conversas.status` é um enum de três valores
- * (ativo | humano | encerrado), não há coluna de tag nem de segmento, e o termo
- * "cedente" no código aparece só como classificador de TEXTO (segmentos.ts,
- * saber.ts) e em copy pública — nunca como marcação de conversa. Ela aparece na
- * tela como `sem_fonte` em vez de ser silenciosamente omitida, porque uma etapa
- * que some do funil some também da pergunta.
+ * A checagem de coluna ausente exige `conversas.length > 0`: com a janela
+ * vazia não há linha para inspecionar, e chutar "coluna não existe" a partir de
+ * lista vazia seria adivinhação. Sem conversa nenhuma, o estado honesto é o
+ * mesmo de sempre — não há o que examinar — e é para lá que a função cai.
+ *
+ * `every` e não `some`: o PostgREST devolve a coluna para TODAS as linhas ou
+ * para nenhuma, então as duas dariam o mesmo resultado hoje. `every` é a que
+ * continua certa se algum dia a lista vier de duas leituras diferentes.
+ */
+function medidaCedente(conversas: LinhaWaConversa[]): Medida<number> {
+  if (conversas.length > 0 && conversas.every((c) => c.tags === undefined)) {
+    return semFonte(
+      "a coluna wa_conversas.tags não existe no banco — a leitura do painel tentou lê-la, levou erro e releu sem ela",
+      "aplicar a migração 0075 (supabase/migrations/0075_wa_conversas_tags.sql); o detector no webhook do WhatsApp já está no ar e passa a gravar assim que a coluna e a função wa_conversa_add_tag existirem"
+    );
+  }
+
+  // Conversa anterior ao detector tem `tags = {}` porque nunca foi examinada,
+  // não porque foi examinada e inocentada. Só entra no denominador quem nasceu
+  // com o detector já de pé.
+  const examinaveis = conversas.filter((c) => {
+    const dia = diaBR(c.criado_em);
+    return dia != null && dia >= DETECTOR_CEDENTE_DESDE;
+  });
+
+  if (examinaveis.length === 0) {
+    return semFonte(
+      `detector não implantado quando estas conversas nasceram: nenhuma da janela é de ${DETECTOR_CEDENTE_DESDE} ou depois, e array de etiquetas vazio em conversa antiga significa "nunca examinada", não "não é cedente"`,
+      "a próxima conversa que entrar já nasce examinada; a etapa vira número sozinha conforme a janela de 30 dias rola sobre a data de implantação"
+    );
+  }
+
+  const marcadas = examinaveis.filter((c) => (c.tags ?? []).includes(TAG_CEDENTE)).length;
+  return medido(marcadas, examinaveis.length);
+}
+
+/**
+ * O funil de conteúdo→negócio. Cinco etapas.
+ *
+ * A quinta — "marcadas `cedente`" — nasceu `sem_fonte` fixa (não havia onde
+ * gravar a marcação: `wa_conversas.status` é o enum ativo|humano|encerrado e
+ * nada mais) e ganhou fonte em 09/08/2026, com a coluna `tags` da migração 0075
+ * e o detector de vocabulário em `lib/farol/cedente.ts`. Ela agora tem TRÊS
+ * estados, e a razão de existirem três é que dois deles seriam o mesmo "0" na
+ * tela:
+ *
+ *   1. COLUNA AUSENTE (migração 0075 não aplicada) — `tags` vem `undefined`
+ *      porque `lerConversas` caiu no plano B. Não dá para marcar ninguém.
+ *   2. COLUNA EXISTE, MAS A JANELA É TODA ANTERIOR AO DETECTOR — as conversas
+ *      têm `tags = {}`, e esse array vazio NÃO quer dizer "não é cedente",
+ *      quer dizer "nunca foi examinada". O detector só passa a olhar as
+ *      mensagens que chegam depois de instalado; ele não volta no tempo.
+ *   3. MEDIDO — há conversa da janela nascida em `DETECTOR_CEDENTE_DESDE` ou
+ *      depois, e aí `{}` finalmente significa "examinada e não bateu".
+ *
+ * O `n` da medida é o número de conversas EXAMINÁVEIS, não o total da janela.
+ * Do contrário, no primeiro dia o painel diria "0 de 45" quando a verdade é
+ * "0 de 3" — e o operador concluiria que o detector não funciona, quando ele
+ * só é novo. O denominador cresce sozinho conforme a janela rola.
  */
 export function funil(
   conversas: LinhaWaConversa[],
@@ -387,26 +454,28 @@ export function funil(
   );
   const conversasComResposta = conversas.filter((c) => comResposta.has(c.id)).length;
 
-  const etapas: Array<{ rotulo: string; medida: Medida<number> }> = [
+  const etapas: Array<{ rotulo: string; medida: Medida<number>; semConversao?: boolean }> = [
     { rotulo: "comentários tratados", medida: medido(doComenta.length, doComenta.length) },
     { rotulo: "private replies entregues", medida: medido(entregues.length, entregues.length) },
     { rotulo: "conversas iniciadas", medida: medido(conversas.length, conversas.length) },
     { rotulo: "conversas com resposta do cliente", medida: medido(conversasComResposta, conversas.length) },
-    {
-      rotulo: "marcadas cedente",
-      medida: semFonte(
-        "não existe marcação de cedente em conversa: wa_conversas.status é o enum ativo|humano|encerrado e não há coluna de tag",
-        "depende de uma fatia que crie a marcação (FAROL-CAPTACAO-01 é onde ela cabe); hoje 'cedente' só existe como classificador de texto"
-      ),
-    },
+    // `semConversao`: esta etapa NUNCA mostra taxa de conversão, mesmo quando
+    // vira número. A etapa anterior conta as conversas da janela inteira e esta
+    // conta só as nascidas depois do detector; dividir uma pela outra daria uma
+    // taxa que despenca no primeiro mês e sobe sozinha depois, sem que nada
+    // tenha mudado no atendimento. É o mesmo motivo pelo qual `custoRender` não
+    // entra no `totalUsd`: duas séries de coberturas diferentes não se dividem
+    // nem se somam. O número absoluto é honesto; a razão entre eles não seria.
+    { rotulo: "marcadas cedente", medida: medidaCedente(conversas), semConversao: true },
   ];
 
   let anterior: number | null = null;
-  return etapas.map((e) => {
-    const atual = e.medida.estado === "medido" ? e.medida.valor : null;
-    const conversao = anterior != null && anterior > 0 && atual != null ? atual / anterior : null;
+  return etapas.map(({ rotulo, medida, semConversao }) => {
+    const atual = medida.estado === "medido" ? medida.valor : null;
+    const conversao =
+      !semConversao && anterior != null && anterior > 0 && atual != null ? atual / anterior : null;
     if (atual != null) anterior = atual;
-    return { ...e, conversao };
+    return { rotulo, medida, conversao };
   });
 }
 
@@ -567,7 +636,7 @@ export type ColunaPersona = { persona: string; pecas: number; indice: Medida<num
 export function colunasPersona(reels: LinhaReel[], metricas: LinhaMetrica[]): Medida<ColunaPersona[]> {
   const uso = new Map<string, number>();
   for (const r of reels) {
-    const p = (r.detalhe as { persona?: string } | null)?.persona;
+    const p = r.detalhe?.persona;
     if (!p) continue;
     uso.set(p, (uso.get(p) ?? 0) + 1);
   }
@@ -611,6 +680,16 @@ export function colunasPersona(reels: LinhaReel[], metricas: LinhaMetrica[]): Me
 export const USD_POR_MTOK_IN = 0.15;
 export const USD_POR_MTOK_OUT = 0.6;
 
+/**
+ * US$ por SEGUNDO de render, a tabela declarada pela OS ("segundos × US$0,05").
+ *
+ * Vem da OS, não de fatura, e por isso é a parcela MENOS auditável do bloco:
+ * o preço de token eu conferi na tabela pública do provedor, este eu recebi
+ * pronto. Fica nomeado aqui para que o dia em que a fatura do HeyGen contradizer
+ * a conta, se corrija num lugar só.
+ */
+export const USD_POR_SEGUNDO_RENDER = 0.05;
+
 export type CustoDia = { dia: string; usd: number; tokensIn: number; tokensOut: number };
 
 export function custoDeTokens(tokensIn: number, tokensOut: number): number {
@@ -623,13 +702,13 @@ export function custoDeTokens(tokensIn: number, tokensOut: number): number {
  * A OS pede "custo estimado de render (segundos × US$0,05) + embeddings +
  * pauta". Dessas três parcelas, NENHUMA é computável hoje, e a razão está
  * medida:
- *   · RENDER: não existe duração persistida em lugar nenhum. `farol_reels` não
- *     tem coluna de duração e `detalhe` não tem a chave (as 10 chaves medidas
- *     são administradora, avatar_tipo, escolha, credito, tipo, url_hospedada,
- *     custo_am, data, fonte_texto, dedupe_confirmado_em). lib/heygen.ts:429
- *     documenta que a resposta v3 TRAZ `duration`, mas o tipo `StatusVideo`
- *     (estado, videoUrl, bruto, erro, idResolvido) não a carrega e `lerStatus`
- *     nunca a lê. O multiplicando da conta não existe.
+ *   · RENDER: DESTRAVADO em 09/08/2026. Era a parcela sem multiplicando — o
+ *     `StatusVideo` não carregava o `duration` que a v3 devolve e ninguém
+ *     gravava. Agora `lerStatus` lê e a fase 2 grava `detalhe.duracao_s` assim
+ *     que o render fica pronto; o custo sai em `placarCusto.custoRender`, não
+ *     nesta série. Fica FORA do custo diário de propósito: as peças anteriores
+ *     a 09/08 não têm duração e nunca terão, então uma barra por dia misturaria
+ *     dias medidos com dias cegos desenhados como baratos.
  *   · EMBEDDINGS e PAUTA: nenhuma das duas grava contagem de token. A única
  *     tabela com `tokens_in`/`tokens_out` é `wa_mensagens`.
  *
@@ -668,13 +747,33 @@ export type PlacarCusto = {
   custoRender: Medida<number>;
 };
 
+/**
+ * POR QUE `custoRender` NÃO É SOMADO AO `totalUsd`.
+ *
+ * Seria fácil devolver um "custo do mês" único e parecer mais completo. Seria
+ * mentira aritmética: o custo de token cobre a janela INTEIRA (toda mensagem de
+ * IA grava token desde julho), enquanto o de render só cobre os reels
+ * renderizados a partir de 09/08/2026 — antes disso a duração era descartada e
+ * é irrecuperável. Somar uma série completa com uma série que começa no meio
+ * produz um total que não é nem uma coisa nem outra, e que sobe sozinho no mês
+ * que vem sem que nada tenha encarecido. Duas medidas, dois `n`, cada uma
+ * dizendo de quantas peças está falando.
+ */
 export function placarCusto(
   serieC: CustoDia[],
   pecasPublicadas: number,
-  conversasNovas: number
+  conversasNovas: number,
+  reels: LinhaReel[] = []
 ): PlacarCusto {
   const total = serieC.reduce((s, d) => s + d.usd, 0);
   const nComToken = serieC.filter((d) => d.tokensIn + d.tokensOut > 0).length;
+
+  // Só os reels que TÊM duração medida. Os antigos não entram nem como zero:
+  // zero segundo de render é peça que não existiu, e diluiria o custo médio.
+  const comDuracao = reels
+    .map((r) => r.detalhe?.duracao_s)
+    .filter((d): d is number => typeof d === "number" && Number.isFinite(d) && d > 0);
+  const segundos = comDuracao.reduce((s, d) => s + d, 0);
 
   return {
     totalUsd:
@@ -698,10 +797,13 @@ export function placarCusto(
             "sem conversa nova na janela, ou sem custo medido",
             "custo por lead = custo do mês ÷ conversas novas do mês"
           ),
-    custoRender: semFonte(
-      "nenhuma duração de render é persistida: farol_reels não tem coluna de duração e `detalhe` não tem a chave",
-      "a HeyGen já devolve `duration` no GET /v3/videos/{id} (lib/heygen.ts:429); falta o tipo StatusVideo carregar e o reel-render gravar"
-    ),
+    custoRender:
+      comDuracao.length > 0
+        ? medido(segundos * USD_POR_SEGUNDO_RENDER, comDuracao.length)
+        : semFonte(
+            "nenhum reel da janela tem `detalhe.duracao_s` gravada",
+            "a gravação passou a existir em 09/08/2026 (StatusVideo carrega `duration` e a fase 2 grava assim que o render fica pronto); as peças anteriores não têm e não dá para recuperar — o próximo render preenche"
+          ),
   };
 }
 
@@ -740,14 +842,45 @@ function falha(qual: string, msg: string): string {
  * economia de bytes: é não trazer telefone de cliente para uma tela de operação
  * que só quer contar linhas.
  */
+/**
+ * Conversas da janela — com PLANO B para a coluna `tags`.
+ *
+ * A releitura sem `tags` não é zelo decorativo, é a única forma de esta seção
+ * sobreviver ao intervalo entre o deploy deste código e a aplicação da migração
+ * 0075. No PostgREST um nome de coluna inexistente no `select` derruba a
+ * CONSULTA INTEIRA, não só o campo: sem o plano B, a seção 2 do painel
+ * apareceria vazia — comentários, private replies, conversas, respostas, tudo —
+ * e a tela diria "não houve conversa nenhuma em 30 dias" quando a verdade é
+ * "faltou rodar um `alter table`". Perder uma etapa por falta de coluna é
+ * aceitável; perder as outras quatro junto não é.
+ *
+ * O custo é uma ida a mais ao banco no dia em que a migração ainda não foi
+ * aplicada, e nenhuma depois. Quando a coluna existir, o primeiro `select`
+ * passa e o plano B nunca roda.
+ *
+ * O `erro` do plano B fica em `null` de propósito: não é falha de leitura, é
+ * uma etapa sem fonte, e quem conta isso na tela é o `funil()` — que vê `tags`
+ * ausente e devolve `sem_fonte` com o texto certo. Um banner vermelho de "erro"
+ * aqui mandaria o operador procurar defeito onde só falta uma migração.
+ */
 export async function lerConversas(
   db: Db,
   dias = JANELA_DASHBOARD_DIAS
 ): Promise<Bloco<LinhaWaConversa[]>> {
+  const corte = desde(dias);
+  const comTags = await db
+    .from("wa_conversas")
+    .select("id,canal,criado_em,tags")
+    .gte("criado_em", corte)
+    .order("criado_em", { ascending: false });
+  if (!comTags.error) {
+    return { dados: (comTags.data ?? []) as LinhaWaConversa[], erro: null };
+  }
+
   const { data, error } = await db
     .from("wa_conversas")
     .select("id,canal,criado_em")
-    .gte("criado_em", desde(dias))
+    .gte("criado_em", corte)
     .order("criado_em", { ascending: false });
   if (error) return { dados: [], erro: falha("wa_conversas ilegível", error.message) };
   return { dados: (data ?? []) as LinhaWaConversa[], erro: null };
