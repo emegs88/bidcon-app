@@ -21,7 +21,11 @@
 // Mantenha esta bancada verde ao mexer nas fôrmas.
 // ============================================================================
 import { FORMULAS } from "@/lib/farol/formulas";
-import { roteiroDaFormula, montarLegendaReel } from "@/lib/farol/reel-texto";
+import {
+  roteiroDaFormula,
+  legendaDaFormula,
+  montarLegendaReel,
+} from "@/lib/farol/reel-texto";
 import { revisarLegenda } from "@/lib/farol/selecao";
 import type { CartaCarrossel } from "@/lib/carrossel-formato";
 
@@ -54,6 +58,24 @@ const VEICULO: CartaCarrossel = {
 // Régua medida (ver cabeçalho): 160,5 palavras/min = 2,68 palavras por segundo.
 const PALAVRAS_POR_SEGUNDO = 2.68;
 
+/**
+ * A RÉGUA TEM DUAS PONTAS, E EU ESTAVA IMPRIMINDO SÓ O MEIO.
+ *
+ * As duas amostras que formam a régua não concordam: 171,5 ppm num reel e
+ * 149,9 ppm no outro — 14% de dispersão. A agregada (160,5) é a melhor
+ * estimativa central, mas nenhum vídeo sai na média: cada um sai numa das
+ * pontas, dependendo do avatar, da voz e da pontuação do texto. E agora são
+ * DUAS vozes (Porta-voz e Valentina, FAROL-DUPLA-01), o que só alarga a faixa.
+ *
+ * Imprimir só a agregada é declarar 25,0s para uma peça que pode sair a 26,8s e
+ * estourar um teto de 25s — com a HeyGen já cobrada. A ponta LENTA (149,9 ppm =
+ * 2,50 pal/s) é o pior caso realista, e é ela que decide se a promessa de
+ * duração se sustenta. Uma folga de 2s na régua média é MENOR que o erro da
+ * própria régua; sem esta coluna, "RASPANDO" não distingue o que passa raspado
+ * do que já não passa.
+ */
+const PALAVRAS_POR_SEGUNDO_LENTO = 2.5;
+
 // Abaixo desta folga o roteiro passa, mas passa raspando: qualquer palavra a
 // mais numa próxima edição estoura o teto. Não é reprova — é aviso.
 const FOLGA_MINIMA_S = 2;
@@ -74,6 +96,18 @@ function contarPalavras(texto: string): number {
 
 let reprovas = 0;
 let raspando = 0;
+
+/**
+ * Conta separada, e de propósito. Estourar na ponta LENTA da régua não é o
+ * mesmo fato que estourar na régua central: o primeiro é um risco medido, o
+ * segundo é uma certeza. Somar os dois no mesmo contador transformaria a
+ * incerteza da minha medição em reprova de um texto que talvez esteja certo —
+ * e a bancada passaria a reprovar a régua, não a fôrma.
+ *
+ * Por isso: REPROVAS bloqueia, PIOR CASO informa. Quem lê decide se aceita o
+ * risco, mas ninguém decide sem saber que ele existe.
+ */
+let estouraNoPiorCaso = 0;
 
 for (const f of FORMULAS) {
   for (const c of [IMOVEL, VEICULO]) {
@@ -97,6 +131,43 @@ for (const f of FORMULAS) {
       sinal = `RASPANDO — só ${folga.toFixed(1)}s de folga`;
     }
 
+    // A mesma contagem de palavras, na voz lenta. Não é cenário inventado:
+    // é uma das duas amostras que formam a régua, medida de um mp4 que a
+    // Bidcon já publicou.
+    const segundosLento = palavras / PALAVRAS_POR_SEGUNDO_LENTO;
+    const folgaLenta = f.duracao_alvo - segundosLento;
+    let sinalLento = "cabe";
+    if (folgaLenta < 0) {
+      estouraNoPiorCaso++;
+      sinalLento = `ESTOURA por ${(-folgaLenta).toFixed(1)}s`;
+    }
+
+    // A LEGENDA DA FÔRMA ENTROU NA BANCADA EM 09/08, junto com o fecho curto.
+    // Enquanto a legenda repetia o áudio, medir só o roteiro era medir a peça.
+    // Agora entrada e parcelas existem SÓ na legenda: uma bancada que não a
+    // renderizasse estaria declarando verde uma peça da qual ela não viu
+    // metade — inclusive os dois números que saíram do áudio por ordem da
+    // coordenação, que é exatamente o que se quer conferir.
+    const legenda = legendaDaFormula(c, f);
+    const veredLegenda = revisarLegenda(legenda);
+    if (veredLegenda) reprovas++;
+
+    // Os quatro números têm que estar ESCRITOS. Não é zelo: a ordem de 09/08
+    // tirou dois deles do áudio com a condição explícita de que aparecessem
+    // aqui ("o que sai do áudio não pode sumir da peça"). Sem esta conferência,
+    // a metade da ordem que eu cumpri esconderia a metade que eu tivesse
+    // esquecido.
+    const faltando = [
+      ["Crédito", /^Crédito: /m],
+      ["Entrada", /^Entrada: /m],
+      ["Parcelas", /^Parcelas: /m],
+      ["Custo", /^Custo: /m],
+      ["CTA da fôrma", new RegExp(escapar(f.cta), "m")],
+    ]
+      .filter(([, re]) => !(re as RegExp).test(legenda))
+      .map(([nome]) => nome as string);
+    if (faltando.length) reprovas++;
+
     console.log(`\n=== ${f.id} ${f.nome} · ${c.tipoLabel} · teto ${f.duracao_alvo}s`);
     console.log(`--- linter: ${veredito ?? "OK"}`);
     console.log(roteiro);
@@ -104,7 +175,21 @@ for (const f of FORMULAS) {
       `--- palavras: ${palavras} · duração: ${segundos.toFixed(1)}s ` +
         `· teto: ${f.duracao_alvo}s · folga: ${folga.toFixed(1)}s · ${sinal}`
     );
+    console.log(
+      `--- voz lenta (${PALAVRAS_POR_SEGUNDO_LENTO} pal/s): ` +
+        `${segundosLento.toFixed(1)}s · ${sinalLento}`
+    );
+    console.log(`--- LEGENDA (linter: ${veredLegenda ?? "OK"}):`);
+    console.log(legenda);
+    console.log(
+      `--- legenda completa: ${faltando.length ? `FALTA ${faltando.join(", ")}` : "OK"}`
+    );
   }
+}
+
+/** Escapa o CTA para virar regex literal — ele tem ponto, vírgula e acento. */
+function escapar(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 for (const c of [IMOVEL, VEICULO]) {
@@ -117,3 +202,7 @@ for (const c of [IMOVEL, VEICULO]) {
 
 console.log(`\n\nREPROVAS: ${reprovas}`);
 console.log(`RASPANDO (passou com menos de ${FOLGA_MINIMA_S}s de folga): ${raspando}`);
+console.log(
+  `ESTOURA NA VOZ LENTA (${PALAVRAS_POR_SEGUNDO_LENTO} pal/s, medida em reel real): ` +
+    `${estouraNoPiorCaso} — informativo, não reprova`
+);

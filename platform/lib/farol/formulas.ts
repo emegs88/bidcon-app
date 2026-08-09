@@ -77,17 +77,27 @@
 // isso é escolha editorial do Emerson, não minha.
 //
 // ---------------------------------------------------------------------------
-// A PROVA — o que o FECHO fala, separado de quanto ele dura
+// A PROVA — o FECHO CURTO virou UNIVERSAL, e o campo `prova` morreu com isso
 // ---------------------------------------------------------------------------
-// `ehCurta()` (lib/farol/reel-texto.ts) decidia isso com `duracao_alvo <= 20`.
-// Funcionava por COINCIDÊNCIA, enquanto os alvos eram redondos. Com os alvos
-// medidos a coincidência morre: P6 CEDENTE fecha só com o crédito e mede 30,2s
-// — mais que P5 (27,6s) e P8 (29,1s), que falam a carta inteira. Trocar só os
-// números faria P6 virar "completa" em silêncio e passar a falar entrada e
-// parcelas. Por isso nasceu o campo `prova`: duração é consequência do texto
-// todo, o que o fecho fala é decisão editorial, e as duas estavam amarradas num
-// campo só. Hoje `prova: "so_credito"` são exatamente P3, P6 e P7 — as mesmas
-// três de antes, agora por declaração e não por aritmética.
+// AUTORIZADO: coordenação de 09/08/2026 — "só crédito + custo ao mês passa a
+// ser o padrão de TODAS as 8 fôrmas, não só da P6. Entrada e parcelas SAEM do
+// áudio e vão para a LEGENDA. O custo ao mês CONTINUA falado — é promessa da
+// marca." Motivo medido: o fecho longo consumia ~15s de 39s, quase metade da
+// peça, e contradizia o eixo das possibilidades.
+//
+// EXISTIA AQUI UM CAMPO `prova: "so_credito" | "completa"`, nascido em 08/08
+// para separar "o que o fecho fala" de "quanto o fecho dura" — duas coisas que
+// até então estavam amarradas em `duracao_alvo <= 20`. Ele cumpriu o papel
+// dele: foi por causa dessa separação que P6 não virou "completa" no silêncio
+// quando os alvos passaram a ser medidos.
+//
+// Com o fecho curto universal, o campo deixou de discriminar QUALQUER coisa —
+// e um campo que não discrimina nada é pior que campo nenhum, porque continua
+// LENDO como se discriminasse: quem abrisse a P1 e lesse `prova: "completa"`
+// concluiria que a P1 fala entrada e parcelas, e não fala mais. Foi removido,
+// junto com `ehCurta()` (lib/farol/reel-texto.ts), que era seu único leitor em
+// todo o repositório. É a mesma lição do `duracao_alvo <= 20`, aplicada ao
+// campo que a substituiu.
 //
 // ---------------------------------------------------------------------------
 // A PERSONA — quem FALA cada fôrma (FAROL-DUPLA-01, decisão 6 de 08/08)
@@ -141,12 +151,6 @@ export type Formula = {
    */
   duracao_alvo: number;
   /**
-   * Quanto da carta o FECHO fala: "so_credito" fala só o crédito; "completa"
-   * fala crédito + entrada + parcelas. Ver "A PROVA" no header — isto era
-   * INFERIDO de `duracao_alvo` e agora é declarado.
-   */
-  prova: "so_credito" | "completa";
-  /**
    * Quem fala esta fôrma. Ver "A PERSONA" no header. Só tem efeito com
    * `FAROL_DUPLA=on`; desarmada, TODAS falam pelo Porta-voz de sempre.
    */
@@ -171,113 +175,108 @@ export const FORMULAS: readonly Formula[] = [
     id: "P1",
     nome: "SAIR DO ALUGUEL",
     duracao_alvo: 40, // LONGA — medido: 104 palavras / 2,68 = 38,8s (imóvel)
-    prova: "completa",
     persona: "valentina", // casa/sonho
     objetivo: "moradia_propria",
     tipos: ["imovel"],
     gancho:
       "Você paga aluguel há quantos anos? Faz a conta do que já saiu da sua mão.",
     esqueleto:
-      "O aluguel pago não volta e não vira patrimônio. A carta contemplada é crédito JÁ liberado: compra o imóvel à vista e troca o aluguel por parcela de algo que fica seu. Explica o mecanismo em duas frases factuais, sem projeção e sem comparar com número que não foi dado. Fecha com os números da carta do dia como prova de que existe hoje.",
+      "O aluguel pago não volta e não vira patrimônio. A carta contemplada é crédito JÁ liberado: compra o imóvel à vista e troca o aluguel por parcela de algo que fica seu. Explica o mecanismo em duas frases factuais, sem projeção e sem comparar com número que não foi dado. Fecha com o CRÉDITO da carta do dia e o custo ao mês como prova de que existe hoje — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Toca no link da bio para ver a carta, ou comenta ALUGUEL que eu te mando a conta.",
   },
   {
     id: "P2",
     nome: "QUITAR FINANCIAMENTO",
     duracao_alvo: 40, // LONGA — medido: 105 pal / 39,2s imóvel; 102 / 38,1s veículo
-    prova: "completa",
     persona: "porta_voz", // dinheiro/dívida
     objetivo: "trocar_divida_cara",
     tipos: ["imovel", "veiculo"],
     gancho:
       "Dá para trocar juros de banco por taxa de administração usando carta contemplada.",
     esqueleto:
-      "Quem já tem financiamento pode usar o crédito da carta para quitar o saldo devedor e passar a pagar a parcela do consórcio. Descreve o mecanismo, sem prometer economia e sem citar percentual que não seja o custo da própria carta. Fecha com os números da carta do dia.",
+      "Quem já tem financiamento pode usar o crédito da carta para quitar o saldo devedor e passar a pagar a parcela do consórcio. Descreve o mecanismo, sem prometer economia e sem citar percentual que não seja o custo da própria carta. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Manda no direct o saldo do teu financiamento que a gente faz a conta.",
   },
   {
     id: "P3",
     nome: "PODER DE COMPRA À VISTA",
     duracao_alvo: 25, // CURTA — medido: 67 pal / 25,0s imóvel; 66 / 24,6s veículo
-    prova: "so_credito",
     persona: "porta_voz", // dinheiro/negociação
     objetivo: "poder_de_compra",
     tipos: ["imovel", "veiculo"],
     gancho:
       "Chegar com o crédito na mão muda o desconto que você negocia.",
     esqueleto:
-      "Comprador à vista negocia diferente de comprador financiado — é fato de mercado, dito sem número inventado. A carta contemplada é exatamente isso: crédito liberado para comprar à vista. Curta e seca. Fecha com os números da carta do dia.",
+      "Comprador à vista negocia diferente de comprador financiado — é fato de mercado, dito sem número inventado. A carta contemplada é exatamente isso: crédito liberado para comprar à vista. Curta e seca. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Link na bio para ver a carta de hoje.",
   },
   {
     id: "P4",
     nome: "EMPRESA / CNPJ",
     duracao_alvo: 32, // MÉDIA — medido: 82 pal / 30,6s imóvel; 79 / 29,5s veículo
-    prova: "completa",
     persona: "porta_voz", // dado duro/B2B
     objetivo: "patrimonio_empresa",
     tipos: ["imovel", "veiculo"],
     gancho:
       "Sua empresa paga aluguel comercial há quanto tempo?",
     esqueleto:
-      "Empresa também adquire carta de crédito: sede própria em vez de aluguel comercial, ou frota planejada em vez de compra apertada. Escolhe UM dos dois conforme o tipo da carta do dia — imóvel puxa sede, veículo puxa frota. Fecha com os números da carta do dia.",
+      "Empresa também adquire carta de crédito: sede própria em vez de aluguel comercial, ou frota planejada em vez de compra apertada. Escolhe UM dos dois conforme o tipo da carta do dia — imóvel puxa sede, veículo puxa frota. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Chama no direct com o CNPJ que a gente monta o cenário.",
   },
   {
     id: "P5",
     nome: "OBRA, TERRENO, REFORMA",
     duracao_alvo: 32, // MÉDIA — medido: 74 palavras / 27,6s (imóvel)
-    prova: "completa",
     persona: "valentina", // casa/sonho
     objetivo: "construir_ampliar",
     tipos: ["imovel"],
     gancho: "O crédito não é só para casa pronta.",
     esqueleto:
-      "Terreno, construção, reforma e ampliação também entram. É o uso que a maioria não sabe que existe, e é fato, não promessa. Duas frases de mecanismo. Fecha com os números da carta do dia.",
+      "Terreno, construção, reforma e ampliação também entram. É o uso que a maioria não sabe que existe, e é fato, não promessa. Duas frases de mecanismo. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Comenta OBRA que eu te explico como usa.",
   },
   {
     id: "P6",
-    // A fôrma que provou que duração não é conteúdo: fecha SÓ com o crédito
-    // (era `duracao_alvo <= 20`), mas é a mais falada das curtas — 30,2s, acima
-    // de P5 e P8, que falam a carta inteira. Ver "A PROVA" no header.
+    // A fôrma que virou o PADRÃO. Ela já fechava só com o crédito quando as
+    // outras sete recitavam a carta inteira, e foi a comparação com ela que
+    // mostrou o preço do fecho longo: ~15s de 39s. A coordenação de 09/08
+    // estendeu o fecho da P6 às oito. Ver "A PROVA" no header.
+    // Continua sendo a única com abertura de fecho própria ("Esse estoque gira
+    // todo dia — hoje tem…"), agora por parâmetro e não por cópia do fecho.
     nome: "CEDENTE",
     duracao_alvo: 32, // MÉDIA — medido: 81 pal / 30,2s imóvel; 80 / 29,9s veículo
-    prova: "so_credito",
     persona: "valentina", // captação — ver "O ÚNICO CASO QUE CONFLITA" no header
     objetivo: "captacao",
     tipos: ["imovel", "veiculo"],
     gancho:
       "Tem carta parada que você já pagou anos? Ela vale dinheiro hoje.",
     esqueleto:
-      "Fala com quem TEM carta, não com quem quer comprar. A cota já paga tem valor de mercado agora. Cita a Conta Notarial na descrição canônica da casa, porque a dúvida de quem vende é justamente o pagamento. Fecha usando a carta do dia como prova de que esse estoque gira.",
+      "Fala com quem TEM carta, não com quem quer comprar. A cota já paga tem valor de mercado agora. Cita a Conta Notarial na descrição canônica da casa, porque a dúvida de quem vende é justamente o pagamento. Fecha usando o CRÉDITO da carta do dia e o custo ao mês como prova de que esse estoque gira — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Manda os dados da tua cota no direct que a gente avalia.",
   },
   {
     id: "P7",
     nome: "CARRO DE TRABALHO",
     duracao_alvo: 25, // CURTA — medido: 62 palavras / 23,1s (veículo)
-    prova: "so_credito",
     persona: "valentina", // cotidiano/trabalho
     objetivo: "ferramenta_de_renda",
     tipos: ["veiculo"],
     gancho:
       "Motorista de app, entregador: o veículo que trabalha por você.",
     esqueleto:
-      "Para quem roda, o carro não é luxo — é ferramenta. Trocar o veículo com crédito à vista muda a condição de compra. Curta, direta, sem prometer faturamento nem retorno. Fecha com os números da carta do dia.",
+      "Para quem roda, o carro não é luxo — é ferramenta. Trocar o veículo com crédito à vista muda a condição de compra. Curta, direta, sem prometer faturamento nem retorno. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Link na bio para ver a carta de hoje.",
   },
   {
     id: "P8",
     nome: "MITO × VERDADE",
     duracao_alvo: 32, // MÉDIA — medido: 78 pal / 29,1s imóvel; 75 / 28,0s veículo
-    prova: "completa",
     persona: "porta_voz", // dado duro/objeção
     objetivo: "quebra_de_objecao",
     tipos: ["imovel", "veiculo"],
     gancho: "Consórcio é sorteio? A contemplada já passou por isso.",
     esqueleto:
-      "Mito: consórcio é esperar sorteio. Verdade: a carta contemplada JÁ foi contemplada — o que se adquire é o crédito liberado. Diz o mito e a verdade sem rodeio, no passado, sem nenhuma palavra sobre contemplação futura. Fecha com os números da carta do dia.",
+      "Mito: consórcio é esperar sorteio. Verdade: a carta contemplada JÁ foi contemplada — o que se adquire é o crédito liberado. Diz o mito e a verdade sem rodeio, no passado, sem nenhuma palavra sobre contemplação futura. Fecha com o CRÉDITO da carta do dia e o custo ao mês — só esses dois números, nunca entrada nem parcelas, que vivem na legenda.",
     cta: "Comenta DÚVIDA que eu respondo a próxima.",
   },
 ] as const;

@@ -157,8 +157,26 @@ const HASHTAGS_REEL: Record<string, string> = {
  * parágrafo institucional do post de feed — quem está no reel já ouviu a Conta
  * Notarial pela voz; ler a mesma coisa embaixo só empurra o CTA para fora da
  * primeira dobra.
+ *
+ * ---------------------------------------------------------------------------
+ * A LEGENDA PASSOU A SER O DESTINO DE ENTRADA E PARCELAS (coordenação, 09/08):
+ * "a LEGENDA de cada fôrma passa a carregar os números completos (crédito,
+ * entrada, parcelas, custo a.m.) + o CTA — o que sai do áudio não pode sumir da
+ * peça."
+ *
+ * DIGO O QUE MUDOU DE VERDADE, para ninguém ler mais do que houve: os quatro
+ * números JÁ estavam aqui desde a FAROL-REEL-01 — esta legenda nunca falou só
+ * o crédito. O que a ordem de 09/08 muda é (a) o STATUS deles, que deixaram de
+ * ser repetição do áudio e passaram a ser a única aparição de entrada e
+ * parcelas na peça, e (b) o CTA, que é novo aqui.
+ *
+ * `cta` SUBSTITUI a linha genérica em vez de somar a ela. Somar daria três
+ * pedidos na mesma legenda ("link da bio", "chama no direct", e o da fôrma) —
+ * e o CTA da fôrma é justamente o específico e verificável ("comenta OBRA que
+ * eu te explico como usa"). Diluí-lo em dois genéricos seria desfazer a razão
+ * de ele existir.
  */
-function legendaClassica(c: CartaCarrossel, selo = false): string {
+function legendaClassica(c: CartaCarrossel, selo = false, cta?: string): string {
   const linhas: string[] = [];
 
   linhas.push(`Carta contemplada · ${c.tipoLabel}`);
@@ -179,7 +197,7 @@ function legendaClassica(c: CartaCarrossel, selo = false): string {
   linhas.push(`Custo: ${pctAoMes(c.custoAm)}`);
   linhas.push("");
 
-  linhas.push("Detalhes no link da bio. Prefere conversar? Chama no direct.");
+  linhas.push(cta ?? "Detalhes no link da bio. Prefere conversar? Chama no direct.");
   linhas.push("");
   linhas.push(HASHTAGS_REEL[c.tipo] ?? HASHTAGS_REEL.imovel);
 
@@ -208,65 +226,63 @@ function legendaClassica(c: CartaCarrossel, selo = false): string {
 // ===========================================================================
 
 /**
- * Os números da carta na forma FALADA, como prova no fecho.
+ * A carta na forma FALADA, como prova no fecho: CRÉDITO e CUSTO AO MÊS, só.
  *
- * DUAS LARGURAS, POR MEDIÇÃO. A régua desta nota estava ERRADA e foi refeita em
+ * ---------------------------------------------------------------------------
+ * FECHO CURTO UNIVERSAL. AUTORIZADO: coordenação de 09/08/2026 —
+ * "provaFalada(c, true) — só crédito + custo ao mês — passa a ser o padrão de
+ * TODAS as 8 fôrmas, não só da P6. Entrada e parcelas SAEM do áudio e vão para
+ * a LEGENDA. O custo ao mês CONTINUA falado — é promessa da marca."
+ *
+ * A MEDIÇÃO QUE MOTIVOU. A régua desta nota estava ERRADA e foi refeita em
  * 08/08 (FAROL-AULA-01, medição 1): eu tinha escrito "~170 palavras por minuto"
  * a partir de UMA amostra lembrada de cabeça. Medindo o átomo `mvhd` dos dois
  * mp4 REAIS que foram ao ar — 90 palavras/31,49s e 82 palavras/32,81s — a régua
- * agregada é 160,5 ppm, ou 2,68 palavras por segundo. A antiga subestimava a
- * duração em ~6%.
+ * agregada é 160,5 ppm, ou 2,68 palavras por segundo.
  *
- * Com a régua certa, a prova COMPLETA de uma carta de R$ 2,3 milhões custa 45
- * palavras, ~17 segundos, sozinha. Por isso as fôrmas de `prova: "so_credito"`
- * falam só o CRÉDITO. A carta continua aparecendo como prova, que é o que a OS
- * exige; entrada e parcelas continuam escritas na legenda e na página da carta,
- * que é onde a pessoa decide. O ganho não é só de retenção: a HeyGen cobra por
- * duração (US$0,05/s no Photo Avatar) e são 30 renders/mês.
+ * Com a régua certa, a prova COMPLETA de uma carta de R$ 2,3 milhões custava 45
+ * palavras — ~17 dos 39 segundos da peça, quase metade dela, só para recitar
+ * número. Numa série cujo eixo é a POSSIBILIDADE e não o produto, esse era o
+ * ponto em que o vídeo voltava a ser um anúncio de carta.
+ *
+ * O QUE NÃO SE PERDEU: entrada e parcelas continuam na legenda (aqui embaixo,
+ * `legendaClassica`) e na página da carta, que é onde a pessoa decide. O que
+ * sai do áudio não sai da peça. E o custo ao mês continua falado, porque dizer
+ * o preço em voz alta é a promessa que separa esta casa do resto do mercado.
+ *
+ * Efeito colateral bem-vindo: a HeyGen cobra por DURAÇÃO (US$0,05/s no Photo
+ * Avatar) e são 30 renders/mês.
  */
-function provaFalada(c: CartaCarrossel, curta = false): string {
-  const partes: string[] = [`crédito de ${valorFalado(c.credito)}`];
-  if (curta) return partes[0];
-  if (c.entrada > 0) partes.push(`entrada de ${valorFalado(c.entrada)}`);
-  if (c.parcelas > 0 && c.parcela > 0) {
-    partes.push(`${c.parcelas} parcelas de ${valorFalado(c.parcela)}`);
-  }
-  return partes.join(", ");
-}
-
-/**
- * Fôrma que fecha enxuto. Ver `provaFalada`.
- *
- * ISTO ERA `f.duracao_alvo <= 20` E VIROU UM CAMPO. AUTORIZADO: decisão 2 da
- * coordenação de 08/08 ("alvos passam a ser os valores medidos"). Enquanto os
- * alvos eram chutes redondos (15/20/30/35), a duração por acaso separava as
- * curtas. Com os alvos medidos, ela não separa mais: P6 CEDENTE fecha só com o
- * crédito e mesmo assim mede 30,2s — mais que P5 (27,6s) e P8 (29,1s), que
- * falam a carta inteira. Se eu tivesse só trocado os números, P6 teria virado
- * "completa" no silêncio e passado a falar entrada e parcelas.
- *
- * Duração é consequência do texto todo; o que o fecho fala é decisão editorial.
- * Eram duas coisas amarradas num campo só, e agora são dois campos.
- */
-function ehCurta(f: Formula): boolean {
-  return f.prova === "so_credito";
+function provaFalada(c: CartaCarrossel): string {
+  return `crédito de ${valorFalado(c.credito)}`;
 }
 
 /**
  * A frase de custo. VAZIA quando o custo não é exibível: preferimos calar do
  * que falar "custo de traço". `pctAoMes(null)` devolve "—", e um TTS lendo isso
  * produz silêncio ou ruído — nos dois casos, um vídeo estragado.
+ *
+ * A cauda ", tudo já calculado" saiu junto com o fecho longo (09/08): ela era a
+ * versão `curta = false` desta frase, e a P6 — a fôrma que a coordenação elegeu
+ * como padrão — já fechava sem ela. Continua viva no roteiro CLÁSSICO, que não
+ * passa por aqui.
  */
-function custoFrase(c: CartaCarrossel, curta = false): string {
+function custoFrase(c: CartaCarrossel): string {
   if (c.custoAm == null) return "";
-  const cauda = curta ? "" : ", tudo já calculado";
-  return ` Custo de ${custoFalado(c.custoAm)}${cauda}.`;
+  return ` Custo de ${custoFalado(c.custoAm)}.`;
 }
 
-/** O fecho comum: prova + custo + CTA da fôrma. */
-function fecho(c: CartaCarrossel, f: Formula): string {
-  const curta = ehCurta(f);
-  return `Hoje tem ${provaFalada(c, curta)}.${custoFrase(c, curta)} ${f.cta}`;
+/**
+ * O fecho comum: prova + custo + CTA da fôrma. UM só, para as oito.
+ *
+ * `abertura` existe por causa da P6, que emenda o fecho numa frase de contexto
+ * ("Esse estoque gira todo dia — hoje tem…"). Antes ela carregava uma CÓPIA
+ * inteira do fecho no corpo do roteiro, e foi só por sorte que a cópia não
+ * divergiu do original em três dias de vida. Um parâmetro de uma palavra é mais
+ * barato que uma segunda fonte da mesma frase.
+ */
+function fecho(c: CartaCarrossel, f: Formula, abertura = "Hoje tem"): string {
+  return `${abertura} ${provaFalada(c)}.${custoFrase(c)} ${f.cta}`;
 }
 
 type Roteirista = (c: CartaCarrossel, f: Formula) => string;
@@ -319,7 +335,9 @@ const ROTEIROS: Record<string, Roteirista> = {
       f.gancho,
       "A cota que você já pagou tem valor de mercado agora.",
       "E o pagamento é protegido por Conta Notarial em cartório: o valor só é liberado ao vendedor depois da aprovação da administradora.",
-      `Esse estoque gira todo dia — hoje tem ${provaFalada(c, true)}.${custoFrase(c, true)} ${f.cta}`,
+      // A única fôrma que não abre o fecho com "Hoje tem": aqui a carta do dia
+      // é prova de que o estoque GIRA, que é o que interessa a quem vende.
+      fecho(c, f, "Esse estoque gira todo dia — hoje tem"),
     ].join(" "),
 
   P7: (c, f) =>
@@ -347,6 +365,16 @@ const ROTEIROS: Record<string, Roteirista> = {
 export function roteiroDaFormula(c: CartaCarrossel, f: Formula): string {
   const r = ROTEIROS[f.id];
   return r ? r(c, f) : roteiroClassico(c);
+}
+
+/**
+ * Legenda de uma fôrma específica. Gêmea de `roteiroDaFormula`, e exportada
+ * pelo mesmo motivo: desde 09/08 a legenda é METADE da peça — é ela que carrega
+ * entrada e parcelas, que saíram do áudio. Uma bancada que rendesse só o
+ * roteiro passaria a medir metade do que vai ao ar.
+ */
+export function legendaDaFormula(c: CartaCarrossel, f: Formula): string {
+  return legendaClassica(c, true, f.cta);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,11 +412,23 @@ export function montarRoteiro(c: CartaCarrossel, dia?: string): string {
 }
 
 /**
- * Legenda do reel. A fôrma NÃO muda a legenda — os números são os mesmos e o
- * CTA escrito continua o mesmo. O que a env liga aqui é só o selo de
- * exclusividade (decisão 3), que é onde a exclusividade passou a morar.
+ * Legenda do reel.
+ *
+ * ATÉ 09/08 ESTA FUNÇÃO IGNORAVA A FÔRMA (`void dia`), e o comentário aqui
+ * dizia, com todas as letras, que "a fôrma NÃO muda a legenda". Mudou: com o
+ * fecho curto universal, entrada e parcelas só existem AQUI, e o CTA da fôrma
+ * também. A legenda deixou de ser o rodapé do reel e virou a outra metade dele.
+ *
+ * Lê a fôrma pela MESMA `formulaDoTemplate()` que `montarRoteiro()` consulta, e
+ * não por uma segunda cópia da condição do kill-switch: com `FAROL_FORMULAS`
+ * desarmada não há fôrma, não há `cta`, e esta função devolve byte a byte o que
+ * devolvia antes desta fatia.
+ *
+ * O SELO continua amarrado à ENV e não à fôrma, de propósito. Sem `dia` não há
+ * fôrma, mas a carta exclusiva continua exclusiva — o selo é fato da carta
+ * (decisão 3 de 08/08), não da fôrma.
  */
 export function montarLegendaReel(c: CartaCarrossel, dia?: string): string {
-  void dia;
-  return legendaClassica(c, process.env.FAROL_FORMULAS === "on");
+  const f = formulaDoTemplate(c, dia);
+  return legendaClassica(c, process.env.FAROL_FORMULAS === "on", f?.cta);
 }
