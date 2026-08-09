@@ -333,7 +333,21 @@ const ROTEIROS: Record<string, Roteirista> = {
   P6: (c, f) =>
     [
       f.gancho,
-      "A cota que você já pagou tem valor de mercado agora.",
+      // SEGUNDA PALAVRA CORTADA em 09/08: caiu o "agora" do fim desta frase.
+      // AUTORIZADO: coordenação — "P6/Imóvel: autorizada a SEGUNDA palavra
+      // (32,0s exatos não é folga)". A primeira palavra tinha tirado a peça de
+      // 32,4s (estourava) para 32,0s CRAVADOS na voz lenta, contra teto de 32s:
+      // deixou de estourar e não ganhou folga nenhuma. Eu relatei isso como
+      // lacuna em vez de resolver por conta própria; a coordenação fechou.
+      //
+      // Escolhi "agora" porque o gancho IMEDIATAMENTE ANTES já diz "Ela vale
+      // dinheiro hoje". Com ele, a fôrma tinha três marcadores de tempo em duas
+      // frases ("hoje", "agora", e o "todo dia" do fecho). O que sai é
+      // redundância de advérbio, não afirmação: a frase continua dizendo que a
+      // cota tem valor de mercado, e o "hoje" da frase anterior continua
+      // datando isso. Nenhuma das duas palavras cortadas nesta fôrma carrega
+      // conteúdo — uma era conjunção, a outra é eco.
+      "A cota que você já pagou tem valor de mercado.",
       // O "E" inicial desta frase foi CORTADO em 09/08. AUTORIZADO nominalmente
       // pela coordenação: "P6/Imóvel: autorizado o corte de 1 palavra para
       // folga real na voz lenta". Escolhi a conjunção e não uma palavra do

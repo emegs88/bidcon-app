@@ -7,6 +7,12 @@
 // tiques×1) atingir 7.000 unidades, comentários PARAM e logam '[farol-yt]
 // orcamento_reservado_upload'. O teto de 10/tique morre — quem governa é o
 // diário." Cron a cada 10 minutos.
+//
+// A PARTE DE COTA DESSA CITAÇÃO ESTÁ SUPERSEDIDA. A reserva de 7.000 caiu em
+// 09/08/2026, autorizada por Emerson depois de ele LER a página de cotas do
+// Cloud Console: "RESERVA_UPLOAD = 7.000 é fantasma: videos.insert NÃO consome
+// o balde de 10.000. Reduzir para RESERVA_LEITURA = 1.000." O teto de 60
+// respostas continua, por outra razão. Ver o bloco OS DOIS TETOS abaixo.
 // ----------------------------------------------------------------------------
 // O QUE ESTA ROTA É. O YouTube não tem DM e não tem webhook de comentário. A
 // resposta é PÚBLICA, no thread, e a captura é POLLING. Isto aqui acorda de 10
@@ -19,29 +25,52 @@
 // DESARMADA.
 //
 // ----------------------------------------------------------------------------
-// OS DOIS TETOS, E POR QUE SÃO DOIS.
+// OS DOIS TETOS — REFEITOS EM 09/08/2026 CONTRA A COTA MEDIDA NO CONSOLE
+// ----------------------------------------------------------------------------
+// ATÉ 09/08 ESTE BLOCO AFIRMAVA que "a Data API dá 10.000 unidades/dia para o
+// PROJETO e o `videos.insert` do YOUTUBE-01 bebe do MESMO balde". Emerson abriu
+// a página de cotas do Cloud Console em 09/08 e leu os tetos literais:
 //
-// A Data API v3 dá 10.000 unidades/dia para o PROJETO — não para o endpoint. O
-// `videos.insert` do YOUTUBE-01, que sobe o Short diário, bebe do MESMO balde.
-// O teto de 10 respostas/tique que a OS pedia originalmente daria, no pior dia,
-// 10 × 144 tiques × 50 = 72.000 unidades: 7,2× a cota inteira. Um teto por
-// tique protege LATÊNCIA, não cota — e o custo de descobrir isso em produção
-// seria o Short do dia seguinte morrer calado por `quotaExceeded`.
+//   Queries per day .................. 10.000   ← o que ESTA rota consome
+//   Search Queries per day ............... 100
+//   Video Uploads per day ................ 100   ← o Short diário, balde PRÓPRIO
+//   Video Batch Get Stats per day ..... 10.000   ← o olheiro, balde PRÓPRIO
 //
-//   TETO_DIA_RESPOSTAS (60) — o que governa. 60 × 50 = 3.000 unidades.
-//   RESERVA_UPLOAD (7.000)  — o cinto. Só morde se alguém subir o teto acima
-//                             sem refazer esta conta.
+// O upload NÃO divide balde com os comentários. Logo `RESERVA_UPLOAD = 7_000`
+// protegia contra uma colisão que não existe: reservava 70% do balde para um
+// consumo que nunca esteve nele. Foi removida.
 //
-// Com os números de hoje o primeiro sempre bate antes do segundo (3.000 + 144
-// de listagem = 3.144, longe de 7.000). Isso é DE PROPÓSITO: o cinto existe
-// para o dia em que o número de cima mudar e ninguém lembrar do de baixo.
+// O QUE ENTROU NO LUGAR, e por que o SENTIDO da constante mudou. A antiga era
+// um TETO DE GASTO ("pare ao chegar em 7.000"). A nova é um PISO PROTEGIDO:
+//
+//   RESERVA_LEITURA (1.000) — unidades que esta rota NÃO gasta, para que a
+//                             leitura do dia caiba: os 144 tiques de listagem
+//                             daqui + as chamadas do FAROL-OLHEIRO, que também
+//                             bebem de "Queries per day".
+//   TETO_UNIDADES (9.000)   — o que sobra do balde depois da reserva. É contra
+//                             ISTO que o consumo projetado é conferido.
+//
+// A INVERSÃO IMPORTA E QUASE ME PEGOU. Ler "RESERVA_LEITURA = 1.000" como teto
+// de gasto (trocar 7.000 por 1.000 no mesmo `if`) travaria a rota em 17
+// respostas/dia — porque `estimado(0)` já embute os 144 tiques e 18 × 50 + 144
+// passa de 1.000. Isso contradiria a decisão da mesma coordenação de manter o
+// teto em 60. Piso e teto são a mesma palavra em português comercial e coisas
+// opostas em aritmética; está escrito aqui para ninguém "simplificar" de volta.
+//
+//   TETO_DIA_RESPOSTAS (60) — o que governa. 60 × 50 + 144 = 3.144 unidades.
+//
+// E ELE PASSOU A GOVERNAR POR OUTRA RAZÃO. Antes era cota; agora é PRUDÊNCIA
+// EDITORIAL — o canal tem 3 dias de vida e 60 respostas públicas por dia já é
+// mais do que ele recebe. Por isso virou parametrizável por env
+// (`FAROL_YT_TETO_DIA`): quando a audiência justificar, sobe sem deploy, e o
+// cinto de 9.000 continua atrás. A 60, sobram ~5.850 unidades ociosas no balde.
 //
 // DECISÃO DECLARADA — "consumo estimado do dia". A frase da OS admite duas
 // leituras: o gasto ATÉ AGORA ou o gasto do DIA INTEIRO. Adotei a segunda e
 // reservo os 144 tiques completos já no primeiro tique da madrugada. A leitura
 // otimista ("só o que já gastei") liberaria respostas de manhã que faltariam à
-// noite, e o que faltaria à noite é o upload — que é justamente o que a OS
-// chamou de sagrado. Reservar cedo é o único jeito de a reserva significar algo.
+// noite. Continua valendo: o que falta à noite agora é a LEITURA — a listagem
+// desta rota e a varredura do olheiro.
 //
 // ----------------------------------------------------------------------------
 // O QUE NÃO É RESPONDIDO, e por quê:
@@ -66,11 +95,40 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Teto diário de respostas. Decisão do Emerson, 07/08/2026. */
-const TETO_DIA_RESPOSTAS = 60;
+/**
+ * Balde "Queries per day" do nosso projeto, LIDO no Cloud Console em 09/08/2026.
+ * É de onde saem a listagem (1) e cada resposta (50). Ver header.
+ */
+const COTA_QUERIES_DIA = 10_000;
 
-/** Reserva intocável para o `videos.insert` do YOUTUBE-01. Mesma decisão. */
-const RESERVA_UPLOAD = 7_000;
+/**
+ * Piso protegido — unidades que esta rota NÃO gasta. Cobre os 144 tiques de
+ * listagem daqui (144 unidades) e sobra folga larga para o FAROL-OLHEIRO, que
+ * bebe do mesmo balde. NÃO é teto de gasto: ver a inversão explicada no header.
+ */
+const RESERVA_LEITURA = 1_000;
+
+/** O que esta rota pode gastar: o balde menos o piso. 9.000. */
+const TETO_UNIDADES = COTA_QUERIES_DIA - RESERVA_LEITURA;
+
+/**
+ * Teto diário de respostas. 60 desde 07/08/2026 — mas a RAZÃO mudou em 09/08:
+ * era limite de cota, virou prudência editorial (canal de 3 dias). Por isso
+ * agora aceita env: sobe quando a audiência justificar, sem deploy.
+ *
+ * O clamp em 180 não é decoração. 180 × 50 + 144 = 9.144 > TETO_UNIDADES, ou
+ * seja, é exatamente onde o cinto de 9.000 começaria a morder — acima disso o
+ * env estaria pedindo algo que a aritmética recusa silenciosamente no meio do
+ * dia, e teto que mente é pior que teto baixo. Quem precisar de mais que 180
+ * tem que vir aqui reler a conta, que é o ponto.
+ */
+function tetoDiaRespostas(): number {
+  const bruto = Number(process.env.FAROL_YT_TETO_DIA);
+  if (!Number.isFinite(bruto) || bruto < 1) return 60;
+  return Math.min(Math.floor(bruto), 180);
+}
+
+const TETO_DIA_RESPOSTAS = tetoDiaRespostas();
 
 // Tiques do cron num dia: de 10 em 10 minutos ⇒ 6/hora × 24 = 144. Comentário
 // de LINHA, e não de bloco, porque a expressão do cron contém a sequência que
@@ -155,12 +213,16 @@ export async function GET(req: Request) {
     });
   }
 
-  if (estimado(0) >= RESERVA_UPLOAD) {
-    console.log("[farol-yt] orcamento_reservado_upload");
+  if (estimado(0) >= TETO_UNIDADES) {
+    // Nome do motivo mudou junto com o conceito (era "orcamento_reservado_upload").
+    // DESVIO DECLARADO da OS de 07/08, que fixou aquela string: mantê-la faria o
+    // log jurar que parou para proteger o upload — que não divide balde nenhum
+    // com esta rota. Log que mente sobre a causa custa a próxima investigação.
+    console.log("[farol-yt] orcamento_reserva_leitura");
     return NextResponse.json({
       ok: true,
       respondeu: 0,
-      motivo: "orcamento_reservado_upload",
+      motivo: "orcamento_reserva_leitura",
       hoje: jaHoje,
     });
   }
@@ -191,8 +253,8 @@ export async function GET(req: Request) {
       );
       break;
     }
-    if (estimado(respondeu + 1) > RESERVA_UPLOAD) {
-      console.log("[farol-yt] orcamento_reservado_upload");
+    if (estimado(respondeu + 1) > TETO_UNIDADES) {
+      console.log("[farol-yt] orcamento_reserva_leitura");
       break;
     }
 

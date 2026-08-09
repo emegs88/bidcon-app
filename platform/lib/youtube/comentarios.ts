@@ -27,11 +27,46 @@
 //
 // ----------------------------------------------------------------------------
 // COTA — a razão de esta lib devolver custo junto com dado.
-// Medido em determine_quota_cost: a Data API v3 dá 10.000 unidades/dia para o
-// PROJETO INTEIRO, somando todos os endpoints. `commentThreads.list` custa 1.
-// `comments.insert` custa 50. E o `videos.insert` do YOUTUBE-01 divide o mesmo
-// balde. Por isso `comments.insert` nunca é chamado por esta lib sem que a rota
-// tenha conferido os dois tetos antes — ver app/api/farol/yt-comenta/route.ts.
+// Medido em determine_quota_cost: `commentThreads.list` custa 1 unidade e
+// `comments.insert` custa 50. Esses dois números seguem medidos e valem.
+//
+// ----------------------------------------------------------------------------
+// OS BALDES SÃO QUATRO, E SÃO INDEPENDENTES — MEDIDO NO CONSOLE EM 09/08/2026
+// ----------------------------------------------------------------------------
+// FONTE: Emerson Gomes dos Santos abriu a página de cotas do Google Cloud
+// Console do nosso projeto em 09/08/2026 e leu os nomes e os tetos LITERAIS:
+//
+//   Queries per day .................. 10.000
+//   Search Queries per day ............... 100
+//   Video Uploads per day ................ 100   ← balde PRÓPRIO
+//   Video Batch Get Stats per day ..... 10.000   ← balde PRÓPRIO
+//
+// Isto é fatura do nosso projeto, não resumo de página pública, e por isso
+// manda. Ela DERRUBA o que este bloco afirmava até ontem — que "a Data API dá
+// 10.000 unidades/dia para o PROJETO INTEIRO e o `videos.insert` do YOUTUBE-01
+// divide o mesmo balde". Não divide: o upload tem balde só dele.
+//
+// A CONSEQUÊNCIA DIRETA, e ela mexe em produção: `RESERVA_UPLOAD = 7_000` na
+// rota era um FANTASMA. Reservava 7.000 do balde de 10.000 contra um consumo
+// que nunca esteve nesse balde. Foi trocado por `RESERVA_LEITURA = 1_000` na
+// mesma medição — ver app/api/farol/yt-comenta/route.ts, onde a aritmética e a
+// mudança de SENTIDO da constante (de teto de gasto para piso protegido) estão
+// escritas por extenso.
+//
+// O QUE ESTA LIB CONSOME, e de qual balde:
+//   `commentThreads.list` → Queries per day  (1 unidade)
+//   `comments.insert`     → Queries per day  (50 unidades)
+// Nenhum dos dois toca "Video Uploads": o Short diário do YOUTUBE-01 não é mais
+// concorrente desta rota, e não deve ser tratado como se fosse.
+//
+// REGISTRO DE TERCEIROS, NÃO MEDIDO POR NÓS: há relato de que em 04/12/2025 o
+// custo do `videos.insert` caiu de ~1.600 para ~100 unidades. Fica anotado como
+// relato — com o upload em balde próprio de 100 chamadas/dia, o número deixou
+// de importar para qualquer conta nossa.
+//
+// Ainda assim `comments.insert` nunca é chamado por esta lib sem que a rota
+// tenha conferido os tetos antes. O que mudou foi contra o que se confere; a
+// conferência em si continua.
 // ============================================================================
 import { accessToken, type Resultado } from "@/lib/youtube/upload";
 

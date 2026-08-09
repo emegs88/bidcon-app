@@ -151,7 +151,11 @@ function escalar(
     const faltando = [!avatarId && "HEYGEN_AVATAR_ID_2", !voiceId && "HEYGEN_VOICE_ID_2"]
       .filter(Boolean)
       .join(",");
-    console.error("[farol-reel] FAROL_DUPLA=on e env da 2ª persona ausente:", {
+    // Tag `persona_indisponivel` NOMEADA pelo Emerson em 09/08. É a mesma dos
+    // dois casos de fallback (env ausente aqui, id recusado no render) de
+    // propósito: quem for procurar "a persona caiu" faz UM grep, não dois.
+    console.error("[farol-reel] persona_indisponivel:", {
+      motivo: "env_2_ausente",
       formula: f.id,
       faltando,
       caiu_em: "porta_voz",
@@ -169,6 +173,19 @@ function escalar(
     tipo: process.env.HEYGEN_AVATAR_TIPO_2 ?? "avatar",
     fallback: false,
   };
+}
+
+/**
+ * O erro do render foi RECUSA de pedido (4xx) ou incerteza (timeout/5xx)?
+ *
+ * Só a recusa autoriza repetir o render com outra persona. `lib/heygen.ts`
+ * formata todo erro HTTP como `http_<status>[ code=...] <mensagem>`, e as outras
+ * saídas têm nome próprio (`timeout_heygen(...)`, `resposta_sem_video_id`,
+ * `env_ausente(...)`) — nenhuma delas casa com este padrão, que é o ponto: o
+ * default desta função é NÃO repetir. Ver o bloco do fallback no corpo do GET.
+ */
+function recusaDeCadastro(erro: string): boolean {
+  return /^http_4\d\d(\s|$)/.test(erro);
 }
 
 /** Início do dia de hoje em São Paulo, em ISO — a régua da contagem diária. */
@@ -360,7 +377,7 @@ export async function GET(req: Request) {
     });
 
     // ---- Render (a única linha que custa) ---------------------------------
-    const r = await dispararRender({
+    let r = await dispararRender({
       roteiro,
       avatarId: elenco.avatarId,
       voiceId: elenco.voiceId,
@@ -369,6 +386,51 @@ export async function GET(req: Request) {
       // virou chave de resgate lá — duas cópias seriam duas verdades.
       titulo: tituloRender(hoje, carta.tipo),
     });
+
+    // -----------------------------------------------------------------------
+    // A SEGUNDA PORTA DO FALLBACK DE PERSONA (09/08/2026)
+    // -----------------------------------------------------------------------
+    // AUTORIZADO: Emerson — "se HEYGEN_AVATAR_ID_2/VOICE_ID_2 falharem, a rota
+    // cai no Porta-voz ou marca reel_falhou? Se marcar falhou, implemente
+    // FALLBACK (...) — não vale perder o vídeo do dia por uma persona."
+    //
+    // "FALHAR" tem DOIS casos, e só um estava coberto. `escalar()` já cobria o
+    // env AUSENTE. Faltava o env PRESENTE E ERRADO — id copiado com espaço,
+    // avatar apagado no painel do HeyGen, voz despublicada. Nesse caso as envs
+    // existem, `escalar()` devolve Valentina satisfeita, e a recusa só aparece
+    // aqui, onde a rota gravava `reel_falhou` e perdia o vídeo do dia. Era
+    // exatamente o que o Emerson não queria, e estava acontecendo.
+    //
+    // O RETRY É CONDICIONAL, E A CONDIÇÃO É DINHEIRO. Só repete em 4xx — a
+    // HeyGen RECUSOU o pedido, nada foi enfileirado, nada será cobrado.
+    // `timeout_heygen`, 5xx e `resposta_sem_video_id` NÃO repetem: nos três o
+    // render pode ter COMEÇADO do outro lado, e repetir cegamente pagaria dois
+    // vídeos para publicar um. Perder o vídeo do dia é ruim; pagar dobrado sem
+    // saber é pior, porque não aparece em lugar nenhum.
+    //
+    // Só o roteiro sobrevive à troca — e ele já passou pelo compliance acima,
+    // que não depende de quem fala. Nada é re-medido porque nada mudou no texto.
+    let personaFinal: Persona = elenco.persona;
+    let motivoFallback: string | null = elenco.fallback ? "env_2_ausente" : null;
+
+    if (!r.ok && elenco.persona === "valentina" && recusaDeCadastro(r.erro)) {
+      console.error("[farol-reel] persona_indisponivel:", {
+        data: hoje,
+        carta_id: carta.id,
+        formula: formulaUsada?.id ?? null,
+        erro: r.erro,
+        caiu_em: "porta_voz",
+      });
+      r = await dispararRender({
+        roteiro,
+        avatarId,
+        voiceId,
+        tipo: tipoAvatar,
+        titulo: tituloRender(hoje, carta.tipo),
+      });
+      personaFinal = "porta_voz";
+      motivoFallback = "render_recusado";
+    }
 
     if (!r.ok) {
       console.error("[farol-reel] render recusado:", {
@@ -398,8 +460,12 @@ export async function GET(req: Request) {
         // QUEM FALOU, gravado na linha (ordem do Emerson na decisão 6). Sem a
         // dupla armada isto é sempre "porta_voz", que é a verdade de hoje —
         // então a coluna já nasce preenchida e comparável quando a dupla ligar.
-        persona: elenco.persona,
-        ...(elenco.fallback ? { persona_fallback: "env_2_ausente" } : {}),
+        // `personaFinal`, e NÃO `elenco.persona`: depois do fallback de render
+        // os dois divergem, e gravar a intenção no lugar do fato faria o
+        // FAROL-METRICAS-01 creditar à Valentina um vídeo que o Porta-voz
+        // gravou. Métrica de persona construída sobre isso mediria fantasma.
+        persona: personaFinal,
+        ...(motivoFallback ? { persona_fallback: motivoFallback } : {}),
         // Aditivo e opcional: `detalhe` é jsonb, então dizer QUAL fôrma gerou
         // este reel não custa migração. É o dado que o FAROL-METRICAS-01 vai
         // precisar para saber quais fôrmas retêm e quais devem morrer.
@@ -461,7 +527,7 @@ export async function GET(req: Request) {
       custo_am: carta.custoAm,
       escolha: motivoEscolha,
       texto: pautaUsada ? `pauta:${pautaUsada.formula}` : "template",
-      persona: elenco.persona,
+      persona: personaFinal,
     });
 
     return NextResponse.json({
@@ -472,7 +538,10 @@ export async function GET(req: Request) {
       escolha: motivoEscolha,
       texto: pautaUsada ? "pauta" : "template",
       formula: pautaUsada?.formula ?? formulaUsada?.id ?? null,
-      persona: elenco.persona,
+      persona: personaFinal,
+      // Sai na RESPOSTA, e não só no log: é assim que o Emerson vê que a
+      // persona caiu sem precisar abrir o painel de logs da Vercel.
+      persona_fallback: motivoFallback,
     });
   } catch (e) {
     const erro = e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido";
