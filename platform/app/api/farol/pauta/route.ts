@@ -66,6 +66,7 @@ import {
 } from "@/lib/farol/selecao";
 import { formulaDoDia } from "@/lib/farol/formulas";
 import { ouvirTendencias, escreverPauta } from "@/lib/farol/pauta";
+import { blocoSaber } from "@/lib/farol/saber";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -180,8 +181,26 @@ export async function GET(req: Request) {
       });
     }
 
+    // ---- Base de conhecimento (FAROL-SABER-01, Entrega 2) -----------------
+    // A "pergunta" aqui não vem de cliente nenhum: é o ASSUNTO do dia, montado
+    // com o nome da fôrma e o tipo da carta. É o que faz o acervo devolver o
+    // verbete certo — numa fôrma de junção, o verbete de junção; numa de
+    // segurança, o da Conta Notarial. Sem isso o modelo escreveria sobre o
+    // mecanismo de memória, que é exatamente onde ele inventa.
+    // `blocoSaber` devolve "" com o kill-switch desarmado (o padrão hoje), e
+    // nesse caso `escreverPauta` monta a mensagem idêntica à de antes.
+    // As fontes são listadas UMA A UMA em vez de deixar aberto, e a que falta
+    // é a razão da lista existir: "faq" fica de FORA. Um verbete de FAQ é
+    // pergunta de cliente real, anonimizada mas ainda assim texto de conversa
+    // privada — ele serve para o cérebro do WhatsApp saber o que perguntam, e
+    // não para virar matéria-prima de um reel público. A separação é aqui,
+    // no código, e não numa instrução de prompt.
+    const saber = await blocoSaber(db, `${formula.nome} ${carta.tipo}`, {
+      fontes: ["lei", "abac", "administradora", "processo", "glossario", "caso"],
+    });
+
     // ---- 2ª chamada: a redação -------------------------------------------
-    const texto = await escreverPauta(carta, formula, escuta.texto);
+    const texto = await escreverPauta(carta, formula, escuta.texto, saber);
     if (!texto.ok) {
       console.error("[farol-pauta] redação falhou:", texto.erro);
       return NextResponse.json({

@@ -65,6 +65,7 @@ import {
   type BuscarCartasInput,
 } from "@/lib/buscar-cartas-tool";
 import { toolsParaAgente } from "@/lib/tools-por-agente";
+import { blocoSaber, ultimaPerguntaDoCliente } from "@/lib/farol/saber";
 import {
   buscarPlanos,
   resultadoParaToolPlanos,
@@ -484,6 +485,16 @@ export async function gerarRespostaWhatsApp(
   let system = montarSystem(agenteAtivo, "whatsapp");
   const cartas = await blocoCartas(db);
   if (cartas) system += "\n\n" + cartas;
+
+  // FAROL-SABER-01, Entrega 2 — consumo cirúrgico da base de conhecimento.
+  // Duas linhas de propósito, e o "de propósito" é o ponto: `blocoSaber`
+  // devolve "" quando o kill-switch FAROL_SABER está desarmado, quando a
+  // migração 0072 ainda não foi aplicada, quando a OpenAI falha ou quando nada
+  // no acervo se parece com a pergunta. Nos quatro casos o system fica
+  // idêntico ao de antes desta fatia — não há caminho em que a base de
+  // conhecimento degrade o atendimento que já existe. Ela só pode ACRESCENTAR.
+  const saber = await blocoSaber(db, ultimaPerguntaDoCliente(hist));
+  if (saber) system += "\n\n" + saber;
 
   // Loop de tool-use — no máximo 2 rodadas de tool_use por turno (F4-TOOL;
   // ver header de lib/buscar-cartas-tool.ts). Na rodada seguinte ao teto,

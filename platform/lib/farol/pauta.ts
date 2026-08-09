@@ -79,7 +79,7 @@ const URL_API = "https://api.anthropic.com/v1/messages";
 const VERSAO_API = "2023-06-01";
 
 /** Ver divergência (1) no header. */
-const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-fable-5";
+export const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-fable-5";
 
 /** Ver divergência (2) no header. */
 const FERRAMENTA_BUSCA = "web_search_20250305";
@@ -96,7 +96,7 @@ const MAX_BUSCAS = 3;
 const MAX_RODADAS = 3;
 
 const TIMEOUT_BUSCA_MS = 60_000;
-const TIMEOUT_REDACAO_MS = 30_000;
+export const TIMEOUT_REDACAO_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -131,7 +131,14 @@ export type R<T> = ({ ok: true } & T) | { ok: false; erro: string };
 
 type BlocoQualquer = Record<string, unknown>;
 
-async function chamar(
+/**
+ * EXPORTADA em 08/08 (FAROL-SABER-01, Entrega 3). Era privada, e a alternativa
+ * era `lib/farol/responde.ts` ter a própria cópia de timeout, AbortController,
+ * corte de corpo de erro e continuação por `pause_turn`. Duas cópias dessa
+ * infra viram duas verdades sobre o que acontece quando a Anthropic demora —
+ * e a segunda envelhece calada. Exportar é a opção menos ruim.
+ */
+export async function chamar(
   corpo: Record<string, unknown>,
   timeoutMs: number
 ): Promise<R<{ data: { content?: BlocoQualquer[]; stop_reason?: string } }>> {
@@ -171,7 +178,8 @@ async function chamar(
 }
 
 /** Junta os blocos `text` de uma resposta. Ignora tool_use e resultados. */
-function textoDe(content: BlocoQualquer[] | undefined): string {
+/** Exportada junto de `chamar` — ver a nota lá. */
+export function textoDe(content: BlocoQualquer[] | undefined): string {
   let out = "";
   for (const b of content ?? []) {
     if (b?.type === "text" && typeof b.text === "string") out += b.text;
@@ -416,39 +424,63 @@ function numeros(c: CartaCarrossel): string {
  * recorte entre a primeira `{` e a última `}` custa nada e transforma o modo de
  * falha mais comum (uma frase de cortesia antes do objeto) em não-evento.
  */
-function recortarJson(bruto: string): string {
+/** Exportada junto de `chamar` — ver a nota lá. */
+export function recortarJson(bruto: string): string {
   const s = bruto.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const i = s.indexOf("{");
   const j = s.lastIndexOf("}");
   return i >= 0 && j > i ? s.slice(i, j + 1) : s;
 }
 
+/**
+ * FAROL-SABER-01, Entrega 2 — o lado da ESCUTA.
+ *
+ * `saber` chega PRONTO, como string, e não como um cliente de banco. É
+ * deliberado: este módulo é hoje um consumidor puro da Anthropic, sem nenhuma
+ * dependência de Supabase, e essa pureza é o que deixa `escreverPauta`
+ * testável sem subir banco. Quem tem o `db` é o route (que já cria o
+ * `createXtvClient`), então é lá que `blocoSaber()` é chamado — inclusive o
+ * kill-switch, que mora dentro dele.
+ *
+ * Vazio (o padrão) reproduz byte a byte a mensagem de antes desta fatia: o
+ * bloco só é empilhado quando tem conteúdo. Desarmado, sem migração aplicada,
+ * OpenAI fora ou acervo sem nada parecido — em todos os casos a pauta sai
+ * exatamente como sai hoje.
+ */
 export async function escreverPauta(
   carta: CartaCarrossel,
   formula: Formula,
-  angulos: string
+  angulos: string,
+  saber = ""
 ): Promise<R<TextoPauta>> {
+  const conteudo = [
+    "O que está em alta agora (use só como referência de ESTRUTURA — não",
+    "copie nenhuma frase daqui):",
+    angulos,
+    "",
+  ];
+
+  // A ordem importa: o saber entra DEPOIS da tendência e ANTES dos números.
+  // A tendência é forma, o saber é fato da casa e os números são a verdade
+  // desta carta — e o modelo dá mais peso ao que vem por último. Deixar o
+  // acervo acima dos números evita que um verbete genérico ("imóvel costuma
+  // ter prazo longo") compita com o prazo real que está no card.
+  if (saber) conteudo.push(saber, "");
+
+  conteudo.push(
+    "A carta de hoje (use estes números e nenhum outro):",
+    numeros(carta),
+    "",
+    `Escreva a pauta na fôrma ${formula.id}. Responda só o JSON.`
+  );
+
   const r = await chamar(
     {
       model: MODELO,
       max_tokens: 1500,
       system: systemRedacao(formula),
       // SEM `tools` — ver o header. É o que força o turno a fechar em texto.
-      messages: [
-        {
-          role: "user",
-          content: [
-            "O que está em alta agora (use só como referência de ESTRUTURA — não",
-            "copie nenhuma frase daqui):",
-            angulos,
-            "",
-            "A carta de hoje (use estes números e nenhum outro):",
-            numeros(carta),
-            "",
-            `Escreva a pauta na fôrma ${formula.id}. Responda só o JSON.`,
-          ].join("\n"),
-        },
-      ],
+      messages: [{ role: "user", content: conteudo.join("\n") }],
     },
     TIMEOUT_REDACAO_MS
   );

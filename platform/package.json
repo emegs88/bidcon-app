@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --tsconfig tsconfig.test.json --test lib/comissao.test.ts lib/ia.guardrail.test.ts lib/simulador-disal.test.tsx lib/disal/custo-efetivo-plano-novo.test.ts lib/farol/reel-texto.test.ts lib/reserve/0017.test.ts lib/reserve/repasse-pricing.test.ts lib/reserve/reserve.test.ts lib/simulador/engine.test.ts lib/simulador/otimizador.test.ts lib/whatsapp/cerebro.test.ts"
+    "test": "tsx --tsconfig tsconfig.test.json --test lib/comissao.test.ts lib/ia.guardrail.test.ts lib/simulador-disal.test.tsx lib/disal/custo-efetivo-plano-novo.test.ts lib/farol/reel-texto.test.ts lib/farol/responde.test.ts lib/farol/saber.test.ts lib/reserve/0017.test.ts lib/reserve/repasse-pricing.test.ts lib/reserve/reserve.test.ts lib/simulador/engine.test.ts lib/simulador/otimizador.test.ts lib/whatsapp/cerebro.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
