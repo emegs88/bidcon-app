@@ -41,9 +41,9 @@
      qualquer site que os use). Não são segredo e por isso podem viver no
      repositório — diferente de qualquer chave de API, que nunca entra aqui.
      ========================================================================= */
-  var GA4_ID             = '';   // [PREENCHER: ex. G-XXXXXXXXXX]
-  var ADS_ID             = '';   // [PREENCHER: ex. AW-123456789]
-  var ADS_CONVERSAO_LEAD = '';   // [PREENCHER: ex. AW-123456789/AbC-D_efGhIjK]
+  var GA4_ID             = 'G-2TCXC9C1B8';   // [PREENCHER: ex. G-XXXXXXXXXX]
+  var ADS_ID             = 'AW-18367230323';   // [PREENCHER: ex. AW-123456789]
+  var ADS_CONVERSAO_LEAD = 'AW-18367230323/KZiXCLW5894cEPPilrZE';   // [PREENCHER: ex. AW-123456789/AbC-D_efGhIjK]
   var CLARITY_ID         = '';   // [PREENCHER: ex. abcdefghij]
 
   var KEY = 'bidcon_consent_v1';
