@@ -54,19 +54,31 @@
   quem resolvia o padrão era o **test runner do Node, só a partir da v22**.
   Local Node 24: 346 testes. Runner Node 20: `Could not find
   '.../lib/**/*.test.ts'`, exit 1, suíte inteira pulada com o tsc passando.
-- A nota no `package.json` **já dizia** "quem expande é o Node (>= 21)" e o
-  `testes.yml` **já fixava** `node-version: 20`. Os dois fatos estavam escritos,
-  um degrau de distância, e ninguém os cruzou. Ao mexer em ferramenta cujo
-  comportamento depende de versão, conferir a versão do runner no mesmo
-  movimento — está no workflow, não é adivinhação.
+- **PISO DE VERSÃO DECLARADO NUM ARQUIVO TEM QUE ESTAR DECLARADO NO RUNNER
+  TAMBÉM.** Quando o `package.json` (ou qualquer script) depender de um recurso
+  com versão mínima, o `testes.yml` precisa **fixar essa versão** E a nota
+  precisa **dizer onde está o par**. Um piso escrito só de um lado não é
+  garantia, é anotação.
+- O incidente que gerou a regra: a nota no `package.json` **já dizia** "quem
+  expande é o Node (>= 21)" e o `testes.yml` **já fixava** `node-version: 20`.
+  Os dois fatos estavam escritos, a um degrau de distância. **O custo não foi de
+  descoberta, foi de CRUZAMENTO** — ninguém leu os dois no mesmo movimento.
+  Descobrir é caro; cruzar o que já está escrito é de graça, e foi exatamente o
+  que faltou. Ao mexer em ferramenta cujo comportamento depende de versão,
+  conferir a versão do runner na mesma passada — está no workflow, não é
+  adivinhação.
 - **Validar reproduzindo o runner, não confiando na máquina.** `npx -y node@20`
   roda a versão do CI aqui. E rodar sob `sh -c '...'` com aspas simples para
   provar que o conserto não depende de shell nenhum.
-- **Suíte que não acha arquivo tem que FALHAR.** Medido: `--test lib`
-  (diretório) no Node 20 devolve `pass 0` com **exit 0**, porque a descoberta
-  padrão do Node 20 só reconhece .js/.cjs/.mjs. Seria trocar CI vermelho por CI
-  VERDE QUE NÃO RODA NADA — estritamente pior, porque o vermelho ao menos grita.
-  Todo descobridor de teste carrega portão de "zero arquivo = exit 1".
+- **CANDIDATO REJEITADO, registrado para não ser reproposto:** `--test lib`
+  (passar o diretório). Medido no Node 20: **exit 0 com ZERO testes** — a
+  descoberta padrão do Node 20 só reconhece .js/.cjs/.mjs, e nenhum `.test.ts`
+  entra. Teria "consertado" o CI trocando vermelho por **verde vazio**.
+- **Verde vazio é pior que vermelho, porque PARA DE AVISAR.** O vermelho é um
+  defeito que grita; o verde vazio é um defeito que se disfarça de saúde e
+  compra confiança sem entregar cobertura — e só aparece quando a produção
+  quebra. Daí a regra dura: **suíte que não acha arquivo tem que FALHAR**, e
+  todo descobridor de teste carrega portão de "zero arquivo = exit 1".
 - Corolário da mesma família: **lista explícita de arquivo de teste é proibida**
   (arquivo novo nunca roda, em silêncio, e o total sobe por causa dos outros).
   A descoberta vive em `platform/scripts/testes.mjs`, em Node puro, sem glob
