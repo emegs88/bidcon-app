@@ -24,6 +24,12 @@ import {
   TETO_CUSTO_AM,
   MARGEM_TETO_VIEW,
   LIMITE_CANDIDATOS,
+  JANELA_REPETICAO_DIAS,
+  JANELA_REPETICAO_PADRAO,
+  JANELA_REPETICAO_MAX,
+  janelaDias,
+  repetiriaCedoDemais,
+  memoriaVazia,
 } from "./selecao";
 import type { CartaCarrossel } from "@/lib/carrossel-formato";
 
@@ -259,4 +265,77 @@ test("carta cara com alavancagem altíssima é eliminada, não promovida", () =>
   assert.ok(alavancagem(predadora) > alavancagem(honesta), "ela ganharia no ranking puro");
   const fila = [predadora, honesta].filter(dentroDoTeto).sort(compararPelaRegra);
   assert.deepEqual(fila.map((c) => c.id), ["h"], "a camada 1 tinha que ter eliminado a predadora");
+});
+
+// ---------------------------------------------------------------------------
+// JANELA ANTI-REPETIÇÃO POR TIPO — AUTORIZADO: 09/08/2026.
+//
+// A janela deixou de ser um número e virou duas. O teste que importa não é
+// "existe uma constante 7": é que a MESMA memória, com a MESMA carta e o MESMO
+// relógio, responde COISAS DIFERENTES para veículo e para imóvel. Se alguém
+// reunificar as janelas por engano, é aqui que quebra.
+// ---------------------------------------------------------------------------
+
+const DIA = 24 * 60 * 60 * 1000;
+
+test("JANELA · veículo usa 7 dias e imóvel usa 14", () => {
+  assert.equal(JANELA_REPETICAO_DIAS.veiculo, 7);
+  assert.equal(JANELA_REPETICAO_DIAS.imovel, 14);
+  assert.equal(janelaDias("veiculo"), 7);
+  assert.equal(janelaDias("imovel"), 14);
+});
+
+test("JANELA · tipo ausente ou desconhecido cai na janela mais LONGA", () => {
+  // Na dúvida, repetir menos. Um tipo novo na view não pode estrear com a
+  // janela curta sem alguém ter decidido isso.
+  assert.equal(janelaDias(undefined), JANELA_REPETICAO_PADRAO);
+  assert.equal(janelaDias(null), JANELA_REPETICAO_PADRAO);
+  assert.equal(janelaDias(""), JANELA_REPETICAO_PADRAO);
+  assert.equal(janelaDias("motorhome"), JANELA_REPETICAO_PADRAO);
+  assert.equal(JANELA_REPETICAO_PADRAO, 14);
+});
+
+test("JANELA · a memória enxerga para trás o suficiente para a janela mais longa", () => {
+  // `publicadasRecentemente` faz UMA consulta, com o maior dos prazos, e o
+  // corte fino acontece por carta. Se MAX ficar menor que qualquer janela, a
+  // memória chegaria cega em `candidatos()` e a carta voltaria cedo demais.
+  for (const [tipo, dias] of Object.entries(JANELA_REPETICAO_DIAS)) {
+    assert.ok(JANELA_REPETICAO_MAX >= dias, `MAX não cobre a janela de ${tipo}`);
+  }
+  assert.ok(JANELA_REPETICAO_MAX >= JANELA_REPETICAO_PADRAO);
+});
+
+test("JANELA · aos 10 dias o veículo já voltou e o imóvel ainda não", () => {
+  // O coração da decisão, num único instante. Mesma memória, mesmo relógio.
+  const agora = Date.UTC(2026, 7, 9, 14, 0, 0);
+  const memoria = new Map([["x", agora - 10 * DIA]]);
+  const veiculo = { id: "x", tipo: "veiculo" };
+  const imovel = { id: "x", tipo: "imovel" };
+  assert.equal(repetiriaCedoDemais(memoria, veiculo, agora), false, "veículo já cumpriu os 7 dias");
+  assert.equal(repetiriaCedoDemais(memoria, imovel, agora), true, "imóvel ainda deve 4 dias dos 14");
+});
+
+test("JANELA · a borda é o dia exato — 6d59 ainda barra o veículo, 7d libera", () => {
+  const agora = Date.UTC(2026, 7, 9, 14, 0, 0);
+  const quase = new Map([["x", agora - (7 * DIA - 60_000)]]);
+  const cheio = new Map([["x", agora - 7 * DIA]]);
+  const veiculo = { id: "x", tipo: "veiculo" };
+  assert.equal(repetiriaCedoDemais(quase, veiculo, agora), true);
+  assert.equal(repetiriaCedoDemais(cheio, veiculo, agora), false, "a janela é fechada no fim");
+});
+
+test("JANELA · carta que nunca foi publicada nunca é barrada", () => {
+  const memoria = new Map([["outra", Date.now()]]);
+  assert.equal(repetiriaCedoDemais(memoria, { id: "x", tipo: "veiculo" }), false);
+  assert.equal(repetiriaCedoDemais(memoriaVazia(), { id: "x", tipo: "imovel" }), false);
+});
+
+test("JANELA · memória vazia não barra ninguém — é o contrato do carrossel", () => {
+  // O carrossel de sábado passa `memoriaVazia()` DE PROPÓSITO: a promessa dele
+  // é "as melhores da semana", não "as melhores que ainda não postei".
+  const vazia = memoriaVazia();
+  assert.equal(vazia.size, 0);
+  for (const tipo of ["imovel", "veiculo", "motorhome"]) {
+    assert.equal(repetiriaCedoDemais(vazia, { id: "qualquer", tipo }), false);
+  }
 });

@@ -28,7 +28,8 @@
 // SELEÇÃO DA CARTA DO DIA (determinística, sem IA — regra da OS):
 //   1. fonte = `vw_vitrine_viva`, a MESMA que /api/card-image lê. Se a carta
 //      não está nela, a arte devolveria 404 e a Meta recusaria o container.
-//   2. exclui cartas publicadas nos últimos 14 dias (memória em farol_posts).
+//   2. exclui cartas publicadas na janela DO TIPO delas — 14 dias para imóvel,
+//      7 para veículo (memória em farol_posts). Ver `JANELA_REPETICAO_DIAS`.
 //   3. alterna tipo por dia: ímpar = imóvel, par = veículo. Sem estoque
 //      daquele tipo, cai pro outro.
 //   4. filtra pelo TETO de custo do tipo e escolhe a de maior ALAVANCAGEM
@@ -76,7 +77,7 @@
 //
 // ---------------------------------------------------------------------------
 // EXTRAÇÃO (FAROL-REEL-01, 06/08/2026): o guard, a data em São Paulo, a memória
-// de 14 dias, a busca de candidatos, a escolha, a trava de compliance e o
+// da janela, a busca de candidatos, a escolha, a trava de compliance e o
 // `registrar()` saíram DESTE arquivo e viraram lib/farol/selecao.ts, porque a
 // OS do reel manda usar "a MESMA lib de seleção do FAROL-POST" — e ela não
 // existia. MUDANÇA DE ENDEREÇO, NÃO DE COMPORTAMENTO: o corpo foi levado
@@ -184,14 +185,14 @@ export async function GET(req: Request) {
   try {
     // Memória com ["post_publicado"] — exatamente a mesma lista de antes da
     // extração, para que o comportamento desta rota não mude. Ver header.
-    const excluidos = await publicadasRecentemente(db, ["post_publicado"]);
+    const memoria = await publicadasRecentemente(db, ["post_publicado"]);
 
     // ---- Escolha da carta -------------------------------------------------
     const {
       carta: escolhida,
       motivo: motivoEscolha,
       tipoDoDia,
-    } = await escolherCartaDoDia(db, { dia, segunda, excluidos });
+    } = await escolherCartaDoDia(db, { dia, segunda, memoria });
 
     if (!escolhida) {
       console.log("[farol] sem carta elegível hoje:", { data: hoje, tipoDoDia });

@@ -253,14 +253,14 @@ export async function GET(req: Request) {
     // regra da casa, e o perfil ganha duas cartas por dia em vez da mesma duas
     // vezes. ("Próxima mais barata" até 09/08/2026; hoje a fila é ordenada por
     // alavancagem dentro do teto de custo — ver lib/farol/selecao.ts.)
-    const excluidos = await publicadasRecentemente(db, [
+    const memoria = await publicadasRecentemente(db, [
       "post_publicado",
       "reel_publicado",
     ]);
     const { carta, motivo: motivoEscolha, tipoDoDia } = await escolherCartaDoDia(db, {
       dia,
       segunda,
-      excluidos,
+      memoria,
     });
 
     if (!carta) {

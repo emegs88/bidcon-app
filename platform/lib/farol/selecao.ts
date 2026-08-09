@@ -39,7 +39,8 @@
 // ---------------------------------------------------------------------------
 // A REGRA:
 //   1. fonte = `vw_vitrine_viva`, a MESMA que /api/card-image lê;
-//   2. exclui cartas já usadas nos últimos 14 dias (memória em farol_posts);
+//   2. exclui cartas já usadas na janela DO TIPO delas — 14 dias para imóvel,
+//      7 para veículo (memória em farol_posts). Ver `JANELA_REPETICAO_DIAS`;
 //   3. alterna tipo por dia: ímpar = imóvel, par = veículo; sem estoque, cai
 //      no outro;
 //   4. FILTRO por teto de custo + RANKING por ALAVANCAGEM — ver o bloco
@@ -61,8 +62,47 @@ type Db = ReturnType<typeof createXtvClient>;
 
 const TZ = "America/Sao_Paulo";
 
-/** Dias sem repetir a mesma carta. Regra da OS. */
-export const JANELA_REPETICAO_DIAS = 14;
+/**
+ * Dias sem repetir a mesma carta — POR TIPO desde 09/08/2026.
+ *
+ * Era 14 para todo mundo. Veículo caiu para 7 por uma pressão MEDIDA, não por
+ * gosto. Com o teto de veículo em 1,50% a.m. (decisão (d) da mesma data), o
+ * pool elegível é de 17 cartas. Com post diário e carrossel de sábado armados,
+ * o consumo projetado é de ~13 cartas de veículo a cada 14 dias — sobrariam ~4.
+ * Nada quebraria: `escolherCartaDoDia` cai no outro tipo sozinha, sem erro. E é
+ * exatamente por isso que o problema é perigoso — ele apareceria como "sumiu
+ * veículo do Instagram", sem uma única linha vermelha em log nenhum.
+ *
+ * Imóvel não tem essa pressão (278 elegíveis) e fica em 14.
+ *
+ * Afrouxar o teto seria o instrumento errado, e isso também está MEDIDO:
+ * 1,55% não compra nenhuma carta nova (17), 1,60% compra 2 (19), e só 1,70%
+ * alarga de verdade (27) — devolvendo ao card o 1,6x% a.m. que a decisão (d)
+ * tinha acabado de tirar de propósito.
+ *
+ * O fundamento da escolha: a janela existe por FRESCOR EDITORIAL, não por
+ * correção. Carta republicada depois de 7 dias continua disponível e continua
+ * verdadeira. Vitrine sem veículo, essa sim, é erro de produto.
+ */
+export const JANELA_REPETICAO_DIAS: Record<string, number> = {
+  imovel: 14,
+  veiculo: 7,
+};
+
+/** Tipo desconhecido usa a janela mais LONGA: na dúvida, repete menos. */
+export const JANELA_REPETICAO_PADRAO = 14;
+
+/** A maior das janelas — é o quanto a memória precisa enxergar para trás. */
+export const JANELA_REPETICAO_MAX = Math.max(
+  JANELA_REPETICAO_PADRAO,
+  ...Object.values(JANELA_REPETICAO_DIAS)
+);
+
+/** A janela do tipo, em dias. Tipo ausente ou desconhecido cai no padrão. */
+export function janelaDias(tipo?: string | null): number {
+  if (!tipo) return JANELA_REPETICAO_PADRAO;
+  return JANELA_REPETICAO_DIAS[tipo] ?? JANELA_REPETICAO_PADRAO;
+}
 
 /**
  * Quantos candidatos puxar da view antes do cálculo canônico.
@@ -261,17 +301,39 @@ export function hojeSP(): { data: string; dia: number; segunda: boolean } {
   return { data, dia: Number(data.slice(8, 10)), segunda: semana === "Mon" };
 }
 
-/** Cartas já usadas na janela — a memória que impede repetir. */
+/**
+ * A memória que impede repetir: id da carta → instante do post MAIS RECENTE.
+ *
+ * DEIXOU DE SER `Set<string>` EM 09/08/2026, e a razão é a janela por tipo.
+ * Esta função lê `farol_posts`, que guarda `carta_id` e mais nada sobre a
+ * carta — ela NÃO SABE se aquilo era imóvel ou veículo, e cada rota a chama uma
+ * única vez, antes de o tipo do dia sequer existir. Um conjunto de ids já
+ * cortados numa janela fixa não tem como carregar duas janelas diferentes.
+ *
+ * Então a divisão do trabalho mudou: aqui se lê pela janela MAIS LONGA e se
+ * devolve o CARIMBO DE TEMPO; o corte exato acontece em `candidatos()`, carta a
+ * carta, onde `normalizarCarta` já disse o tipo de cada uma. Continua sendo uma
+ * pergunta ao banco, não duas — e o ramo da exclusiva, que varre os dois tipos
+ * juntos e por isso nunca teve um "tipo do filtro", passou a acertar a janela
+ * de cada carta em vez de aplicar uma só para as duas.
+ */
+export type MemoriaRecente = Map<string, number>;
+
+/** Memória vazia — para quem não usa janela (o carrossel, de propósito). */
+export function memoriaVazia(): MemoriaRecente {
+  return new Map();
+}
+
 export async function publicadasRecentemente(
   db: Db,
   acoes: string[] = ["post_publicado"]
-): Promise<Set<string>> {
+): Promise<MemoriaRecente> {
   const desde = new Date(
-    Date.now() - JANELA_REPETICAO_DIAS * 24 * 60 * 60 * 1000
+    Date.now() - JANELA_REPETICAO_MAX * 24 * 60 * 60 * 1000
   ).toISOString();
   const { data, error } = await db
     .from("farol_posts")
-    .select("carta_id")
+    .select("carta_id,criado_em")
     .in("acao", acoes)
     .gte("criado_em", desde);
   if (error) {
@@ -279,11 +341,33 @@ export async function publicadasRecentemente(
     // FAROL poderia postar a mesma carta dois dias seguidos. Propaga.
     throw new Error(`farol_posts_ilegivel: ${error.message}`);
   }
-  const ids = new Set<string>();
-  for (const l of (data ?? []) as { carta_id: string | null }[]) {
-    if (l.carta_id) ids.add(l.carta_id);
+  const memoria: MemoriaRecente = new Map();
+  const linhas = (data ?? []) as {
+    carta_id: string | null;
+    criado_em: string | null;
+  }[];
+  for (const l of linhas) {
+    if (!l.carta_id) continue;
+    const t = l.criado_em ? Date.parse(l.criado_em) : NaN;
+    // Data ilegível vira "agora": o efeito é excluir a carta pela janela
+    // inteira. Errar para o lado de NÃO repetir, igual ao erro de leitura.
+    const quando = Number.isFinite(t) ? t : Date.now();
+    const atual = memoria.get(l.carta_id);
+    // Só o post mais recente importa: é dele que a janela conta.
+    if (atual === undefined || quando > atual) memoria.set(l.carta_id, quando);
   }
-  return ids;
+  return memoria;
+}
+
+/** True se a carta foi publicada DENTRO da janela do tipo dela. */
+export function repetiriaCedoDemais(
+  memoria: MemoriaRecente,
+  carta: { id: string; tipo?: string | null },
+  agora: number = Date.now()
+): boolean {
+  const quando = memoria.get(carta.id);
+  if (quando === undefined) return false;
+  return agora - quando < janelaDias(carta.tipo) * 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -298,8 +382,11 @@ export async function publicadasRecentemente(
 export async function candidatos(
   db: Db,
   filtro: { tipo?: string; exclusiva?: boolean },
-  excluidos: Set<string>
+  memoria: MemoriaRecente
 ): Promise<CartaCarrossel[]> {
+  // Um instante só para o lote inteiro: duas cartas na mesma consulta não podem
+  // ser julgadas por relógios diferentes.
+  const agora = Date.now();
   // Teto no banco: com tipo conhecido, o dele; sem tipo (ramo da exclusiva, que
   // varre imóvel e veículo juntos), o MAIOR dos dois — apertar aqui cortaria
   // veículo legítimo antes de o canônico opinar. A peneira exata vem depois.
@@ -322,7 +409,8 @@ export async function candidatos(
   return ((data ?? []) as LinhaVitrine[])
     .map(normalizarCarta)
     .filter((c): c is CartaCarrossel => c !== null)
-    .filter((c) => !excluidos.has(c.id))
+    // Janela anti-repetição, agora pelo tipo DA CARTA (7 veículo / 14 imóvel).
+    .filter((c) => !repetiriaCedoDemais(memoria, c, agora))
     // custoAm null = a carta não tem parcela/prazo utilizáveis. O card e a
     // legenda mostrariam "—" no lugar do número principal. Fora.
     .filter((c) => c.custoAm != null)
@@ -345,7 +433,7 @@ export type EscolhaDoDia = {
  */
 export async function escolherCartaDoDia(
   db: Db,
-  opts: { dia: number; segunda: boolean; excluidos: Set<string> }
+  opts: { dia: number; segunda: boolean; memoria: MemoriaRecente }
 ): Promise<EscolhaDoDia> {
   const tipoDoDia = opts.dia % 2 === 1 ? "imovel" : "veiculo";
   const tipoAlternativo = tipoDoDia === "imovel" ? "veiculo" : "imovel";
@@ -353,18 +441,18 @@ export async function escolherCartaDoDia(
   // Segunda: exclusiva fura fila (qualquer tipo). Se não houver exclusiva
   // elegível, o dia segue a regra normal — sem post especial, sem erro.
   if (opts.segunda) {
-    const exclusivas = await candidatos(db, { exclusiva: true }, opts.excluidos);
+    const exclusivas = await candidatos(db, { exclusiva: true }, opts.memoria);
     if (exclusivas.length > 0) {
       return { carta: exclusivas[0], motivo: "exclusiva_segunda", tipoDoDia };
     }
   }
 
-  const doTipo = await candidatos(db, { tipo: tipoDoDia }, opts.excluidos);
+  const doTipo = await candidatos(db, { tipo: tipoDoDia }, opts.memoria);
   if (doTipo.length > 0) {
     return { carta: doTipo[0], motivo: `tipo_do_dia:${tipoDoDia}`, tipoDoDia };
   }
 
-  const doOutro = await candidatos(db, { tipo: tipoAlternativo }, opts.excluidos);
+  const doOutro = await candidatos(db, { tipo: tipoAlternativo }, opts.memoria);
   if (doOutro.length > 0) {
     return {
       carta: doOutro[0],
