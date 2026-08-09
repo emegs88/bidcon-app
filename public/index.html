@@ -211,6 +211,41 @@
     </div>
   </section>
 
+  <!-- ==========================================================================
+       COMPLIANCE-ADS-01 — divulgação exigida pela política de serviços
+       financeiros do Google: endereço físico completo, taxas associadas e
+       caminho para os termos precisam estar VISÍVEIS E IMEDIATOS na landing —
+       sem clique, sem hover, sem popup, sem accordion. Por isso este bloco é
+       permanente e fica ACIMA da seção de cartas, e não no rodapé.
+
+       FONTE DO CEP — declarada de propósito: 01451-917 NÃO saiu do repositório.
+       Saiu da base dos Correios (confirmação externa, três fontes
+       independentes): Av. Brigadeiro Faria Lima, 1572, Edifício Barão de
+       Rothschild, Jardim Paulistano, São Paulo/SP. Antes dessa medição o CEP
+       não existia em nenhum texto visível do site — só dentro do ld+json
+       ("postalCode", no head), onde nenhum humano lê. O rodapé desta mesma
+       página traz o endereço SEM CEP.
+
+       RESSALVA REGISTRADA: circula também 01451-001 para o mesmo número. Esse
+       é o CEP do logradouro; 01451-917 é de grande usuário (o edifício). Para
+       exibição, qualquer um dos dois localiza. Para declaração formal a fonte
+       de verdade é o cartão CNPJ, ainda pendente de confirmação. Se divergir,
+       é uma linha só — aqui, no rodapé e no ld+json do head.
+       ========================================================================== -->
+  <style>
+    .bc-cpl{background:var(--carvao);border:1px solid var(--linha);border-radius:var(--raio-sm);padding:15px 18px;margin:30px 0 4px;font-size:12px;line-height:1.7;color:var(--cinza)}
+    .bc-cpl b{color:#d8d8de;font-weight:600}
+    .bc-cpl span{display:block}
+    .bc-cpl span+span{margin-top:5px}
+    .bc-cpl a{color:var(--ambar-l);text-decoration:underline;text-underline-offset:2px}
+    @media(max-width:640px){.bc-cpl{font-size:11.5px;padding:13px 15px;margin-top:24px}}
+  </style>
+  <section class="bc-cpl" aria-label="Identificação da empresa e custos">
+    <span><b>EGS Capital Participações Ltda</b> · CNPJ 67.709.975/0001-64 · NIRE 35.250.408.073</span>
+    <span>Av. Brigadeiro Faria Lima, 1572, sala 1022 — Jardim Paulistano, São Paulo/SP, CEP 01451-917</span>
+    <span><b>Custos:</b> a comissão de intermediação da bidcon já está incluída na entrada exibida — não há taxa cobrada por fora. O custo ao mês é exibido em cada carta. Condições completas nos <a href="/termos">Termos de Uso</a>.</span>
+  </section>
+
   <div class="stats" id="stats"></div>
 
   <div class="cotas-head" id="cotas">
@@ -1315,7 +1350,7 @@
     bidcon · Marketplace de cotas contempladas<br>
     by <a href="https://www.prospere.com.br/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><b>Grupo Prospere</b></a><br>
     <span class="bc-mono" style="font-size:11px;color:var(--cinza2)">bidcon é marca de EGS Capital Participações Ltda · CNPJ 67.709.975/0001-64<br>
-    NIRE 35.250.408.073 · Av. Brigadeiro Faria Lima, 1572, sala 1022 — São Paulo/SP<br>
+    NIRE 35.250.408.073 · Av. Brigadeiro Faria Lima, 1572, sala 1022 — Jardim Paulistano, São Paulo/SP, CEP 01451-917<br>
     Grupo Prospere · Consórcios · Imóveis · Seguros<br>
     A bidcon intermedia a negociação e não custodia valores. Pagamentos exclusivamente por boleto da conta vinculada do 5º Tabelionato de Notas de Campinas (CNJ 197/2025). Marca BIDCON depositada no INPI — processo 944364616.</span><br>
     <span style="font-size:11px;color:var(--cinza2)">Valores exibidos são estimativas; transferência sujeita à análise e aprovação da administradora.</span>
