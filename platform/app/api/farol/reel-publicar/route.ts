@@ -75,6 +75,7 @@ import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { autorizadoFarol, revisarLegenda, registrar } from "@/lib/farol/selecao";
 import { chamarGraph } from "@/lib/instagram/publicar";
+import { enviarBytesResumable } from "@/lib/instagram/rupload";
 import { statusVideo, tituloRender } from "@/lib/heygen";
 import { subirShort } from "@/lib/youtube/upload";
 import { publicarVideo } from "@/lib/tiktok/upload";
@@ -315,7 +316,7 @@ async function hospedarVideo(
   db: Db,
   videoId: string,
   videoUrl: string
-): Promise<{ ok: true; url: string } | { ok: false; erro: string }> {
+): Promise<{ ok: true; url: string; bytes: Uint8Array<ArrayBuffer> } | { ok: false; erro: string }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_VIDEO_MS);
   try {
@@ -349,7 +350,13 @@ async function hospedarVideo(
       bytes: bytes.byteLength,
       url: data.publicUrl,
     });
-    return { ok: true, url: data.publicUrl };
+    // DEVOLVE OS BYTES JUNTO (FASE2-A). Eles já estão em memória aqui — o
+    // `arrayBuffer()` acima os materializou por inteiro para poder subir ao
+    // bucket. Devolvê-los não acrescenta um único byte de teto; o que ele
+    // evita é o caminho resumable ter que BAIXAR DE NOVO o mp4 que acabou de
+    // passar por esta função. Sem isto, ligar o resumable dobraria o tráfego e
+    // o tempo desta rota sem melhorar nada.
+    return { ok: true, url: data.publicUrl, bytes };
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
       return { ok: false, erro: `timeout_download(${TIMEOUT_VIDEO_MS}ms)` };
@@ -358,6 +365,51 @@ async function hospedarVideo(
       ok: false,
       erro: e instanceof Error ? e.message.slice(0, 300) : "erro_desconhecido",
     };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Rebaixa o mp4 do NOSSO bucket para a memória, quando o caminho resumable
+ * precisa dos bytes e esta invocação não foi a que hospedou.
+ *
+ * POR QUE ISTO EXISTE E POR QUE É BARATO: a hospedagem é idempotente por
+ * video_id, então uma invocação que retoma uma linha já hospedada não tem o
+ * buffer em memória — ele morreu com a lambda anterior. Baixar do HeyGen de
+ * novo estaria fora de questão (URL presignada, pode ter expirado); baixar do
+ * nosso bucket é a mesma região do banco e não custa o teto de tempo do
+ * download original.
+ *
+ * Devolve null em vez de lançar: quem chama já tem um ramo de falha nomeado.
+ * O teto de bytes é o MESMO da hospedagem — não há caminho por onde entrar em
+ * memória mais do que TETO_VIDEO_BYTES.
+ */
+async function rebaixarHospedado(url: string | null): Promise<Uint8Array<ArrayBuffer> | null> {
+  if (!url) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_VIDEO_MS);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) {
+      console.error("[farol-reel] rebaixar hospedado falhou:", { url, status: resp.status });
+      return null;
+    }
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > TETO_VIDEO_BYTES) {
+      console.error("[farol-reel] rebaixar hospedado tamanho inválido:", {
+        url,
+        bytes: bytes.byteLength,
+      });
+      return null;
+    }
+    return bytes;
+  } catch (e) {
+    console.error("[farol-reel] rebaixar hospedado erro:", {
+      url,
+      erro: e instanceof Error ? e.message.slice(0, 200) : "desconhecido",
+    });
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -681,6 +733,10 @@ export async function GET(req: Request) {
       // video_id), para que uma republicação não pague o download de novo.
       const detPre = (linha.detalhe ?? {}) as { url_hospedada?: string };
       let urlPublica = detPre.url_hospedada ?? null;
+      // Buffer vivo desta invocação. Só existe se a hospedagem correu AGORA;
+      // numa invocação que reaproveitou `url_hospedada` ele fica nulo e o
+      // caminho resumable rebaixa do nosso bucket (rápido, mesma região).
+      let bytesEmMemoria: Uint8Array<ArrayBuffer> | null = null;
       if (!urlPublica) {
         const h = await hospedarVideo(db, linha.video_id, s.data.videoUrl);
         if (!h.ok) {
@@ -696,6 +752,7 @@ export async function GET(req: Request) {
           break;
         }
         urlPublica = h.url;
+        bytesEmMemoria = h.bytes;
         // Grava ANTES de criar o container, pelo mesmo motivo da trava (3): se
         // a invocação morrer no meio, a próxima reaproveita o upload em vez de
         // refazê-lo — e é este campo que distingue container novo de legado.
@@ -704,14 +761,42 @@ export async function GET(req: Request) {
         linha.detalhe = detalheNovo;
       }
 
-      // A Meta recebe a NOSSA URL: estável, sem expiração e distinta por objeto
-      // — que é o que quebra o dedupe de container medido hoje.
-      const container = await chamarGraph("media", {
-        media_type: "REELS",
-        video_url: urlPublica,
-        caption: legenda,
-        share_to_feed: true,
-      });
+      // ---- Container: DOIS CAMINHOS, um deles desarmado (FASE2-A) ----------
+      // PADRÃO (`video_url`): a Meta recebe a NOSSA URL — estável, sem
+      // expiração e distinta por objeto, que é o que quebra o dedupe de
+      // container medido em produção. Este continua sendo o caminho de fábrica.
+      //
+      // RESUMABLE (`FAROL_REEL_RESUMABLE=on`): nós EMPURRAMOS os bytes em vez
+      // de dar uma URL para a Meta buscar. Isso remove da corrente o único
+      // trecho que nunca conseguimos observar — o fetch dela na nossa URL —,
+      // que por eliminação é onde o container fica IN_PROGRESS para sempre.
+      //
+      // É HIPÓTESE SOB TESTE, NÃO CONSERTO. Se o container travar mesmo com os
+      // bytes entregues na mão, a hipótese do fetch morre e sobra a Meta. Isso
+      // é informação, e é por isso que a troca nasce atrás de env: quem decide
+      // mudar o padrão decide com o log na mão, não com uma expectativa.
+      //
+      // A HOSPEDAGEM CONTINUA ACONTECENDO NOS DOIS CAMINHOS, de propósito. Ela
+      // não é só insumo do container: o mp4 hospedado é o asset oficial para o
+      // repost manual no TikTok, e é ele que permite voltar ao caminho padrão
+      // sem baixar nada do HeyGen de novo (cuja URL presignada já pode ter
+      // expirado). Economizar a hospedagem aqui compraria segundos e venderia
+      // a reversibilidade.
+      const usarResumable = process.env.FAROL_REEL_RESUMABLE === "on";
+
+      const container = usarResumable
+        ? await chamarGraph("media", {
+            media_type: "REELS",
+            upload_type: "resumable",
+            caption: legenda,
+            share_to_feed: true,
+          })
+        : await chamarGraph("media", {
+            media_type: "REELS",
+            video_url: urlPublica,
+            caption: legenda,
+            share_to_feed: true,
+          });
       if (!container.ok) {
         console.error("[farol-reel] container recusado:", {
           video_id: linha.video_id,
@@ -758,6 +843,62 @@ export async function GET(req: Request) {
         detalhe: detalheFinal,
       });
       linha.detalhe = detalheFinal;
+
+      // ---- O push dos bytes (só no caminho resumable) -----------------------
+      // DEPOIS de gravar o container_id, e não antes: se a lambda morrer no meio
+      // do push, a linha fica 'publicando' com o container conhecido, e a
+      // autocura tem em que se agarrar. Empurrar antes de gravar deixaria um
+      // container órfão na Meta que ninguém sabe que existe.
+      if (usarResumable) {
+        const bytes = bytesEmMemoria ?? (await rebaixarHospedado(urlPublica));
+        if (!bytes) {
+          console.error("[farol-reel] resumable sem bytes:", {
+            video_id: linha.video_id,
+            url: urlPublica,
+          });
+          await atualizar(db, linha.id, { status: "falhou", erro: "resumable: sem_bytes" });
+          olhados.push({ video_id: linha.video_id, resultado: "resumable_sem_bytes" });
+          break;
+        }
+
+        const push = await enviarBytesResumable({
+          containerId: container.id as string,
+          bytes,
+          token: process.env.IG_ACCESS_TOKEN ?? "",
+        });
+
+        // O CUSTO SEMPRE VAI PARA O LOG, inclusive no erro. Foi o que a
+        // coordenação pediu, e é o número que decide se este caminho vira
+        // padrão: um push de 2,6 MB que leva 800ms é barato; o mesmo push
+        // levando 40s comeria metade do maxDuration e a conversa muda.
+        console.log("[farol-reel] rupload:", {
+          video_id: linha.video_id,
+          container_id: container.id,
+          bytes: push.bytes,
+          ms: push.ms,
+          ok: push.ok,
+          erro: push.ok ? null : push.erro,
+        });
+
+        if (!push.ok) {
+          // Falha de push NÃO é falha de render. A linha morre com motivo
+          // literal e o container fica lá vazio — inofensivo, porque sem bytes
+          // ele nunca vira post. O próximo ciclo recomeça do zero, e desarmar
+          // o env volta ao caminho padrão sem tocar em código.
+          await atualizar(db, linha.id, {
+            status: "falhou",
+            erro: `rupload: ${push.erro}`.slice(0, 500),
+          });
+          await registrar(db, "reel_falhou", linha.carta_id, null, {
+            video_id: linha.video_id,
+            erro: push.erro,
+            bytes: push.bytes,
+            ms: push.ms,
+          });
+          olhados.push({ video_id: linha.video_id, resultado: "rupload_falhou" });
+          break;
+        }
+      }
 
       const r = await publicarContainer(db, linha, container.id as string);
       olhados.push({ video_id: linha.video_id, resultado: r });
