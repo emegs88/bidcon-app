@@ -78,6 +78,8 @@ import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrarMensagemSistema } from "@/lib/whatsapp/sistema";
 import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
 import { etiquetasDaMensagem } from "@/lib/farol/cedente";
+import { etiquetasSemEntrada } from "@/lib/farol/sem-entrada";
+import { semEntradaLigado } from "@/lib/farol/pivo-sem-entrada";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -414,7 +416,18 @@ export async function POST(req: Request) {
     // resultado é log e segue — perder uma etiqueta é aceitável, perder a
     // resposta ao cliente porque a etiquetagem falhou não é. É por isso que
     // isto vem DEPOIS do insert da mensagem e não faz parte dele.
-    for (const tag of etiquetasDaMensagem(conteudo)) {
+    // PROSPERITO-SEM-ENTRADA-01 — a etiqueta `consorcio_novo` entra na MESMA
+    // lista e no mesmo laço, então herda de graça a garantia de cima: falha de
+    // RPC vira log, nunca queda do webhook.
+    //
+    // Vem atrás do kill-switch junto com a resposta, e não solta: armar uma
+    // chave só tem que ligar a fatia inteira. Etiqueta sem a conversa que a
+    // justifica marcaria gente no painel sem ninguém saber por quê.
+    const etiquetas = [
+      ...etiquetasDaMensagem(conteudo),
+      ...(semEntradaLigado() ? etiquetasSemEntrada(conteudo) : []),
+    ];
+    for (const tag of etiquetas) {
       const { error: errTag } = await db.rpc("wa_conversa_add_tag", {
         p_conversa: conversa.id,
         p_tag: tag,

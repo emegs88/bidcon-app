@@ -66,6 +66,8 @@ import {
 } from "@/lib/buscar-cartas-tool";
 import { toolsParaAgente } from "@/lib/tools-por-agente";
 import { blocoSaber, ultimaPerguntaDoCliente } from "@/lib/farol/saber";
+import { pareceSemEntrada } from "@/lib/farol/sem-entrada";
+import { blocoSemEntrada } from "@/lib/farol/pivo-sem-entrada";
 import {
   buscarPlanos,
   resultadoParaToolPlanos,
@@ -495,6 +497,18 @@ export async function gerarRespostaWhatsApp(
   // conhecimento degrade o atendimento que já existe. Ela só pode ACRESCENTAR.
   const saber = await blocoSaber(db, ultimaPerguntaDoCliente(hist));
   if (saber) system += "\n\n" + saber;
+
+  // PROSPERITO-SEM-ENTRADA-01 — o pivô de quem não tem a entrada.
+  // Mesma forma do bloco acima, e pela mesma razão: devolve "" quando o
+  // kill-switch PROSPERITO_SEM_ENTRADA está desarmado (que é como ele nasce) e
+  // quando a última mensagem do cliente não é de alguém sem entrada. Nos dois
+  // casos o system fica idêntico ao de antes desta fatia.
+  //
+  // O detector é chamado AQUI, e não dentro do pivô, para existir um lugar só
+  // que decide o que conta como gatilho — o mesmo `pareceSemEntrada` que a
+  // etiquetagem do webhook usa.
+  const sem = blocoSemEntrada(pareceSemEntrada(ultimaPerguntaDoCliente(hist)));
+  if (sem) system += "\n\n" + sem;
 
   // Loop de tool-use — no máximo 2 rodadas de tool_use por turno (F4-TOOL;
   // ver header de lib/buscar-cartas-tool.ts). Na rodada seguinte ao teto,
