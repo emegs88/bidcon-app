@@ -287,3 +287,161 @@
     gap: 2px;
   }
 }
+
+/* ---- Inventário da HeyGen (PAINEL-VOZES-01) --------------------------------
+   A ordem visual aqui é uma afirmação: o aviso de lista parcial, o resumo, as
+   fontes e o controle vêm ANTES da lista. A lista é a parte que convence, e
+   uma lista incompleta convence do mesmo jeito — quem responde "isto é tudo?"
+   precisa estar acima dela, não num rodapé que ninguém rola até o fim.        */
+.inventario {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Em destaque de propósito: é a única linha capaz de impedir a conclusão
+   errada ("não aparece aqui, logo não existe") que originou esta tela. */
+.invParcial {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r-sm);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.invResumo {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.invFontes,
+.invAvisos {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.invFontes code {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+}
+.fonteOk {
+  color: var(--text-muted);
+}
+.fonteRuim {
+  color: var(--warn);
+}
+.fonteErro {
+  overflow-wrap: anywhere;
+}
+.invAvisos {
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+
+.invControleOk {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ok);
+}
+.invControleRuim {
+  margin: 0;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+.invFiltro {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.invFiltro:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* Teto de altura com rolagem própria: uma conta com centenas de vozes empurraria
+   o resto do painel para fora da tela, inclusive o cabeçalho que acabou de ser
+   lido. */
+.invLista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 460px;
+  overflow: auto;
+}
+.invItem {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.invCabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.invMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.invIdLinha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* Monoespaçado e quebrável: 32 hexadecimais sem separador só são conferíveis a
+   olho nu com largura fixa, e é conferindo a olho que se acha o dígito trocado. */
+.invId {
+  font-family: var(--mono-painel, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+.copiar {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.copiar:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.invAudio {
+  width: 100%;
+  max-width: 320px;
+  height: 32px;
+}
+.invSemAmostra {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.invPreview {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}

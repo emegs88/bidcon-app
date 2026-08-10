@@ -71,6 +71,7 @@ import {
   type LinhaReel,
 } from "@/lib/farol/painel";
 import { DisparosManuais, DestravarReel, PautaAcoes } from "./FarolAcoes";
+import InventarioHeyGen from "./InventarioHeyGen";
 import areaStyles from "@/components/area.module.css";
 import styles from "./farol.module.css";
 
@@ -562,6 +563,37 @@ export default async function AdminFarol() {
               vê. Todo disparo fica registrado com o seu e-mail e o horário.
             </p>
             <DisparosManuais armado={armado} />
+          </Card>
+        </section>
+
+        {/* --------------------------------------------------------------------
+            PAINEL-VOZES-01 — inventário da HeyGen.
+
+            DEPOIS de "Disparos manuais" de propósito, e não antes: esta seção é
+            leitura pura e a de cima é a que muda o mundo. Quem abre o painel
+            para agir encontra os disparos primeiro; quem abre para conferir um
+            id rola mais um pouco. A ordem da tela é a ordem da urgência.
+
+            SEM `armado`. As duas seções acima dependem daquele flag porque um
+            disparo desarmado é um botão que mente. Aqui não existe estado de
+            armamento a respeitar: a rota é GET, a guarda é a sessão admin, e
+            não há nada a armar.
+        -------------------------------------------------------------------- */}
+        <section className={areaStyles.section}>
+          <div className={areaStyles.sectionHead}>
+            <h2 className={areaStyles.sectionTitle}>Inventário da HeyGen</h2>
+          </div>
+          <Card>
+            <p className={styles.aviso}>
+              Leitura pura: nada é gravado, nada é publicado e nenhum crédito é
+              gasto — a consulta só lista o que já existe na conta. A chave da
+              HeyGen é usada no servidor e nunca chega ao navegador, que era o
+              ponto: descobrir o id de uma voz deixa de exigir alguém com o
+              segredo na mão. Leia o cabeçalho do resultado antes da lista: se
+              ele disser <code>LISTA PARCIAL</code> ou acusar falha no controle,
+              a ausência de um id aqui não prova que ele não existe na conta.
+            </p>
+            <InventarioHeyGen />
           </Card>
         </section>
 
