@@ -151,12 +151,47 @@ export const CENAS: Record<CategoriaFigurativa, string> = {
 };
 
 /**
+ * A CENA DA CATEGORIA 'abstrata' — o buraco que este bloco fecha.
+ *
+ * Medido em 10/08: `farol_arte.categoria` tem DEFAULT 'abstrata' na 0076, e
+ * 'abstrata' é o acervo coringa — o que serve QUALQUER carta, porque não afirma
+ * bem nenhum e por isso não obriga o selo "Imagem ilustrativa". É, de longe, a
+ * categoria mais reaproveitável do acervo.
+ *
+ * E era a única sem texto. `CENAS` cobria as seis figurativas; a coringa,
+ * default da tabela, dependia de alguém improvisar na hora — exatamente o
+ * defeito que o cabeçalho deste arquivo diz existir para impedir ("regra medida
+ * que vive fora do repositório é regra que se perde na primeira limpeza").
+ *
+ * O texto abaixo NÃO é invenção de cena nova: é a lição de a3 aplicada sem
+ * objeto. A medição de 09/08 diz que o véu de 78% apaga massa de meio-tom e
+ * preserva fonte pontual — num fundo sem objeto isso vira a regra inteira,
+ * porque não há silhueta para segurar a leitura. Daí "pontos de luz sobre
+ * escuro", e nada de gradiente liso.
+ */
+export const CENA_ABSTRATA =
+  "An abstract dark background: deep midnight navy surface with subtle texture, " +
+  "soft bokeh points of warm amber light scattered across it like distant city lights " +
+  "out of focus, gentle depth and atmosphere, no objects, no architecture, no vehicles, " +
+  "no horizon line. ";
+
+/** Tudo que o acervo sabe pintar: as seis figurativas mais a coringa. */
+export const CATEGORIAS = [...CATEGORIAS_FIGURATIVAS, "abstrata"] as const;
+export type Categoria = (typeof CATEGORIAS)[number];
+
+/**
  * Monta o prompt final. É a ÚNICA porta: cena + acabamento + composição +
  * proibições, nessa ordem, sempre. Quem quiser gerar arte chama isto.
  *
  * A ordem não é aleatória — as proibições vão por último porque é a última
  * coisa que o modelo lê e a que menos pode ser diluída pelo resto.
+ *
+ * A coringa recebe as MESMAS três caudas. Poderia-se argumentar que um fundo
+ * sem objeto não precisa da regra de composição — precisa mais: o número do
+ * crédito cai no mesmo lugar, e um brilho no centro horizontal atrapalha tanto
+ * vindo de um farol quanto vindo de um bokeh.
  */
-export function montarPrompt(categoria: CategoriaFigurativa): string {
-  return CENAS[categoria] + ACABAMENTO + COMPOSICAO + PROIBICOES;
+export function montarPrompt(categoria: Categoria): string {
+  const cena = categoria === "abstrata" ? CENA_ABSTRATA : CENAS[categoria];
+  return cena + ACABAMENTO + COMPOSICAO + PROIBICOES;
 }
