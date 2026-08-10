@@ -179,22 +179,128 @@ export async function lerCartaViva(
   return { ok: true, carta: data as CartaPublicada };
 }
 
+// ---------------------------------------------------------------------------
+// RETENTATIVA — um mecanismo só, para os dois passos da publicação
+// ---------------------------------------------------------------------------
+// POR QUE ISTO FOI MEXIDO — 10/08/2026, medido, não preventivo.
+//
+// O post das 11h falhou com `code=9004 subcode=2207052 Only photo or video can
+// be accepted as media type`. Investigado, o card estava SÃO: a mesma URL
+// respondia 200, `image/png`, magic 89504e47, PNG 1080×1080 RGBA — e era
+// indistinguível, no cabeçalho e no corpo, do card que a Meta ACEITOU em 09/08.
+// Aquela mensagem é o envelope GENÉRICO da Meta para "não consegui buscar a
+// mídia nesta URI"; ela não descreve o que a URI devolveu.
+//
+// E aí apareceu a assimetria que este bloco conserta: `publicarContainer` já
+// tinha retentativa, com um comentário dizendo que ela existe "quando a Meta
+// ainda está baixando a imagem" — mas quem BAIXA a imagem é o passo `media`, e
+// era justamente ele que não tinha nenhuma. A retentativa estava no passo
+// errado. Isto é conserto de defeito NOSSO, e vale independentemente de qual
+// hipótese sobre a Meta esteja certa.
+//
+// UM MECANISMO, NÃO DOIS. `criarContainerImagem` e `publicarContainer` são
+// irmãos e passaram a dividir esta função. Duas cópias da regra de retentativa
+// seriam duas verdades sobre quando repetir — e a primeira a divergir venceria
+// em silêncio.
+
+/** Espera entre a 1ª e a 2ª tentativa. Um só valor para os dois passos. */
+export const ESPERA_RETENTATIVA_MS = 3000;
+
+/**
+ * Erro que a segunda tentativa não tem como consertar. Hoje há exatamente um:
+ * `chamarGraph` devolve `env_ausente(...)` ANTES de tocar a rede, então repetir
+ * é dormir 3s para reler a mesma string. Todo o resto — inclusive OAuth e 4xx —
+ * é retentado, porque eu NÃO consigo provar que são permanentes e o custo de
+ * errar para este lado são três segundos dentro de um cron de 60s.
+ */
+export function inutilRepetir(erro: string | undefined): boolean {
+  return (erro ?? "").startsWith("env_ausente(");
+}
+
+/**
+ * UMA segunda tentativa, com espera, e o log que a torna medível.
+ *
+ * OS DOIS WARNS SÃO PARTE DO CONSERTO, não enfeite. Sem eles, uma retentativa
+ * que salva o post do dia fica, no log, idêntica a uma que nunca precisou
+ * existir — e daqui a um mês ninguém sabe dizer se ela alguma vez serviu. Um
+ * conserto que não pode ser medido é indistinguível de um conserto que não
+ * funciona.
+ *
+ * `esperaMs` é parâmetro com padrão, e não constante lida aqui dentro, para que
+ * o teste consiga exercitar a ORQUESTRAÇÃO (quantas chamadas, qual resultado
+ * volta) passando 0 — em vez de a suíte dormir 3s de verdade, ou de a regra
+ * ficar sem teste nenhum, que é o desfecho de sempre quando testar dói.
+ */
+export async function comRetentativa(
+  rotulo: string,
+  tentar: () => Promise<RespostaGraph>,
+  esperaMs: number = ESPERA_RETENTATIVA_MS
+): Promise<RespostaGraph> {
+  const primeira = await tentar();
+  if (primeira.ok || inutilRepetir(primeira.erro)) return primeira;
+
+  console.warn(`[ig-publicar] ${rotulo} recusado — 2ª tentativa em ${esperaMs}ms:`, {
+    erro: primeira.erro,
+  });
+  if (esperaMs > 0) await new Promise((r) => setTimeout(r, esperaMs));
+
+  const segunda = await tentar();
+  if (segunda.ok) {
+    console.warn(`[ig-publicar] ${rotulo} aceito na 2ª tentativa:`, {
+      erro_1: primeira.erro,
+    });
+  } else {
+    console.error(`[ig-publicar] ${rotulo} recusado nas DUAS tentativas:`, {
+      erro_1: primeira.erro,
+      erro_2: segunda.erro,
+    });
+  }
+  return segunda;
+}
+
+/**
+ * Cria o container de IMAGEM, com UMA segunda tentativa. É o passo em que a
+ * Meta baixa o nosso card — ou seja, o passo que falhou em 10/08.
+ *
+ * REPETIR AQUI É SEGURO, e esta é a parte que precisa ficar escrita: se a 1ª
+ * chamada tiver dado certo do lado da Meta e a resposta se perdido (timeout de
+ * 20s), a 2ª cria um SEGUNDO container. Container é rascunho: só vira post se
+ * alguém chamar `media_publish` com o id dele, e nós só publicamos o id que
+ * volta desta função. O container órfão expira sozinho em 24h. Ou seja: o pior
+ * caso é lixo invisível, nunca post duplicado no perfil.
+ *
+ * ESCOPO DECLARADO — troquei UM ponto de chamada, o do feed, que é o que
+ * falhou. `/api/farol/story` e `/api/farol/carrossel` também chamam `media` com
+ * a mesma natureza (a Meta baixa uma imagem nossa) e têm o mesmo defeito
+ * latente; estão desarmados e n=0, então não os mexi às cegas de carona num
+ * conserto medido. `/api/farol/reel-publicar` fica de fora de propósito: lá o
+ * container é vídeo e aquele arquivo já argumenta, por escrito, por que não
+ * retenta.
+ */
+export async function criarContainerImagem(
+  campos: Record<string, unknown>
+): Promise<RespostaGraph> {
+  return comRetentativa("container", () => chamarGraph("media", campos));
+}
+
 /**
  * Publica um container já criado, com UMA segunda tentativa após 3s.
  * Container de IMAGEM costuma nascer pronto, mas a Meta não garante: quando
  * ela ainda está baixando a imagem, o media_publish responde erro transitório.
  * Uma segunda tentativa depois de 3s cobre esse caso sem virar loop. Falhou
  * duas vezes, devolve o erro literal — o container fica lá, não vira post.
+ *
+ * O CORPO virou uma chamada a `comRetentativa` (10/08/2026): mesmo número de
+ * tentativas, mesma espera, mesma ordem. As duas únicas diferenças de
+ * comportamento são ganhos — sai 3s mais cedo quando falta env (devolvendo o
+ * mesmo erro literal), e agora escreve no log que houve segunda tentativa.
  */
 export async function publicarContainer(
   creationId: string
 ): Promise<RespostaGraph> {
-  let publicado = await chamarGraph("media_publish", { creation_id: creationId });
-  if (!publicado.ok) {
-    await new Promise((r) => setTimeout(r, 3000));
-    publicado = await chamarGraph("media_publish", { creation_id: creationId });
-  }
-  return publicado;
+  return comRetentativa("publicação", () =>
+    chamarGraph("media_publish", { creation_id: creationId })
+  );
 }
 
 export type ResultadoPublicacao =
@@ -248,7 +354,9 @@ export async function publicarCartaNoFeed(params: {
   const imageUrl = urlCard(cartaId, "?formato=feed");
 
   // ---- 2. Container ------------------------------------------------------
-  const container = await chamarGraph("media", {
+  // A retentativa mora em `criarContainerImagem` — ver lá POR QUE ela nasceu
+  // aqui e não no passo de publicar (10/08/2026).
+  const container = await criarContainerImagem({
     image_url: imageUrl,
     caption: legenda,
   });
