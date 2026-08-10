@@ -112,10 +112,19 @@ alter table public.wa_anexo_acessos enable row level security;
 -- ----------------------------------------------------------------------------
 -- A extensão do storage_path foi ESCRITA a partir do mime, por EXT_POR_MIME em
 -- lib/whatsapp/media.ts. Inverter esse mapa é determinístico, não é chute.
--- Medido em 10/08/2026: as 15 linhas têm só `.jpg` (11) e `.pdf` (4) — nenhuma
--- caiu no fallback `.bin`, que é o único caso em que a extensão não determina o
--- mime. Por isso o `where` cobre extensão por extensão e ignora o resto: se
--- amanhã existir um `.bin`, ele fica NULO em vez de receber um palpite.
+-- Medido em 10/08/2026 (contado pelo banco, com `group by`): as 15 linhas têm
+-- só `.jpg` (12) e `.pdf` (3) — nenhuma caiu no fallback `.bin`, que é o único
+-- caso em que a extensão não determina o mime. Por isso o `where` cobre
+-- extensão por extensão e ignora o resto: se amanhã existir um `.bin`, ele fica
+-- NULO em vez de receber um palpite.
+--
+-- CORREÇÃO DE 10/08/2026, depois de aplicada. Este bloco dizia 11 jpg e 4 pdf.
+-- Estava errado, e o modo como errou é o que interessa: eu nunca contei por
+-- extensão no banco — li 15 linhas cruas na tela e somei de olho. O número
+-- nasceu de um olho e foi escrito aqui, na CONFERÊNCIA, que é justamente a
+-- parte cujo trabalho é pegar erro. Um esperado inventado não confere nada:
+-- transforma o acerto do `case` em suspeita. Os 3/12 acima vieram de
+-- `count(*) filter (...)` e batem com os objetos reais do bucket wa-extratos.
 --
 -- nome_arquivo e tamanho_bytes NÃO são retroagidos. Ver comentários das colunas.
 update public.wa_mensagens
@@ -133,7 +142,8 @@ update public.wa_mensagens
 -- ----------------------------------------------------------------------------
 -- CONFERÊNCIA (rodar depois de aplicar; nenhuma destas escreve)
 -- ----------------------------------------------------------------------------
--- Esperado em 10/08/2026: 15 anexos, 15 com mime, 4 pdf e 11 jpg, 0 sem mime.
+-- Esperado em 10/08/2026: 15 anexos, 0 sem mime, 3 pdf e 12 jpg, 0 acessos.
+-- CONFERIDO pelo Emerson depois de aplicar: bate.
 --
 --   select count(*) filter (where storage_path is not null)            as anexos,
 --          count(*) filter (where storage_path is not null
@@ -143,4 +153,16 @@ update public.wa_mensagens
 --     from public.wa_mensagens;
 --
 --   select count(*) from public.wa_anexo_acessos;   -- esperado: 0
+--
+-- CONTRAPROVA QUE FALTAVA AQUI. O `case` acima deriva o mime da extensão do
+-- path. Se um dia um arquivo NOMEADO .pdf estiver salvo com extensão .jpg
+-- (foto de extrato tirada pelo cliente), o mime fica image/jpeg e o nome diz
+-- outra coisa — a tela não mente, mas a busca por "pdf" perde o documento.
+-- Medido em 10/08/2026: ZERO divergências. Vale repetir quando o acervo crescer.
+--
+--   select count(*) filter (where conteudo ilike '%.pdf'
+--                             and storage_path not ilike '%.pdf')  as nome_pdf_path_outro,
+--          count(*) filter (where storage_path ilike '%.pdf'
+--                             and coalesce(conteudo,'') not ilike '%.pdf') as path_pdf_nome_outro
+--     from public.wa_mensagens where storage_path is not null;
 -- ============================================================================
