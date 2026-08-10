@@ -511,6 +511,13 @@ export async function POST(req: Request) {
         telefone,
         msgInseridaId: msgInserida.id,
         anexoId: anexo?.id ?? null,
+        // PROSPERITO-ANEXO-01, Entrega 2: o filename só existe AQUI. A Graph
+        // Media API, no background, devolve url e mime — nunca o nome. Se ele
+        // não pegar carona no job, o nome que o cliente enviou se perde e a
+        // tela mostra "PDF" para um arquivo que se chamava EXTRATO.pdf.
+        // `caption` NÃO entra: legenda de foto não é nome de arquivo (foi
+        // exatamente essa confusão que sujou as 15 linhas antigas).
+        anexoNome: anexo?.filename ?? null,
         conversaOptOut: conversa.opt_out === true,
         conversaStatus: conversa.status ?? null,
         agenteAtivo: conversa.agente_ativo ?? null,

@@ -282,6 +282,105 @@
   color: var(--text-muted);
 }
 
+/* Anexo dentro da bolha (PROSPERITO-ANEXO-01, item 2).
+   `white-space: normal` desfaz o `pre-wrap` herdado de `.bolha`: ali ele existe
+   para preservar as quebras que o cliente digitou, e aqui só faria o nome do
+   arquivo esticar a bolha. */
+.anexo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: inherit;
+  text-decoration: none;
+  white-space: normal;
+}
+.anexo:hover {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
+}
+.anexoMiniatura {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.anexoIcone {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  border-radius: 8px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.anexoTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.anexoNome {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.anexoMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Lista de "Extratos recebidos" (PROSPERITO-ANEXO-01, item 3).
+   Sem miniatura de propósito: aqui podem caber 200 linhas, e 200 imagens
+   buscadas de uma vez seriam 200 linhas de auditoria que ninguém pediu, além
+   do peso. O ícone diz o tipo; quem quiser ver, abre. */
+.extratos {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.extratoLinha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.extratoIcone {
+  font-size: 20px;
+  flex: 0 0 auto;
+}
+.extratoCorpo {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.extratoNome {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.extratoMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.extratoAcoes {
+  display: flex;
+  gap: 12px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .acoesWrap {
   margin-top: 14px;
   padding-top: 14px;
