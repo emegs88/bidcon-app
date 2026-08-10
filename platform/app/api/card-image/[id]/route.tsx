@@ -22,6 +22,29 @@
 // de 400. Esta rota é chamada pelo servidor da Meta; ela não tem para quem
 // reclamar de um 400.
 //
+// ----------------------------------------------------------------------------
+// 09/08/2026 — FAROL-ARTE-01: `?arte=<uuid>`, OPCIONAL, só em feed e story.
+// ----------------------------------------------------------------------------
+//   ?arte=<uuid> → usa como FUNDO a imagem aprovada do acervo `farol_arte`,
+//                  recortada no centro e coberta por véu navy #0A0E1A a 78%.
+//
+// O QUE O MODELO GENERATIVO PODE FAZER, E O QUE ELE NUNCA FAZ: ele pinta fundo,
+// textura e luz. Ele NÃO escreve número, valor, percentual nem nome de
+// administradora — isso continua vindo do satori, por cima do véu, como sempre
+// veio. A razão é dura: modelo de imagem alucina dígito sem avisar, e um card
+// com "R$ 361.5OO" iria para um perfil público como se fosse carta real.
+//
+// AUSÊNCIA DE ARTE NÃO É ERRO, É O CAMINHO NORMAL. Sem `?arte=`, com uuid
+// inválido, com arte não aprovada, com arquivo corrompido ou com o bucket fora
+// do ar ou lento, `buscarArte` devolve `null`, `<Fundo>` não gera nó nenhum e a
+// árvore entregue ao satori é IDÊNTICA à de antes desta fatia — o card do dia
+// sai igual, sem drama e sem post perdido. Ver lib/farol-arte.ts, que é onde o
+// contrato "ou vem inteira, ou vem null" está implementado e comentado.
+//
+// O `padrao` (1200×630, WhatsApp) NÃO recebe arte em nenhuma hipótese, e nem
+// paga a latência da busca: ela roda depois do retorno dele. Os slides fixos do
+// carrossel também não recebem — ver o bloco no GET.
+//
 // POR QUE AO VIVO E NÃO PNG PRÉ-GERADO: a vitrine é substituída inteira a cada
 // rodada de sync. Uma arte gerada na hora do disparo já nasceria vencida se o
 // carrossel for reenviado, e o carrossel vive para sempre no celular do cliente.
@@ -91,6 +114,12 @@ import {
   FONT_TITULO,
   FONT_NUMERO,
 } from "@/lib/card-fontes";
+import {
+  buscarArte,
+  recorteCentral,
+  VEU_NAVY,
+  type Arte,
+} from "@/lib/farol-arte";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -304,9 +333,82 @@ function fonteCredito(texto: string, larguraUtil: number, maximo: number): numbe
 }
 
 // ---------------------------------------------------------------------------
+// FUNDO — a arte do acervo e o véu, quando há arte. FAROL-ARTE-01, 09/08/2026.
+// ---------------------------------------------------------------------------
+// SEM ARTE ELE DEVOLVE `null`, e `null` como filho de JSX não gera nó nenhum:
+// a árvore que o satori recebe fica IDÊNTICA à de antes desta fatia. É isso que
+// torna o "cai no card de hoje, idêntico" verificável em vez de prometido — não
+// há caminho em que a ausência de arte mude um pixel do card atual.
+//
+// POR QUE `position: absolute` E NÃO UM INVÓLUCRO NOVO: os filhos absolutos
+// saem do fluxo do flex, então os quatro blocos que já existem em Feed/Story
+// continuam se distribuindo exatamente como antes — nenhum `justifyContent`,
+// nenhum padding, nenhuma medida precisou ser tocada para a arte entrar. E o
+// satori pinta na ORDEM DO DOCUMENTO: por ser o primeiro filho, o fundo fica
+// atrás de todo o conteúdo sem precisar de z-index (que o satori ignora).
+//
+// O `backgroundColor: NAVY` do div externo CONTINUA onde estava, atrás da arte.
+// Ele deixa de ser o fundo visível e vira a rede: se o png tiver transparência
+// ou não cobrir por um pixel, o que aparece é o navy do card — nunca branco.
+//
+// AS TRÊS CAMADAS, de baixo para cima: navy (do div externo) · arte recortada ·
+// véu de 78%. Os números vêm depois, por cima de tudo, e continuam saindo do
+// gerador determinístico — a regra inegociável da fatia.
+function Fundo({
+  arte,
+  largura,
+  altura,
+}: {
+  arte: Arte | null;
+  largura: number;
+  altura: number;
+}) {
+  if (!arte) return null;
+  const corte = recorteCentral(arte, largura, altura);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: `${largura}px`,
+        height: `${altura}px`,
+        display: "flex",
+        // O que efetiva o recorte: a imagem é maior que a caixa e o excedente é
+        // aparado aqui. Sem isto a arte vazaria por cima do padding do card.
+        overflow: "hidden",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={arte.fonte}
+        alt=""
+        width={corte.largura}
+        height={corte.altura}
+        style={{
+          position: "absolute",
+          left: `${corte.esquerda}px`,
+          top: `${corte.topo}px`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${largura}px`,
+          height: `${altura}px`,
+          backgroundColor: VEU_NAVY,
+        }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // FEED — 1080×1080. É o que define o grid do perfil.
 // ---------------------------------------------------------------------------
-function Feed({ carta }: { carta: CartaCarrossel }) {
+function Feed({ carta, arte }: { carta: CartaCarrossel; arte?: Arte | null }) {
   const credito = reais(carta.credito);
   return (
     <div
@@ -321,6 +423,8 @@ function Feed({ carta }: { carta: CartaCarrossel }) {
         fontFamily: FONT_TITULO,
       }}
     >
+      <Fundo arte={arte ?? null} largura={1080} altura={1080} />
+
       {/* Topo: marca no canto de sempre, pill do tipo, assinatura. */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div
@@ -398,7 +502,7 @@ function Feed({ carta }: { carta: CartaCarrossel }) {
 // no topo, caixa de resposta e barra de compartilhar embaixo. Tudo que importa
 // mora na zona segura central.
 // ---------------------------------------------------------------------------
-function Story({ carta }: { carta: CartaCarrossel }) {
+function Story({ carta, arte }: { carta: CartaCarrossel; arte?: Arte | null }) {
   const credito = reais(carta.credito);
   return (
     <div
@@ -418,6 +522,8 @@ function Story({ carta }: { carta: CartaCarrossel }) {
         fontFamily: FONT_TITULO,
       }}
     >
+      <Fundo arte={arte ?? null} largura={1080} altura={1920} />
+
       {/* Topo (com folga): a MESMA marca, no MESMO canto do feed. */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Marca tamanho={22} />
@@ -823,8 +929,37 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   // --- FEED / STORY --------------------------------------------------------
+  // ARTE DO ACERVO (FAROL-ARTE-01, 09/08/2026) — `?arte=<uuid>`, opcional.
+  //
+  // A BUSCA MORA AQUI, E NÃO LÁ EM CIMA, POR TRÊS RAZÕES QUE SÃO A FATIA INTEIRA:
+  //
+  // 1. O `padrao` (1200×630, WhatsApp) já retornou acima. Ele é byte-a-byte
+  //    congelado e NÃO PODE receber arte nem por parâmetro nem por engano — e,
+  //    do jeito que está posto, nem sequer paga a latência da consulta. Passar
+  //    `?arte=` num card do WhatsApp é ignorado em silêncio, na mesma doutrina
+  //    do `formato` e do `slide` desconhecidos.
+  // 2. Os slides fixos do carrossel (capa/CTA) também já retornaram, antes até
+  //    do banco. Eles seguem sem arte DE PROPÓSITO e isso está declarado: são
+  //    peças de texto cravado, e o véu de 78% que justifica a qualidade `medium`
+  //    do acervo não se aplica a elas. Dar arte a esses slides reabre a decisão
+  //    de qualidade — ver a condição de reabertura em lib/farol-arte.ts.
+  // 3. Neste ponto a carta já existe. Se o card fosse falhar, ele já teria
+  //    falhado; a arte nunca é a razão de um 404.
+  //
+  // `buscarArte` NUNCA lança e NUNCA demora mais que PRAZO_MS: id inválido,
+  // linha inexistente ou não aprovada, arquivo corrompido, bucket fora do ar ou
+  // lento — tudo devolve `null`, e `null` faz `Fundo` não gerar nó nenhum. O
+  // card então sai IDÊNTICO ao de antes desta fatia. Não existe `try` aqui
+  // porque não existe o que capturar: o contrato do módulo é esse, e é ele que
+  // garante que um enfeite não derrube o post do dia.
+  const arte = await buscarArte(busca.get("arte"));
+
   const elemento =
-    formato === "feed" ? <Feed carta={carta} /> : <Story carta={carta} />;
+    formato === "feed" ? (
+      <Feed carta={carta} arte={arte} />
+    ) : (
+      <Story carta={carta} arte={arte} />
+    );
   const medidas =
     formato === "feed"
       ? { width: 1080, height: 1080 }

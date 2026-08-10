@@ -27,10 +27,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+// A MESMA linha que a rota lê. Antes a palavra era repetida aqui à mão, com um
+// comentário pedindo que batesse com o servidor — e pedido em comentário não é
+// garantia: no dia em que a rota mudasse a palavra, este botão continuaria
+// mandando a antiga e o operador levaria 400 sem entender por quê.
+import { PALAVRA_PUBLICAR as PALAVRA } from "@/lib/farol/confirmacao";
 import styles from "./farol.module.css";
-
-/** A palavra tem de bater com PALAVRA_CONFIRMACAO da rota — o servidor confere. */
-const PALAVRA = "PUBLICAR";
 
 function Erro({ texto }: { texto: string | null }) {
   if (!texto) return null;

@@ -49,13 +49,15 @@ import { NextResponse } from "next/server";
 import { checarAdminConsoleApi } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrar } from "@/lib/farol/selecao";
+// A palavra mora em lib/ e não aqui. Ela JÁ FOI exportada deste arquivo, o que
+// é ilegal num route handler do Next — e passava no build só porque o import
+// cruzado do /destravar tirava esta rota da geração de tipos. O header de
+// `lib/farol/confirmacao.ts` traz a medição inteira.
+import { PALAVRA_PUBLICAR as PALAVRA_CONFIRMACAO } from "@/lib/farol/confirmacao";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 180;
-
-/** A palavra que o operador digita. Única, e conferida no servidor. */
-export const PALAVRA_CONFIRMACAO = "PUBLICAR";
 
 type Alvo = "render" | "publicar" | "pauta";
 

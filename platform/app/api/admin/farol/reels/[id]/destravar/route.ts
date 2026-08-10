@@ -40,7 +40,10 @@ import { checarAdminConsoleApi } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrar } from "@/lib/farol/selecao";
 import { STATUS_REEL_VIVOS } from "@/lib/farol/painel";
-import { PALAVRA_CONFIRMACAO } from "@/app/api/admin/farol/disparar/route";
+// Vinha de `@/app/api/admin/farol/disparar/route` — uma rota importando outra.
+// Além de acoplar duas rotas por uma constante de texto, era esse import que
+// escondia do build um export ilegal lá. Ver `lib/farol/confirmacao.ts`.
+import { PALAVRA_PUBLICAR as PALAVRA_CONFIRMACAO } from "@/lib/farol/confirmacao";
 
 export const dynamic = "force-dynamic";
 
