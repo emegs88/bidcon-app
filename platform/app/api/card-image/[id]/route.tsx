@@ -129,7 +129,7 @@ const GRADIENTE = "linear-gradient(90deg, #8FB7FF 0%, #36C5F0 50%, #1E6FE6 100%)
 const AZUL_CLARO = "#8FB7FF";
 
 /** "Vidro" do kit aproximado sem backdrop-filter — ver header. */
-const VIDRO_FUNDO = "rgba(143, 183, 255, 0.07)";
+const VIDRO_FUNDO = "rgba(18, 26, 48, 0.72)";
 const VIDRO_BORDA = "1px solid rgba(143, 183, 255, 0.22)";
 const CINZA_TEXTO = "#C7D3E8";
 
