@@ -111,6 +111,11 @@ export type WaJob = {
   telefone: string;
   msgInseridaId: number;
   anexoId: string | null;
+  /** PROSPERITO-ANEXO-01, Entrega 2: o `filename` que a Meta mandou. OPCIONAL
+   *  de propósito — o webhook do Instagram também monta WaJob e não tem esse
+   *  dado; torná-lo obrigatório quebraria o outro canal para guardar um nome.
+   *  Ausente vira null e a tela cai no rótulo genérico do tipo. */
+  anexoNome?: string | null;
   conversaOptOut: boolean;
   conversaStatus: string | null;
   agenteAtivo: string | null;
@@ -206,9 +211,22 @@ async function processarUmJob(
       const midia = await baixarMidia(anexoId);
       const storagePath = await subirParaStorage(conversaId, anexoId, midia);
 
+      // PROSPERITO-ANEXO-01, Entrega 2: as três colunas novas viajam no MESMO
+      // update do storage_path — nenhuma ida a mais ao banco.
+      //
+      // O mime e o tamanho vêm do arquivo BAIXADO, não do que a Meta declarou
+      // no webhook: aqui já lemos os bytes, então este é o dado observado, e
+      // observado ganha de declarado. O nome, ao contrário, só existe no
+      // webhook (a Graph Media API não devolve filename) — por isso ele viaja
+      // no job. Sem nome, fica null: a tela prefere dizer "PDF" a inventar.
       await db
         .from("wa_mensagens")
-        .update({ storage_path: storagePath })
+        .update({
+          storage_path: storagePath,
+          mime_type: midia.mimeType,
+          nome_arquivo: job.anexoNome ?? null,
+          tamanho_bytes: midia.bytes.byteLength,
+        })
         .eq("id", msgInseridaId);
 
       const base64 = Buffer.from(midia.bytes).toString("base64");

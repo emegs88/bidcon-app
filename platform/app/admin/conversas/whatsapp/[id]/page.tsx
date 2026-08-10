@@ -15,6 +15,16 @@ import { Badge } from "@/components/ui/Badge";
 import { ConversaAcoes } from "../../ConversaAcoes";
 import { ResponderWhatsApp } from "../../ResponderWhatsApp";
 import { dataHoraAnoBR } from "@/lib/data-br";
+import {
+  temAnexo,
+  textoVisivel,
+  mimeDoAnexo,
+  ehImagem,
+  rotuloTipo,
+  nomeExibicao,
+  tamanhoLegivel,
+  type AnexoBruto,
+} from "@/lib/whatsapp/anexos";
 import styles from "../../conversas.module.css";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +62,13 @@ export default async function AdminConversaWhatsApp({
 
   const { data: mensagens } = await supabase
     .from("wa_mensagens")
-    .select("id, papel, conteudo, agente, criado_em, status_envio, erro")
+    // PROSPERITO-ANEXO-01, Entrega 2 (item 2): as quatro últimas colunas nunca
+    // foram pedidas aqui. O anexo não estava escondido por CSS nem por
+    // permissão — o dado simplesmente não saía do banco. Desde 20/07 o arquivo
+    // estava no bucket e a tela não tinha como saber que ele existia.
+    .select(
+      "id, papel, conteudo, agente, criado_em, status_envio, erro, storage_path, mime_type, nome_arquivo, tamanho_bytes"
+    )
     .eq("conversa_id", conversa.id)
     .order("criado_em", { ascending: true });
 
@@ -118,21 +134,73 @@ export default async function AdminConversaWhatsApp({
       </Card>
 
       <ul className={styles.thread}>
-        {(mensagens ?? []).map((m) => (
-          <li key={m.id} className={`${styles.bolha} ${bolhaClasse(m.papel as string)}`}>
-            {m.conteudo}
-            <span className={styles.bolhaMeta}>
-              {m.papel}
-              {m.agente ? ` · ${m.agente}` : ""} · {dataHoraAnoBR(m.criado_em as string)}
-              {m.status_envio === "falha" ? (
-                <span className={styles.falha}>
-                  {" "}
-                  · não entregue{m.erro ? `: ${String(m.erro)}` : ""}
-                </span>
+        {(mensagens ?? []).map((m) => {
+          const bruto: AnexoBruto = {
+            storage_path: (m.storage_path as string | null) ?? null,
+            mime_type: (m.mime_type as string | null) ?? null,
+            nome_arquivo: (m.nome_arquivo as string | null) ?? null,
+            conteudo: (m.conteudo as string | null) ?? null,
+            tamanho_bytes: (m.tamanho_bytes as number | null) ?? null,
+          };
+          const comAnexo = temAnexo(bruto);
+          const mime = mimeDoAnexo(bruto);
+          const tamanho = tamanhoLegivel(bruto.tamanho_bytes);
+
+          // NUNCA a URL assinada; sempre a nossa porta. É ela que confere a
+          // sessão, grava quem abriu e só então cunha um link de 60s. Uma URL
+          // assinada aqui no HTML seria copiável pra fora e abrível N vezes
+          // sem passar por nós — o log registraria intenção, não leitura.
+          const porta = `/api/admin/conversas/anexo?mensagem=${m.id}`;
+
+          return (
+            <li key={m.id} className={`${styles.bolha} ${bolhaClasse(m.papel as string)}`}>
+              {/* `textoVisivel` e não `m.conteudo`: em mensagem com anexo esse
+                  campo guarda filename OU legenda OU um marcador interno do
+                  webhook. Ver lib/whatsapp/anexos.ts. */}
+              {textoVisivel(bruto)}
+
+              {comAnexo ? (
+                <a className={styles.anexo} href={porta} target="_blank" rel="noopener noreferrer">
+                  {ehImagem(mime) ? (
+                    // `loading="lazy"` de propósito: sem ele, abrir uma thread
+                    // com seis fotos dispararia seis buscas de uma vez. Com ele,
+                    // a miniatura (e a linha 'miniatura' no log) só acontece
+                    // quando a bolha entra na tela.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className={styles.anexoMiniatura}
+                      src={`${porta}&motivo=miniatura`}
+                      alt={nomeExibicao(bruto)}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className={styles.anexoIcone} aria-hidden="true">
+                      📄
+                    </span>
+                  )}
+                  <span className={styles.anexoTexto}>
+                    <span className={styles.anexoNome}>{nomeExibicao(bruto)}</span>
+                    <span className={styles.anexoMeta}>
+                      {rotuloTipo(mime)}
+                      {tamanho ? ` · ${tamanho}` : ""} · abrir
+                    </span>
+                  </span>
+                </a>
               ) : null}
-            </span>
-          </li>
-        ))}
+
+              <span className={styles.bolhaMeta}>
+                {m.papel}
+                {m.agente ? ` · ${m.agente}` : ""} · {dataHoraAnoBR(m.criado_em as string)}
+                {m.status_envio === "falha" ? (
+                  <span className={styles.falha}>
+                    {" "}
+                    · não entregue{m.erro ? `: ${String(m.erro)}` : ""}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </AppShell>
   );
