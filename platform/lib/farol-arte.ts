@@ -38,7 +38,10 @@
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
 
-/** Bucket público das artes. Ver POR QUE PÚBLICO, abaixo. */
+/**
+ * Bucket PRIVADO das artes — privado por decisão de coordenação, porque arte
+ * rejeitada não pode ficar servível por URL direta. Ver POR QUE ASSINADA, abaixo.
+ */
 export const BUCKET_ARTES = "farol-artes";
 
 /**
@@ -47,6 +50,15 @@ export const BUCKET_ARTES = "farol-artes";
  * não aproximar o timeout do servidor da Meta, que é quem espera este render.
  */
 export const PRAZO_MS = 2500;
+
+/**
+ * Validade da URL assinada, em segundos. 60s é MUITO mais do que o necessário —
+ * quem consome a URL é o `fetch` da linha de baixo, dentro dos mesmos 2,5s — e é
+ * curto o bastante para que uma URL que vaze em log não sirva a ninguém depois.
+ * Não vale reduzir para perto de PRAZO_MS: relógio de container fora de sincronia
+ * transformaria a assinatura em fonte nova de card sem arte.
+ */
+export const VALIDADE_URL_S = 60;
 
 /**
  * Teto de bytes do arquivo. Uma arte de 1152×2048 em PNG fica na casa de 2–4 MB.
@@ -163,9 +175,27 @@ function desistir(motivo: string, id?: string): null {
  *   · o download falha, devolve não-2xx, ou estoura o teto de bytes;
  *   · os bytes não são de uma imagem reconhecível;
  *   · o trajeto inteiro passa de PRAZO_MS.
+ *
+ * ----------------------------------------------------------------------------
+ * O `preview`, E POR QUE ELE É UM PARÂMETRO E NÃO UM ENV
+ * ----------------------------------------------------------------------------
+ * Existia uma circularidade: o card serve para JULGAR a arte, mas a arte só
+ * entrava no card depois de julgada. `preview: true` ignora o filtro de status
+ * — e só isso; todos os outros guardas continuam de pé.
+ *
+ * Quem pode ligar: SÓ o painel de curadoria, em sessão admin. O caminho de
+ * publicação (post diário, carrossel, reel) chama `buscarArte(id)` sem segundo
+ * argumento e portanto NUNCA vê arte não aprovada. Isso não é convenção: o
+ * padrão do parâmetro é `false`, então esquecer de passar cai no lado seguro, e
+ * há teste travando que o caminho de publicação não passa `preview`.
+ *
+ * Um env não serviria: seria global e mudaria o comportamento de TODO card do
+ * processo, inclusive o do post do dia. Parâmetro é por chamada, que é a
+ * granularidade certa para uma exceção de curadoria.
  */
 export async function buscarArte(
-  id: string | null | undefined
+  id: string | null | undefined,
+  opcoes?: { preview?: boolean }
 ): Promise<Arte | null> {
   // Sem id não há o que buscar. Silencioso de propósito: este é o caminho
   // NORMAL de todo card que não pediu arte, e logar aqui encheria o log de
@@ -174,10 +204,12 @@ export async function buscarArte(
 
   if (!RE_UUID.test(id)) return desistir("id_nao_uuid");
 
+  const preview = opcoes?.preview === true;
+
   let prazo: ReturnType<typeof setTimeout> | undefined;
   try {
     const corrida = await Promise.race([
-      carregar(id),
+      carregar(id, preview),
       new Promise<"prazo">((resolve) => {
         prazo = setTimeout(() => resolve("prazo"), PRAZO_MS);
       }),
@@ -197,25 +229,31 @@ export async function buscarArte(
   }
 }
 
-async function carregar(id: string): Promise<Arte | null> {
+async function carregar(id: string, preview: boolean): Promise<Arte | null> {
   // ---- A linha ------------------------------------------------------------
   // `status = 'aprovada'` NO WHERE, e não conferido depois em JavaScript: assim
   // não existe caminho de código — nem futuro, nem por descuido de refatoração —
   // em que uma arte pendente ou rejeitada seja servida. A curadoria é uma
   // cláusula da consulta, não uma boa intenção do chamador.
   //
+  // A ÚNICA exceção é `preview`, e ela segue sendo cláusula de consulta: em vez
+  // de conferir status depois, o filtro simplesmente não é acrescentado. Assim
+  // continua não existindo caminho em que alguém "esqueça de checar".
+  //
   // Colunas UMA A UMA, nunca `select('*')`: doutrina da casa para leitura com
   // service_role.
   const db = createXtvClient();
-  const { data, error } = await db
+  let consulta = db
     .from("farol_arte")
     .select("id, caminho, largura, altura")
-    .eq("id", id)
-    .eq("status", "aprovada")
-    .maybeSingle();
+    .eq("id", id);
+  if (!preview) consulta = consulta.eq("status", "aprovada");
+  const { data, error } = await consulta.maybeSingle();
 
   if (error) return desistir(`banco:${error.message}`, id);
-  if (!data) return desistir("nao_aprovada_ou_inexistente", id);
+  if (!data) {
+    return desistir(preview ? "inexistente" : "nao_aprovada_ou_inexistente", id);
+  }
 
   const caminho = typeof data.caminho === "string" ? data.caminho : "";
   if (!caminho) return desistir("caminho_vazio", id);
@@ -224,18 +262,34 @@ async function carregar(id: string): Promise<Arte | null> {
   }
 
   // ---- O arquivo ----------------------------------------------------------
-  // POR QUE PÚBLICO E `getPublicUrl`: `createSignedUrl` custaria uma ida a mais
-  // ao Supabase ANTES do download, dentro do mesmo prazo de 2,5s, para proteger
-  // um fundo abstrato — que não tem dado de cliente, não tem número de carta e
-  // não tem nome de administradora (é justamente a regra inegociável da fatia:
-  // o modelo só pinta textura e luz). O bucket `farol-videos` já segue este
-  // padrão em reel-publicar. Se um dia entrar arte com qualquer coisa sensível,
-  // esta decisão cai junto — mas aí a regra inegociável já teria caído antes.
+  // POR QUE ASSINADA, e não `getPublicUrl` — CORRIGIDO EM 10/08/2026.
   //
-  // `getPublicUrl` é montagem de string, não faz rede: ele não gasta prazo.
-  const { data: pub } = db.storage.from(BUCKET_ARTES).getPublicUrl(caminho);
-  const url = pub?.publicUrl;
-  if (!url) return desistir("sem_url_publica", id);
+  // O comentário que morava aqui afirmava que o bucket era público e defendia
+  // `getPublicUrl` por economia de prazo. Era falso: `farol-artes` nasceu
+  // PRIVADO, e privado por decisão de coordenação — arte REJEITADA não pode
+  // ficar servível por URL direta a quem souber o caminho. O código pedia URL
+  // pública a um bucket privado, recebia uma URL que responde 400, e caía em
+  // `desistir("http_400")`. Como a queda é o caminho bem-comportado da fatia, o
+  // card saía sem arte EM SILÊNCIO: nenhuma arte aparecia em card nenhum, para
+  // ninguém, e nada acusava.
+  //
+  // Lição registrada: comentário que descreve infraestrutura envelhece mal e
+  // não é verificado por teste nenhum. Este aqui afirmava o oposto do real.
+  //
+  // O custo é uma ida a mais ao Supabase dentro dos 2,5s. Ele cabe: a assinatura
+  // é uma chamada de metadado, e o download que vem depois é que é o caro. Se um
+  // dia o prazo apertar, o lugar de mexer é PRAZO_MS, não a privacidade.
+  //
+  // Validade CURTA de propósito: a URL só precisa viver o suficiente para este
+  // mesmo processo baixar os bytes, logo abaixo. Ela nunca vai para o HTML, para
+  // o card ou para o cliente — o que sai daqui são os BYTES, viram data URI no
+  // render. Uma URL que vazasse de um log morre em VALIDADE_URL_S segundos.
+  const { data: assinada, error: erroUrl } = await db.storage
+    .from(BUCKET_ARTES)
+    .createSignedUrl(caminho, VALIDADE_URL_S);
+  if (erroUrl) return desistir(`assinatura:${erroUrl.message}`, id);
+  const url = assinada?.signedUrl;
+  if (!url) return desistir("sem_url_assinada", id);
 
   // AbortController além do prazo global: ele CANCELA a conexão de verdade, em
   // vez de só deixá-la órfã. É o que evita um bucket lento segurar socket do

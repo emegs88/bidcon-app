@@ -29,6 +29,8 @@
 // ============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import {
   buscarArte,
   recorteCentral,
@@ -37,6 +39,7 @@ import {
   TETO_BYTES,
   VEU_NAVY,
   BUCKET_ARTES,
+  VALIDADE_URL_S,
 } from "./farol-arte";
 
 /** uuid sintaticamente válido que não existe em banco nenhum. */
@@ -294,4 +297,142 @@ test("prazo e teto continuam nos valores medidos", () => {
   // faz TODA arte cair no fallback silenciosamente — o card continua saindo, e
   // ninguém descobre que o acervo parou de ser usado.
   assert.equal(BUCKET_ARTES, "farol-artes");
+});
+
+test("a URL da arte é ASSINADA, e a validade é curta", () => {
+  // O bucket é PRIVADO por decisão de coordenação: arte rejeitada não pode ser
+  // servível por URL direta. Baixar para `getPublicUrl` devolveria uma URL que
+  // o storage recusa, e o modo de falha seria SILENCIOSO — todo card sairia sem
+  // arte, para todo mundo, e o fallback esconderia o estrago. Ver POR QUE
+  // ASSINADA em lib/farol-arte.ts.
+  assert.equal(VALIDADE_URL_S, 60);
+  assert.ok(VALIDADE_URL_S * 1000 > PRAZO_MS, "validade menor que o prazo do fetch");
+});
+
+// ---------------------------------------------------------------------------
+// 5. A TRAVA DO `preview` — o caminho de publicação nunca o passa
+// ---------------------------------------------------------------------------
+// AUTORIZADO: Emerson Gomes dos Santos, coordenação 10/08:
+//   "buscarArte ganha um parâmetro `preview` que ignora o filtro de status,
+//    usado SÓ pelo painel de curadoria em sessão admin. O caminho de publicação
+//    nunca aceita preview — travar isso em teste."
+//
+// POR QUE ESTE TESTE LÊ CÓDIGO-FONTE, contrariando a regra do cabeçalho deste
+// arquivo ("provam o CONTRATO, nunca o caminho interno"). A propriedade que
+// precisa ser travada não é um comportamento de `buscarArte` — é um fato sobre
+// os SÍTIOS DE CHAMADA: "ninguém no caminho de publicação passa preview".
+// Nenhuma asserção de runtime dentro da lib consegue enxergar isso; a função
+// não tem como saber quem a chamou nem por quê. O objeto sob teste aqui é o
+// grafo de chamadas, e a única forma honesta de inspecioná-lo sem carregar o
+// Next inteiro é ler o texto. Declarado por ser exceção.
+//
+// O QUE ELE PEGA: alguém acrescenta `{ preview: true }` na rota do card para
+// "testar rápido", e o post do dia passa a publicar arte não julgada. Esse é o
+// defeito que a fatia inteira existe para impedir.
+
+/**
+ * Conta os argumentos de uma chamada, lendo parênteses balanceados a partir do
+ * `(` de abertura. Não é regex de propósito: `buscarArte(f(a, b))` tem UM
+ * argumento, e uma regex que contasse vírgulas diria dois. Ignora vírgula
+ * dentro de (), [], {} e dentro de string.
+ */
+function contarArgumentos(texto: string, posAbre: number): number {
+  let profundidade = 0;
+  let args = 1;
+  let aspa: string | null = null;
+  for (let i = posAbre; i < texto.length; i++) {
+    const c = texto[i];
+    if (aspa) {
+      if (c === "\\") i++;
+      else if (c === aspa) aspa = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { aspa = c; continue; }
+    if (c === "(" || c === "[" || c === "{") profundidade++;
+    else if (c === ")" || c === "]" || c === "}") {
+      profundidade--;
+      if (profundidade === 0) return args;
+    } else if (c === "," && profundidade === 1) args++;
+  }
+  throw new Error("parênteses não fecharam — chamada malformada?");
+}
+
+/** Todo .ts/.tsx sob `dir`, recursivo. */
+function varrer(dir: string, achados: string[] = []): string[] {
+  for (const item of readdirSync(dir, { withFileTypes: true })) {
+    if (item.name === "node_modules" || item.name.startsWith(".")) continue;
+    const caminho = join(dir, item.name);
+    if (item.isDirectory()) varrer(caminho, achados);
+    else if (/\.tsx?$/.test(item.name)) achados.push(caminho);
+  }
+  return achados;
+}
+
+test("publicação: nenhum chamador fora do painel de curadoria passa `preview`", () => {
+  // `__dirname` e não `process.cwd()`: a suíte roda os testes por caminho
+  // absoluto, e o cwd depende de onde `npm test` foi disparado.
+  const plataforma = join(__dirname, "..");
+
+  // A ÚNICA porta que pode passar preview é o painel de curadoria em sessão
+  // admin. Enquanto ele não existe, esta lista está vazia de propósito — e a
+  // recomendação registrada é que ele use uma ROTA ADMIN PRÓPRIA, e não um
+  // `?preview=1` na rota pública do card: um parâmetro de query transformaria
+  // a trava numa checagem de sessão dentro de uma rota que hoje é pública, que
+  // é exatamente o tipo de mistura que produz vazamento.
+  const PERMITIDOS = [
+    join("app", "api", "admin", "farol", "arte-preview"),
+  ];
+
+  const arquivos = [
+    ...varrer(join(plataforma, "app")),
+    ...varrer(join(plataforma, "lib")),
+  ].filter((f) => !f.endsWith("farol-arte.ts") && !f.endsWith("farol-arte.test.ts"));
+
+  const chamadores: string[] = [];
+  for (const arquivo of arquivos) {
+    const texto = readFileSync(arquivo, "utf8");
+    const re = /\bbuscarArte\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(texto))) {
+      const abre = m.index + m[0].length - 1;
+      const n = contarArgumentos(texto, abre);
+      const relativo = arquivo.slice(plataforma.length + 1);
+      chamadores.push(`${relativo}:${n}`);
+      if (n > 1 && !PERMITIDOS.some((p) => relativo.startsWith(p))) {
+        assert.fail(
+          `${relativo} chama buscarArte com ${n} argumentos. Só o painel de ` +
+            `curadoria (${PERMITIDOS.join(", ")}) pode passar { preview }. ` +
+            `Ver a trava do preview em lib/farol-arte.test.ts.`
+        );
+      }
+    }
+  }
+
+  // Contra-prova do próprio teste: se um dia a varredura parar de achar o
+  // chamador real, ela passaria a aprovar por vacuidade — verde sem cobertura,
+  // que é a mesma lição do portão de "zero arquivo encontrado" da suíte.
+  assert.ok(
+    chamadores.some((c) => c.startsWith(join("app", "api", "card-image"))),
+    `a varredura não achou a rota do card entre os chamadores (achou: ${
+      chamadores.join(", ") || "nenhum"
+    }) — o teste estaria passando por vacuidade`
+  );
+});
+
+test("preview não quebra o contrato do fallback", () => {
+  // O que se prende aqui é modesto e verdadeiro: `preview` é opcional, e
+  // esquecê-lo cai no lado SEGURO. Não dá para provar por runtime que o filtro
+  // de status foi aplicado sem subir um banco — quem prova isso é a trava de
+  // sítio de chamada acima, mais a leitura de `carregar`.
+  // Sequencial, e não Promise.all: `comEnv` mexe em `process.env`, que é global
+  // do processo — rodar em paralelo faria um restaurar a env debaixo do outro.
+  return (async () => {
+    for (const op of [undefined, { preview: false }, { preview: true }]) {
+      await comEnv("http://192.0.2.1:1", "x", async () => {
+        await assert.doesNotReject(async () => {
+          assert.equal(await buscarArte(UUID_INVENTADO, op), null);
+        }, `lançou com opções ${JSON.stringify(op)}`);
+      });
+    }
+  })();
 });
