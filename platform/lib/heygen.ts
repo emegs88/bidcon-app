@@ -719,3 +719,454 @@ export function recusaDeVoz(erro: string | undefined): boolean {
   if (!/^http_4\d\d(\s|$)/.test(texto)) return false;
   return /voice[_ ]?id|voice not found|invalid voice/i.test(texto);
 }
+
+// ===========================================================================
+// PAINEL-VOZES-01 — o INVENTÁRIO, que não é o cardápio
+// AUTORIZADO: Emerson Gomes dos Santos — 10/08/2026, depois do reel perdido:
+//   "devolve id, nome, idioma, gênero, premium e amostra das fontes v3 e v2,
+//    sem filtro e sem teto. Só GET, sessão admin como guarda, nada grava e
+//    nada gasta. (...) Mesmo desenho para os avatares."
+// ---------------------------------------------------------------------------
+// POR QUE ISTO NÃO É `listarVozes` COM OUTRO NOME. As funções acima existem
+// para MONTAR UM CARDÁPIO: `/api/farol/reel-opcoes` tenta três rótulos de
+// idioma, peneira por `pareceBr()` e corta em 20. Cardápio serve para escolher
+// entre poucas coisas boas. O que faltou em 10/08 foi outra coisa: responder
+// "o id 05601cd1... existe nesta conta?" — e para essa pergunta um cardápio é
+// inútil, porque a ausência num cardápio não é ausência na conta.
+//
+// AS TRÊS DIFERENÇAS DE DESENHO, e cada uma nasceu de um defeito medido:
+//
+//  1. PAGINA. `listarVozes` faz UMA chamada com `limit`. Se a conta tem 900
+//     vozes e o teto é 100, as outras 800 simplesmente não existem para quem
+//     lê. Aqui o laço segue o token até acabar.
+//
+//  2. NÃO TRUNCA EM SILÊNCIO. Quando o orçamento de relógio estoura, ou o teto
+//     de páginas é atingido, a resposta carrega `parcial: true` e o motivo
+//     escrito em `avisos`. Uma lista curta que se apresenta como completa é o
+//     "verde vazio" da doutrina 09b6434 — pior do que um erro, porque convence.
+//
+//  3. TRAZ O CONTROLE JUNTO. `controle.socorro_presente` responde se a voz
+//     sabidamente boa (VOZ_SOCORRO, o Pedro Lima) apareceu. É a mesma lógica
+//     de `escolherVoz`: uma lista onde nem o socorro aparece não reprova voz
+//     nenhuma — ela reprova a si mesma. Sem esse campo, o operador leria
+//     "não achei o id" e concluiria "o id não existe", que é o erro que este
+//     arquivo inteiro existe para impedir.
+//
+// FALHA PARCIAL NÃO DERRUBA. Cada fonte vira uma linha em `fontes[]` com o erro
+// literal. A v2 morrer não pode apagar as vozes que a v3 trouxe: metade de um
+// inventário ainda responde a pergunta metade das vezes; uma exceção não
+// responde nunca.
+//
+// NADA AQUI GASTA CRÉDITO: só GET de listagem. Nenhum `POST /v3/videos`.
+// ===========================================================================
+
+/**
+ * Como o inventário fala com a HeyGen. Existe como PARÂMETRO, e não como
+ * chamada direta a `get`, por um motivo prático: `scripts/testes.mjs` roda sem
+ * rede e sem chave. Com o buscador injetável, a paginação, a deduplicação, o
+ * orçamento e o controle — que é onde mora o risco de errar — ficam todos sob
+ * teste. O padrão continua sendo `get`, então a rota não precisa saber disso.
+ */
+export type Buscador = (caminho: string) => Promise<Resposta<unknown>>;
+
+export type VozInventario = {
+  id: string;
+  nome: string;
+  genero: string | null;
+  idioma: string | null;
+  /** `true`/`false` quando a API disse; `null` quando ela não falou. */
+  premium: boolean | null;
+  /** URL do áudio de amostra. O painel toca; o servidor não confere. */
+  amostra: string | null;
+  origem: "v3" | "v2";
+};
+
+export type AvatarInventario = {
+  id: string;
+  nome: string;
+  tipo: string | null;
+  preview: string | null;
+  origem: "v3" | "v3_photo" | "v1_talking_photo";
+};
+
+/** O estado de UMA fonte. `ok:false` com `n>0` é fonte que caiu no meio. */
+export type FonteInventario = {
+  nome: string;
+  ok: boolean;
+  erro?: string;
+  n: number;
+};
+
+export type Inventario<T> = {
+  itens: T[];
+  fontes: FonteInventario[];
+  /**
+   * Só as vozes têm controle — `VOZ_SOCORRO` é uma voz, não um avatar. Em
+   * avatares isto é `null` de propósito, e não um `false`: dizer
+   * "socorro_presente: false" para uma família que não tem socorro seria
+   * inventar uma reprovação.
+   */
+  controle: { socorro_presente: boolean } | null;
+  /** `true` = esta lista pode não ser tudo. O painel avisa em destaque. */
+  parcial: boolean;
+  avisos: string[];
+};
+
+/**
+ * Irmão booleano de `primeiro` e `numeroPositivo`, e existe pela mesma razão
+ * que eles: `primeiro` só devolve string, então `premium: true` passaria por
+ * ele e sairia `null` — o campo nasceria vazio com cara de "a API não mandou".
+ *
+ * A DISTINÇÃO QUE ELE PRESERVA: `false` é a API dizendo "não é premium";
+ * `null` é a API não tendo dito nada. Achatar os dois em `false` faria uma voz
+ * paga parecer gratuita numa tela usada para escolher voz.
+ *
+ * Aceita `1`/`0` e `"true"`/`"false"` porque JSON de terceiro troca a
+ * serialização de booleano sem avisar — foi assim que `numeroPositivo` nasceu.
+ */
+function booleano(obj: Record<string, unknown>, ...chaves: string[]): boolean | null {
+  for (const k of chaves) {
+    const v = obj[k];
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") {
+      if (v === 1) return true;
+      if (v === 0) return false;
+    }
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (s === "true" || s === "1") return true;
+      if (s === "false" || s === "0") return false;
+    }
+  }
+  return null;
+}
+
+/**
+ * O token da próxima página, procurado na raiz E dentro de `data`, com quatro
+ * nomes. Não sei qual deles a conta usa — a mesma ignorância declarada no
+ * cabeçalho deste arquivo — e um token não encontrado significa "acabou", o que
+ * faria uma conta de 900 vozes parecer uma conta de 200 sem nenhum erro na tela.
+ */
+function tokenDaPagina(bruto: unknown): string | null {
+  const raiz = (bruto ?? {}) as Record<string, unknown>;
+  const dados = (raiz.data ?? {}) as Record<string, unknown>;
+  return (
+    primeiro(dados, "token", "next_token", "page_token", "cursor") ??
+    primeiro(raiz, "token", "next_token", "page_token", "cursor")
+  );
+}
+
+/** Itens por página na v3. Alto de propósito: menos idas à rede no orçamento. */
+const PAGINA = 200;
+
+/**
+ * Trava de LAÇO, não de negócio. 40 × 200 = 8.000 itens, muito acima de
+ * qualquer conta real. Ela existe para o caso de a API devolver sempre o mesmo
+ * token: sem teto, isso é um laço infinito dentro de um handler da Vercel.
+ */
+export const TETO_PAGINAS = 40;
+
+/**
+ * O orçamento de relógio. A rota tem `maxDuration = 300`; 120s deixa folga
+ * larga para as duas famílias e para a serialização. Estourar não é erro — é
+ * `parcial: true` com o motivo escrito.
+ */
+export const ORCAMENTO_INVENTARIO_MS = 120_000;
+
+export type OpcoesInventario = {
+  buscar?: Buscador;
+  orcamentoMs?: number;
+  /** Relógio injetável: deixa o teste do orçamento rodar sem esperar 120s. */
+  agora?: () => number;
+};
+
+function mapearVoz(v: Record<string, unknown>, origem: "v3" | "v2"): VozInventario {
+  return {
+    id: primeiro(v, "id", "voice_id") ?? "",
+    nome: primeiro(v, "name", "display_name", "voice_name") ?? "(sem nome)",
+    genero: primeiro(v, "gender"),
+    idioma: primeiro(v, "language", "language_name"),
+    premium: booleano(v, "premium", "is_premium", "isPremium"),
+    amostra: primeiro(
+      v,
+      "preview_audio",
+      "preview_audio_url",
+      "sample",
+      "sample_url",
+      "audio_url",
+      "preview_url"
+    ),
+    origem,
+  };
+}
+
+/**
+ * Junta as fontes por `id`, PREFERINDO O REGISTRO QUE TRAZ AMOSTRA.
+ *
+ * A ordem importa e não é arbitrária: a mesma voz costuma aparecer na v3 e na
+ * v2 com campos diferentes preenchidos. Ficar com a primeira ocorrência por
+ * reflexo perderia a amostra quando ela só existe do outro lado — e amostra é
+ * metade da razão de o Emerson ter pedido esta tela. Empate em amostra,
+ * desempata quem sabe dizer `premium`.
+ */
+function deduplicarVozes(itens: VozInventario[]): VozInventario[] {
+  const porId = new Map<string, VozInventario>();
+  for (const v of itens) {
+    const atual = porId.get(v.id);
+    if (!atual) {
+      porId.set(v.id, v);
+      continue;
+    }
+    if (!atual.amostra && v.amostra) {
+      porId.set(v.id, v);
+      continue;
+    }
+    if (atual.amostra && !v.amostra) continue;
+    if (atual.premium === null && v.premium !== null) porId.set(v.id, v);
+  }
+  return [...porId.values()];
+}
+
+/**
+ * Percorre uma família paginada até o fim, o orçamento ou o teto.
+ *
+ * DEVOLVE O QUE CONSEGUIU, SEMPRE. Um erro na página 3 não apaga as páginas 1 e
+ * 2: ele vira `erro` ao lado de `n`, e quem lê decide. É a mesma escolha de
+ * `vozesEmPrazo` — a consulta auxiliar não tem permissão para derrubar nada.
+ */
+async function paginar(
+  buscar: Buscador,
+  montarCaminho: (token: string | null) => string,
+  colher: (bruto: unknown) => Record<string, unknown>[],
+  estourou: () => boolean
+): Promise<{ linhas: Record<string, unknown>[]; erro?: string; aviso?: string }> {
+  const linhas: Record<string, unknown>[] = [];
+  let token: string | null = null;
+  let paginas = 0;
+
+  for (;;) {
+    if (estourou()) {
+      return {
+        linhas,
+        aviso: `orçamento de tempo estourado após ${paginas} página(s); a lista está incompleta.`,
+      };
+    }
+
+    let r: Resposta<unknown>;
+    try {
+      r = await buscar(montarCaminho(token));
+    } catch (e) {
+      return {
+        linhas,
+        erro: e instanceof Error ? e.message.slice(0, 300) : "erro_desconhecido",
+      };
+    }
+    if (!r.ok) return { linhas, erro: r.erro };
+
+    const itens = colher(r.data);
+    linhas.push(...itens);
+    paginas++;
+
+    const proximo = tokenDaPagina(r.data);
+    // Token igual ao anterior é API repetindo página: parar é o certo, e sem
+    // isso o teto abaixo seria a única defesa contra o laço infinito.
+    if (!proximo || proximo === token || itens.length === 0) return { linhas };
+
+    if (paginas >= TETO_PAGINAS) {
+      return {
+        linhas,
+        aviso: `teto de ${TETO_PAGINAS} páginas atingido; a lista pode estar incompleta.`,
+      };
+    }
+    token = proximo;
+  }
+}
+
+/**
+ * O inventário de VOZES: v3 paginada + v2, deduplicado, com controle.
+ *
+ * Nunca lança. O pior caso é `{itens: [], fontes: [dois erros], parcial: true}`
+ * — que é uma resposta legível, e não um 500 mudo na cara do operador.
+ */
+export async function inventarioVozes(
+  opcoes: OpcoesInventario = {}
+): Promise<Inventario<VozInventario>> {
+  const buscar = opcoes.buscar ?? ((c: string) => get(c));
+  const orcamentoMs = opcoes.orcamentoMs ?? ORCAMENTO_INVENTARIO_MS;
+  const agora = opcoes.agora ?? (() => Date.now());
+  const inicio = agora();
+  const estourou = () => agora() - inicio >= orcamentoMs;
+
+  const fontes: FonteInventario[] = [];
+  const avisos: string[] = [];
+  const cru: VozInventario[] = [];
+
+  // --- v3, paginada ---------------------------------------------------------
+  const v3 = await paginar(
+    buscar,
+    (token) => {
+      const q = new URLSearchParams({ limit: String(PAGINA) });
+      if (token) q.set("token", token);
+      return `/v3/voices?${q.toString()}`;
+    },
+    (bruto) => comoLista(bruto, "voices"),
+    estourou
+  );
+  const daV3 = v3.linhas.map((v) => mapearVoz(v, "v3")).filter((v) => v.id);
+  cru.push(...daV3);
+  fontes.push({
+    nome: "v3/voices",
+    ok: !v3.erro,
+    ...(v3.erro ? { erro: v3.erro } : {}),
+    n: daV3.length,
+  });
+  if (v3.aviso) avisos.push(`v3/voices: ${v3.aviso}`);
+  if (v3.erro && daV3.length > 0) {
+    avisos.push(`v3/voices caiu depois de ${daV3.length} voz(es); o resto não foi lido.`);
+  }
+
+  // --- v2, uma chamada ------------------------------------------------------
+  // O legado não pagina no que eu medi, e ele responde 401 (não 404) — ou seja,
+  // existe. Fica aqui porque uma voz antiga da conta pode aparecer SÓ nele.
+  if (estourou()) {
+    fontes.push({ nome: "v2/voices", ok: false, erro: "orcamento_estourado", n: 0 });
+    avisos.push("v2/voices nem foi consultada: o orçamento acabou na v3.");
+  } else {
+    let r2: Resposta<unknown>;
+    try {
+      r2 = await buscar("/v2/voices");
+    } catch (e) {
+      r2 = { ok: false, erro: e instanceof Error ? e.message.slice(0, 300) : "erro_desconhecido" };
+    }
+    if (r2.ok) {
+      const daV2 = comoLista(r2.data, "voices")
+        .map((v) => mapearVoz(v, "v2"))
+        .filter((v) => v.id);
+      cru.push(...daV2);
+      fontes.push({ nome: "v2/voices", ok: true, n: daV2.length });
+    } else {
+      fontes.push({ nome: "v2/voices", ok: false, erro: r2.erro, n: 0 });
+    }
+  }
+
+  const itens = deduplicarVozes(cru);
+
+  // --- o controle -----------------------------------------------------------
+  const socorro_presente = itens.some((v) => v.id === VOZ_SOCORRO);
+  if (!socorro_presente) {
+    avisos.push(
+      `CONTROLE FALHOU: a voz de socorro (${VOZ_SOCORRO}) não apareceu. ` +
+        "Trate esta lista como incompleta — a ausência de um id aqui NÃO prova " +
+        "que ele não existe na conta."
+    );
+  }
+
+  return {
+    itens,
+    fontes,
+    controle: { socorro_presente },
+    parcial: avisos.length > 0 || fontes.some((f) => !f.ok),
+    avisos,
+  };
+}
+
+function mapearAvatar(
+  a: Record<string, unknown>,
+  origem: AvatarInventario["origem"],
+  tipoPadrao: string | null
+): AvatarInventario {
+  return {
+    id: primeiro(a, "id", "avatar_id", "look_id", "talking_photo_id") ?? "",
+    nome:
+      primeiro(a, "name", "avatar_name", "look_name", "talking_photo_name") ?? "(sem nome)",
+    tipo: primeiro(a, "avatar_type", "type") ?? tipoPadrao,
+    preview: primeiro(a, "preview_image_url", "preview_url", "image_url"),
+    origem,
+  };
+}
+
+/**
+ * O inventário de AVATARES: looks da v3 (todos e `photo_avatar`) + talking
+ * photos do legado.
+ *
+ * DESVIO QUE EU DECLARO: as duas fontes v3 vão com `ownership=private`, e não
+ * sem filtro. O motivo é que `ownership=public` é o catálogo de estoque da
+ * HeyGen — milhares de avatares que não são da casa e que afogariam o único
+ * item que a tela existe para encontrar. Se um dia o avatar procurado não
+ * aparecer aqui, este parágrafo é o primeiro lugar a olhar.
+ *
+ * `controle: null` — não existe avatar de socorro cravado como VOZ_SOCORRO. Ver
+ * o comentário do tipo `Inventario`.
+ */
+export async function inventarioAvatares(
+  opcoes: OpcoesInventario = {}
+): Promise<Inventario<AvatarInventario>> {
+  const buscar = opcoes.buscar ?? ((c: string) => get(c));
+  const orcamentoMs = opcoes.orcamentoMs ?? ORCAMENTO_INVENTARIO_MS;
+  const agora = opcoes.agora ?? (() => Date.now());
+  const inicio = agora();
+  const estourou = () => agora() - inicio >= orcamentoMs;
+
+  const fontes: FonteInventario[] = [];
+  const avisos: string[] = [];
+  const porId = new Map<string, AvatarInventario>();
+
+  const familias: {
+    nome: string;
+    tipo: string | null;
+    origem: AvatarInventario["origem"];
+  }[] = [
+    { nome: "v3/avatars/looks", tipo: null, origem: "v3" },
+    { nome: "v3/avatars/looks(photo_avatar)", tipo: "photo_avatar", origem: "v3_photo" },
+  ];
+
+  for (const f of familias) {
+    const r = await paginar(
+      buscar,
+      (token) => {
+        const q = new URLSearchParams({ limit: String(PAGINA), ownership: "private" });
+        if (f.tipo) q.set("avatar_type", f.tipo);
+        if (token) q.set("token", token);
+        return `/v3/avatars/looks?${q.toString()}`;
+      },
+      (bruto) => comoLista(bruto, "looks", "avatars"),
+      estourou
+    );
+    const lista = r.linhas.map((a) => mapearAvatar(a, f.origem, f.tipo)).filter((a) => a.id);
+    // Primeiro a chegar fica: o look genérico e o photo_avatar são a MESMA
+    // entidade quando o id bate, e a primeira família já traz o `avatar_type`.
+    for (const a of lista) if (!porId.has(a.id)) porId.set(a.id, a);
+    fontes.push({ nome: f.nome, ok: !r.erro, ...(r.erro ? { erro: r.erro } : {}), n: lista.length });
+    if (r.aviso) avisos.push(`${f.nome}: ${r.aviso}`);
+  }
+
+  // --- talking photos do legado --------------------------------------------
+  if (estourou()) {
+    fontes.push({ nome: "v1/talking_photo.list", ok: false, erro: "orcamento_estourado", n: 0 });
+    avisos.push("v1/talking_photo.list nem foi consultada: o orçamento acabou antes.");
+  } else {
+    let r: Resposta<unknown>;
+    try {
+      r = await buscar("/v1/talking_photo.list");
+    } catch (e) {
+      r = { ok: false, erro: e instanceof Error ? e.message.slice(0, 300) : "erro_desconhecido" };
+    }
+    if (r.ok) {
+      const lista = comoLista(r.data, "talking_photos")
+        .map((t) => mapearAvatar(t, "v1_talking_photo", "talking_photo"))
+        .filter((a) => a.id);
+      for (const a of lista) if (!porId.has(a.id)) porId.set(a.id, a);
+      fontes.push({ nome: "v1/talking_photo.list", ok: true, n: lista.length });
+    } else {
+      fontes.push({ nome: "v1/talking_photo.list", ok: false, erro: r.erro, n: 0 });
+    }
+  }
+
+  return {
+    itens: [...porId.values()],
+    fontes,
+    controle: null,
+    parcial: avisos.length > 0 || fontes.some((f) => !f.ok),
+    avisos,
+  };
+}
