@@ -379,3 +379,71 @@ export function recorteCentral(
     topo: Math.round((canvasAltura - altura) / 2),
   };
 }
+
+// ---------------------------------------------------------------------------
+// A ESCADA DE RENDER — o degrau que faltava
+// ---------------------------------------------------------------------------
+// POR QUE ISTO NASCEU EM 10/08/2026, e por que é o mesmo assunto do cabeçalho.
+//
+// A ordem de 09/08 mandava que "arquivo corrompido" caísse no card de hoje, e
+// `buscarArte` cumpre isso até onde alcança: fareja a assinatura dos bytes e
+// devolve `null` para o que não é imagem. Só que assinatura válida não é
+// imagem íntegra. Um PNG com cabeçalho bom e corpo truncado PASSA por todos os
+// guardas daqui, vira data URI, e só quebra quando o satori tenta DECODIFICAR
+// — dentro do render, que é o único lugar que este módulo não alcança.
+//
+// Este módulo até declara essa ambição, logo acima do data URI: trazer os
+// bytes para cá faria "toda falha virar null ANTES de o render começar, que é
+// a única forma de o fallback ser um caminho normal em vez de uma exceção
+// capturada por sorte". A ambição está certa e o buraco é real: falha de
+// DECODIFICAÇÃO não tem como acontecer antes do render. Quem fecha é a escada.
+//
+// O DEFEITO CONCRETO QUE ISTO CONSERTA, em card-image/[id]: o `renderKit`
+// tinha dois degraus, e os dois carregavam a MESMA arte. Ele só sabia desistir
+// das FONTES. Então, com uma arte que não decodifica: o 1º degrau estourava, o
+// `catch` culpava as fontes e jogava fora o cache delas, e o 2º degrau
+// re-renderizava a mesma arte envenenada — dessa vez em STREAM, sem `catch`
+// possível. Render que morre no meio do stream não vira 500: vira conexão
+// vazia. E conexão vazia é exatamente o que faz o servidor da Meta responder
+// "não consegui buscar a mídia nesta URI".
+//
+// POR QUE A ARTE CAI ANTES DAS FONTES. O `catch` do 1º degrau não sabe dizer
+// se quem quebrou foi a fonte ou a arte — chega a mesma exceção. Então a ordem
+// não pode ser adivinhação, tem que ser a que sobrevive aos DOIS casos. Se
+// derrubássemos a fonte primeiro, o degrau seguinte ainda levaria a arte
+// quebrada e ainda seria o último — ou seja, o caso "arte ruim" voltaria a
+// morrer em stream. Derrubando a arte primeiro, o caso "fonte ruim" apenas
+// gasta um degrau a mais e chega inteiro no último. Uma ordem serve aos dois;
+// a outra serve a um só.
+//
+// A INVARIANTE, e é ela que o teste crava: o ÚLTIMO degrau nunca leva arte e
+// nunca leva fonte. É o único que renderiza em stream, sem rede de segurança,
+// e por isso tem que ser o mais pobre e o mais provável de dar certo — o card
+// navy chapado, idêntico ao que existia antes de a arte existir. Enfeite não
+// derruba produto.
+
+/** Um degrau da escada: o que ele ainda se permite carregar. */
+export type Degrau = {
+  /** Usa as fontes do kit? `false` = stack padrão do renderizador. */
+  fontes: boolean;
+  /** Leva a arte do acervo? `false` = card navy chapado. */
+  arte: boolean;
+};
+
+/**
+ * A ordem das tentativas de render, da mais rica para a mais pobre.
+ *
+ * Sempre termina em `{ fontes: false, arte: false }` — inclusive quando não há
+ * arte nem fonte para começo de conversa, caso em que a escada tem UM degrau só
+ * e o comportamento é exatamente o de antes desta fatia.
+ *
+ * Não gera degrau inútil: sem arte, não existe degrau "sem arte" intermediário.
+ */
+export function degrausDeRender(temArte: boolean, temFontes: boolean): Degrau[] {
+  const degraus: Degrau[] = [];
+  if (temFontes && temArte) degraus.push({ fontes: true, arte: true });
+  if (temFontes) degraus.push({ fontes: true, arte: false });
+  if (!temFontes && temArte) degraus.push({ fontes: false, arte: true });
+  degraus.push({ fontes: false, arte: false });
+  return degraus;
+}

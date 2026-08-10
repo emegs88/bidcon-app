@@ -116,6 +116,7 @@ import {
 } from "@/lib/card-fontes";
 import {
   buscarArte,
+  degrausDeRender,
   recorteCentral,
   VEU_NAVY,
   type Arte,
@@ -890,7 +891,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // de um 400.
   const pedidoSlide = busca.get("slide")?.toLowerCase();
   if (formato === "feed" && (pedidoSlide === "capa" || pedidoSlide === "cta")) {
-    return await renderKit(pedidoSlide === "capa" ? <Capa /> : <Cta />, {
+    // Sem terceiro argumento: estes slides não levam arte NEM opcionalmente, e
+    // a escada nasce com um degrau (fontes) e o degrau final. Comportamento
+    // idêntico ao de antes da escada.
+    return await renderKit(() => (pedidoSlide === "capa" ? <Capa /> : <Cta />), {
       width: 1080,
       height: 1080,
     });
@@ -954,18 +958,21 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // garante que um enfeite não derrube o post do dia.
   const arte = await buscarArte(busca.get("arte"));
 
-  const elemento =
+  // O elemento agora é MONTADO PELA ESCADA, não montado aqui e entregue pronto:
+  // é o que permite ao `renderKit` re-renderizar SEM a arte quando é a arte que
+  // não decodifica. Ver a escada em lib/farol-arte.ts (10/08/2026).
+  const montar = (a: Arte | null) =>
     formato === "feed" ? (
-      <Feed carta={carta} arte={arte} />
+      <Feed carta={carta} arte={a} />
     ) : (
-      <Story carta={carta} arte={arte} />
+      <Story carta={carta} arte={a} />
     );
   const medidas =
     formato === "feed"
       ? { width: 1080, height: 1080 }
       : { width: 1080, height: 1920 };
 
-  return await renderKit(elemento, medidas);
+  return await renderKit(montar, medidas, arte);
 }
 
 /**
@@ -977,39 +984,61 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  * consertada num lugar e não no outro.
  */
 async function renderKit(
-  elemento: ReactElement,
-  medidas: { width: number; height: number }
+  montar: (arte: Arte | null) => ReactElement,
+  medidas: { width: number; height: number },
+  arte: Arte | null = null
 ): Promise<Response> {
   const fontes = await fontesDoKit();
+  const escada = degrausDeRender(arte !== null, fontes !== null);
 
-  // POR QUE ESTE RAMO EXISTE (cicatriz, não paranoia): quando o satori não
-  // consegue parsear uma fonte registrada, o erro NÃO vira 500 — ele estoura
-  // durante o pipe do stream e o cliente recebe conexão vazia
-  // (`curl: (52) Empty reply from server`). Foi exatamente o que aconteceu com
-  // a fonte variável do google/fonts (ver lib/card-fontes.ts). Consumir o corpo
-  // aqui, com `arrayBuffer()`, transforma esse erro invisível numa exceção que
-  // dá para pegar — e aí a arte SAI na stack padrão em vez de o feed do
-  // Instagram ficar sem imagem. `esquecerFontes()` evita repetir o download
-  // condenado a cada request do container.
-  if (fontes) {
+  // POR QUE OS DEGRAUS INTERMEDIÁRIOS SÃO BUFFERIZADOS (cicatriz, não paranoia):
+  // quando o satori não consegue parsear uma fonte registrada — ou decodificar
+  // uma arte —, o erro NÃO vira 500. Ele estoura durante o pipe do stream e o
+  // cliente recebe conexão vazia (`curl: (52) Empty reply from server`). Foi
+  // exatamente o que aconteceu com a fonte variável do google/fonts (ver
+  // lib/card-fontes.ts). Consumir o corpo aqui, com `arrayBuffer()`, transforma
+  // esse erro invisível numa exceção que dá para pegar — e aí o card SAI mais
+  // pobre em vez de o feed do Instagram ficar sem imagem.
+  //
+  // O ÚLTIMO degrau é o único que segue em stream, porque abaixo dele não há
+  // para onde cair: ele é o card navy chapado, sem arte e sem fonte. Bufferizar
+  // o último só trocaria o modo de falhar, sem salvar nada, e pagaria o card
+  // inteiro em memória em TODA requisição.
+  for (let i = 0; i < escada.length; i++) {
+    const degrau = escada[i];
+    const elemento = montar(degrau.arte ? arte : null);
+    const opcoes = degrau.fontes && fontes ? { ...medidas, fonts: fontes } : medidas;
+    const ultimo = i === escada.length - 1;
+
+    if (ultimo) {
+      const imagem = new ImageResponse(elemento, opcoes);
+      return comCache(imagem.headers, imagem.body);
+    }
+
     try {
-      const bytes = await new ImageResponse(elemento, {
-        ...medidas,
-        fonts: fontes,
-      }).arrayBuffer();
+      const bytes = await new ImageResponse(elemento, opcoes).arrayBuffer();
       const headers = new Headers({ "content-type": "image/png" });
       return comCache(headers, bytes);
     } catch (e) {
-      console.error(
-        "[card-image] render com fontes falhou — caindo na stack padrão:",
-        e instanceof Error ? e.message : "erro_desconhecido"
-      );
-      esquecerFontes();
+      // Qual degrau caiu importa para quem for ler o log depois: "com arte"
+      // caindo e "sem arte" passando é o diagnóstico de arte podre; os dois
+      // caindo é fonte podre. Sem isto, os dois casos escrevem a mesma linha.
+      console.error("[card-image] degrau de render falhou:", {
+        degrau: `fontes=${degrau.fontes} arte=${degrau.arte}`,
+        proximo: `fontes=${escada[i + 1].fontes} arte=${escada[i + 1].arte}`,
+        erro: e instanceof Error ? e.message : "erro_desconhecido",
+      });
+      // `esquecerFontes()` SÓ quando o próximo degrau também abre mão delas —
+      // ou seja, quando as fontes são de fato a suspeita. Antes disto, uma arte
+      // podre fazia o cache de fontes ser jogado fora a cada requisição,
+      // culpando as fontes por um defeito que não era delas.
+      if (degrau.fontes && !escada[i + 1].fontes) esquecerFontes();
     }
   }
 
-  const imagem = new ImageResponse(elemento, medidas);
-  return comCache(imagem.headers, imagem.body);
+  // Inalcançável: `degrausDeRender` nunca devolve lista vazia e o último degrau
+  // sempre retorna. Existe para o compilador, não para o runtime.
+  throw new Error("escada de render vazia");
 }
 
 /**

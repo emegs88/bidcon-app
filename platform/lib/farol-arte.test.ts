@@ -33,6 +33,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   buscarArte,
+  degrausDeRender,
   recorteCentral,
   tipoPelaAssinatura,
   PRAZO_MS,
@@ -435,4 +436,111 @@ test("preview não quebra o contrato do fallback", () => {
       });
     }
   })();
+});
+
+// ============================================================================
+// 5. A ESCADA DE RENDER — a invariante que impede o enfeite de derrubar o post
+// ----------------------------------------------------------------------------
+// POR QUE ISTO É TESTÁVEL E O `renderKit` NÃO É. O `renderKit` mora num route
+// handler, chama o satori e faz I/O de fonte — exercitá-lo pediria stub de rede,
+// coisa que a casa não faz em lugar nenhum. Mas a decisão que importa não é o
+// render: é a ORDEM das tentativas. Ela é aritmética pura, mora aqui, e é o
+// único ponto onde o defeito de 10/08 poderia voltar sem ninguém ver.
+//
+// O QUE ESTES TESTES PRENDEM, em uma frase: o último degrau nunca leva arte. Ele
+// é o único que renderiza em stream, sem `catch` possível, e foi por levar arte
+// que o card morreu em conexão vazia. Se alguém reordenar a escada "para tentar
+// preservar a arte até o fim", estes testes ficam vermelhos — que é exatamente o
+// serviço que eles têm a prestar.
+// ============================================================================
+
+test("escada: o último degrau NUNCA leva arte nem fonte — em qualquer entrada", () => {
+  for (const temArte of [true, false]) {
+    for (const temFontes of [true, false]) {
+      const escada = degrausDeRender(temArte, temFontes);
+      const ultimo = escada[escada.length - 1];
+      assert.deepEqual(
+        ultimo,
+        { fontes: false, arte: false },
+        `último degrau errado para arte=${temArte} fontes=${temFontes}`
+      );
+    }
+  }
+});
+
+test("escada: nunca é vazia — sempre há para onde renderizar", () => {
+  for (const temArte of [true, false]) {
+    for (const temFontes of [true, false]) {
+      assert.ok(
+        degrausDeRender(temArte, temFontes).length >= 1,
+        `escada vazia para arte=${temArte} fontes=${temFontes}`
+      );
+    }
+  }
+});
+
+test("escada: com arte e fontes, a arte cai ANTES das fontes", () => {
+  const escada = degrausDeRender(true, true);
+  assert.deepEqual(escada, [
+    { fontes: true, arte: true },
+    { fontes: true, arte: false },
+    { fontes: false, arte: false },
+  ]);
+
+  // A afirmação do comentário, escrita como medida: no degrau em que a arte já
+  // se foi, as fontes ainda estão de pé. Trocar a ordem quebra aqui.
+  const primeiraPerdaDeArte = escada.findIndex((d) => !d.arte);
+  const primeiraPerdaDeFonte = escada.findIndex((d) => !d.fontes);
+  assert.ok(
+    primeiraPerdaDeArte < primeiraPerdaDeFonte,
+    "a fonte caiu antes da arte — o caso 'arte podre' volta a morrer em stream"
+  );
+});
+
+test("escada: sem arte, o comportamento é o de antes da fatia (2 degraus)", () => {
+  assert.deepEqual(degrausDeRender(false, true), [
+    { fontes: true, arte: false },
+    { fontes: false, arte: false },
+  ]);
+});
+
+test("escada: sem fontes, a arte ainda é tentada uma vez", () => {
+  // Sem fontes do kit a arte não é culpada de nada — ela merece a primeira
+  // tentativa. O que não pode é ser a ÚLTIMA, e não é.
+  assert.deepEqual(degrausDeRender(true, false), [
+    { fontes: false, arte: true },
+    { fontes: false, arte: false },
+  ]);
+});
+
+test("escada: sem arte e sem fontes, UM degrau só — nada de tentativa inútil", () => {
+  assert.deepEqual(degrausDeRender(false, false), [{ fontes: false, arte: false }]);
+});
+
+test("escada: nenhum degrau se repete — cada tentativa é diferente da anterior", () => {
+  for (const temArte of [true, false]) {
+    for (const temFontes of [true, false]) {
+      const escada = degrausDeRender(temArte, temFontes);
+      const vistos = new Set(escada.map((d) => `${d.fontes}/${d.arte}`));
+      assert.equal(
+        vistos.size,
+        escada.length,
+        `degrau repetido em arte=${temArte} fontes=${temFontes}: repetir a ` +
+          `mesma tentativa é gastar prazo do servidor da Meta à toa`
+      );
+    }
+  }
+});
+
+test("escada: a arte nunca reaparece depois de cair", () => {
+  // Uma escada que largasse a arte e a retomasse depois seria pior que inútil:
+  // o degrau final voltaria a carregar o veneno.
+  for (const temFontes of [true, false]) {
+    const escada = degrausDeRender(true, temFontes);
+    const caiu = escada.findIndex((d) => !d.arte);
+    assert.ok(caiu >= 0, "a arte nunca cai — não existe degrau de resgate");
+    for (let i = caiu; i < escada.length; i++) {
+      assert.equal(escada[i].arte, false, `arte ressuscitou no degrau ${i}`);
+    }
+  }
 });
