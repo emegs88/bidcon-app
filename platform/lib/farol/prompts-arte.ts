@@ -110,13 +110,60 @@ export type CategoriaFigurativa = (typeof CATEGORIAS_FIGURATIVAS)[number];
  */
 export const CENAS: Record<CategoriaFigurativa, string> = {
   // MEDIDA em 09/08 — resultado a1: composição errada (carro no centro
-  // horizontal). O texto abaixo já corrige o enquadramento pedindo o lado.
+  // horizontal). Corrigido pedindo o lado.
+  //
+  // MEDIDA em 10/08 — REPROVADA na curadoria, e não por composição: o carro saiu
+  // um VW Polo RECONHECÍVEL (grade, faróis, linha de teto), e a rua era vila
+  // europeia — casas de pedra e chaminés —, não Brasil. Risco duplo: usar
+  // desenho de montadora em peça publicitária, e sugerir que a carta compra
+  // aquele carro.
+  //
+  // POR QUE PROIBIR NÃO RESOLVEU — e é isto que faz a correção ser geométrica e
+  // não mais uma frase. O texto antigo JÁ pedia "unbranded" e "anonymous grille
+  // with no emblem", e `PROIBICOES` JÁ veta "no logos, no brand marks, no
+  // emblems, no badges". O modelo OBEDECEU: não pintou emblema nenhum. O que
+  // denuncia a marca não é o emblema desenhado — é a GEOMETRIA da grade, do
+  // farol e da linha de teto, copiada do acervo de carros reais que o modelo
+  // conhece. Proibição alcança marca desenhada; forma de carroceria não se
+  // proíbe por texto. Só resolve TIRANDO DE CENA a superfície que carrega a
+  // identidade. Daí três quartos TRASEIRO — e daí a palavra "grille" SAIR do
+  // texto: pedir "grade anônima" é, antes de tudo, pedir grade.
+  //
+  // E sair INCLUSIVE das negações. A primeira versão desta correção dizia "no
+  // grille, no headlights, no front bumper in frame" — ou seja, nomeava de novo
+  // as duas superfícies que eu tinha acabado de argumentar que não se deve
+  // nomear. Com o carro de traseira a frase era redundante além de contraditória.
+  // O texto agora diz o que ESTÁ em quadro (tampa, vidro e para-choque
+  // traseiros), que é a forma que não depende de o modelo obedecer a negação.
+  //
+  // Carroceria escura fosca também é medição, não gosto: fosca não devolve
+  // reflexo especular, então a massa do carro fica escura e os pontos de luz da
+  // cláusula de luz pontual vêm das janelas e dos postes — que é exatamente o
+  // que sobrevive ao véu (ver o bloco de ACABAMENTO).
+  //
+  // TENSÃO DECLARADA: "at night" aqui puxa contra "late afternoon golden light"
+  // de `ACABAMENTO`, que é cauda comum e não sei reescrever sem remedir as seis
+  // categorias. A cláusula de luz pontual já pede "distinct points against dark
+  // surroundings", então as duas convivem — mas isto é raciocínio, não medida, e
+  // só vira medida quando a regeração for autorizada.
   veiculo_popular:
-    "A small compact hatchback car parked on a quiet residential street at dusk, seen in a " +
-    "three-quarter front view from a low angle, positioned to one side of the frame. Plain " +
-    "unbranded bodywork in a neutral silver-grey, smooth anonymous grille with no emblem, " +
-    "plain wheels. Street lamps and lit windows behind it. ",
+    "A small compact hatchback car parked on a quiet Brazilian residential street at night, " +
+    "seen from behind in a three-quarter REAR view from a low angle, positioned to one side " +
+    "of the frame. Only the rear of the car is in frame — rear hatch, rear window and rear " +
+    "bumper; the front of the car falls outside the frame entirely. Plain unbranded dark " +
+    "matte charcoal bodywork with no gloss and no " +
+    "reflections, plain steel wheels, simple plain rectangular tail lights. Behind it a " +
+    "Brazilian residential street: plastered boundary walls, a low metal gate, a leafy tree, " +
+    "warm street lamps and " +
+    "windows lit from inside. No stone cottages, no chimneys, no European village " +
+    "architecture, no cobblestones. ",
 
+  // ATENÇÃO — o mesmo defeito de 10/08 está LATENTE aqui e em `veiculo_alto`:
+  // ambos pedem "three-quarter view" (que o modelo lê como frontal) e ambos
+  // pedem "anonymous grille with no emblem", que é a frase que não funcionou.
+  // Nenhuma das duas foi gerada, então não há medição própria — mas o mecanismo
+  // é o mesmo. NÃO reescritas aqui de propósito: a autorização de 10/08 era para
+  // corrigir `veiculo_popular`. Reportado para decisão.
   veiculo_medio:
     "A modern unbranded sedan parked at the edge of a quiet avenue at dusk, three-quarter " +
     "view from a low angle, positioned to one side of the frame. Neutral dark bodywork, " +
