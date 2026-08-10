@@ -96,11 +96,17 @@ export default async function AdminConversaWhatsApp({
             {conversa.status === "humano" ? "Precisa de atenção" : conversa.status}
           </Badge>
         </div>
+        {/* `nome`/`contato` alimentam a confirmação nominal de CONVERSAS-02.
+            O contato vai CRU porque é cru que esta tela o mostra (linha acima):
+            a confirmação tem de repetir o que está na tela, não uma segunda
+            versão do mesmo dado. */}
         <ConversaAcoes
           canal="whatsapp"
           conversaId={conversa.id}
           status={conversa.status}
           telefone={conversa.telefone as string | null}
+          nome={conversa.nome as string | null}
+          contato={conversa.telefone as string | null}
         />
         <ResponderWhatsApp
           conversaId={conversa.id as string}
