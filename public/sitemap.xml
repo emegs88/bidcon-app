@@ -41,6 +41,19 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://www.bidcon.com.br/seguranca</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- SEM barra final, de proposito: trailingSlash e false e /blog/ responde
+       308 para /blog. Publicar a versao com barra seria mandar o robo a um
+       redirect e gastar rastreamento com um salto que nao precisa existir. -->
+  <url>
+    <loc>https://www.bidcon.com.br/blog</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.bidcon.com.br/blog/como-funciona-carta-de-credito-do-consorcio</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
