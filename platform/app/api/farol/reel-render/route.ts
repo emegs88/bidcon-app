@@ -96,7 +96,15 @@ import {
 } from "@/lib/farol/reel-texto";
 import { formulaPorId, type Formula, type Persona } from "@/lib/farol/formulas";
 import { statusConsumivelDaPauta } from "@/lib/farol/painel";
-import { dispararRender, tituloRender } from "@/lib/heygen";
+import {
+  dispararRender,
+  tituloRender,
+  listarVozes,
+  vozesEmPrazo,
+  escolherVoz,
+  recusaDeVoz,
+  VOZ_SOCORRO,
+} from "@/lib/heygen";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -390,11 +398,43 @@ export async function GET(req: Request) {
       tipo: tipoAvatar,
     });
 
+    // ---- Conferência da voz (FAROL-VOZ-01, 10/08/2026) ---------------------
+    // AUTORIZADO: Emerson, após o reel das 11h31 morrer com `Invalid voice_id:
+    // '05601cd1...'. Voice not found.` — "antes do render, conferir o voice_id
+    // contra /api/farol/reel-opcoes; voz inválida deve cair na voz padrão com
+    // log, não perder o vídeo do dia."
+    //
+    // DESVIO DECLARADO, E É DE PROPÓSITO: a conferência NÃO é contra
+    // `/api/farol/reel-opcoes`. Fui ler aquela rota: ela devolve um cardápio
+    // CURADO — filtra por `pareceBr` e corta em `slice(0, 20)`. Conferir contra
+    // ela reprovaria voz boa que a HeyGen não indexa como português, ou que
+    // ficou na 21ª posição, e trocaria a voz da marca por artefato de
+    // paginação. Além disso aquela rota é guardada por `DISPARO_SECRET`, que o
+    // caminho de publicação não tem e cujo próprio cabeçalho diz para não
+    // compartilhar. Então: `listarVozes("")` direto da lib, sem filtro de
+    // idioma e sem HTTP para nós mesmos.
+    //
+    // A CONFERÊNCIA TEM PERMISSÃO PARA NÃO ACONTECER. Prazo curto, e qualquer
+    // fracasso vira lista vazia -> `lista_indisponivel` -> segue com a voz
+    // configurada. Ela nunca derruba nem atrasa o render.
+    const vozes = await vozesEmPrazo(() => listarVozes("", 100));
+    const escolha = escolherVoz(elenco.voiceId, vozes);
+    if (escolha.motivo) {
+      console.warn("[farol-reel] voz conferida:", {
+        data: hoje,
+        carta_id: carta.id,
+        motivo: escolha.motivo,
+        vozes_listadas: vozes.length,
+        trocou: escolha.voz !== elenco.voiceId,
+      });
+    }
+
     // ---- Render (a única linha que custa) ---------------------------------
+    let vozUsada = escolha.voz;
     let r = await dispararRender({
       roteiro,
       avatarId: elenco.avatarId,
-      voiceId: elenco.voiceId,
+      voiceId: vozUsada,
       tipo: elenco.tipo,
       // Mesma função que a fase 2 usa para procurar. Era template literal aqui;
       // virou chave de resgate lá — duas cópias seriam duas verdades.
@@ -435,15 +475,55 @@ export async function GET(req: Request) {
         erro: r.erro,
         caiu_em: "porta_voz",
       });
+      // A voz do Porta-voz é OUTRA env, que não passou pela conferência lá em
+      // cima — a lista já está na mão, então conferir de novo não custa rede.
+      vozUsada = escolherVoz(voiceId, vozes).voz;
       r = await dispararRender({
         roteiro,
         avatarId,
-        voiceId,
+        voiceId: vozUsada,
         tipo: tipoAvatar,
         titulo: tituloRender(hoje, carta.tipo),
       });
       personaFinal = "porta_voz";
       motivoFallback = "render_recusado";
+    }
+
+    // -----------------------------------------------------------------------
+    // A QUEDA DEPOIS DO ERRO — a que teria salvado o vídeo de 10/08
+    // -----------------------------------------------------------------------
+    // A conferência acima pode passar verde e o render falhar assim mesmo: a
+    // voz recusada em 10/08 EXISTIA no estúdio do HeyGen, então é provável que
+    // ela apareça na listagem. Uma conferência que não reprova o caso que a
+    // motivou não protege ninguém sozinha. Este bloco é o que protege.
+    //
+    // AS TRÊS CONDIÇÕES SÃO TODAS NECESSÁRIAS:
+    //   `recusaDeVoz`         — 4xx E a mensagem falando de voz. Só o 4xx prova
+    //                           que nada foi enfileirado nem cobrado; e sem a
+    //                           segunda metade, 4xx de avatar ou de cota viraria
+    //                           re-render inútil e pago.
+    //   `vozUsada !== SOCORRO` — se a voz recusada JÁ era o socorro, repetir com
+    //                           ela é pagar de novo pelo mesmo "não".
+    //   `vozes.length === 0 || ...` não entra: mesmo sem listagem este caminho
+    //                           vale, porque aqui quem deu o veredito foi a
+    //                           própria HeyGen, não uma lista incompleta.
+    if (!r.ok && recusaDeVoz(r.erro) && vozUsada !== VOZ_SOCORRO) {
+      console.error("[farol-reel] voz_recusada_no_render:", {
+        data: hoje,
+        carta_id: carta.id,
+        voz_recusada: vozUsada,
+        erro: r.erro,
+        caiu_em: "voz_socorro",
+      });
+      vozUsada = VOZ_SOCORRO;
+      r = await dispararRender({
+        roteiro,
+        avatarId: personaFinal === "porta_voz" ? avatarId : elenco.avatarId,
+        voiceId: vozUsada,
+        tipo: personaFinal === "porta_voz" ? tipoAvatar : elenco.tipo,
+        titulo: tituloRender(hoje, carta.tipo),
+      });
+      motivoFallback = motivoFallback ?? "voz_recusada";
     }
 
     if (!r.ok) {

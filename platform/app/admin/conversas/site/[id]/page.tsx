@@ -73,7 +73,13 @@ export default async function AdminConversaSite({
             {conversa.status === "humano" ? "Precisa de atenção" : conversa.status}
           </Badge>
         </div>
-        <ConversaAcoes canal="site" conversaId={conversa.id} status={conversa.status} />
+        <ConversaAcoes
+          canal="site"
+          conversaId={conversa.id}
+          status={conversa.status}
+          nome={interesse?.nome ?? null}
+          contato={interesse?.telefone ?? null}
+        />
       </Card>
 
       <ul className={styles.thread}>

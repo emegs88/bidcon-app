@@ -78,6 +78,8 @@ import { createXtvClient } from "@/lib/supabase-xtv";
 import { registrarMensagemSistema } from "@/lib/whatsapp/sistema";
 import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-background";
 import { etiquetasDaMensagem } from "@/lib/farol/cedente";
+import { etiquetasSemEntrada } from "@/lib/farol/sem-entrada";
+import { semEntradaLigado } from "@/lib/farol/pivo-sem-entrada";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -312,6 +314,8 @@ export async function POST(req: Request) {
 
   const valor = (evento as Record<string, unknown>)?.entry as unknown;
   const msgs = extrairMensagens(valor);
+  // CONVERSAS-02 — nomes do perfil, casados por wa_id na hora do upsert.
+  const nomesPorWaId = extrairNomes(valor);
 
   // CARROSSEL-OPS-01 Peça 0 — statuses do outbound (sent/delivered/read/
   // failed). Roda ANTES do early return abaixo de propósito: um recibo de
@@ -365,10 +369,18 @@ export async function POST(req: Request) {
       anexo?.caption ??
       (anexo ? "[anexo sem nome/legenda]" : "");
 
+    // CONVERSAS-02 — o nome entra AQUI, no mesmo upsert, e não numa segunda
+    // consulta: é a diferença entre uma ida ao banco e duas por mensagem. A
+    // chave só existe quando há nome (ver o bloco de `extrairNomes`): webhook
+    // sem `contacts` mantém o nome que já estava.
+    const nomePerfil = nomesPorWaId.get(telefone);
     const { data: conversa, error: errConversa } = await db
       .from("wa_conversas")
-      .upsert({ telefone }, { onConflict: "telefone", ignoreDuplicates: false })
-      .select("id, status, agente_ativo, opt_out, referral")
+      .upsert(nomePerfil ? { telefone, nome: nomePerfil } : { telefone }, {
+        onConflict: "telefone",
+        ignoreDuplicates: false,
+      })
+      .select("id, status, agente_ativo, opt_out, referral, nome")
       .single();
     if (errConversa || !conversa) continue;
 
@@ -404,7 +416,18 @@ export async function POST(req: Request) {
     // resultado é log e segue — perder uma etiqueta é aceitável, perder a
     // resposta ao cliente porque a etiquetagem falhou não é. É por isso que
     // isto vem DEPOIS do insert da mensagem e não faz parte dele.
-    for (const tag of etiquetasDaMensagem(conteudo)) {
+    // PROSPERITO-SEM-ENTRADA-01 — a etiqueta `consorcio_novo` entra na MESMA
+    // lista e no mesmo laço, então herda de graça a garantia de cima: falha de
+    // RPC vira log, nunca queda do webhook.
+    //
+    // Vem atrás do kill-switch junto com a resposta, e não solta: armar uma
+    // chave só tem que ligar a fatia inteira. Etiqueta sem a conversa que a
+    // justifica marcaria gente no painel sem ninguém saber por quê.
+    const etiquetas = [
+      ...etiquetasDaMensagem(conteudo),
+      ...(semEntradaLigado() ? etiquetasSemEntrada(conteudo) : []),
+    ];
+    for (const tag of etiquetas) {
       const { error: errTag } = await db.rpc("wa_conversa_add_tag", {
         p_conversa: conversa.id,
         p_tag: tag,
@@ -610,6 +633,67 @@ function ehOptOut(m: MensagemMeta): boolean {
   }
   const texto = m.text?.body;
   return !!texto && PALAVRAS_OPT_OUT.has(normalizarTexto(texto));
+}
+
+// ============================================================================
+// CONVERSAS-02 — o nome de quem está falando.
+// ----------------------------------------------------------------------------
+// MEDIDO em 09/08/2026: 27 conversas, 0 com nome. A coluna `wa_conversas.nome`
+// existe desde sempre e é nulável; nunca houve quem escrevesse nela. A tela de
+// atendimento era, literalmente, uma lista de telefones repetidos — e a Meta
+// mandava o nome do perfil em TODO webhook de mensagem, em
+// `entry[].changes[].value.contacts[]`, que este arquivo descartava. Não era
+// dado que faltava: era dado que chegava e ia para o lixo.
+//
+// POR QUE O NOME É FRESCO E O REFERRAL É FIRST-TOUCH. Logo abaixo, o `referral`
+// só é gravado se ainda não houver nenhum — vale o PRIMEIRO clique, porque a
+// pergunta que ele responde é "de onde esta pessoa veio", e origem não muda.
+// O nome é o oposto: a pergunta é "como chamo esta pessoa AGORA". Quem trocou
+// o nome do perfil trocou de nome; congelar o primeiro faria o operador chamar
+// o cliente por um nome que o próprio cliente abandonou. Então este sobrescreve
+// e aquele não — a diferença é de propósito, e é o motivo de estarem a dez
+// linhas um do outro com regras opostas.
+//
+// AUSÊNCIA NÃO APAGA. A chave `nome` só entra no upsert quando há nome. Um
+// webhook sem `contacts` (acontece) não pode zerar o nome que já tínhamos —
+// seria trocar informação por silêncio.
+// ============================================================================
+type ContatoMeta = {
+  wa_id?: string;
+  profile?: { name?: string };
+};
+
+/**
+ * Mapa `wa_id → nome do perfil`, varrendo todas as entries/changes (como
+ * `extrairStatuses`, e não como `extrairMensagens`, que só olha a `[0]`).
+ *
+ * A chave é `wa_id` e não a posição no array: `contacts` e `messages` são
+ * listas paralelas por convenção, não por contrato. Casar por índice
+ * funcionaria em 99% dos webhooks e trocaria o nome de duas pessoas no 1%
+ * restante — e um nome trocado na tela de atendimento é pior que nome nenhum,
+ * porque o operador confia nele.
+ */
+function extrairNomes(entry: unknown): Map<string, string> {
+  const mapa = new Map<string, string>();
+  if (!Array.isArray(entry)) return mapa;
+  for (const e of entry) {
+    const changes = (e as Record<string, unknown> | undefined)?.changes;
+    if (!Array.isArray(changes)) continue;
+    for (const c of changes) {
+      const value = (c as Record<string, unknown> | undefined)?.value as
+        | Record<string, unknown>
+        | undefined;
+      const contatos = value?.contacts;
+      if (!Array.isArray(contatos)) continue;
+      for (const ct of contatos as ContatoMeta[]) {
+        const id = ct?.wa_id;
+        const nome = ct?.profile?.name?.trim();
+        // Nome vazio ou só espaços é ausência, não nome.
+        if (id && nome) mapa.set(id, nome.slice(0, 120));
+      }
+    }
+  }
+  return mapa;
 }
 
 /** Extrai o array de `messages` do envelope `entry[].changes[].value.messages`

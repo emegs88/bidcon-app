@@ -22,6 +22,29 @@
 // de 400. Esta rota é chamada pelo servidor da Meta; ela não tem para quem
 // reclamar de um 400.
 //
+// ----------------------------------------------------------------------------
+// 09/08/2026 — FAROL-ARTE-01: `?arte=<uuid>`, OPCIONAL, só em feed e story.
+// ----------------------------------------------------------------------------
+//   ?arte=<uuid> → usa como FUNDO a imagem aprovada do acervo `farol_arte`,
+//                  recortada no centro e coberta por véu navy #0A0E1A a 78%.
+//
+// O QUE O MODELO GENERATIVO PODE FAZER, E O QUE ELE NUNCA FAZ: ele pinta fundo,
+// textura e luz. Ele NÃO escreve número, valor, percentual nem nome de
+// administradora — isso continua vindo do satori, por cima do véu, como sempre
+// veio. A razão é dura: modelo de imagem alucina dígito sem avisar, e um card
+// com "R$ 361.5OO" iria para um perfil público como se fosse carta real.
+//
+// AUSÊNCIA DE ARTE NÃO É ERRO, É O CAMINHO NORMAL. Sem `?arte=`, com uuid
+// inválido, com arte não aprovada, com arquivo corrompido ou com o bucket fora
+// do ar ou lento, `buscarArte` devolve `null`, `<Fundo>` não gera nó nenhum e a
+// árvore entregue ao satori é IDÊNTICA à de antes desta fatia — o card do dia
+// sai igual, sem drama e sem post perdido. Ver lib/farol-arte.ts, que é onde o
+// contrato "ou vem inteira, ou vem null" está implementado e comentado.
+//
+// O `padrao` (1200×630, WhatsApp) NÃO recebe arte em nenhuma hipótese, e nem
+// paga a latência da busca: ela roda depois do retorno dele. Os slides fixos do
+// carrossel também não recebem — ver o bloco no GET.
+//
 // POR QUE AO VIVO E NÃO PNG PRÉ-GERADO: a vitrine é substituída inteira a cada
 // rodada de sync. Uma arte gerada na hora do disparo já nasceria vencida se o
 // carrossel for reenviado, e o carrossel vive para sempre no celular do cliente.
@@ -91,6 +114,13 @@ import {
   FONT_TITULO,
   FONT_NUMERO,
 } from "@/lib/card-fontes";
+import {
+  buscarArte,
+  degrausDeRender,
+  recorteCentral,
+  VEU_NAVY,
+  type Arte,
+} from "@/lib/farol-arte";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,7 +130,7 @@ const GRADIENTE = "linear-gradient(90deg, #8FB7FF 0%, #36C5F0 50%, #1E6FE6 100%)
 const AZUL_CLARO = "#8FB7FF";
 
 /** "Vidro" do kit aproximado sem backdrop-filter — ver header. */
-const VIDRO_FUNDO = "rgba(143, 183, 255, 0.07)";
+const VIDRO_FUNDO = "rgba(18, 26, 48, 0.72)";
 const VIDRO_BORDA = "1px solid rgba(143, 183, 255, 0.22)";
 const CINZA_TEXTO = "#C7D3E8";
 
@@ -304,9 +334,82 @@ function fonteCredito(texto: string, larguraUtil: number, maximo: number): numbe
 }
 
 // ---------------------------------------------------------------------------
+// FUNDO — a arte do acervo e o véu, quando há arte. FAROL-ARTE-01, 09/08/2026.
+// ---------------------------------------------------------------------------
+// SEM ARTE ELE DEVOLVE `null`, e `null` como filho de JSX não gera nó nenhum:
+// a árvore que o satori recebe fica IDÊNTICA à de antes desta fatia. É isso que
+// torna o "cai no card de hoje, idêntico" verificável em vez de prometido — não
+// há caminho em que a ausência de arte mude um pixel do card atual.
+//
+// POR QUE `position: absolute` E NÃO UM INVÓLUCRO NOVO: os filhos absolutos
+// saem do fluxo do flex, então os quatro blocos que já existem em Feed/Story
+// continuam se distribuindo exatamente como antes — nenhum `justifyContent`,
+// nenhum padding, nenhuma medida precisou ser tocada para a arte entrar. E o
+// satori pinta na ORDEM DO DOCUMENTO: por ser o primeiro filho, o fundo fica
+// atrás de todo o conteúdo sem precisar de z-index (que o satori ignora).
+//
+// O `backgroundColor: NAVY` do div externo CONTINUA onde estava, atrás da arte.
+// Ele deixa de ser o fundo visível e vira a rede: se o png tiver transparência
+// ou não cobrir por um pixel, o que aparece é o navy do card — nunca branco.
+//
+// AS TRÊS CAMADAS, de baixo para cima: navy (do div externo) · arte recortada ·
+// véu de 78%. Os números vêm depois, por cima de tudo, e continuam saindo do
+// gerador determinístico — a regra inegociável da fatia.
+function Fundo({
+  arte,
+  largura,
+  altura,
+}: {
+  arte: Arte | null;
+  largura: number;
+  altura: number;
+}) {
+  if (!arte) return null;
+  const corte = recorteCentral(arte, largura, altura);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: `${largura}px`,
+        height: `${altura}px`,
+        display: "flex",
+        // O que efetiva o recorte: a imagem é maior que a caixa e o excedente é
+        // aparado aqui. Sem isto a arte vazaria por cima do padding do card.
+        overflow: "hidden",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={arte.fonte}
+        alt=""
+        width={corte.largura}
+        height={corte.altura}
+        style={{
+          position: "absolute",
+          left: `${corte.esquerda}px`,
+          top: `${corte.topo}px`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${largura}px`,
+          height: `${altura}px`,
+          backgroundColor: VEU_NAVY,
+        }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // FEED — 1080×1080. É o que define o grid do perfil.
 // ---------------------------------------------------------------------------
-function Feed({ carta }: { carta: CartaCarrossel }) {
+function Feed({ carta, arte }: { carta: CartaCarrossel; arte?: Arte | null }) {
   const credito = reais(carta.credito);
   return (
     <div
@@ -321,6 +424,8 @@ function Feed({ carta }: { carta: CartaCarrossel }) {
         fontFamily: FONT_TITULO,
       }}
     >
+      <Fundo arte={arte ?? null} largura={1080} altura={1080} />
+
       {/* Topo: marca no canto de sempre, pill do tipo, assinatura. */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div
@@ -398,7 +503,7 @@ function Feed({ carta }: { carta: CartaCarrossel }) {
 // no topo, caixa de resposta e barra de compartilhar embaixo. Tudo que importa
 // mora na zona segura central.
 // ---------------------------------------------------------------------------
-function Story({ carta }: { carta: CartaCarrossel }) {
+function Story({ carta, arte }: { carta: CartaCarrossel; arte?: Arte | null }) {
   const credito = reais(carta.credito);
   return (
     <div
@@ -418,6 +523,8 @@ function Story({ carta }: { carta: CartaCarrossel }) {
         fontFamily: FONT_TITULO,
       }}
     >
+      <Fundo arte={arte ?? null} largura={1080} altura={1920} />
+
       {/* Topo (com folga): a MESMA marca, no MESMO canto do feed. */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         <Marca tamanho={22} />
@@ -784,7 +891,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // de um 400.
   const pedidoSlide = busca.get("slide")?.toLowerCase();
   if (formato === "feed" && (pedidoSlide === "capa" || pedidoSlide === "cta")) {
-    return await renderKit(pedidoSlide === "capa" ? <Capa /> : <Cta />, {
+    // Sem terceiro argumento: estes slides não levam arte NEM opcionalmente, e
+    // a escada nasce com um degrau (fontes) e o degrau final. Comportamento
+    // idêntico ao de antes da escada.
+    return await renderKit(() => (pedidoSlide === "capa" ? <Capa /> : <Cta />), {
       width: 1080,
       height: 1080,
     });
@@ -823,14 +933,46 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   // --- FEED / STORY --------------------------------------------------------
-  const elemento =
-    formato === "feed" ? <Feed carta={carta} /> : <Story carta={carta} />;
+  // ARTE DO ACERVO (FAROL-ARTE-01, 09/08/2026) — `?arte=<uuid>`, opcional.
+  //
+  // A BUSCA MORA AQUI, E NÃO LÁ EM CIMA, POR TRÊS RAZÕES QUE SÃO A FATIA INTEIRA:
+  //
+  // 1. O `padrao` (1200×630, WhatsApp) já retornou acima. Ele é byte-a-byte
+  //    congelado e NÃO PODE receber arte nem por parâmetro nem por engano — e,
+  //    do jeito que está posto, nem sequer paga a latência da consulta. Passar
+  //    `?arte=` num card do WhatsApp é ignorado em silêncio, na mesma doutrina
+  //    do `formato` e do `slide` desconhecidos.
+  // 2. Os slides fixos do carrossel (capa/CTA) também já retornaram, antes até
+  //    do banco. Eles seguem sem arte DE PROPÓSITO e isso está declarado: são
+  //    peças de texto cravado, e o véu de 78% que justifica a qualidade `medium`
+  //    do acervo não se aplica a elas. Dar arte a esses slides reabre a decisão
+  //    de qualidade — ver a condição de reabertura em lib/farol-arte.ts.
+  // 3. Neste ponto a carta já existe. Se o card fosse falhar, ele já teria
+  //    falhado; a arte nunca é a razão de um 404.
+  //
+  // `buscarArte` NUNCA lança e NUNCA demora mais que PRAZO_MS: id inválido,
+  // linha inexistente ou não aprovada, arquivo corrompido, bucket fora do ar ou
+  // lento — tudo devolve `null`, e `null` faz `Fundo` não gerar nó nenhum. O
+  // card então sai IDÊNTICO ao de antes desta fatia. Não existe `try` aqui
+  // porque não existe o que capturar: o contrato do módulo é esse, e é ele que
+  // garante que um enfeite não derrube o post do dia.
+  const arte = await buscarArte(busca.get("arte"));
+
+  // O elemento agora é MONTADO PELA ESCADA, não montado aqui e entregue pronto:
+  // é o que permite ao `renderKit` re-renderizar SEM a arte quando é a arte que
+  // não decodifica. Ver a escada em lib/farol-arte.ts (10/08/2026).
+  const montar = (a: Arte | null) =>
+    formato === "feed" ? (
+      <Feed carta={carta} arte={a} />
+    ) : (
+      <Story carta={carta} arte={a} />
+    );
   const medidas =
     formato === "feed"
       ? { width: 1080, height: 1080 }
       : { width: 1080, height: 1920 };
 
-  return await renderKit(elemento, medidas);
+  return await renderKit(montar, medidas, arte);
 }
 
 /**
@@ -842,39 +984,61 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
  * consertada num lugar e não no outro.
  */
 async function renderKit(
-  elemento: ReactElement,
-  medidas: { width: number; height: number }
+  montar: (arte: Arte | null) => ReactElement,
+  medidas: { width: number; height: number },
+  arte: Arte | null = null
 ): Promise<Response> {
   const fontes = await fontesDoKit();
+  const escada = degrausDeRender(arte !== null, fontes !== null);
 
-  // POR QUE ESTE RAMO EXISTE (cicatriz, não paranoia): quando o satori não
-  // consegue parsear uma fonte registrada, o erro NÃO vira 500 — ele estoura
-  // durante o pipe do stream e o cliente recebe conexão vazia
-  // (`curl: (52) Empty reply from server`). Foi exatamente o que aconteceu com
-  // a fonte variável do google/fonts (ver lib/card-fontes.ts). Consumir o corpo
-  // aqui, com `arrayBuffer()`, transforma esse erro invisível numa exceção que
-  // dá para pegar — e aí a arte SAI na stack padrão em vez de o feed do
-  // Instagram ficar sem imagem. `esquecerFontes()` evita repetir o download
-  // condenado a cada request do container.
-  if (fontes) {
+  // POR QUE OS DEGRAUS INTERMEDIÁRIOS SÃO BUFFERIZADOS (cicatriz, não paranoia):
+  // quando o satori não consegue parsear uma fonte registrada — ou decodificar
+  // uma arte —, o erro NÃO vira 500. Ele estoura durante o pipe do stream e o
+  // cliente recebe conexão vazia (`curl: (52) Empty reply from server`). Foi
+  // exatamente o que aconteceu com a fonte variável do google/fonts (ver
+  // lib/card-fontes.ts). Consumir o corpo aqui, com `arrayBuffer()`, transforma
+  // esse erro invisível numa exceção que dá para pegar — e aí o card SAI mais
+  // pobre em vez de o feed do Instagram ficar sem imagem.
+  //
+  // O ÚLTIMO degrau é o único que segue em stream, porque abaixo dele não há
+  // para onde cair: ele é o card navy chapado, sem arte e sem fonte. Bufferizar
+  // o último só trocaria o modo de falhar, sem salvar nada, e pagaria o card
+  // inteiro em memória em TODA requisição.
+  for (let i = 0; i < escada.length; i++) {
+    const degrau = escada[i];
+    const elemento = montar(degrau.arte ? arte : null);
+    const opcoes = degrau.fontes && fontes ? { ...medidas, fonts: fontes } : medidas;
+    const ultimo = i === escada.length - 1;
+
+    if (ultimo) {
+      const imagem = new ImageResponse(elemento, opcoes);
+      return comCache(imagem.headers, imagem.body);
+    }
+
     try {
-      const bytes = await new ImageResponse(elemento, {
-        ...medidas,
-        fonts: fontes,
-      }).arrayBuffer();
+      const bytes = await new ImageResponse(elemento, opcoes).arrayBuffer();
       const headers = new Headers({ "content-type": "image/png" });
       return comCache(headers, bytes);
     } catch (e) {
-      console.error(
-        "[card-image] render com fontes falhou — caindo na stack padrão:",
-        e instanceof Error ? e.message : "erro_desconhecido"
-      );
-      esquecerFontes();
+      // Qual degrau caiu importa para quem for ler o log depois: "com arte"
+      // caindo e "sem arte" passando é o diagnóstico de arte podre; os dois
+      // caindo é fonte podre. Sem isto, os dois casos escrevem a mesma linha.
+      console.error("[card-image] degrau de render falhou:", {
+        degrau: `fontes=${degrau.fontes} arte=${degrau.arte}`,
+        proximo: `fontes=${escada[i + 1].fontes} arte=${escada[i + 1].arte}`,
+        erro: e instanceof Error ? e.message : "erro_desconhecido",
+      });
+      // `esquecerFontes()` SÓ quando o próximo degrau também abre mão delas —
+      // ou seja, quando as fontes são de fato a suspeita. Antes disto, uma arte
+      // podre fazia o cache de fontes ser jogado fora a cada requisição,
+      // culpando as fontes por um defeito que não era delas.
+      if (degrau.fontes && !escada[i + 1].fontes) esquecerFontes();
     }
   }
 
-  const imagem = new ImageResponse(elemento, medidas);
-  return comCache(imagem.headers, imagem.body);
+  // Inalcançável: `degrausDeRender` nunca devolve lista vazia e o último degrau
+  // sempre retorna. Existe para o compilador, não para o runtime.
+  throw new Error("escada de render vazia");
 }
 
 /**

@@ -1,6 +1,215 @@
 /* CRM-01 — Central de Conversas. Só CSS Modules + tokens globais, mesmo
    espírito das demais áreas do admin (revisao/processos). */
 
+/* ==========================================================================
+   CONVERSAS-02 — o topo da tela: quatro números
+   ==========================================================================
+   Plex Mono vem de `--font-mono`, carregado na própria página via next/font
+   (padrão da casa, ver app/minha-carta/page.tsx). O fallback declarado não é
+   decoração: se a fonte não carregar, `monospace` mantém o alinhamento das
+   colunas de dígitos, que é a única razão de ser mono aqui. */
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.numero {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 14px 16px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.numeroValor {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+/* Âmbar só quando o número PEDE ação (gente esperando). Cor sozinha nunca
+   carrega o significado — o rótulo abaixo diz a mesma coisa por escrito. */
+.numeroValorAtencao {
+  color: var(--accent-amber);
+}
+.numeroRotulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+/* A nota é onde o número CONFESSA o que não sabe. Campo sem fonte aparece
+   vazio com o motivo — regra da OS, e é aqui que ela vive. */
+.numeroNota {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   Busca
+   ========================================================================== */
+.busca {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.buscaCampo {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   O card da conversa
+   ========================================================================== */
+.topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.identidade {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Avatar de TEXTO. Sem foto de perfil — a OS vetou. */
+.avatar {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.nomes {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.contato {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Identidade visual do canal: ÍCONE + RÓTULO, nunca só cor. No alto contraste
+   os pontos coloridos são neutralizados mais abaixo — quem depende do tema de
+   baixa visão continua lendo o canal pelo rótulo, que sempre esteve lá. */
+.canal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 3px 10px 3px 8px;
+  white-space: nowrap;
+}
+.canalPonto {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-pill);
+  flex: 0 0 auto;
+}
+.canalWhatsapp .canalPonto {
+  background: #25d366;
+}
+.canalInstagram .canalPonto {
+  background: linear-gradient(135deg, #f9ce34, #ee2a7b 50%, #6228d7);
+}
+.canalSite .canalPonto {
+  background: var(--brand);
+}
+[data-theme="contrast"] .canalPonto {
+  background: var(--text) !important;
+}
+
+/* A fala do CLIENTE — o que a tela anterior não mostrava. */
+.fala {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--text-soft);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.falaAutor {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.semFala {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.etiquetas {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  align-items: center;
+}
+.sinais {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.tempo {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+/* Destaque âmbar quando o CLIENTE falou por último — a OS pediu, e é o único
+   lugar do card onde a cor sinaliza urgência. Acompanhada de texto: "esperando
+   há X". */
+.tempoEsperando {
+  color: var(--accent-amber);
+  font-weight: 600;
+}
+
+/* Aviso de estado vazio DENTRO da lista: por que uma etiqueta prometida não
+   aparece em conversa nenhuma. Melhor do que a etiqueta sumir sem explicação. */
+.rodapeMotivos {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
 .row {
   display: flex;
   align-items: flex-start;
@@ -78,11 +287,46 @@
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+/* Modo lista: as mesmas ações sem margem nem régua, porque no card da fila
+   quem já desenhou a separação foi `.rodape`. Repetir a borda criaria duas
+   linhas horizontais coladas. */
+.acoesCompactas {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
 .botoes {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* A confirmação NOMINAL (CONVERSAS-02). Ocupa o lugar dos botões em vez de
+   flutuar sobre a tela: um diálogo modal por card, numa lista de 27, esconderia
+   justamente a linha que o operador precisa reler para saber se acertou o alvo.
+   Aqui o nome fica lado a lado com o card que o gerou. */
+.confirma {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-amber) 45%, var(--border));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--accent-amber) 8%, var(--surface));
+  min-width: 0;
+}
+.confirmaPergunta {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.confirmaConsequencia {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 .erro {
   margin-top: 8px;

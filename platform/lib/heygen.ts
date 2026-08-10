@@ -518,3 +518,204 @@ export async function statusVideo(
     data: lerStatus(achado.data, primeiro(achado.data, "id", "video_id")),
   };
 }
+
+// ===========================================================================
+// A VOZ — conferir antes, e ter para onde cair depois
+// AUTORIZADO: Emerson — 10/08/2026, após a falha do reel das 11h31:
+//   "acrescente uma validação: antes do render, conferir o voice_id contra
+//    /api/farol/reel-opcoes; voz inválida deve cair na voz padrão com log, não
+//    perder o vídeo do dia."
+// ---------------------------------------------------------------------------
+// O QUE FALHOU, LITERAL: `http_400 code=invalid_parameter Invalid voice_id:
+// '05601cd1a3f34777b78dce4e1ff9c66c'. Voice not found.` A voz existe no estúdio
+// do HeyGen; a API de vídeo não a aceita.
+//
+// PRIMEIRO, O ACHADO QUE MUDA O DESENHO: NÃO EXISTE "VOZ PADRÃO" NO CÓDIGO.
+// `HEYGEN_VOICE_ID` **é** o padrão — não há segunda voz escrita em lugar nenhum
+// (medido: nem o id do Pedro Lima nem o da voz recusada aparecem no repositório).
+// Então "cair na voz padrão" era uma instrução circular: cair de HEYGEN_VOICE_ID
+// para... HEYGEN_VOICE_ID. É por isso que o fallback de persona que já existia
+// não teria salvado nada — ele re-renderiza com a MESMA voz da env.
+//
+// Para a ordem virar código, o padrão precisou de uma fonte fora da env. É o
+// VOZ_SOCORRO abaixo, e ele não é configuração nova inventada por mim: é o
+// registro de um fato medido.
+//
+// SEGUNDO, E ISTO PRECISA SER DITO EM VOZ ALTA: A CONFERÊNCIA PRÉVIA PODE SER
+// VÁCUA. Ela pergunta à conta do HeyGen quais vozes existem. Mas o Emerson
+// mesmo relatou que a voz recusada EXISTE no estúdio — ou seja, ela
+// provavelmente APARECE nessa lista, a conferência passa verde, e o render
+// falha do mesmo jeito. Uma conferência que não pode reprovar o caso que a
+// motivou é exatamente o "verde vazio" que o commit 09b6434 desta casa proíbe.
+//
+// Não posso medir isso daqui: HEYGEN_API_KEY só existe na Vercel. Então a
+// conferência foi implementada como pedido, E veio acompanhada de `recusaDeVoz`
+// — a queda DEPOIS do erro, que é a que teria salvado o vídeo de 10/08. A
+// primeira é barata e pode não pegar nada; a segunda pega o caso real. Se a
+// medição em produção mostrar que a lista de fato reprova a voz, a segunda
+// vira rede de segurança em vez de mecanismo principal — e nenhuma das duas
+// precisa ser desfeita.
+//
+// TERCEIRO — E ESTE ACHADO CONTRARIA A LETRA DA ORDEM. A ordem diz "conferir o
+// voice_id contra /api/farol/reel-opcoes". Fui ler o que aquela rota devolve, e
+// ela NÃO devolve o inventário da conta: ela devolve um CARDÁPIO CURADO. As
+// vozes passam por um filtro `pareceBr` (só o que parece português) e depois por
+// `slice(0, 20)`. Conferir contra ela produziria REPROVAÇÃO FALSA em dois casos
+// banais: voz boa que a HeyGen não indexa como português, e voz boa que ficou
+// na 21ª posição. O resultado seria trocar a voz da marca por causa de um
+// artefato de paginação — um jeito NOVO de estragar o vídeo, criado pela
+// própria proteção contra estragar o vídeo.
+//
+// Então a conferência foi feita contra `listarVozes("", ...)` — a listagem SEM
+// filtro de idioma — e não contra o cardápio. É desvio deliberado da letra, em
+// favor do que a ordem quer: não perder o vídeo do dia.
+//
+// QUARTO, a consequência disso no desenho: uma lista com teto NÃO PROVA
+// AUSÊNCIA. Se a voz configurada não está lá, pode ser que ela não exista — ou
+// que a lista tenha acabado antes dela. Por isso `escolherVoz` só aceita
+// condenar a configurada quando a lista traz o VOZ_SOCORRO junto: a presença de
+// uma voz sabidamente boa é a CREDENCIAL da lista. Lista sem essa credencial
+// não reprova ninguém.
+// ===========================================================================
+
+/**
+ * A VOZ DE SOCORRO — Pedro Lima.
+ *
+ * POR QUE UM ID CRAVADO NO CÓDIGO, sendo que a casa evita configuração em
+ * código: porque isto não é preferência, é o registro de uma MEDIÇÃO. Esta é a
+ * voz que produziu os reels que saíram, e é para ela que a instrução de env de
+ * 10/08 manda o `HEYGEN_VOICE_ID` voltar. Uma queda precisa de um destino
+ * conhecido-bom; um env não serve de destino porque o env é justamente o que
+ * pode estar errado.
+ *
+ * QUANDO ISTO VIRA INÓCUO, e tudo bem: depois que o Emerson reverter a env,
+ * `VOZ_SOCORRO` passa a ser igual à voz configurada, `escolherVoz` devolve
+ * `configurada` e nenhum render extra acontece. O socorro só volta a ter função
+ * se alguém trocar a env de novo por uma voz que a API recusa — que é
+ * exatamente o acidente de 10/08.
+ *
+ * O RISCO DECLARADO: id cravado apodrece calado se a HeyGen apagar esta voz.
+ * Por isso `escolherVoz` também confere o SOCORRO contra a conta, e tem um
+ * terceiro degrau — não confia neste valor por fé.
+ */
+export const VOZ_SOCORRO = "6872a840c4194f42a7f8ce0aee47660c";
+
+/**
+ * O PRAZO DA CONFERÊNCIA — e por que ele não é o TIMEOUT_MS de 20s.
+ *
+ * ORÇAMENTO MEDIDO: `reel-render` tem `maxDuration = 60`. Dentro dele já cabiam
+ * o render (até 20s) e, no fallback de persona, um segundo render (mais 20s).
+ * Somar uma listagem de 20s fecha os 60s no pior caso — e a rota morreria por
+ * estouro de tempo ANTES de publicar. Uma conferência que pode custar o vídeo
+ * do dia é o oposto do que a ordem de 10/08 pediu.
+ *
+ * 6s é o que sobra com folga para os dois renders. E o estouro do prazo não é
+ * erro: `vozesEmPrazo` devolve lista VAZIA, `escolherVoz` lê isso como
+ * `lista_indisponivel` e o render segue com a voz configurada. A conferência
+ * tem permissão para não acontecer; não tem permissão para atrapalhar.
+ */
+export const PRAZO_LISTAGEM_MS = 6000;
+
+/**
+ * A listagem de vozes com prazo curto, achatada em `OpcaoVoz[]`.
+ *
+ * LISTA VAZIA É A RESPOSTA PARA TUDO QUE DEU ERRADO — timeout, 4xx, 5xx, chave
+ * ausente, exceção. Não distingo os casos aqui de propósito: nenhum deles é
+ * prova sobre a VOZ, e o único uso desta lista é decidir sobre a voz. Quem
+ * precisa do erro literal para o log é a rota, que ainda tem a resposta crua.
+ *
+ * O fetch de baixo não é cancelado quando o prazo estoura — `Promise.race` só
+ * para de esperar. Como é um GET, seguir rodando sozinho não faz nada a
+ * ninguém, e cancelar exigiria passar um AbortController por três camadas para
+ * economizar uma conexão ociosa.
+ */
+export async function vozesEmPrazo(
+  listar: () => Promise<{ ok: true; data: OpcaoVoz[] } | { ok: false; erro: string }>,
+  prazoMs: number = PRAZO_LISTAGEM_MS
+): Promise<OpcaoVoz[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const prazo = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), prazoMs);
+  });
+  try {
+    const r = await Promise.race([listar().catch(() => null), prazo]);
+    if (!r || !r.ok) return [];
+    return r.data;
+  } catch {
+    return [];
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export type EscolhaDeVoz = {
+  /** A voz que deve ir para o render. */
+  voz: string;
+  /** `null` quando a configurada passou. Caso contrário, por que ela caiu. */
+  motivo:
+    | null
+    | "lista_indisponivel"
+    | "configurada_ausente_da_conta"
+    | "lista_sem_referencia";
+};
+
+/**
+ * Qual voz vai para o render, dada a configurada e o que a conta oferece.
+ *
+ * A REGRA MAIS IMPORTANTE É A PRIMEIRA, e ela é sobre não inventar uma forma
+ * nova de perder o vídeo: se a lista veio vazia ou não veio (`disponiveis`
+ * vazio), a resposta é a voz CONFIGURADA, não o socorro. Uma listagem que
+ * falhou não é prova de que a voz é ruim — é ausência de prova. Deixar uma
+ * consulta auxiliar derrubar (ou desviar) o render seria trocar um defeito raro
+ * por um defeito novo, dependente de uma chamada a mais dar certo todo dia.
+ *
+ * A SEGUNDA REGRA É A QUE ESTA FUNÇÃO GANHOU DEPOIS DE EU MEDIR O TETO da
+ * listagem (ver QUARTO no cabeçalho): só desviar quando a lista traz o SOCORRO.
+ * Uma lista truncada em que a configurada não aparece é ambígua — pode ser voz
+ * inexistente, pode ser página que acabou antes. Mas se o socorro, que é voz
+ * sabidamente boa, TAMBÉM não aparece, a explicação provável é a lista, não as
+ * vozes. Nesse caso a função se cala e devolve a configurada: quem dá veredito
+ * sobre voz é a HeyGen no render, não uma listagem incompleta.
+ *
+ * Escrevi antes um terceiro degrau que, nesse caso, escolhia qualquer voz em
+ * português da conta. Removi depois de medir: ele trocaria a voz da marca por
+ * causa de paginação. Prefiro o render falhar e `recusaDeVoz` decidir com o
+ * veredito da própria HeyGen na mão.
+ */
+export function escolherVoz(
+  configurada: string,
+  disponiveis: OpcaoVoz[],
+  socorro: string = VOZ_SOCORRO
+): EscolhaDeVoz {
+  if (disponiveis.length === 0) {
+    return { voz: configurada, motivo: "lista_indisponivel" };
+  }
+
+  const ids = new Set(disponiveis.map((v) => v.id));
+  if (ids.has(configurada)) return { voz: configurada, motivo: null };
+
+  if (ids.has(socorro)) {
+    return { voz: socorro, motivo: "configurada_ausente_da_conta" };
+  }
+
+  return { voz: configurada, motivo: "lista_sem_referencia" };
+}
+
+/**
+ * O erro do render é recusa DA VOZ especificamente?
+ *
+ * DUAS CONDIÇÕES, E AS DUAS IMPORTAM. A primeira é 4xx, pela mesma razão de
+ * dinheiro que governa `recusaDeCadastro` em reel-render: só o 4xx prova que a
+ * HeyGen recusou o pedido, que nada foi enfileirado e que nada será cobrado —
+ * repetir depois de timeout ou 5xx pode pagar dois vídeos para publicar um.
+ *
+ * A segunda é a voz aparecer na mensagem. Sem ela, todo 4xx viraria motivo para
+ * re-renderizar trocando a voz, inclusive 4xx de avatar, de roteiro ou de cota
+ * — trocar a voz não conserta nenhum deles, e a segunda cobrança seria certa e
+ * inútil.
+ */
+export function recusaDeVoz(erro: string | undefined): boolean {
+  const texto = erro ?? "";
+  if (!/^http_4\d\d(\s|$)/.test(texto)) return false;
+  return /voice[_ ]?id|voice not found|invalid voice/i.test(texto);
+}
