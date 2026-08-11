@@ -285,8 +285,34 @@ a Vercel, fonte independente. Norma fixada por Emerson.)
   **INTOCÁVEL**, read-only. prospere-360 só com fatia própria.
 
 ## Regras de negócio canônicas
-- Comissão 7% do crédito somada à entrada (exceto LANCE: já embutida na origem).
-- Custo financeiro = TIR ao mês (Newton-Raphson). Nunca % nominal.
+- **Duas coisas diferentes se chamam "comissão". Não confundir:**
+  - **Originação de terceiro (vitrine):** 7% do crédito somados à entrada crua
+    (exceto LANCE: já embutida na origem). Vive em
+    `lib/playcontempladas-source.ts` (`MARGEM_CREDITO`) e é adaptador de
+    scraper — não é regra de remuneração da casa.
+  - **Captação direta de cedente (Modelo B):** fee da Bidcon =
+    `max(ágio × 10%, R$ 2.500)` — incide sobre o **ágio**, nunca sobre o
+    crédito. Cota cancelada: 6%. Canônico em `lib/reserve/fee-plan.ts`
+    (`calcularFee`, `FEE_MINIMO`). O cedente recebe `ágio − fee`.
+    **O piso de R$ 2.500 domina em crédito pequeno** (ágio de R$ 10.000 →
+    fee = 25% do ágio) e por isso aparece NOMEADO na tela
+    ("piso mínimo aplicado"), nunca diluído dentro do preço.
+  - `lib/comissao.ts` é falso amigo: não é custo do cliente e não entra em
+    nenhum fluxo de TIR.
+- **TIR / custo efetivo — por BISSEÇÃO, nunca Newton-Raphson.**
+  Newton foi diagnosticado e rejeitado **por escrito** em `lib/tir.ts`:
+  estoura em fluxos com sinal trocando mais de uma vez, que é exatamente o
+  fluxo de consórcio. **Qualquer ordem que peça Newton está repetindo uma
+  decisão já revertida** — medir antes de obedecer.
+  Canônicos: `lib/tir.ts` (`tirMensal`, `tirMensalMenorRaiz`) e
+  `lib/custo-efetivo.ts` (`taxaEfetivaMensal`) — os dois por bisseção.
+  Sempre "% a.m.", nunca % nominal, nunca "juros"/"CET".
+- **`taxaEfetivaMensal` devolve `null` por dois motivos OPOSTOS:** dado
+  faltando, e `parcela × prazo <= saldo` ("paga ≤ que recebe: sem custo").
+  Na vitrine os dois viram "—" e tudo bem, porque a carta já foi conferida.
+  Em tela de análise/triagem é obrigatório separar `incompleta` de
+  `sem_custo` — senão um extrato ilegível e uma cota excelente ficam
+  idênticos na tela (o "verde vazio", `09b6434`).
 - Administradora exposta no card (pré-requisito da junção).
 - Nunca prometer ou sugerir data de contemplação.
 
