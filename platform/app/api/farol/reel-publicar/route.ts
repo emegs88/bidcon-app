@@ -86,7 +86,11 @@ import {
   DERROTA_MS,
   POLL_MAX_MS,
   POLL_PASSO_MS,
+  TETO_RECRIACOES,
+  caminhoRetry,
+  contarRecriacoes,
   decidirDerrota,
+  decidirRecriacao,
   idadeContainerMs,
   motivoDerrota,
   resumoContainer,
@@ -386,6 +390,56 @@ async function rebaixarHospedado(url: string | null): Promise<Uint8Array<ArrayBu
 }
 
 /**
+ * CONTAINER-LOTERIA-01 — o MESMO mp4 num ENDEREÇO NOVO.
+ *
+ * ----------------------------------------------------------------------------
+ * POR QUE COPIAR EM VEZ DE REUSAR A URL
+ * ----------------------------------------------------------------------------
+ * `hospedarVideo` grava em `${videoId}.mp4` com `upsert: true` — idempotente
+ * por design, e é exatamente essa idempotência que torna um retry ingênuo
+ * inútil: recriar o container apontando para a mesma URL devolve, medido em
+ * 07/08, o MESMO container travado. O endereço precisa mudar. Bytes idênticos,
+ * caminho novo — a mesma manobra que a DIAG-CONTAINER-01 usou no lado A.
+ *
+ * DE ONDE VÊM OS BYTES: do NOSSO bucket, nunca do HeyGen. Neste ponto do
+ * caminho a URL presignada do HeyGen já pode ter expirado há horas, e um
+ * download vazio (200 com corpo de zero byte, o modo silencioso de falhar
+ * daquela URL) transformaria um resgate numa segunda falha com outro nome.
+ *
+ * A CÓPIA SAI SEMPRE DO ORIGINAL, e não da cópia anterior. `url_hospedada`
+ * segue apontando para `${videoId}.mp4` mesmo depois da terceira recriação —
+ * assim nenhuma corrupção se propaga em cadeia, e YouTube/TikTok, que leem
+ * aquele campo, continuam com um caminho estável.
+ */
+async function copiarParaRetry(
+  db: Db,
+  videoId: string,
+  urlOriginal: string,
+  agora: number
+): Promise<{ ok: true; url: string; caminho: string } | { ok: false; erro: string }> {
+  const bytes = await rebaixarHospedado(urlOriginal);
+  // `rebaixarHospedado` já recusa vazio e acima do teto, e já logou o motivo.
+  if (!bytes) return { ok: false, erro: "rebaixa_falhou" };
+
+  const caminho = caminhoRetry(videoId, agora);
+  const up = await db.storage.from(BUCKET_VIDEOS).upload(caminho, bytes, {
+    contentType: "video/mp4",
+    upsert: true,
+  });
+  if (up.error) return { ok: false, erro: `upload_falhou: ${up.error.message}`.slice(0, 200) };
+
+  const { data } = db.storage.from(BUCKET_VIDEOS).getPublicUrl(caminho);
+  if (!data?.publicUrl) return { ok: false, erro: "sem_url_publica" };
+
+  console.log("[farol-reel] copia de retry criada:", {
+    video_id: videoId,
+    caminho,
+    bytes: bytes.byteLength,
+  });
+  return { ok: true, url: data.publicUrl, caminho };
+}
+
+/**
  * Reclama a linha com UPDATE CONDICIONAL — a trava (2) do header.
  * Devolve false quando outra invocação chegou primeiro.
  */
@@ -576,7 +630,20 @@ export async function GET(req: Request) {
           // 15 min. Se ficasse fora desta lista, o laço continuaria para a
           // próxima linha depois de já ter gasto o orçamento inteiro numa
           // sondagem, que é exatamente o gasto que a FASE2-C veio cortar.
-          if (r === "publicado" || r === "falhou" || r === "derrota") break;
+          //
+          // 'recriado' e 'recriacao_adiada' entram pelo SEGUNDO motivo, não
+          // pelo primeiro: nenhum dos dois é morte — a linha continua viva em
+          // 'publicando' — mas ambos já gastaram a sondagem inteira mais um
+          // download e um upload. Seguir para a próxima linha depois disso é
+          // como se compra um timeout.
+          if (
+            r === "publicado" ||
+            r === "falhou" ||
+            r === "derrota" ||
+            r === "recriado" ||
+            r === "recriacao_adiada"
+          )
+            break;
           continue;
         }
       }
@@ -886,6 +953,157 @@ export async function GET(req: Request) {
 }
 
 /**
+ * CONTAINER-LOTERIA-01 — o container travado não mata a linha na primeira vez.
+ *
+ * ----------------------------------------------------------------------------
+ * O QUE A PRODUÇÃO MEDIU, E QUE ESTA FUNÇÃO EXPLORA
+ * ----------------------------------------------------------------------------
+ * O container da Meta é BINÁRIO: ou termina em segundos, ou trava para sempre.
+ * O A/B e o resgate de 07/08 mostraram as duas pontas — e mostraram também que
+ * container FRESCO cura. Não é conserto do travamento (a causa segue do lado de
+ * lá); é transformar uma loteria de uma cartela só numa estatística com três.
+ *
+ * A URL PRECISA SER NOVA, e é por isso que existe a cópia. Recriar apontando
+ * para a MESMA URL, dentro da janela de dedupe, devolve o MESMO container
+ * travado — foi exatamente esse o "reset girando em falso" registrado no
+ * anti-roleta logo acima. Bytes idênticos, endereço novo.
+ *
+ * SEMPRE PELO CAMINHO `video_url`, mesmo com `FAROL_REEL_RESUMABLE=on`. O
+ * resumable é hipótese sob teste e não tem URL para desduplicar; misturar as
+ * duas coisas faria o resgate depender de uma env experimental e tornaria o
+ * resultado ilegível. O resgate é do caminho de fábrica.
+ *
+ * TRÊS SAÍDAS, E ELAS NÃO SÃO SINÔNIMOS:
+ *   · `recriado` — nasceu container novo, a linha continua viva;
+ *   · `adiado`   — falhou do NOSSO lado (bucket). Não gasta tentativa e não
+ *                  condena a linha: seria contar contra a Meta um erro nosso.
+ *                  Quem limita isso é `encerrarVencidos`, não este contador;
+ *   · `derrota`  — a recriação é impossível ou inútil; devolve o motivo para a
+ *                  derrota de verdade registrá-lo com nome.
+ */
+async function tentarRecriar(
+  db: Db,
+  linha: LinhaReel,
+  containerAbandonado: string,
+  tentativa: number,
+  resumo: ResumoContainer,
+  idadeMin: number
+): Promise<
+  | { fim: "recriado" }
+  | { fim: "adiado"; erro: string }
+  | { fim: "derrota"; motivo: string }
+> {
+  const det = (linha.detalhe ?? {}) as { url_hospedada?: string };
+  const urlOriginal = det.url_hospedada ?? null;
+  // Sem mp4 em casa não há o que copiar: é container LEGADO, criado quando a
+  // URL vinha do HeyGen. Aquela presignada já expirou há horas. Derrota limpa.
+  if (!urlOriginal) return { fim: "derrota", motivo: "sem_url_hospedada" };
+
+  // A legenda é remedida ANTES de gastar bytes. Um container novo é um post
+  // novo, e nenhum post nasce nesta casa sem passar pelo compliance — nem
+  // quando o texto é o mesmo que já passou faz vinte minutos.
+  const legenda = linha.legenda ?? "";
+  const reprovada = revisarLegenda(legenda);
+  if (!legenda || reprovada) {
+    return { fim: "derrota", motivo: `legenda:${reprovada ?? "vazia"}` };
+  }
+
+  const agora = Date.now();
+  const copia = await copiarParaRetry(db, linha.video_id, urlOriginal, agora);
+  if (!copia.ok) return { fim: "adiado", erro: copia.erro };
+
+  const container = await chamarGraph("media", {
+    media_type: "REELS",
+    video_url: copia.url,
+    caption: legenda,
+    share_to_feed: true,
+  });
+  if (!container.ok) {
+    return { fim: "derrota", motivo: `container: ${container.erro}`.slice(0, 200) };
+  }
+
+  const idNovo = String(container.id ?? "");
+  if (!idNovo) return { fim: "derrota", motivo: "container_sem_id" };
+
+  // FATO QUE MATA A HIPÓTESE, se acontecer: URL genuinamente nova e a Meta
+  // ainda assim devolveu o mesmo container. Então o dedupe não é por URL, e
+  // insistir mais duas vezes só queimaria ciclos provando o mesmo. Derrota
+  // agora, e em voz alta — este log é o dado que decide a próxima fatia.
+  if (idNovo === containerAbandonado) {
+    console.warn("[farol-reel] DEDUPE APESAR DE URL NOVA:", {
+      video_id: linha.video_id,
+      container_id: idNovo,
+      caminho_novo: copia.caminho,
+    });
+    return { fim: "derrota", motivo: "dedupe_apesar_de_url_nova" };
+  }
+
+  const detalheNovo: Record<string, unknown> = { ...(linha.detalhe ?? {}) };
+  // ---- O RELÓGIO. Esta é a linha mais importante da fatia. -----------------
+  // `ancoraContainer` prefere `dedupe_confirmado_em` a `atualizado_em`. Se o
+  // carimbo sobrevivesse à recriação, o container recém-nascido apareceria com
+  // 15+ min de idade já no tique seguinte, seria declarado vencido de imediato,
+  // e as três tentativas queimariam em três ciclos sem que NENHUM container
+  // chegasse a ter tempo de terminar — o teto viraria um contador de nada.
+  // Apagando os dois, a âncora cai em `atualizado_em`, que o `atualizar()`
+  // logo abaixo põe em AGORA. O container novo nasce com idade zero, que é a
+  // idade que ele tem.
+  delete detalheNovo.dedupe_confirmado_em;
+  delete detalheNovo.container_anterior;
+
+  const historico = Array.isArray(detalheNovo.recriacoes) ? detalheNovo.recriacoes : [];
+  detalheNovo.recriacoes = [
+    ...historico,
+    {
+      em: new Date(agora).toISOString(),
+      tentativa,
+      container_abandonado: containerAbandonado,
+      container_novo: idNovo,
+      caminho: copia.caminho,
+      idade_min: idadeMin,
+      status_code: resumo.status_code,
+      status: resumo.status,
+    },
+  ];
+  // `url_hospedada` NÃO é sobrescrita, de propósito. Ela é o caminho canônico
+  // do mp4 e o YouTube e o TikTok leem dela mais abaixo; trocá-la faria a
+  // terceira cópia sair da segunda, encadeando qualquer corrupção, e mudaria o
+  // asset dos outros dois destinos sem que ninguém tivesse pedido. O caminho da
+  // cópia fica registrado no histórico, que é onde ele importa.
+
+  await atualizar(db, linha.id, {
+    status: "publicando",
+    container_id: idNovo,
+    // `erro` volta a nulo: a linha deixou de ser uma falha e voltou a ser uma
+    // espera. Deixar o texto velho faria o painel mostrar como falha uma linha
+    // que está viva.
+    erro: null,
+    detalhe: detalheNovo,
+  });
+  linha.detalhe = detalheNovo;
+  linha.container_id = idNovo;
+
+  console.warn("[farol-reel] container RECRIADO:", {
+    video_id: linha.video_id,
+    tentativa: `${tentativa}/${TETO_RECRIACOES}`,
+    abandonado: containerAbandonado,
+    novo: idNovo,
+    caminho: copia.caminho,
+    idade_min_do_abandonado: idadeMin,
+  });
+  await registrar(db, "reel_container_recriado", linha.carta_id, null, {
+    video_id: linha.video_id,
+    tentativa,
+    teto: TETO_RECRIACOES,
+    container_abandonado: containerAbandonado,
+    container_novo: idNovo,
+    idade_min: idadeMin,
+    status_code: resumo.status_code,
+  });
+  return { fim: "recriado" };
+}
+
+/**
  * Espera o container e publica. Compartilhado pelo caminho novo e pela retomada
  * — que é o que garante que retomar seja o MESMO código, e não um primo dele.
  */
@@ -914,8 +1132,54 @@ async function publicarContainer(
     const d = decidirDerrota({ idadeMs, ultimoCode: espera.ultimo });
 
     if (d.derrota) {
+      // ---- CONTAINER-LOTERIA-01: antes da derrota, três cartelas -----------
+      // A régua acima decidiu "este container não anda mais". Isso não é o
+      // mesmo que "este reel não vai sair": container fresco cura, e é aqui —
+      // com a leitura fresca na mão e o container ainda identificado — que a
+      // recriação custa zero chamada extra.
+      //
+      // A decisão é da lib, e ela é conservadora nas três direções: só recria
+      // com a Meta AFIRMANDO `IN_PROGRESS`/`PUBLISHING` (não ler não autoriza
+      // gastar bytes), nunca com contador ilegível, nunca acima do teto.
+      let recriacaoNegada: string | null = null;
+      const rec = decidirRecriacao({
+        ultimoCode: espera.ultimo,
+        recriacoes: contarRecriacoes(linha.detalhe),
+      });
+      if (rec.recriar) {
+        const t = await tentarRecriar(
+          db,
+          linha,
+          containerId,
+          rec.tentativa,
+          espera.resumo,
+          idadeMin
+        );
+        // Nasceu container novo: a linha segue viva em 'publicando' e o próximo
+        // ciclo entra pela retomada. Não é publicação e não é derrota — e o
+        // nome devolvido diz isso, em vez de mentir "derrota" no relatório.
+        if (t.fim === "recriado") return "recriado";
+        if (t.fim === "adiado") {
+          // Falha NOSSA (bucket). A linha fica como está: nem falhou, nem
+          // gastou tentativa. Quem a encerra, se isso virar hábito, é a janela
+          // de `encerrarVencidos` — não um contador que culpa a Meta por um
+          // upload nosso que não subiu.
+          console.error("[farol-reel] recriação adiada (falha nossa):", {
+            video_id: linha.video_id,
+            container_id: containerId,
+            erro: t.erro,
+          });
+          return "recriacao_adiada";
+        }
+        recriacaoNegada = t.motivo;
+      } else {
+        recriacaoNegada = rec.motivo;
+      }
+
       const motivo = motivoDerrota(espera.resumo, idadeMin);
       console.error("[farol-reel] DERROTA declarada:", {
+        recriacao_negada: recriacaoNegada,
+        recriacoes_gastas: contarRecriacoes(linha.detalhe),
         video_id: linha.video_id,
         container_id: containerId,
         idade_min: idadeMin,
@@ -938,6 +1202,11 @@ async function publicarContainer(
             em: new Date().toISOString(),
             container_id: containerId,
             idade_min: idadeMin,
+            // POR QUE a linha morreu em vez de nascer de novo. Sem este campo,
+            // "teto atingido" e "code não em curso" ficariam indistinguíveis no
+            // painel — e são diagnósticos opostos.
+            recriacao_negada: recriacaoNegada,
+            recriacoes_gastas: contarRecriacoes(linha.detalhe),
             status_code: espera.resumo.status_code,
             copyright_check_status: espera.resumo.copyright_check_status,
             status: espera.resumo.status,

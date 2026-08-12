@@ -32,6 +32,15 @@ import {
   VIDEO_A_ORIGEM,
   VIDEO_B,
 } from "./diag-container";
+import { CODES_EM_CURSO as CODES_EM_CURSO_ORIGEM } from "./container";
+
+test("CODES_EM_CURSO e UMA lista, nao duas com o mesmo nome", () => {
+  // Identidade por referencia, e nao deepEqual: duas listas com o mesmo
+  // conteudo passariam num deepEqual e voltariam a divergir na primeira vez que
+  // alguem editasse so uma. Foi assim que dois leitores de container com a
+  // MESMA string de campos deram respostas diferentes em 11/08.
+  assert.equal(CODES_EM_CURSO, CODES_EM_CURSO_ORIGEM);
+});
 
 // ---------------------------------------------------------------------------
 // A TRAVA. Primeiro teste do arquivo, de propósito.
