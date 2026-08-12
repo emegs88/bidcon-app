@@ -200,14 +200,31 @@ export function ConversaAcoes({
             Assumir
           </Button>
         )}
-        {canal === "whatsapp" && !encerrada && (
-          <Button size="sm" variant="ghost" onClick={() => setConfirmando("encerrar")}>
-            Encerrar
-          </Button>
-        )}
         {href && (
           <Button href={href} variant="link" size="sm">
             Abrir
+          </Button>
+        )}
+        {/* ITEM 5 DA CONVERSAS-03 — "ação destrutiva não fica no mesmo peso da
+            ação principal".
+            DUAS MUDANÇAS, E SÓ DUAS: o peso visual (`ghost`, que desenha borda
+            e fundo como o Assumir, vira `link` mais uma classe apagada) e a
+            POSIÇÃO — passou para depois do "Abrir", no fim da fileira. A ordem
+            importa tanto quanto a cor: enquanto o Encerrar era o segundo botão,
+            ele ficava exatamente onde o polegar cai depois do primeiro.
+            O QUE NÃO MUDOU: a confirmação nominal. A OS foi explícita ("continua"),
+            e ela é a trava que impede encerrar a conversa da linha errada — o
+            risco real numa lista de cards quase idênticos. Rebaixar o botão E
+            afrouxar a confirmação seria trocar uma defesa por outra; aqui as
+            duas ficam. */}
+        {canal === "whatsapp" && !encerrada && (
+          <Button
+            size="sm"
+            variant="link"
+            className={styles.encerrar}
+            onClick={() => setConfirmando("encerrar")}
+          >
+            Encerrar
           </Button>
         )}
         {/* A nota explica o estado do bot. No card da fila ela sai: a mesma
