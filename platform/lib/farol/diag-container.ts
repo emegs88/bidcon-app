@@ -61,6 +61,12 @@
  *     não aparece em tela. Se um dia alguém escrever um `.list()`, o prefixo
  *     `diag/` é o que torna esses objetos filtráveis numa linha.
  */
+
+// Único import deste arquivo, e ele é de vocabulário puro (nada de rede, banco
+// ou relógio) — a regra "o diag não depende de ninguém" continua valendo em
+// espírito: `container.ts` é a MESMA camada, não uma de baixo.
+import { CODES_EM_CURSO } from "./container";
+
 export const PREFIXO_DIAG = "diag";
 
 /** O bucket é o MESMO da produção — de propósito: cabeçalho igual, host igual. */
@@ -219,8 +225,21 @@ export type EstadoLado =
  * resposta veio ok mas sem o campo — e isso é ausência, não progresso; por isso
  * ele NÃO entra: ver `estadoLado`. Deixo a observação escrita porque a tentação
  * de incluí-lo "para simplificar" é exatamente o defeito de 11/08.
+ *
+ * ----------------------------------------------------------------------------
+ * A LISTA MUDOU DE CASA NA CONTAINER-LOTERIA-01, e o nome não mudou.
+ * ----------------------------------------------------------------------------
+ * A fase 2 do reel-publicar passou a precisar da MESMA lista para decidir se
+ * recria um container travado. Duplicá-la aqui e lá seria repetir, na semana
+ * seguinte, o defeito que a DIAG-CONTAINER-02 acabou de consertar: dois
+ * leitores com os mesmos nomes não são o mesmo leitor. Ela agora nasce em
+ * `container.ts`, ao lado de `CODES_TERMINAIS`, e esta linha a reexporta —
+ * nenhum import de quem já usava mudou.
+ *
+ * Importada E reexportada (e não só reexportada) porque `estadoLado`, logo
+ * abaixo, precisa dela no escopo deste arquivo.
  */
-export const CODES_EM_CURSO: readonly string[] = ["IN_PROGRESS", "PUBLISHING"];
+export { CODES_EM_CURSO };
 
 /**
  * Estado de UM lado.

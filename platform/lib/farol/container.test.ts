@@ -20,13 +20,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   CAMPOS_CONTAINER,
+  CODES_EM_CURSO,
   CODES_TERMINAIS,
   DERROTA_MS,
   ESCADA_CAMPOS,
   POLL_MAX_MS,
   POLL_PASSO_MS,
+  TETO_RECRIACOES,
   ancoraContainer,
+  caminhoRetry,
+  contarRecriacoes,
   decidirDerrota,
+  decidirRecriacao,
   degrauAbaixo,
   idadeContainerMs,
   motivoDerrota,
@@ -264,4 +269,119 @@ test("motivo cabe na coluna: nunca passa de 500", () => {
     99
   );
   assert.ok(m.length <= 500, `motivo tem ${m.length}`);
+});
+
+// ---------------------------------------------------------------------------
+// CONTAINER-LOTERIA-01 · a régua de RECRIAR
+// ---------------------------------------------------------------------------
+// `decidirDerrota` é a função que joga um vídeo fora. `decidirRecriacao` é a
+// que decide gastar download, upload e uma chamada de container para tentar de
+// novo. As duas erram caro em direções opostas, e por isso as duas moram aqui
+// em vez de virarem um `if` dentro do laço da fase 2.
+//
+// O teste que mais importa deste bloco é o do `DESCONHECIDO`. Ele é a lição da
+// DIAG-CONTAINER-02 escrita em forma executável: `DESCONHECIDO` é o nome que a
+// casa dá a NÃO TER LIDO o container, e autorizar uma ação por não ter lido é
+// exatamente o defeito que aquela fatia consertou. Se alguém um dia "melhorar"
+// `decidirRecriacao` aceitando qualquer code não-terminal, este teste cai.
+// ---------------------------------------------------------------------------
+
+test("teto de recriacoes e o numero da ordem: 3", () => {
+  // Falar alto. Trocar 3 por 10 é uma decisão de gasto, não um ajuste fino.
+  assert.equal(TETO_RECRIACOES, 3);
+});
+
+test("as duas listas de code nao se cruzam", () => {
+  for (const c of CODES_EM_CURSO) {
+    assert.ok(!CODES_TERMINAIS.includes(c), `${c} nao pode ser terminal e em curso`);
+  }
+});
+
+test("contarRecriacoes: ausente e zero, corrompido e NaN", () => {
+  assert.equal(contarRecriacoes(null), 0);
+  assert.equal(contarRecriacoes({}), 0);
+  assert.equal(contarRecriacoes({ recriacoes: [] }), 0);
+  assert.equal(contarRecriacoes({ recriacoes: [{ em: "x" }, { em: "y" }] }), 2);
+  // Campo presente e nao-lista: nao sabemos quantas foram. NaN, e nao 0 — um
+  // zero aqui daria tres recriacoes novas a uma linha que ja pode ter gasto.
+  assert.ok(Number.isNaN(contarRecriacoes({ recriacoes: 2 })));
+  assert.ok(Number.isNaN(contarRecriacoes({ recriacoes: "duas" })));
+  assert.ok(Number.isNaN(contarRecriacoes({ recriacoes: {} })));
+});
+
+test("caminhoRetry: prefixo fixo, carimbo dentro e mp4 no fim", () => {
+  const c = caminhoRetry("abc123", 1_700_000_000_000);
+  assert.ok(c.startsWith("retry/"), c);
+  assert.ok(c.endsWith(".mp4"), c);
+  assert.match(c, /abc123/);
+  assert.match(c, /1700000000000/);
+});
+
+test("caminhoRetry: carimbo diferente, caminho diferente — e e isso que quebra o dedupe", () => {
+  // O ponto inteiro da ordem. Se dois instantes distintos dessem o mesmo
+  // caminho, a URL nao seria nova e a Meta devolveria o container travado.
+  assert.notEqual(caminhoRetry("v1", 1_000), caminhoRetry("v1", 1_001));
+});
+
+test("caminhoRetry: id de fora nao escapa do prefixo", () => {
+  const c = caminhoRetry("../../segredo", 7);
+  assert.ok(c.startsWith("retry/"), c);
+  assert.doesNotMatch(c, /\.\./);
+  assert.equal(caminhoRetry("", 7), "retry/sem_id-7.mp4");
+  assert.equal(caminhoRetry("///", 7), "retry/___-7.mp4");
+});
+
+test("recria quando a Meta AFIRMA que o container ainda anda", () => {
+  const r = decidirRecriacao({ ultimoCode: "IN_PROGRESS", recriacoes: 0 });
+  assert.equal(r.recriar, true);
+  assert.equal(r.tentativa, 1);
+  assert.equal(r.motivo, "container_travado");
+
+  const r2 = decidirRecriacao({ ultimoCode: "PUBLISHING", recriacoes: 2 });
+  assert.equal(r2.recriar, true);
+  assert.equal(r2.tentativa, 3);
+});
+
+test("NAO recria por code DESCONHECIDO — nao ler nao autoriza gastar", () => {
+  // A licao da DIAG-CONTAINER-02, em forma executavel.
+  for (const c of ["DESCONHECIDO", "", "null", "sei_la"]) {
+    const r = decidirRecriacao({ ultimoCode: c, recriacoes: 0 });
+    assert.equal(r.recriar, false, c);
+    assert.equal(r.tentativa, 0, c);
+    assert.match(r.motivo, /code_nao_em_curso/);
+  }
+});
+
+test("NAO recria em code terminal — a Meta ja respondeu", () => {
+  for (const c of CODES_TERMINAIS) {
+    assert.equal(decidirRecriacao({ ultimoCode: c, recriacoes: 0 }).recriar, false, c);
+  }
+});
+
+test("NAO recria com contador ilegivel", () => {
+  for (const n of [Number.NaN, Infinity, -1]) {
+    const r = decidirRecriacao({ ultimoCode: "IN_PROGRESS", recriacoes: n });
+    assert.equal(r.recriar, false, String(n));
+    assert.equal(r.tentativa, 0);
+  }
+});
+
+test("no teto a derrota volta a ser definitiva", () => {
+  const r = decidirRecriacao({ ultimoCode: "IN_PROGRESS", recriacoes: TETO_RECRIACOES });
+  assert.equal(r.recriar, false);
+  assert.match(r.motivo, /teto_atingido/);
+  // E nao afrouxa depois: contador acima do teto tambem recusa.
+  assert.equal(
+    decidirRecriacao({ ultimoCode: "IN_PROGRESS", recriacoes: TETO_RECRIACOES + 5 }).recriar,
+    false
+  );
+});
+
+test("a linha inteira: tres recriacoes autorizadas, a quarta nao", () => {
+  const autorizadas: number[] = [];
+  for (let n = 0; n < 6; n++) {
+    const r = decidirRecriacao({ ultimoCode: "IN_PROGRESS", recriacoes: n });
+    if (r.recriar) autorizadas.push(r.tentativa);
+  }
+  assert.deepEqual(autorizadas, [1, 2, 3]);
 });

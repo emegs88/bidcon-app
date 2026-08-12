@@ -133,6 +133,23 @@ export const CODES_TERMINAIS: readonly string[] = [
   "EXPIRED",
 ];
 
+/**
+ * Códigos EM CURSO — a Meta afirmando que o container ainda anda.
+ *
+ * Mudou de endereço na CONTAINER-LOTERIA-01: nasceu em `diag-container.ts`, e
+ * agora mora aqui, ao lado de `CODES_TERMINAIS`, porque passou a ter DOIS
+ * leitores (a árvore do diag e a régua de recriação da fase 2). Duas listas
+ * com os mesmos nomes não são a mesma lista — foi exatamente esse o defeito
+ * que a DIAG-CONTAINER-02 gastou uma manhã consertando. `diag-container.ts`
+ * reexporta daqui; nenhum chamador mudou de import.
+ *
+ * A LISTA NÃO É O COMPLEMENTO DE `CODES_TERMINAIS`, de propósito. Fora das
+ * duas listas sobram `null` e `"DESCONHECIDO"` — que não são estados do
+ * container, e sim o nome que damos a NÃO TER LIDO. Exigir presença aqui é o
+ * que impede "não li" de autorizar uma ação.
+ */
+export const CODES_EM_CURSO: readonly string[] = ["IN_PROGRESS", "PUBLISHING"];
+
 /** Os quatro literais que interessam, extraídos da resposta crua da Graph. */
 export type ResumoContainer = {
   id: string | null;
@@ -243,4 +260,97 @@ export function motivoDerrota(resumo: ResumoContainer, idadeMin: number): string
     resumo.status ? `status=${resumo.status}` : null,
   ].filter(Boolean);
   return partes.join(" ").slice(0, 500);
+}
+
+// ===========================================================================
+// CONTAINER-LOTERIA-01 — container travado deixa de matar a linha
+// AUTORIZADO: Emerson Gomes dos Santos, 11/08/2026:
+//   "o A/B + o resgate provaram em produção que container da Meta é binário
+//    (termina em segundos ou trava pra sempre) e que container FRESCO cura.
+//    Mudança na fase 2: derrota por IN_PROGRESS não mata a linha — RECRIA o
+//    container com URL cache-busted (copiar o mp4 para caminho novo,
+//    retry/<ts>.mp4, como o diag fez com A — retry com a MESMA URL em janela
+//    curta arrisca o dedupe devolver o container travado, que é o 'reset
+//    girando em falso' que teu próprio comentário registra). Teto: 3
+//    tentativas, depois derrota de verdade."
+// ---------------------------------------------------------------------------
+// POR QUE A URL PRECISA SER NOVA, E NÃO SÓ O CONTAINER. Medido em 07/08: com a
+// mesma URL, resetar o container fazia a Meta devolver o MESMO id, de 10 em 10
+// minutos. Recriar apontando para o mesmo endereço não é uma segunda tentativa
+// — é a primeira, repetida, com outro nome. O que quebra o dedupe é o endereço
+// mudar. Daí `caminhoRetry`.
+//
+// O TETO EXISTE PARA A RECRIAÇÃO NÃO VIRAR A PRÓPRIA LOTERIA. Sem ele, uma
+// linha condenada por conteúdo (não por azar) giraria para sempre, gastando
+// download, upload e chamada de container a cada ciclo. Três é o número do
+// Emerson; o valor mora aqui, sob teste, e não espalhado no laço.
+// ===========================================================================
+
+/** Quantas vezes uma linha pode nascer de novo antes da derrota valer. */
+export const TETO_RECRIACOES = 3;
+
+/**
+ * Quantas recriações esta linha já gastou, lidas de `detalhe.recriacoes`.
+ *
+ * Devolve `NaN` quando o campo existe e NÃO é lista. Não é preciosismo: o
+ * `detalhe` é JSON livre, e um campo corrompido lido como `0` autorizaria três
+ * recriações novas em cima de uma linha que já pode ter gasto as suas. `NaN`
+ * atravessa `decidirRecriacao` como recusa — o mesmo desenho de `idadeMs`
+ * ilegível em `decidirDerrota`: dado podre nunca autoriza ação.
+ */
+export function contarRecriacoes(detalhe: Record<string, unknown> | null): number {
+  const v = (detalhe ?? {}).recriacoes;
+  if (v === undefined || v === null) return 0;
+  if (!Array.isArray(v)) return Number.NaN;
+  return v.length;
+}
+
+/**
+ * O caminho do mp4 recriado. Puro, com o relógio de fora.
+ *
+ * O `videoId` entra no nome (a ordem pedia só `retry/<ts>.mp4`) porque um
+ * carimbo de tempo sozinho é inauditável: daqui a um mês, olhando o bucket,
+ * ninguém sabe de que linha veio cada arquivo. Declarado como desvio.
+ *
+ * A HIGIENIZAÇÃO NÃO É DECORAÇÃO. `videoId` vem de fora (HeyGen) e vira
+ * caminho de objeto; sem a troca, um id com `../` escreveria fora do prefixo
+ * `retry/`. Nada indica que o HeyGen faça isso — a trava não é sobre o que ele
+ * faz, é sobre o que ela custa (uma linha) contra o que evita.
+ */
+export function caminhoRetry(videoId: string, agora: number): string {
+  const limpo = String(videoId).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80) || "sem_id";
+  return `retry/${limpo}-${agora}.mp4`;
+}
+
+/**
+ * A DECISÃO de recriar. Pura, e conservadora nas três direções em que errar
+ * custa dinheiro ou verdade:
+ *
+ *   · código que NÃO está em curso nunca recria. Aqui mora a lição da
+ *     DIAG-CONTAINER-02: `null` e `"DESCONHECIDO"` são o nome de "não li o
+ *     container", e recriar por não ter lido seria repetir, gastando bytes, o
+ *     mesmo erro que aquela fatia consertou. Recriação exige a Meta AFIRMANDO
+ *     que o container ainda anda;
+ *   · contador ilegível nunca recria (ver `contarRecriacoes`);
+ *   · teto atingido nunca recria — é o ponto em que a derrota vira definitiva.
+ *
+ * `tentativa` é o número da recriação que está sendo autorizada (1-based), e
+ * vem `0` quando não há autorização. Serve para o registro e para o caminho do
+ * arquivo, sem que o chamador tenha que somar 1 por conta própria.
+ */
+export function decidirRecriacao(p: { ultimoCode: string; recriacoes: number }): {
+  recriar: boolean;
+  motivo: string;
+  tentativa: number;
+} {
+  if (!CODES_EM_CURSO.includes(p.ultimoCode)) {
+    return { recriar: false, motivo: `code_nao_em_curso(${p.ultimoCode})`, tentativa: 0 };
+  }
+  if (!Number.isFinite(p.recriacoes) || p.recriacoes < 0) {
+    return { recriar: false, motivo: "contador_ilegivel", tentativa: 0 };
+  }
+  if (p.recriacoes >= TETO_RECRIACOES) {
+    return { recriar: false, motivo: `teto_atingido(${TETO_RECRIACOES})`, tentativa: 0 };
+  }
+  return { recriar: true, motivo: "container_travado", tentativa: p.recriacoes + 1 };
 }
