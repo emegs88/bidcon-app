@@ -87,12 +87,12 @@ import {
   POLL_MAX_MS,
   POLL_PASSO_MS,
   decidirDerrota,
-  degrauAbaixo,
   idadeContainerMs,
   motivoDerrota,
   resumoContainer,
   type ResumoContainer,
 } from "@/lib/farol/container";
+import { lerContainerGraph } from "@/lib/instagram/ler-container";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -104,8 +104,9 @@ export const runtime = "nodejs";
  */
 export const maxDuration = 180;
 
-/** Mesma versão da Graph que lib/instagram/publicar.ts — um produto, uma versão. */
-const IG_GRAPH_VERSION = "v25.0";
+// A versão da Graph saiu daqui na DIAG-CONTAINER-02: quem monta a URL agora é
+// lib/instagram/ler-container.ts, e uma constante repetida em três arquivos é
+// uma divergência esperando a próxima migração de versão.
 const TIMEOUT_IG_MS = 15_000;
 
 // A cadência (POLL_PASSO_MS), o teto por invocação (POLL_MAX_MS) e o limiar de
@@ -184,8 +185,29 @@ type LinhaReel = {
 };
 
 /**
- * GET no container da Meta. Existe aqui, e não na lib, pelo motivo do header.
- * Nunca lança; erro da Graph repassado literal (code/subcode/message).
+ * GET no container da Meta.
+ *
+ * ----------------------------------------------------------------------------
+ * DIAG-CONTAINER-02: o corpo desta função MUDOU DE ENDEREÇO, o contrato NÃO.
+ * ----------------------------------------------------------------------------
+ * A lógica (escada de campos, erro literal, timeout) agora é
+ * `lerContainerGraph`, em lib/instagram/ler-container.ts, porque existiam DUAS
+ * cópias dela na casa — esta e uma na rota do diag — e a segunda foi escrita
+ * copiando a string de campos e esquecendo a escada. Em 11/08/2026 a Graph
+ * recusou o conjunto com `code=100`, a cópia sem escada devolveu `null` e um
+ * diagnóstico foi impresso como conclusivo em cima de duas requisições
+ * rejeitadas. Enquanto houver dois leitores, o conserto de um não alcança o
+ * outro.
+ *
+ * O QUE NÃO MUDOU, DE PROPÓSITO:
+ *  · a forma `LeituraContainer` — os dois chamadores (`esperarContainer` e o
+ *    laço da fase 2) seguem intocados. Este é o caminho que PUBLICA de verdade,
+ *    de 10 em 10 min; refatorar leitura não é motivo para mexer nele.
+ *  · `TIMEOUT_IG_MS` (15 s), que aqui é MENOR que os 20 s do diag. Passa por
+ *    parâmetro. Uma unificação silenciosa mudaria a paciência da produção por
+ *    causa de uma tela de diagnóstico, e ninguém pediu isso.
+ *  · `code: "DESCONHECIDO"` quando a resposta vem 200 sem `status_code` — é o
+ *    rótulo que o resto deste arquivo já sabe ler.
  */
 type LeituraContainer =
   | { ok: true; code: string; bruto: unknown }
@@ -195,68 +217,16 @@ async function statusContainer(
   containerId: string,
   campos: string = CAMPOS_CONTAINER
 ): Promise<LeituraContainer> {
-  const token = process.env.IG_ACCESS_TOKEN;
-  if (!token) return { ok: false, erro: "env_ausente(IG_ACCESS_TOKEN)", bruto: null };
-
-  const url =
-    `https://graph.instagram.com/${IG_GRAPH_VERSION}/${containerId}` +
-    `?fields=${encodeURIComponent(campos)}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_IG_MS);
-  try {
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
-    const data: unknown = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const err = (data as {
-        error?: { message?: string; code?: number; error_subcode?: number };
-      })?.error;
-
-      // REDE DE SEGURANÇA, agora em ESCADA (FASE2-B): se a Graph recusar o
-      // conjunto por causa de um campo (code 100 é "campo inválido/
-      // inexistente"), desce UM degrau e relê — não despenca até o piso.
-      //
-      // O DEFEITO QUE ISTO CONSERTA ERA MEU: antes caía direto para
-      // `status_code`. Se a Meta recusasse o `copyright_check_status` que
-      // acabou de entrar, perderíamos junto o `status` verboso — a FRASE da
-      // reclamação —, que não tem culpa nenhuma e é justamente o que
-      // diagnostica. Perder um campo é o preço de pedir um campo novo; perder
-      // dois é bug. Os degraus estão em lib/farol/container.ts, sob teste.
-      if (err?.code === 100) {
-        const abaixo = degrauAbaixo(campos);
-        if (abaixo) {
-          console.warn("[farol-reel] campos do container recusados, descendo um degrau:", {
-            campos,
-            proximo: abaixo,
-            erro: err?.message,
-          });
-          return statusContainer(containerId, abaixo);
-        }
-      }
-
-      const partes = [
-        err?.code !== undefined ? `code=${err.code}` : null,
-        err?.error_subcode !== undefined ? `subcode=${err.error_subcode}` : null,
-        err?.message ?? `http_${resp.status}`,
-      ].filter(Boolean);
-      return { ok: false, erro: partes.join(" ").slice(0, 500), bruto: data };
-    }
-    const code = (data as { status_code?: string })?.status_code;
-    return { ok: true, code: String(code ?? "DESCONHECIDO"), bruto: data };
-  } catch (e) {
-    if (e instanceof Error && e.name === "AbortError") {
-      return { ok: false, erro: `timeout_instagram_api(${TIMEOUT_IG_MS}ms)`, bruto: null };
-    }
-    return {
-      ok: false,
-      erro: e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido",
-      bruto: null,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
+  const l = await lerContainerGraph(containerId, {
+    campos,
+    timeoutMs: TIMEOUT_IG_MS,
+  });
+  if (!l.ok) return { ok: false, erro: l.erro, bruto: l.bruto };
+  return {
+    ok: true,
+    code: String(l.resumo.status_code ?? "DESCONHECIDO"),
+    bruto: l.bruto,
+  };
 }
 
 const db_ = () => createXtvClient();

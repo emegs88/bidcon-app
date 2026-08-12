@@ -20,6 +20,7 @@ import {
   bytesConferem,
   caminhoCopiaA,
   carimbo,
+  CODES_EM_CURSO,
   corpoContainerDiag,
   dedupeDetectada,
   estadoLado,
@@ -151,13 +152,50 @@ test("IN_PROGRESS vira `travado` só depois dos 15 min", () => {
   assert.equal(estadoLado("IN_PROGRESS", TRAVADO_MS), "travado");
 });
 
-test("code ausente é espera, nunca recusa", () => {
-  // A Meta às vezes devolve 200 sem status_code. Ler isso como recusa
-  // condenaria um container que não disse nada — o defeito oposto do que este
-  // diagnóstico procura.
-  assert.equal(estadoLado(null, 0), "aguardando");
-  assert.equal(estadoLado(null, 99 * TRAVADO_MS), "travado");
-  assert.equal(estadoLado("DESCONHECIDO", 0), "aguardando");
+/**
+ * ESTE TESTE SUBSTITUI UM TESTE MEU QUE FIXAVA O DEFEITO. A versão anterior
+ * dizia "code ausente é espera, nunca recusa" e afirmava:
+ *
+ *     assert.equal(estadoLado(null, 99 * TRAVADO_MS), "travado");
+ *
+ * O comentário soava prudente — não condenar um container que não disse nada —
+ * e o assert fazia o contrário: condenava por relógio um container sobre o qual
+ * NÃO SE SABIA NADA. Em 11/08 a Graph recusou a requisição inteira com
+ * `code=100`, os dois lados vieram `null` e o painel imprimiu "os dois
+ * travaram" como conclusivo. Um teste verde protegendo a mentira.
+ *
+ * Fica registrado porque a lição não é sobre este `null`: é sobre testes que
+ * fixam o comportamento observado em vez do comportamento devido.
+ */
+test("code ausente NÃO é travamento — é ausência de leitura", () => {
+  assert.equal(estadoLado(null, 0), "sem_leitura");
+  assert.equal(estadoLado(null, 99 * TRAVADO_MS), "sem_leitura");
+  // `DESCONHECIDO` é o rótulo que a leitura dá ao campo AUSENTE. Ausência não
+  // é progresso, e por isso não entra em CODES_EM_CURSO.
+  assert.equal(estadoLado("DESCONHECIDO", 99 * TRAVADO_MS), "sem_leitura");
+});
+
+test("chamada rejeitada é `rejeitado`, e cala o resto", () => {
+  const erro = "code=100 subcode=33 Tried accessing nonexisting field";
+  assert.equal(estadoLado(null, 99 * TRAVADO_MS, erro), "rejeitado");
+  // Mesmo com um code no corpo: se a chamada falhou, o que veio junto é resto
+  // de erro, não estado do container.
+  assert.equal(estadoLado("IN_PROGRESS", 99 * TRAVADO_MS, erro), "rejeitado");
+  assert.equal(estadoLado("FINISHED", 0, erro), "rejeitado");
+});
+
+test("erro vazio ou só espaço não conta como rejeição", () => {
+  // Um `erro: ""` mal preenchido não pode apagar uma leitura boa.
+  assert.equal(estadoLado("FINISHED", 0, ""), "pronto");
+  assert.equal(estadoLado("FINISHED", 0, "   "), "pronto");
+});
+
+test("só quem está EM CURSO pode virar travado", () => {
+  // A regra em uma linha: travamento exige afirmação da Meta.
+  for (const c of CODES_EM_CURSO) {
+    assert.equal(estadoLado(c, 99 * TRAVADO_MS), "travado", c);
+  }
+  assert.ok(!CODES_EM_CURSO.includes("DESCONHECIDO"));
 });
 
 test("idade ilegível nunca vira travado", () => {
@@ -248,6 +286,97 @@ test("os dois travam ⟹ o ticket muda de endereço, vai para a Meta", () => {
   assert.equal(r.veredito, "meta");
   assert.equal(r.conclusivo, true);
   assert.match(r.proximo, /META/);
+});
+
+// ---------------------------------------------------------------------------
+// DIAG-CONTAINER-02 — o `null` nunca mais vira veredito
+// ---------------------------------------------------------------------------
+
+/**
+ * O CENÁRIO EXATO DE 11/08/2026, congelado. Se alguém reabrir a porta que esta
+ * fatia fechou, é aqui que cai.
+ */
+test("chamada rejeitada nos DOIS lados não vira 'meta'", () => {
+  const erro =
+    "code=100 subcode=33 (#100) Tried accessing nonexisting field " +
+    "(copyright_check_status) on node type (IGMedia)";
+  const r = lerAB({
+    ...base,
+    codeA: null,
+    codeB: null,
+    erroA: erro,
+    erroB: erro,
+    // Uma hora de container: com a árvore antiga isto imprimia "os dois
+    // travaram" com conclusivo=true.
+    idadeMs: 4 * TRAVADO_MS,
+  });
+  assert.equal(r.veredito, "leitura_falhou");
+  assert.equal(r.conclusivo, false);
+  assert.notEqual(r.veredito, "meta");
+  // O erro literal precisa chegar na tela: é ele que diz o que consertar.
+  assert.match(r.frase, /code=100/);
+  assert.match(r.proximo, /NÃO é travamento/);
+});
+
+test("basta UM lado ilegível para a rodada inteira parar", () => {
+  // Concluir "arquivo discriminador" tendo lido A e não B seria dizer que B
+  // travou quando o que houve foi não termos perguntado. O A/B só significa
+  // alguma coisa como PAR.
+  const r = lerAB({
+    ...base,
+    codeA: "FINISHED",
+    codeB: null,
+    erroB: "timeout_instagram_api(20000ms)",
+    idadeMs: 4 * TRAVADO_MS,
+  });
+  assert.equal(r.veredito, "leitura_falhou");
+  assert.equal(r.conclusivo, false);
+  assert.match(r.frase, /timeout_instagram_api/);
+  // E a frase diz QUAL lado falhou — sem isso o operador relê os dois no escuro.
+  assert.match(r.frase, /B:/);
+  assert.ok(!/A:/.test(r.frase), "A foi lido; não deve aparecer como ilegível");
+});
+
+test("200 sem status_code também para a rodada, e diz por quê", () => {
+  const r = lerAB({
+    ...base,
+    codeA: "FINISHED",
+    codeB: null,
+    idadeMs: 4 * TRAVADO_MS,
+  });
+  assert.equal(r.veredito, "leitura_falhou");
+  assert.equal(r.conclusivo, false);
+  assert.match(r.frase, /sem status_code/);
+});
+
+test("dedupe continua vindo ANTES da falha de leitura", () => {
+  // A ordem é o desenho: dedupe invalida o experimento; falha de leitura
+  // invalida a medição. Um experimento inválido não vira pendência de releitura.
+  const r = lerAB({
+    idA: "178",
+    idB: "178",
+    codeA: null,
+    codeB: null,
+    erroA: "code=100 x",
+    erroB: "code=100 x",
+    idadeMs: 4 * TRAVADO_MS,
+  });
+  assert.equal(r.veredito, "dedupe");
+});
+
+test("com os dois lados LIDOS, a árvore antiga segue valendo", () => {
+  // O conserto não podia mudar o que já estava certo: `travado` de verdade
+  // (IN_PROGRESS afirmado + relógio vencido) continua indo para a Meta.
+  const r = lerAB({
+    ...base,
+    codeA: "IN_PROGRESS",
+    codeB: "IN_PROGRESS",
+    erroA: null,
+    erroB: null,
+    idadeMs: TRAVADO_MS,
+  });
+  assert.equal(r.veredito, "meta");
+  assert.equal(r.conclusivo, true);
 });
 
 test("INVERTIDO é veredito nomeado, e NÃO é conclusivo", () => {

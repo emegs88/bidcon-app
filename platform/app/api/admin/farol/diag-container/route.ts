@@ -66,6 +66,7 @@ import {
   VIDEO_A_ORIGEM,
   VIDEO_B,
 } from "@/lib/farol/diag-container";
+import { lerContainerGraph } from "@/lib/instagram/ler-container";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -75,12 +76,6 @@ export const runtime = "nodejs";
  * arte/gerar e pauta usam o mesmo teto.
  */
 export const maxDuration = 300;
-
-const IG_GRAPH_VERSION = "v25.0";
-const TIMEOUT_IG_MS = 20_000;
-
-/** Os campos que interessam. Os mesmos de lib/farol/container.ts, por acordo. */
-const CAMPOS = "id,status,status_code,copyright_check_status";
 
 /**
  * Nomes de env conferidos por NOME, nunca por valor. Faltando, a resposta diz
@@ -95,68 +90,23 @@ function envFaltando(): string[] {
   ].filter((n) => !process.env[n]);
 }
 
-/**
- * GET no container. Vive aqui, e não na lib, pelo mesmo motivo que
- * `statusContainer` vive na rota do reel: I/O não desce para a camada pura.
- * Nunca lança; o erro da Graph volta LITERAL (code/subcode/message) — é o
- * diagnóstico, e mastigá-lo seria jogar fora justamente o que se veio buscar.
- */
-async function lerContainer(
-  id: string
-): Promise<{ ok: boolean; status_code: string | null; copyright: string | null; erro?: string }> {
-  const token = process.env.IG_ACCESS_TOKEN;
-  if (!token) return { ok: false, status_code: null, copyright: null, erro: "env_ausente(IG_ACCESS_TOKEN)" };
-
-  const url =
-    `https://graph.instagram.com/${IG_GRAPH_VERSION}/${id}` +
-    `?fields=${encodeURIComponent(CAMPOS)}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_IG_MS);
-  try {
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
-    const data: unknown = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const err = (data as { error?: { message?: string; code?: number; error_subcode?: number } })
-        ?.error;
-      const partes = [
-        err?.code !== undefined ? `code=${err.code}` : null,
-        err?.error_subcode !== undefined ? `subcode=${err.error_subcode}` : null,
-        err?.message ?? `http_${resp.status}`,
-      ].filter(Boolean);
-      return { ok: false, status_code: null, copyright: null, erro: partes.join(" ").slice(0, 500) };
-    }
-    const o = (data ?? {}) as Record<string, unknown>;
-    // `copyright_check_status` às vezes vem OBJETO. Serializar em vez de
-    // descartar: o campo existe justamente para ser lido inteiro.
-    const cc =
-      o.copyright_check_status === null || o.copyright_check_status === undefined
-        ? null
-        : typeof o.copyright_check_status === "string"
-          ? o.copyright_check_status
-          : JSON.stringify(o.copyright_check_status).slice(0, 300);
-    return {
-      ok: true,
-      status_code: o.status_code === undefined || o.status_code === null ? null : String(o.status_code),
-      copyright: cc,
-    };
-  } catch (e) {
-    if (e instanceof Error && e.name === "AbortError") {
-      return { ok: false, status_code: null, copyright: null, erro: `timeout_instagram_api(${TIMEOUT_IG_MS}ms)` };
-    }
-    return {
-      ok: false,
-      status_code: null,
-      copyright: null,
-      erro: e instanceof Error ? e.message.slice(0, 500) : "erro_desconhecido",
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
+// ---------------------------------------------------------------------------
+// O LEITOR NÃO MORA MAIS AQUI — DIAG-CONTAINER-02
+// ---------------------------------------------------------------------------
+// Havia aqui um `lerContainer` próprio, com um comentário que dizia "vive aqui,
+// e não na lib, pelo mesmo motivo que `statusContainer` vive na rota do reel:
+// I/O não desce para a camada pura". A frase era verdadeira sobre `lib/farol/`
+// e cega sobre `lib/instagram/`, que JÁ É a camada de I/O da Graph nesta casa.
+//
+// O preço dessa cegueira foi medido em 11/08/2026: os dois leitores pediam a
+// MESMA string de campos, e mesmo assim um funcionou e o outro mentiu — porque
+// só o do reel-publicar descia um degrau na escada quando a Graph recusava o
+// conjunto com `code=100`. Este devolvia `status_code: null` e a árvore chamava
+// isso de "travado".
+//
+// Agora há UM leitor: `lerContainerGraph`, em lib/instagram/ler-container.ts.
+// Ele já vem com a escada, com o erro literal e com `campos_usados`, que é como
+// se distingue "a Meta não devolveu copyright" de "não perguntamos por ele".
 // ---------------------------------------------------------------------------
 // POST — preparo + dois containers
 // ---------------------------------------------------------------------------
@@ -293,7 +243,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const [a, b] = await Promise.all([lerContainer(idA), lerContainer(idB)]);
+  const [a, b] = await Promise.all([
+    lerContainerGraph(idA),
+    lerContainerGraph(idB),
+  ]);
 
   // Idade a partir do `desde` que o POST devolveu. Ausente ou ilegível ⟹ NaN, e
   // NaN nunca vira "travado": sem relógio, a leitura é sempre "aguardando".
@@ -303,41 +256,66 @@ export async function GET(req: Request) {
   const t0 = desde ? new Date(desde).getTime() : Number.NaN;
   const idadeMs = Number.isFinite(t0) ? Date.now() - t0 : Number.NaN;
 
+  // O ERRO ENTRA NA ÁRVORE. Era isto que faltava em 11/08: a rota tinha o erro
+  // na mão (`code=100 ...`) e passava só o `status_code: null` adiante, de modo
+  // que "não consegui perguntar" chegava em `lerAB` com a mesma cara de "a Meta
+  // não respondeu nada". Agora os dois literais viajam juntos.
   const leitura = lerAB({
     idA,
     idB,
-    codeA: a.status_code,
-    codeB: b.status_code,
+    codeA: a.resumo?.status_code ?? null,
+    codeB: b.resumo?.status_code ?? null,
+    erroA: a.erro,
+    erroB: b.erro,
     idadeMs,
   });
 
   console.log("[diag-container] conferido", {
     quem: acesso.email,
     idade_min: Number.isFinite(idadeMs) ? Math.floor(idadeMs / 60_000) : null,
-    code_a: a.status_code,
-    code_b: b.status_code,
+    code_a: a.resumo?.status_code ?? null,
+    code_b: b.resumo?.status_code ?? null,
+    erro_a: a.erro,
+    erro_b: b.erro,
+    degraus_a: a.degraus,
+    degraus_b: b.degraus,
     veredito: leitura.veredito,
   });
 
   return NextResponse.json({
     ok: true,
     idade_min: Number.isFinite(idadeMs) ? Math.floor(idadeMs / 60_000) : null,
-    a: {
-      rotulo: `A — cópia do 07/08 (${BITRATE_A_KBPS} kbps, PUBLICOU)`,
-      container_id: idA,
-      // `null` é informação: quer dizer "a Meta não devolveu o campo", que é
-      // diferente de "devolveu vazio". Quem imprime decide como mostrar.
-      status_code: a.status_code,
-      copyright_check_status: a.copyright,
-      erro: a.erro ?? null,
-    },
-    b: {
-      rotulo: `B — 11/08 (${BITRATE_B_KBPS} kbps, travou)`,
-      container_id: idB,
-      status_code: b.status_code,
-      copyright_check_status: b.copyright,
-      erro: b.erro ?? null,
-    },
+    a: ladoJson(`A — cópia do 07/08 (${BITRATE_A_KBPS} kbps, PUBLICOU)`, idA, a),
+    b: ladoJson(`B — 11/08 (${BITRATE_B_KBPS} kbps, travou)`, idB, b),
     leitura,
   });
+}
+
+/**
+ * Um lado, do jeito que o painel lê.
+ *
+ * `campos_usados` e `degraus` SAEM NA RESPOSTA de propósito. Sem eles, um
+ * `copyright_check_status: null` é ambíguo entre "a Meta não devolveu" e "a
+ * escada desceu e nem chegamos a pedir o campo" — e essa ambiguidade é a mesma
+ * família do defeito que esta fatia conserta. Com eles, o operador confere na
+ * tela qual pergunta foi de fato feita.
+ */
+function ladoJson(
+  rotulo: string,
+  containerId: string,
+  l: Awaited<ReturnType<typeof lerContainerGraph>>
+) {
+  return {
+    rotulo,
+    container_id: containerId,
+    // `null` é informação: quer dizer "a Meta não devolveu o campo", que é
+    // diferente de "devolveu vazio". Quem imprime decide como mostrar.
+    status_code: l.resumo?.status_code ?? null,
+    copyright_check_status: l.resumo?.copyright_check_status ?? null,
+    /** A reclamação por extenso, quando a Graph manda uma. */
+    status: l.resumo?.status ?? null,
+    campos_usados: l.campos_usados,
+    degraus: l.degraus,
+    erro: l.erro,
+  };
 }
