@@ -72,6 +72,7 @@ import {
 } from "@/lib/farol/painel";
 import { DisparosManuais, DestravarReel, PautaAcoes } from "./FarolAcoes";
 import InventarioHeyGen from "./InventarioHeyGen";
+import DiagContainer from "./DiagContainer";
 import areaStyles from "@/components/area.module.css";
 import styles from "./farol.module.css";
 
@@ -594,6 +595,47 @@ export default async function AdminFarol() {
               a ausência de um id aqui não prova que ele não existe na conta.
             </p>
             <InventarioHeyGen />
+          </Card>
+        </section>
+
+        {/* --------------------------------------------------------------------
+            DIAG-CONTAINER-01 — o A/B que separa ARQUIVO de META.
+
+            POR ÚLTIMO entre as seções de ação, e é a posição certa: isto é um
+            instrumento de perícia, usado três vezes na vida, não uma ferramenta
+            de operação diária. Ficar acima dos disparos daria a ele uma
+            importância de rotina que ele não tem.
+
+            SEM `armado`, pelo mesmo motivo do inventário acima — e um a mais:
+            aqui existe um POST, então convém dizer por que ele não pede
+            confirmação nominal. Ele cria dois containers que expiram sozinhos
+            em 24h e sobe um arquivo inerte sob `diag/`. Não publica (há teste
+            que lê o fonte da rota e falha se `media_publish` aparecer), não
+            gasta crédito e não altera linha nenhuma. Pedir a palavra por um
+            botão inofensivo é como a palavra vira reflexo — e aí ela não
+            protege mais os botões que precisam dela.
+        -------------------------------------------------------------------- */}
+        <section className={areaStyles.section}>
+          <div className={areaStyles.sectionHead}>
+            <h2 className={areaStyles.sectionTitle}>
+              Diagnóstico de container (A/B)
+            </h2>
+          </div>
+          <Card>
+            <p className={styles.aviso}>
+              Mede uma coisa só: se o Instagram engasga com o <em>arquivo</em> ou
+              com a <em>conta</em>. Cria dois containers de teste —{" "}
+              <strong>A</strong>, cópia byte a byte do mp4 de 07/08 que publicou
+              (3.325 kbps), e <strong>B</strong>, o de 11/08 que travou (784
+              kbps) — e mostra o <code>status_code</code> dos dois lado a lado.{" "}
+              <strong>Nada é publicado</strong>: containers órfãos expiram
+              sozinhos em 24h. A cópia de A vai para uma URL nova de propósito,
+              porque a Meta devolve o mesmo container para a mesma URL — sem
+              isso, um <code>FINISHED</code> rápido seria reconhecimento, não
+              transcode. Só leia o resultado depois de 15 minutos: antes disso a
+              leitura fica em “aguardando” e não decide nada.
+            </p>
+            <DiagContainer />
           </Card>
         </section>
 
