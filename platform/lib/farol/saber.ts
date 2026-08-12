@@ -17,7 +17,7 @@
 // empresa; é vetorizar o que ela já diz.
 //
 // EU NÃO ESCREVI NENHUM NÚMERO DE LEI QUE O REPO NÃO TIVESSE. As duas normas
-// citadas (Lei 8.935/94 art. 7º-A, incluído pela Lei 14.711/2024; Provimento
+// citadas (Lei 8.935/94 art. 7º-A, incluído pela Lei 14.711/2023; Provimento
 // CNJ 197/2025) estão em public/llms.txt e em public/conta-notarial.html. Não
 // há nesta lista nenhuma norma que eu tenha buscado de memória.
 //
@@ -88,7 +88,7 @@ export const SEMENTES: Semente[] = [
       "dinheiro da Bidcon, do vendedor nem do cartório. Quem administra é o 5º Tabelionato de Notas de " +
       "Campinas, com fé pública e sem acesso ao valor. O cartório só libera o dinheiro ao vendedor depois " +
       "que a administradora aprova a transferência da cota; se a administradora não aprovar, o valor é " +
-      "devolvido ao comprador. Base legal: Lei 8.935/94, art. 7º-A (incluído pela Lei 14.711/2024) e " +
+      "devolvido ao comprador. Base legal: art. 7º-A da Lei nº 8.935/1994 (incluído pela Lei nº 14.711/2023) e " +
       "Provimento CNJ 197/2025.",
     tags: ["conta notarial", "seguranca", "pagamento", "cartorio", "escrow"],
     origem_no_repo: "public/llms.txt · public/conta-notarial.html",

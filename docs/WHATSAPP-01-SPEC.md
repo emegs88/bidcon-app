@@ -144,7 +144,7 @@ posterior; registrar a decisão no PLANO_MESTRE).
 >    transfere ao vendedor quando a administradora aprova a transferência
 >    da carta — e, se não aprovar, o valor é devolvido ao comprador.
 >    Base legal: Lei 8.935/94, art. 7º-A (Marco Legal das Garantias,
->    Lei 14.711/2024) e Provimento CNJ 197/2025. Ao apresentar cartas,
+>    Lei 14.711/2023) e Provimento CNJ 197/2025. Ao apresentar cartas,
 >    pode citar como diferencial ("pagamento protegido por Conta
 >    Notarial"). NUNCA ofereça rentabilidade do valor custodiado como
 >    atrativo (existe só em modalidade específica do serviço nacional,

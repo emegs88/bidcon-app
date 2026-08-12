@@ -808,7 +808,7 @@ export function SimuladorClient({
             dívidas alheias à operação. O 5º Tabelionato de Notas de Campinas administra com fé
             pública, sem acesso ao valor: libera ao vendedor só após a administradora aprovar a
             transferência; se não aprovar, o valor retorna ao comprador (Lei 8.935/94 art. 7º-A,
-            com redação da Lei 14.711/2024; Provimento CNJ 197/2025).
+            com redação da Lei 14.711/2023; Provimento CNJ 197/2025).
           </p>
         </section>
       )}
