@@ -201,16 +201,82 @@ export const CODES_RECUSA: readonly string[] = ["ERROR", "EXPIRED"];
  */
 export const TRAVADO_MS = 15 * 60 * 1000;
 
-export type EstadoLado = "pronto" | "recusado" | "travado" | "aguardando";
+export type EstadoLado =
+  | "pronto"
+  | "recusado"
+  | "travado"
+  | "aguardando"
+  /** A chamada foi REJEITADA. Não sabemos nada sobre o container. */
+  | "rejeitado"
+  /** A Graph respondeu, mas sem `status_code`. Também não sabemos nada. */
+  | "sem_leitura";
 
 /**
- * Estado de UM lado. `code` ausente/desconhecido não é recusa nem pronto: é
- * espera, e espera com relógio.
+ * Códigos que a Graph usa para dizer "ainda estou trabalhando". Só quem está
+ * NESTA lista pode virar "travado" com o passar do relógio.
+ *
+ * `DESCONHECIDO` está aqui porque é o que `statusContainer` escreve quando a
+ * resposta veio ok mas sem o campo — e isso é ausência, não progresso; por isso
+ * ele NÃO entra: ver `estadoLado`. Deixo a observação escrita porque a tentação
+ * de incluí-lo "para simplificar" é exatamente o defeito de 11/08.
  */
-export function estadoLado(code: string | null, idadeMs: number): EstadoLado {
+export const CODES_EM_CURSO: readonly string[] = ["IN_PROGRESS", "PUBLISHING"];
+
+/**
+ * Estado de UM lado.
+ *
+ * ----------------------------------------------------------------------------
+ * O CONSERTO DA DIAG-CONTAINER-02, e o defeito era meu — inclusive no teste
+ * ----------------------------------------------------------------------------
+ * A versão anterior terminava assim:
+ *
+ *     if (Number.isFinite(idadeMs) && idadeMs >= TRAVADO_MS) return "travado";
+ *     return "aguardando";
+ *
+ * Ou seja: QUALQUER `code` que não fosse terminal — inclusive `null` — virava
+ * "travado" depois de 15 min. E eu não só escrevi isso como escrevi um teste
+ * fixando o comportamento, com um comentário que soava prudente:
+ *
+ *     assert.equal(estadoLado(null, 99 * TRAVADO_MS), "travado");
+ *
+ * O raciocínio era "code ausente é espera, e espera vencida é travamento". Ele
+ * ignora um terceiro caso, que foi o que aconteceu: `null` porque NÃO SE
+ * CONSEGUIU PERGUNTAR. Em 11/08 a Graph derrubou a requisição com `code=100`, o
+ * leitor devolveu `null` nos dois lados, e a árvore imprimiu "os dois travaram"
+ * como CONCLUSIVO — o veredito mais caro da tabela, tirado de duas chamadas que
+ * nunca foram respondidas.
+ *
+ * AGORA "TRAVADO" EXIGE AFIRMAÇÃO. Só é travado quem a Meta disse estar em
+ * curso (`CODES_EM_CURSO`) e passou do relógio. Ausência de resposta tem nome
+ * próprio e não conclui nada:
+ *
+ *   · `rejeitado`   — a chamada falhou; há erro literal para mostrar.
+ *   · `sem_leitura` — a chamada voltou 200 mas sem `status_code`.
+ *
+ * A regra em uma frase, que é a do Emerson: o `null` nunca mais vira veredito.
+ *
+ * @param erro Erro LITERAL da chamada, quando ela falhou. Presente ⟹ nada se
+ *             conclui sobre este lado, em qualquer idade.
+ */
+export function estadoLado(
+  code: string | null,
+  idadeMs: number,
+  erro: string | null = null
+): EstadoLado {
+  // A REJEIÇÃO VEM PRIMEIRO e cala todo o resto, inclusive um `code` que por
+  // acaso tenha vindo junto: se a chamada falhou, o que quer que esteja no
+  // corpo é resto de erro, não estado do container.
+  if (erro !== null && erro.trim() !== "") return "rejeitado";
+
   const c = (code ?? "").trim().toUpperCase();
   if (CODES_PRONTOS.includes(c)) return "pronto";
   if (CODES_RECUSA.includes(c)) return "recusado";
+
+  // Sem código afirmativo não há o que cronometrar. `DESCONHECIDO` cai aqui de
+  // propósito: é o rótulo que a leitura dá à AUSÊNCIA do campo, e ausência não
+  // é progresso.
+  if (!CODES_EM_CURSO.includes(c)) return "sem_leitura";
+
   if (Number.isFinite(idadeMs) && idadeMs >= TRAVADO_MS) return "travado";
   return "aguardando";
 }
@@ -230,6 +296,8 @@ export function dedupeDetectada(idA: string | null, idB: string | null): boolean
 
 export type Veredito =
   | "dedupe"
+  /** A leitura falhou de um dos lados. NADA se conclui — DIAG-CONTAINER-02. */
+  | "leitura_falhou"
   | "aguardando"
   | "arquivo_discriminador"
   | "arquivo_exonerado"
@@ -247,16 +315,48 @@ export type Leitura = {
 };
 
 /**
- * A ÁRVORE, exatamente como o Emerson a escreveu, com dois acréscimos meus que
+ * A frase de UM lado ilegível, com o erro literal quando existe.
+ *
+ * Devolve `null` para lados que foram lidos — assim o chamador só junta o que
+ * de fato falhou, e a frase não vira uma lista com buracos.
+ *
+ * O erro entra CRU, sem tradução. "Não entendi a mensagem da Meta" é um
+ * problema de quem lê o painel; "traduzi a mensagem da Meta" é um problema de
+ * quem confia no painel.
+ */
+function ladoIlegivel(
+  rotulo: string,
+  estado: EstadoLado,
+  erro: string | null
+): string | null {
+  if (estado === "rejeitado") {
+    return `${rotulo}: chamada REJEITADA — ${erro?.trim() || "sem mensagem"}`;
+  }
+  if (estado === "sem_leitura") {
+    return `${rotulo}: a Graph respondeu sem status_code`;
+  }
+  return null;
+}
+
+/**
+ * A ÁRVORE, exatamente como o Emerson a escreveu, com TRÊS acréscimos meus que
  * são sobre não concluir demais:
  *
  *  · DEDUPE VEM PRIMEIRO e cala todo o resto. Sem isso, dois FINISHED
  *    idênticos leriam como "arquivo exonerado" quando na verdade só houve um
  *    container.
+ *  · LEITURA_FALHOU vem LOGO DEPOIS, e é a fatia DIAG-CONTAINER-02. Se um dos
+ *    lados não foi lido — chamada rejeitada ou 200 sem `status_code` —, nada se
+ *    conclui. Era exatamente aqui que a versão anterior caía no ramo "os dois
+ *    travaram", com `conclusivo: true`, a partir de duas requisições que a Graph
+ *    havia recusado.
  *  · "INVERTIDO" (A trava e B termina) existe como veredito NOMEADO. É o
  *    resultado que contraria a hipótese inteira, e resultado que contraria a
  *    hipótese é o mais valioso da mesa — cair no `else` de "os dois travam"
  *    seria apagá-lo.
+ *
+ * A ORDEM É O DESENHO: dedupe invalida o experimento, falha de leitura invalida
+ * a medição, e só depois disso os números querem dizer alguma coisa.
  */
 export function lerAB(p: {
   idA: string | null;
@@ -264,6 +364,10 @@ export function lerAB(p: {
   codeA: string | null;
   codeB: string | null;
   idadeMs: number;
+  /** Erro LITERAL da leitura de A, quando a chamada falhou. */
+  erroA?: string | null;
+  /** Erro LITERAL da leitura de B, quando a chamada falhou. */
+  erroB?: string | null;
 }): Leitura {
   if (dedupeDetectada(p.idA, p.idB)) {
     return {
@@ -277,8 +381,33 @@ export function lerAB(p: {
     };
   }
 
-  const a = estadoLado(p.codeA, p.idadeMs);
-  const b = estadoLado(p.codeB, p.idadeMs);
+  const a = estadoLado(p.codeA, p.idadeMs, p.erroA ?? null);
+  const b = estadoLado(p.codeB, p.idadeMs, p.erroB ?? null);
+
+  // ---------------------------------------------------------------------
+  // O `null` NUNCA MAIS VIRA VEREDITO — item 3 da DIAG-CONTAINER-02.
+  // ---------------------------------------------------------------------
+  // Basta UM lado ilegível para a rodada inteira parar. Não é excesso de
+  // zelo: o A/B só significa alguma coisa como PAR. Concluir "arquivo
+  // discriminador" tendo lido A e não B seria dizer que B travou quando o
+  // que houve foi não termos perguntado.
+  if (a === "rejeitado" || b === "rejeitado" || a === "sem_leitura" || b === "sem_leitura") {
+    const motivos = [
+      ladoIlegivel("A", a, p.erroA ?? null),
+      ladoIlegivel("B", b, p.erroB ?? null),
+    ].filter((s): s is string => s !== null);
+
+    return {
+      veredito: "leitura_falhou",
+      conclusivo: false,
+      frase: `NÃO SE LEU O CONTAINER: ${motivos.join(" · ")}. Nada se conclui.`,
+      proximo:
+        "Isto NÃO é travamento — é ausência de resposta. Corrigir a leitura " +
+        "(erro literal acima; `code=100` é campo inexistente para este nó e a " +
+        "escada de campos deve descer um degrau) e RELER os mesmos ids. " +
+        "Nenhum ticket, para a Meta ou para a HeyGen, sai desta tela.",
+    };
+  }
 
   if (a === "aguardando" || b === "aguardando") {
     return {
@@ -323,7 +452,10 @@ export function lerAB(p: {
     return {
       veredito: "meta",
       conclusivo: true,
-      frase: `Os dois travaram (A=${a}, B=${b}). Nem o arquivo bom passa.`,
+      // "A=travado" e "A=recusado" são coisas diferentes e a frase mostra qual
+      // foi: os dois levam ao mesmo endereço de ticket, mas quem abre o ticket
+      // precisa saber se a Meta recusou ou se ficou moendo.
+      frase: `Nenhum dos dois ficou pronto (A=${a}, B=${b}). Nem o arquivo bom passa.`,
       proximo:
         "O endereço do ticket muda para a META (conta/permissão). O arquivo " +
         "deixa de ser suspeito: o que publicou em 07/08 não publica mais.",

@@ -61,6 +61,17 @@ type LadoConferido = {
   container_id: string;
   status_code: string | null;
   copyright_check_status: string | null;
+  /** A reclamação por extenso da Graph, quando vem uma. */
+  status: string | null;
+  /**
+   * O conjunto de campos que a Graph ACEITOU — DIAG-CONTAINER-02.
+   *
+   * Sem isto, um `copyright_check_status` ausente é ambíguo entre "a Meta não
+   * devolveu" e "a escada desceu um degrau e nem chegamos a pedir". A tela
+   * mostra a pergunta, não só a resposta.
+   */
+  campos_usados: string;
+  degraus: number;
   erro: string | null;
 };
 
@@ -305,7 +316,7 @@ export default function DiagContainer() {
           <p className={styles.invResumo}>
             {conf.idade_min === null
               ? "Sem instante de criação — a idade não pôde ser calculada."
-              : `${conf.idade_min} min desde a criação (o limiar de "travado" é 15 min).`}
+              : `${conf.idade_min} min desde a criação (o limiar de "travado" é 15 min, e só vale para quem a Meta afirmou estar IN_PROGRESS).`}
           </p>
 
           <div className={styles.diagLados}>
@@ -313,14 +324,41 @@ export default function DiagContainer() {
               <div key={l.container_id} className={styles.diagLado}>
                 <p className={styles.diagRotulo}>{l.rotulo}</p>
                 <Campo nome="container_id" valor={l.container_id} />
-                <Campo nome="status_code" valor={l.status_code} />
-                <Campo
-                  nome="copyright_check_status"
-                  valor={l.copyright_check_status}
-                />
+
+                {/*
+                  A CHAMADA REJEITADA APARECE PRIMEIRO E SOZINHA.
+                  Se a Graph recusou a requisição, os campos abaixo seriam todos
+                  `null` — e um `null` empilhado embaixo de um erro se lê como
+                  "a Meta não devolveu", que foi exatamente a confusão de 11/08.
+                  Aqui não há o que imprimir: não se leu.
+                */}
                 {l.erro ? (
-                  <p className={styles.erroAcao} role="alert">
-                    {l.erro}
+                  <>
+                    <p className={styles.erroAcao} role="alert">
+                      CHAMADA REJEITADA — {l.erro}
+                    </p>
+                    <p className={styles.aviso}>
+                      Nada foi lido deste container. Isto NÃO é travamento.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Campo nome="status_code" valor={l.status_code} />
+                    <Campo
+                      nome="copyright_check_status"
+                      valor={l.copyright_check_status}
+                    />
+                    <Campo nome="status" valor={l.status} />
+                  </>
+                )}
+
+                {/* A pergunta que foi feita, sempre — com erro ou sem. */}
+                <Campo nome="campos pedidos" valor={l.campos_usados} />
+                {l.degraus > 0 ? (
+                  <p className={styles.aviso}>
+                    A Graph recusou o conjunto completo; a leitura desceu{" "}
+                    {l.degraus} degrau(s). Campos fora da lista acima NÃO foram
+                    pedidos nesta leitura.
                   </p>
                 ) : null}
               </div>
