@@ -445,3 +445,75 @@
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
 }
+
+/* ==========================================================================
+   DIAG-CONTAINER-01 — o A/B lado a lado
+   --------------------------------------------------------------------------
+   `minmax(0, 1fr)` e não `1fr` no grid: os literais da Meta são strings longas
+   sem espaço (URLs de bucket, JSON do copyright_check_status). Com `1fr` puro,
+   uma coluna de grid recusa encolher abaixo do conteúdo e a outra some. É a
+   diferença entre o A/B aparecer lado a lado e o B ser empurrado para fora da
+   tela justamente quando o erro é comprido — que é sempre.
+   ========================================================================== */
+.diagLados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 10px;
+}
+.diagLado {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.diagRotulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.diagCampo {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.diagNome {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* Ausência é informação, e informação se lê. Itálico e cor apagada distinguem
+   "a Meta não mandou o campo" de um valor que por acaso é curto. */
+.diagAusente {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.diagUrl {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.diagProximo {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--brand);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+.diagIds {
+  display: grid;
+  gap: 8px;
+}
+.diagCampoIn {
+  display: grid;
+  gap: 4px;
+}
