@@ -32,7 +32,19 @@
 begin;
 
 -- 1) Grafias que pertencem a administradoras JA CADASTRADAS ------------------
--- 'BBRASIL' (6 cartas), 'ITAU - M' e 'ITAU - P' (1 carta cada).
+-- CONTAGEM CORRIGIDA (13/08/2026), sobre TODOS os status e nao so disponivel:
+--   BBRASIL     141 cartas (6 disponiveis)
+--   ITAU - M     47 cartas (1 disponivel)   [com acento]
+--   ITAU - P     46 cartas (0 disponiveis)  [com acento]
+--   ITAU - P      6 cartas (1 disponivel)   [sem acento]
+--   GROSCON       2 cartas (2 disponiveis)
+--   = 242 linhas no update do passo 4.
+--
+-- A primeira versao dizia "11 cartas". Era a contagem da fatia disponivel, e
+-- como DESCRICAO do que o update faz estava errada por uma ordem de grandeza,
+-- porque o update nao tem escopo de status. Fica registrado: medir na fatia
+-- que a tela mostra e depois escrever na tabela inteira e um jeito confiavel
+-- de subestimar o proprio raio de acao.
 
 update public.administradoras
    set aliases = array_append(aliases, 'BBRASIL')
@@ -48,6 +60,17 @@ update public.administradoras
    set aliases = array_append(aliases, 'ITAU - P')
  where nome = 'Itaú'
    and not ('ITAU - P' = any(aliases));
+
+-- E a MESMA grafia COM acento, que e outra chave. resolver_administradora casa
+-- por lower(), e lower() nao remove acento: 'itaú - p' e 'itau - p' sao
+-- diferentes. A primeira versao desta migracao so tinha a sem acento, porque a
+-- fatia de disponiveis so continha ela — e teria deixado 46 cartas orfas
+-- enquanto eu declarava o assunto resolvido.
+
+update public.administradoras
+   set aliases = array_append(aliases, 'ITAÚ - P')
+ where nome = 'Itaú'
+   and not ('ITAÚ - P' = any(aliases));
 
 -- 2) Administradora REAL que faltava no cadastro -----------------------------
 -- 'GROSCON' (2 cartas). Groscon e administradora de consorcio de verdade; nao
@@ -67,7 +90,21 @@ on conflict do nothing;
 -- grafia com a fonte. NAO afeta a contagem: com ou sem cadastro, 'KASINSK' e
 -- uma entidade so na view, e o total continua 33.
 --
--- Pela mesma razao 'REPASSE (CAPITAL DE GIRO)' (12 cartas) NAO vira
+-- TRES GRAFIAS QUE APARECERAM NA MEDICAO E FICAM DE FORA DESTA MIGRACAO
+-- Todas com ZERO cartas disponiveis, entao nenhuma mexe no numero da vitrine:
+--   'PORTOAF'  201 cartas, todas indisponiveis. Porto Seguro ja tem o alias
+--              'PORTO AF' COM espaco; esta e a mesma coisa sem o espaco, e
+--              quase certamente dela. Fica de fora porque 201 linhas nao e
+--              detalhe e Emerson nao aprovou esta grafia — ele aprovou uma
+--              lista de cinco que eu apresentei, e esta nao estava nela.
+--   'DAF'        6 cartas, todas indisponiveis. DAF e marca de caminhao;
+--              pode ser administradora, pode ser o bem no campo errado.
+--              Adivinhar aqui e criar administradora falsa.
+--   (vazio)     54 cartas com administradora_raw em branco. Nao ha o que
+--              resolver: falta o dado na origem, nao o vinculo.
+--
+-- Pela mesma razao 'REPASSE (CAPITAL DE GIRO)' (842 cartas no total, 12 delas
+-- disponiveis — e a maior grafia orfa do banco) NAO vira
 -- administradora aqui: nao e administradora, e uma CATEGORIA que vazou para o
 -- campo errado na origem. A view ja a esconde por categoria='repasse'. Limpar
 -- a origem e outro assunto, e e assunto de quem manda no importador.
