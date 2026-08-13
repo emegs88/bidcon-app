@@ -13,9 +13,10 @@
 // nova diz quanto se PAGA do crédito: `valor_credito × pct/100`. A base parou
 // de ser pergunta, então parou de ser parâmetro.
 //
-// ESTE ARQUIVO É O LUGAR DAS REGRAS DE OFERTA — as três (janela, piso, teto)
-// moram juntas de propósito. Uma constante de negócio sozinha num arquivo é uma
-// constante que alguém redefine noutro canto sem saber que já existia.
+// ESTE ARQUIVO É O LUGAR DAS REGRAS DE OFERTA — as quatro (janela, piso, teto
+// e, desde 13/08/2026, a comissão da casa) moram juntas de propósito. Uma
+// constante de negócio sozinha num arquivo é uma constante que alguém redefine
+// noutro canto sem saber que já existia.
 //
 // PRINCÍPIO: função pura. Entrada -> saída. Sem I/O, sem rede, sem `Date.now()`
 // escondido — quem chama passa o instante. Um relógio implícito torna o teste
@@ -202,6 +203,82 @@ export function valorOfertado(
   if (!Number.isFinite(valorCredito) || valorCredito <= 0) return null;
   if (!checarPct(pct).ok) return null;
   return centavos(valorCredito * (pct / 100));
+}
+
+/**
+ * A COMISSÃO DA BIDCON no caminho do fundo. Emerson, 13/08/2026:
+ * "comissao 3,5% do credito quando fundo faz e coloca na platforma mantem os 7".
+ *
+ * BASE: o VALOR DO CRÉDITO — a mesma base da oferta, e a mesma base dos 7% do
+ * caminho da vitrine. Três números sobre uma base só é o que torna a decisão
+ * conferível de cabeça.
+ *
+ * O QUE SÃO "OS 7", medido antes de escrever isto (13/08/2026), porque eu
+ * supunha outra coisa e estava errado:
+ *   - `app/api/analista-grupos/route.ts:248` → `credito * 0.07`, e a linha 59
+ *     chama de "regra canônica": em contemplada o cliente paga 7% DO CRÉDITO
+ *     à Bidcon, SOMADOS À ENTRADA. Em venda nova não existe.
+ *   - `lib/playcontempladas-source.ts:44` → `MARGEM_CREDITO = 0.07`, somado à
+ *     entrada crua do parceiro antes de exibir.
+ *   NÃO é o fee de `lib/reserve/fee-plan.ts` (10% contemplada / 6% cancelada,
+ *   piso R$ 2.500) — aquele incide sobre o ÁGIO e é outro fluxo. Os dois
+ *   coexistem hoje e continuam coexistindo; esta constante não toca neles.
+ *
+ * Quem paga os 7% é o COMPRADOR, por cima da entrada. Aqui, quem compra é o
+ * fundo — e é justamente aí que mora a pergunta ainda em aberto, abaixo.
+ *
+ * PROPORÇÃO: 3,5 é metade de 7, sobre a mesma base. Por carta, o caminho do
+ * fundo rende à casa exatamente metade do caminho da vitrine. Coerente com o
+ * que a ordem já dizia — o fundo compra em lote e a Bidcon não põe capital de
+ * aquisição nenhum.
+ */
+export const COMISSAO_FUNDO_PCT = 3.5;
+
+/**
+ * ============================================================================
+ * EM ABERTO — DE QUEM SAI A COMISSÃO. NÃO DECIDIDO EM 13/08/2026.
+ * ============================================================================
+ * A ordem fixou o percentual e a base. Não disse a INCIDÊNCIA, e as duas
+ * leituras possíveis brigam com a emenda dos 20–35%. Em crédito de R$ 100.000
+ * com oferta no piso de 20% (R$ 20.000) e comissão de R$ 3.500:
+ *
+ *   (A) sai do meio — o cedente recebe R$ 16.500.
+ *       O fundo desembolsa os 20% combinados, mas quem vende recebe 16,5% do
+ *       crédito. O piso de 20% deixa de ser piso PARA QUEM VENDE, e é para
+ *       quem vende que a tela promete o número.
+ *
+ *   (B) entra por cima — o fundo desembolsa R$ 23.500.
+ *       O cedente recebe os 20% inteiros, mas o custo real do fundo vira 23,5%
+ *       do crédito; no teto, 38,5%. A emenda diz "SEMPRE entre 20% e 35% DO
+ *       VALOR DO CRÉDITO", e 38,5% não está entre 20 e 35.
+ *
+ * Nenhuma das duas preserva ao mesmo tempo o piso como "o que o cedente
+ * recebe" e o teto como "o que o fundo paga". É decisão de negócio, não de
+ * engenharia, e chutar aqui seria inventar dinheiro de terceiro.
+ *
+ * POR ISSO `montarLote` NÃO SOMA NEM SUBTRAI COMISSÃO. O total que ele devolve
+ * é o que a emenda define: a soma de `valor_credito × pct/100`. Enquanto a
+ * incidência não for decidida, um total "com comissão" seria um número que a
+ * ordem não autoriza — e é o número que o fundo aprova na tela.
+ *
+ * Nota de proporção, para a decisão: como comissão e oferta dividem a mesma
+ * base, a comissão vale `3,5/pct` da oferta — 17,5% dela no piso de 20% e 10%
+ * dela no teto de 35%. Quanto mais barato o fundo compra, mais pesada ela é
+ * sobre o dinheiro que muda de mão.
+ */
+export const COMISSAO_FUNDO_INCIDENCIA_DECIDIDA = false;
+
+/**
+ * A comissão da casa por carta: `valorCredito × 3,5/100`.
+ *
+ * `null` em crédito não positivo, pelo mesmo motivo de `valorOfertado`: zero é
+ * um número e número mente calado. Não recebe `pct` de propósito — a comissão
+ * não varia com o percentual ofertado, e um parâmetro que não muda a resposta
+ * é um convite a passar o valor errado.
+ */
+export function comissaoFundo(valorCredito: number): number | null {
+  if (!Number.isFinite(valorCredito) || valorCredito <= 0) return null;
+  return centavos(valorCredito * (COMISSAO_FUNDO_PCT / 100));
 }
 
 export type ItemCalculado = {
