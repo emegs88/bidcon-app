@@ -9,6 +9,23 @@
 --    cartas. Motivo: a integridade que NAO pode ser por convencao e a da oferta
 --    com a carta — aceite e dinheiro dependem de FK real para cartas(id), e FK
 --    entre bancos nao existe. ... Nenhuma tabela FIDC no nnv."
+--
+-- EMENDA de 12/08/2026, ANTES DE APLICAR — Emerson fechou as decisoes (1) e (3):
+--   "a oferta e SEMPRE entre 20% (piso) e 35% (teto) DO VALOR DO CREDITO."
+--
+-- Isto nao e um CHECK mais apertado sobre a coluna que existia: e outra conta.
+-- Desagio respondia "quanto se tira da base" — valor = base x (1 - pct/100), com
+-- a base ainda por nomear. A regra nova responde "quanto se paga do credito" —
+-- valor = valor_credito x pct/100. O sinal e a referencia mudaram, entao a
+-- coluna mudou de nome junto: `desagio_pct` e `desagio_base` NAO existem nesta
+-- migracao. Existe `oferta_pct_credito`, e a base deixou de ser coluna porque
+-- deixou de ser escolha — e sempre o valor do credito.
+--
+-- A faixa 20–35 esta em DOIS lugares, de proposito e sem redundancia burra:
+-- `lib/fidc-ofertas.ts` valida ANTES do insert e devolve erro NOMEADO (a pessoa
+-- precisa saber que errou e por que); o CHECK abaixo e a rede — pega o que
+-- passar por rota nova, script ou console. Guarda que so existe na aplicacao
+-- some no dia em que alguem escreve direto no banco.
 -- ----------------------------------------------------------------------------
 -- POR QUE ESTAS TRES TABELAS VIVEM AQUI, E NAO NA nnv.
 --
@@ -37,25 +54,22 @@
 -- valores comerciais que ninguem de fora tem por que ver.
 --
 -- ----------------------------------------------------------------------------
--- QUATRO DECISOES AINDA ABERTAS — carregadas como PLACEHOLDER NOMEADO.
+-- DUAS DECISOES AINDA ABERTAS — carregadas como PLACEHOLDER NOMEADO.
 --
--- A ordem manda: "o Code constroi com placeholder e reporta". Nenhuma delas foi
--- inventada aqui. Onde a decisao falta, existe uma coluna com nome honesto e
--- NENHUM default — o que obriga quem escrever a primeira linha a decidir, em
--- vez de herdar um chute silencioso.
+-- Eram quatro. A emenda de 12/08 fechou (1) e (3) de uma vez: a base do desagio
+-- deixou de existir como pergunta (e sempre o valor do credito) e o piso de
+-- protecao virou a faixa 20–35, com nome de constraint proprio. Sobram:
 --
---   (1) BASE DO DESAGIO — `fidc_ofertas.desagio_base`. Os dois candidatos estao
---       no CHECK; nenhum e default. Ate a decisao, nenhuma rota escreve oferta.
 --   (2) COMISSAO DA BIDCON — `fidc_ofertas.comissao_valor` / `comissao_base`.
 --       As colunas guardam o RESULTADO; o MODELO que o produz e codigo, e por
 --       isso nao esta petrificado aqui. Modelo B, percentual proprio ou embutido
 --       cabem todos nestas duas colunas sem nova migracao.
---   (3) PISO DE PROTECAO (desagio maximo aceitavel) — o CHECK de `desagio_pct`
---       hoje so recusa o absurdo aritmetico (<=0 ou >=100). O teto da casa NAO
---       esta aqui de proposito: quando o Emerson disser o numero, ele vira um
---       ALTER com nome e data, e nao uma constante enterrada num commit.
---   (4) QUAL FIDC ESTREIA — esta migracao NAO insere fundo nenhum. Zero linhas.
+--   (4) QUAL FUNDO ESTREIA — esta migracao NAO insere fundo nenhum. Zero linhas.
 --       O primeiro fundo nasce pela mao do Emerson, no painel admin (Entrega 4).
+--
+-- Enquanto (2) estiver aberta, as duas colunas de comissao aceitam null. Isso e
+-- deliberado e tem prazo: no dia em que o modelo for nomeado, elas viram NOT
+-- NULL por ALTER, e o ALTER carrega a data da decisao.
 --
 -- ----------------------------------------------------------------------------
 -- DESVIOS QUE EU DECLARO, com o motivo.
@@ -92,6 +106,16 @@
 --     pede. Custo assumido e declarado: a normalizacao para minusculas e
 --     responsabilidade da aplicacao (o CHECK que a imporia precisaria de
 --     subconsulta, que CHECK nao aceita). O painel admin grava em minusculas.
+--
+-- (e) RENOMEEI `fidc_oferta_itens.valor_base` PARA `valor_credito`.
+--     A emenda so me mandou matar `desagio_base` em `fidc_ofertas`. Mas o nome
+--     "valor_base" existia para apontar PARA aquela coluna — era o retrato da
+--     base que o fundo tinha escolhido. Sem escolha de base, "base" nao quer
+--     dizer mais nada, e um nome vago no lugar onde se guarda dinheiro e um
+--     convite a alguem preencher com o numero errado. Agora o nome diz a coisa:
+--     e o valor do credito, fotografado. Custo zero — a migracao nao foi
+--     aplicada, entao nao ha ALTER nem dado para migrar. Se a coordenacao
+--     preferir o nome antigo, e uma linha.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -150,10 +174,7 @@ create table if not exists public.fidc_ofertas (
                         references public.fidc_fundos(id) on delete restrict,
   escopo                text not null check (escopo in ('carta', 'lote')),
   filtro_lote           jsonb,
-  desagio_pct           numeric not null
-                        check (desagio_pct > 0 and desagio_pct < 100),
-  desagio_base          text not null
-                        check (desagio_base in ('entrada_vitrine', 'liquido_cedente')),
+  oferta_pct_credito    numeric not null,
   valor_total_calculado numeric not null check (valor_total_calculado >= 0),
   comissao_base         text,
   comissao_valor        numeric check (comissao_valor >= 0),
@@ -166,7 +187,13 @@ create table if not exists public.fidc_ofertas (
   retirada_em           timestamptz,
   retirada_por          text,
   retirada_motivo       text,
-  constraint fidc_ofertas_prazo_coerente check (expira_em > criado_em)
+  constraint fidc_ofertas_prazo_coerente check (expira_em > criado_em),
+  -- Emerson, 12/08/2026: "a oferta e SEMPRE entre 20% (piso) e 35% (teto) DO
+  -- VALOR DO CREDITO." A constraint tem nome proprio para que a violacao chegue
+  -- nomeada ao log: quem ler `fidc_ofertas_faixa_20_35_do_credito` no erro sabe
+  -- na hora qual regra da casa foi tocada, sem abrir o schema.
+  constraint fidc_ofertas_faixa_20_35_do_credito
+    check (oferta_pct_credito >= 20 and oferta_pct_credito <= 35)
 );
 
 comment on table public.fidc_ofertas is
@@ -175,10 +202,8 @@ comment on column public.fidc_ofertas.escopo is
   'carta | lote. Distincao de intencao, nao de estrutura: as duas formas geram linhas em fidc_oferta_itens. Serve para a tela dizer a verdade sobre o que o fundo fez.';
 comment on column public.fidc_ofertas.filtro_lote is
   'AUDITORIA, nao conteudo. Registra COMO o fundo selecionou (tipo, faixa de credito, administradoras) para que seja possivel reconstruir a intencao depois. O QUE foi ofertado esta em fidc_oferta_itens, e so la.';
-comment on column public.fidc_ofertas.desagio_pct is
-  'Percentual de desagio proposto. O CHECK recusa apenas o absurdo aritmetico. O piso de protecao da plataforma (decisao 3, em aberto) NAO esta aqui de proposito: quando existir, vira um ALTER com nome e data.';
-comment on column public.fidc_ofertas.desagio_base is
-  'PLACEHOLDER — decisao 1, em aberto. Sobre o que os desagio_pct incidem. Sem default de proposito: obriga quem escreve a primeira oferta a nomear a base, em vez de herdar um chute. A tela deve exibir esta base por extenso, nunca so o percentual.';
+comment on column public.fidc_ofertas.oferta_pct_credito is
+  'Quanto o fundo paga, em percentual DO VALOR DO CREDITO da carta. Emerson, 12/08/2026: "a oferta e SEMPRE entre 20% (piso) e 35% (teto) DO VALOR DO CREDITO." A BASE NAO E COLUNA porque nao e escolha: e sempre cartas.valor_credito. Guardar uma base configuravel aqui seria oferecer uma opcao que a regra da casa nao da, e a primeira pessoa a escolher errado nao teria como saber. A faixa e imposta em dois lugares: lib/fidc-ofertas.ts (erro nomeado, antes do insert) e a constraint fidc_ofertas_faixa_20_35_do_credito (a rede).';
 comment on column public.fidc_ofertas.valor_total_calculado is
   'Soma de valor_ofertado dos itens no instante do envio. Redundante com a soma dos itens, e de proposito: e o numero que o fundo VIU e aprovou. Se um item for retirado depois, este total continua contando a historia certa.';
 comment on column public.fidc_ofertas.comissao_base is
@@ -222,7 +247,7 @@ create table if not exists public.fidc_oferta_itens (
                   references public.fidc_ofertas(id) on delete cascade,
   carta_id        uuid not null
                   references public.cartas(id) on delete restrict,
-  valor_base      numeric not null check (valor_base >= 0),
+  valor_credito   numeric not null check (valor_credito >= 0),
   valor_ofertado  numeric not null check (valor_ofertado >= 0),
   status          text not null default 'pendente'
                   check (status in ('pendente', 'aceito', 'recusado', 'expirado')),
@@ -242,10 +267,10 @@ comment on column public.fidc_oferta_itens.oferta_id is
   'on delete cascade: item sem oferta nao significa nada. Apagar a oferta e apagar a proposta inteira, e isso e coerente.';
 comment on column public.fidc_oferta_itens.carta_id is
   'FK REAL para cartas(id) — o motivo pelo qual estas tabelas nascem no xtv. on delete restrict: nada apaga carta hoje (medido), e se um dia alguem tentar, o banco vai lembrar que existe um aceite pendurado nela.';
-comment on column public.fidc_oferta_itens.valor_base is
-  'Retrato do valor de referencia NO INSTANTE da oferta, segundo a base nomeada em fidc_ofertas.desagio_base. A vitrine muda de preco; a proposta que o fundo enviou, nao. Sem este retrato, uma oferta de ontem seria recalculada com o numero de hoje e ninguem saberia dizer qual dos dois foi combinado.';
+comment on column public.fidc_oferta_itens.valor_credito is
+  'Retrato de cartas.valor_credito NO INSTANTE da oferta. A carta pode ser corrigida, reimportada ou ter o credito atualizado; a proposta que o fundo enviou, nao. Sem este retrato, uma oferta de ontem seria recalculada com o numero de hoje e ninguem saberia dizer qual dos dois foi combinado.';
 comment on column public.fidc_oferta_itens.valor_ofertado is
-  'Quanto o fundo paga por esta carta. Calculado no envio a partir de valor_base e do desagio; gravado, nunca reconstruido na leitura.';
+  'FOTOGRAFIA: valor_credito x oferta_pct_credito / 100, no momento da escrita. Gravado, nunca reconstruido na leitura — e o numero que a pessoa do outro lado viu antes de aceitar. Reconstruir na leitura significaria que a resposta a "quanto me ofereceram?" muda conforme o dia em que se pergunta.';
 comment on column public.fidc_oferta_itens.status is
   'pendente | aceito | recusado | expirado. Por ITEM, nao por oferta — num lote de 40 o dono pode aceitar 12.';
 comment on column public.fidc_oferta_itens.aceite_palavra is
@@ -301,4 +326,25 @@ alter table public.fidc_oferta_itens enable row level security;
 --    where tc.table_name = 'fidc_oferta_itens' and tc.constraint_type = 'FOREIGN KEY';
 --   -- esperado: carta_id -> cartas, delete_rule = RESTRICT
 --   --           oferta_id -> fidc_ofertas, delete_rule = CASCADE
+--
+--   -- A faixa 20–35 existe COM O NOME que a emenda pediu:
+--   select conname, pg_get_constraintdef(oid) from pg_constraint
+--    where conname = 'fidc_ofertas_faixa_20_35_do_credito';
+--   -- esperado: 1 linha, CHECK (oferta_pct_credito >= 20 AND
+--   --                            oferta_pct_credito <= 35)
+--
+--   -- E a rede pega de verdade. As duas linhas abaixo DEVEM falhar; rodar uma
+--   -- de cada vez e conferir que o erro cita a constraint pelo nome. Ficam em
+--   -- transacao abortada de proposito — nada e gravado:
+--   -- begin;
+--   --   insert into public.fidc_ofertas
+--   --     (fundo_id, escopo, oferta_pct_credito, valor_total_calculado,
+--   --      expira_em, criado_por_email)
+--   --   values (gen_random_uuid(), 'carta', 19.99, 0, now() + interval '1 h',
+--   --           'conferencia@bidcon.com.br');
+--   --   -- esperado: ERRO citando fidc_ofertas_faixa_20_35_do_credito
+--   --   -- (se passar da faixa, cai antes na FK de fundo_id — que tambem
+--   --   --  e um erro, mas NAO e o que este teste queria provar; para provar
+--   --   --  a faixa, usar o id de um fundo real depois do cadastro)
+--   -- rollback;
 -- ============================================================================

@@ -10,8 +10,9 @@
 //    alguém tirar "fidc" da régua, quero saber, porque o cabeçalho deste
 //    arquivo depende disso ser verdade.
 //
-// 2. DINHEIRO. O total de um lote tem de ser a soma exata do que cada vendedor
-//    recebe. Centavo que não fecha é centavo que alguém vai ter de explicar.
+// 2. DINHEIRO. A faixa 20–35% do crédito nas duas pontas (emenda de 12/08), e o
+//    total de um lote tem de ser a soma exata do que cada vendedor recebe.
+//    Centavo que não fecha é centavo que alguém vai ter de explicar.
 //
 // 3. RELÓGIO. A janela de 24h e a regra de expiração na leitura, incluindo o
 //    instante empatado — que é onde toda regra de prazo se decide.
@@ -26,6 +27,9 @@ import { garantirLexico, TERMOS_PROIBIDOS } from "@/lib/lexico";
 import {
   ENV_KILL_SWITCH,
   JANELA_OFERTA_HORAS,
+  OFERTA_PISO_PCT,
+  OFERTA_TETO_PCT,
+  checarPct,
   expiraEm,
   montarLote,
   ofertasLigado,
@@ -46,26 +50,37 @@ test("lexico: a premissa deste modulo — 'fidc' e termo proibido", () => {
   );
   assert.ok(
     lista.includes("desconto"),
-    "'desconto' e proibida; a ordem manda usar 'desagio'"
-  );
-  assert.ok(
-    !lista.includes("desagio") && !lista.includes("deságio"),
-    "'desagio' precisa continuar permitida — e a palavra do produto"
+    "'desconto' e proibida — e depois da emenda de 12/08 nem faz falta: a conta " +
+      "deixou de ser de abatimento e virou 'o fundo paga X% do valor do credito'"
   );
 });
 
 test("lexico: os motivos de descarte podem ir para a tela", () => {
   const lote = montarLote(
     [
-      { id: "a", valorBase: null },
-      { id: "b", valorBase: Number.NaN },
+      { id: "a", valorCredito: null },
+      { id: "b", valorCredito: Number.NaN },
+      { id: "c", valorCredito: 0 },
     ],
-    10
+    25
   );
-  assert.equal(lote.descartadas.length, 2);
+  assert.equal(lote.descartadas.length, 3);
   for (const d of lote.descartadas) {
     const r = garantirLexico(d.motivo);
     assert.equal(r.ok, true, `motivo reprovado no lexico: ${d.motivo}`);
+  }
+});
+
+test("lexico: o motivo de recusa da faixa tambem vai para a tela", () => {
+  // Este texto e o que a pessoa do fundo le quando digita o percentual errado.
+  // Se ele nao passar no lexico, a tela nao pode mostra-lo — e um erro que nao
+  // se pode mostrar e um erro mudo.
+  for (const pct of [0, 19.99, 35.01, 120, Number.NaN]) {
+    const v = checarPct(pct);
+    assert.equal(v.ok, false, `${pct} deveria ser recusado`);
+    if (v.ok) continue;
+    const r = garantirLexico(v.motivo);
+    assert.equal(r.ok, true, `motivo reprovado no lexico: ${v.motivo}`);
   }
 });
 
@@ -73,18 +88,61 @@ test("lexico: os motivos de descarte podem ir para a tela", () => {
 // 2. DINHEIRO
 // ---------------------------------------------------------------------------
 
-test("valorOfertado: desagio simples, arredondado a centavos", () => {
-  assert.equal(valorOfertado(100_000, 10), 90_000);
-  assert.equal(valorOfertado(125_303.66, 12.5), 109_640.7);
+test("faixa: as constantes sao 20 e 35, e as duas pontas ENTRAM", () => {
+  assert.equal(OFERTA_PISO_PCT, 20);
+  assert.equal(OFERTA_TETO_PCT, 35);
+
+  // As pontas valem — piso que recusa o proprio piso nao e piso. E o CHECK do
+  // banco usa >= e <=; se aqui fosse > e <, a tela aceitaria o que o banco
+  // recusa, e o erro so apareceria no insert.
+  assert.equal(checarPct(20).ok, true, "20% e o piso, e piso vale");
+  assert.equal(checarPct(35).ok, true, "35% e o teto, e teto vale");
+  assert.equal(checarPct(27.5).ok, true);
+
+  // E as vizinhancas imediatas nao valem.
+  assert.equal(checarPct(19.99).ok, false);
+  assert.equal(checarPct(35.01).ok, false);
+});
+
+test("faixa: o motivo diz QUAL ponta foi violada", () => {
+  const baixo = checarPct(18);
+  assert.equal(baixo.ok, false);
+  if (!baixo.ok) {
+    assert.ok(baixo.motivo.includes("piso"), baixo.motivo);
+    assert.ok(baixo.motivo.includes("20"), baixo.motivo);
+  }
+
+  const alto = checarPct(40);
+  assert.equal(alto.ok, false);
+  if (!alto.ok) {
+    assert.ok(alto.motivo.includes("teto"), alto.motivo);
+    assert.ok(alto.motivo.includes("35"), alto.motivo);
+  }
+});
+
+test("valorOfertado: percentual DO CREDITO, arredondado a centavos", () => {
+  // A conta e credito x pct/100 — quanto o fundo PAGA —, e nao credito x
+  // (1 - pct/100), que era a conta de desagio antes da emenda de 12/08.
+  assert.equal(valorOfertado(100_000, 20), 20_000, "piso paga 20% do credito");
+  assert.equal(valorOfertado(100_000, 35), 35_000, "teto paga 35% do credito");
+  // Cota real do EXTRATO.pdf: credito de R$ 125.303,66.
+  assert.equal(valorOfertado(125_303.66, 27.5), 34_458.51);
 });
 
 test("valorOfertado: recusa entrada que nao permite resposta honesta", () => {
-  assert.equal(valorOfertado(100, 0), null, "desagio 0 nao e oferta");
-  assert.equal(valorOfertado(100, 100), null, "desagio 100% zeraria a carta");
+  assert.equal(valorOfertado(100, 19.99), null, "abaixo do piso");
+  assert.equal(valorOfertado(100, 35.01), null, "acima do teto");
+  assert.equal(valorOfertado(100, 0), null);
+  assert.equal(valorOfertado(100, 100), null);
   assert.equal(valorOfertado(100, -5), null);
-  assert.equal(valorOfertado(-1, 10), null);
-  assert.equal(valorOfertado(Number.NaN, 10), null);
   assert.equal(valorOfertado(100, Number.POSITIVE_INFINITY), null);
+  assert.equal(valorOfertado(-1, 25), null);
+  assert.equal(valorOfertado(Number.NaN, 25), null);
+  assert.equal(
+    valorOfertado(0, 25),
+    null,
+    "credito zero e recusado, nao aceito com resultado zero"
+  );
 });
 
 test("montarLote: o total e a soma dos itens JA arredondados", () => {
@@ -94,11 +152,11 @@ test("montarLote: o total e a soma dos itens JA arredondados", () => {
   // que importa em qualquer entrada: o total e exatamente a soma do que os
   // vendedores recebem.
   const cartas = [
-    { id: "a", valorBase: 33.33 },
-    { id: "b", valorBase: 33.33 },
-    { id: "c", valorBase: 33.33 },
+    { id: "a", valorCredito: 33.33 },
+    { id: "b", valorCredito: 33.33 },
+    { id: "c", valorCredito: 33.33 },
   ];
-  const lote = montarLote(cartas, 15);
+  const lote = montarLote(cartas, 20);
 
   const somaDosItens = lote.itens.reduce((s, i) => s + i.valorOfertado, 0);
   assert.equal(
@@ -115,19 +173,21 @@ test("montarLote: o total e a soma dos itens JA arredondados", () => {
   }
 });
 
-test("montarLote: carta sem base sai da lista nomeada, nao vira oferta de zero", () => {
+test("montarLote: carta sem credito sai da lista nomeada, nao vira oferta de zero", () => {
   const lote = montarLote(
     [
-      { id: "boa", valorBase: 200_000 },
-      { id: "sem-base", valorBase: null },
+      { id: "boa", valorCredito: 200_000 },
+      { id: "sem-credito", valorCredito: null },
     ],
-    20
+    30
   );
+  assert.equal(lote.recusa, null, "a faixa esta boa; a recusa e por carta");
   assert.equal(lote.itens.length, 1);
   assert.equal(lote.itens[0].cartaId, "boa");
-  assert.equal(lote.itens[0].valorOfertado, 160_000);
+  assert.equal(lote.itens[0].valorCredito, 200_000);
+  assert.equal(lote.itens[0].valorOfertado, 60_000);
   assert.deepEqual(lote.descartadas, [
-    { cartaId: "sem-base", motivo: "sem valor de base" },
+    { cartaId: "sem-credito", motivo: "sem valor de crédito" },
   ]);
   assert.ok(
     !lote.itens.some((i) => i.valorOfertado === 0),
@@ -135,11 +195,38 @@ test("montarLote: carta sem base sai da lista nomeada, nao vira oferta de zero",
   );
 });
 
-test("montarLote: desagio invalido descarta tudo, e o total e zero com lista vazia", () => {
-  const lote = montarLote([{ id: "a", valorBase: 100 }], 0);
+test("montarLote: percentual fora da faixa recusa o LOTE, nao acusa as cartas", () => {
+  const cartas = [
+    { id: "a", valorCredito: 100_000 },
+    { id: "b", valorCredito: 200_000 },
+  ];
+  const lote = montarLote(cartas, 18);
+
   assert.equal(lote.itens.length, 0);
   assert.equal(lote.total, 0);
-  assert.equal(lote.descartadas.length, 1);
+  assert.ok(typeof lote.recusa === "string" && lote.recusa.includes("piso"));
+  assert.deepEqual(
+    lote.descartadas,
+    [],
+    "as cartas estao boas — a culpa e do percentual, e a tela precisa dizer isso"
+  );
+});
+
+test("montarLote: nas duas pontas da faixa o lote sai inteiro", () => {
+  const cartas = [
+    { id: "a", valorCredito: 100_000 },
+    { id: "b", valorCredito: 50_000 },
+  ];
+
+  const piso = montarLote(cartas, OFERTA_PISO_PCT);
+  assert.equal(piso.recusa, null);
+  assert.equal(piso.itens.length, 2);
+  assert.equal(piso.total, 30_000);
+
+  const teto = montarLote(cartas, OFERTA_TETO_PCT);
+  assert.equal(teto.recusa, null);
+  assert.equal(teto.itens.length, 2);
+  assert.equal(teto.total, 52_500);
 });
 
 // ---------------------------------------------------------------------------
