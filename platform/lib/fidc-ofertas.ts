@@ -67,6 +67,30 @@ export const JANELA_OFERTA_HORAS = 24;
 const MS_POR_HORA = 3_600_000;
 
 /**
+ * A palavra que o operador do fundo digita para MANDAR a oferta.
+ *
+ * Palavra PRÓPRIA, e não a PALAVRA_PUBLICAR do FAROL, pela mesma razão que
+ * `lib/farol/confirmacao.ts` já registra ao separar PUBLICAR de APROVAR: o
+ * reflexo treinado numa tela não pode servir na outra. Aqui a ação nem sequer
+ * é publicar — é assumir um compromisso de compra de 24 horas.
+ *
+ * Por que existe confirmação nominal AQUI, se o painel de vozes dispensou:
+ * lá era GET puro. Aqui, medido no acervo vivo em 12/08/2026, a vitrine soma
+ * R$ 420.493.818,53; um "selecionar tudo" no piso de 20% é uma oferta de
+ * R$ 84.098.763,71. Clique de reflexo não pode alcançar esse número.
+ *
+ * Mora neste módulo, e não num arquivo só dela, porque este é o arquivo das
+ * REGRAS DA OFERTA e ele não importa nada — atravessa a fronteira
+ * servidor/cliente sem arrastar dependência, então o botão e a rota leem a
+ * MESMA linha. Palavra repetida à mão nos dois lados é a divergência do dia em
+ * que alguém troca um dos dois.
+ *
+ * Não é segredo e não pode virar um: aparece na tela, no botão e no texto do
+ * erro. Quem autentica é `checarFundoApi()`; esta palavra só impede o reflexo.
+ */
+export const PALAVRA_OFERTAR = "OFERTAR";
+
+/**
  * A FAIXA. Emerson, 12/08/2026: "a oferta é SEMPRE entre 20% (piso) e 35%
  * (teto) DO VALOR DO CRÉDITO."
  *
