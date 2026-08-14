@@ -82,6 +82,16 @@ const EM_ANDAMENTO = new Set(["enviado", "parcial", "rascunho"]);
 
 const MAX_BYTES = 8 * 1024 * 1024; // igual ao limite do /enviar
 
+/**
+ * Signatário fixo da Bidcon. Fica em código, e não em env, porque não é
+ * segredo nem muda por ambiente: é quem assina pela casa. Os campos
+ * seguem editáveis na tela — isto é ponto de partida, não trava.
+ */
+const BIDCON_SIGNATARIO = {
+  nome: "Emerson Gomes dos Santos",
+  email: "eme.santos123@gmail.com",
+} as const;
+
 type Papel = "cedente" | "cessionario" | "bidcon" | "testemunha";
 
 type LinhaSignatario = {
@@ -180,9 +190,9 @@ export function AssinaturaPainel({
     {
       chave: "bidcon",
       papel: "bidcon",
-      nome: "Emerson Gomes dos Santos",
+      nome: BIDCON_SIGNATARIO.nome,
       cpf_cnpj: "",
-      email: "",
+      email: BIDCON_SIGNATARIO.email,
       whatsapp: "",
       removivel: false,
     },
