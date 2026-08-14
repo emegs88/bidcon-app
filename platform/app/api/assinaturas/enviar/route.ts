@@ -230,9 +230,26 @@ export async function POST(req: Request) {
       documentos: enviados.map((e) => ({ item: e.item, titulo: e.titulo, pdf: e.pdf })),
       signatarios: lidos.lista,
     });
-  } catch {
+  } catch (falha) {
     // Mensagem do provedor NÃO sobe: pode ecoar os dados dos signatários.
+    // Mas o motivo tem de existir em ALGUM lugar — sem isso, "não foi
+    // possível" cobre igualmente credencial ausente, credencial errada,
+    // PDF recusado e provedor fora do ar, e o operador não sabe se o
+    // problema é dele ou nosso. O texto vai para o log do servidor.
+    const motivo = falha instanceof Error ? falha.message : String(falha);
+    console.error("[assinaturas/enviar] provedor recusou:", motivo);
     await limpar();
+
+    // Falta de configuração é nossa, não do provedor: essas mensagens são
+    // fixas, lançadas pela nossa própria factory, e não carregam dado de
+    // signatário. Devolver o estado certo evita o operador ficar caçando
+    // erro no PDF quando o que falta é a env.
+    const semCredencial =
+      motivo.includes("ZAPSIGN_API_TOKEN") || motivo.includes("ESIGN_PROVIDER");
+    if (semCredencial) {
+      return NextResponse.json({ status: "nao_configurado" });
+    }
+
     return NextResponse.json(
       { erro: "Não foi possível criar o envelope de assinatura." },
       { status: 400 }
