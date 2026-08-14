@@ -1,0 +1,175 @@
+/* Painel de assinatura eletrônica (BIDCON-ASSINATURA-02).
+   Segue o vocabulário de acoes.module.css: mesmas variáveis, mesmos raios,
+   mesmo tom de erro. Nenhuma cor nova entra por aqui. */
+
+.wrap {
+  display: grid;
+  gap: 16px;
+}
+
+/* Blocos internos do card (Documentos / Signatários / Situação) */
+.bloco {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.bloco:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.blocoTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ajuda {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.erro {
+  margin: 0;
+  color: #f3a4a4;
+  font-size: 13px;
+}
+.ok {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* --- campos ------------------------------------------------------------- */
+.campo {
+  display: grid;
+  gap: 6px;
+}
+.rotulo {
+  color: var(--text);
+  font-size: 13px;
+}
+.input,
+.file {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.file {
+  padding: 6px 8px;
+}
+
+/* --- signatários --------------------------------------------------------- */
+.signatarios {
+  display: grid;
+  gap: 12px;
+}
+.signatario {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.signatarioTopo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.papel {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.grade {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .grade {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --- situação ao vivo ---------------------------------------------------- */
+.cards {
+  display: grid;
+  gap: 8px;
+}
+.cardSig {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.cardNome {
+  display: grid;
+  gap: 2px;
+}
+.cardPapel {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cardData {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* --- arquivos da pasta --------------------------------------------------- */
+.arquivos {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.arquivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.arquivo:last-child {
+  border-bottom: 0;
+}
+.arquivoNome {
+  color: var(--text);
+  font-size: 13px;
+  word-break: break-all;
+}
+.arquivoMeta {
+  color: var(--text-muted);
+  font-size: 12px;
+}

@@ -31,6 +31,7 @@ import {
 } from "@/lib/status";
 import { dataBR } from "@/lib/format";
 import { ProcessoAcoes } from "./ProcessoAcoes";
+import { AssinaturaPainel } from "./AssinaturaPainel";
 import det from "./detalhe.module.css";
 
 // signed URL curta para bucket privado do processo (docs/contratos). Server-only.
@@ -375,6 +376,20 @@ export default async function AdminProcessoDetalhe({
             </dl>
           </Card>
         )}
+
+        {/* Assinatura eletrônica. Fica FORA de qualquer condicional de propósito:
+            é justamente quando ainda não existe envelope que o operador precisa
+            do formulário. O painel se vira sozinho com o /status (mostra
+            "Nenhum envelope enviado" quando é o caso). */}
+        <Card as="section">
+          <h2 className={det.h2}>Assinatura</h2>
+          <AssinaturaPainel
+            processoId={processo.id}
+            clienteNome={cliente?.nome ?? null}
+            clienteEmail={cliente?.email ?? null}
+            clienteTelefone={cliente?.telefone ?? null}
+          />
+        </Card>
 
         <Card as="section">
           <h2 className={det.h2}>Ações</h2>
