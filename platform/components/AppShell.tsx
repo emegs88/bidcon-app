@@ -17,7 +17,9 @@ export function AppShell({
   children,
 }: {
   nome?: string | null;
-  tipo?: "cliente" | "parceiro" | "admin";
+  // "fundo" (FIDC-OFERTAS-01 · E2) ganha navegação PRÓPRIA e curta em ShellNav:
+  // sem os links da área de cliente, sem /parceiro, sem /admin.
+  tipo?: "cliente" | "parceiro" | "admin" | "fundo";
   equipe?: boolean;
   equipeAdminConsole?: boolean;
   children: ReactNode;

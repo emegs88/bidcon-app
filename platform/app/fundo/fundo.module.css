@@ -1,0 +1,350 @@
+/* ============================================================================
+   /fundo — FIDC-OFERTAS-01 · Entrega 2
+
+   Herda os tokens de app/globals.css (--surface, --border, --text-muted,
+   --brand, --warn, --ok, --r-md…). NENHUMA COR LITERAL NOVA. A área do fundo é
+   uma área logada como as outras, e o portal suporta tema claro: qualquer
+   `#hex` cravado aqui viraria contraste quebrado em metade das máquinas.
+
+   Um arquivo só para as quatro telas de /fundo (vitrine, montador, lista de
+   ofertas, contador) porque as classes se cruzam — `.campo` é o mesmo par
+   rótulo/campo no filtro e no montador, e duplicá-lo em dois módulos garantiria
+   que um dia os dois ficassem diferentes.
+   ============================================================================ */
+
+/* ---- Filtro (form GET da vitrine) ----------------------------------------- */
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+/* Par rótulo/campo. Usado no filtro E no montador — ver o cabeçalho. */
+.campo {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.campo input,
+.campo select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+}
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+.campo code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text);
+}
+
+.filtroAcoes {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Botões do filtro. Mesma gramática do components/ui/Button.module.css
+   (pílula, peso 800), escritos aqui porque são <button type="submit"> e <a>
+   dentro de um form nativo — trocar por <Button> não muda um pixel e ainda
+   arrastaria o form GET para dentro de um componente. */
+.btnFiltrar,
+.btnLimpar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  font-family: inherit;
+}
+.btnFiltrar {
+  background: var(--grad-brand);
+  color: #04121f;
+}
+.btnLimpar {
+  background: transparent;
+  color: var(--text-soft);
+  border: 1px solid var(--border-strong);
+}
+.btnFiltrar:active,
+.btnLimpar:active {
+  transform: translateY(1px);
+}
+
+.notaFiltro {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ---- Montador da oferta --------------------------------------------------- */
+.montador {
+  display: grid;
+  gap: 14px;
+}
+.montadorLinha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  /* `flex-end`, não `end`. O autoprefixer reprova `end` em contêiner FLEX —
+     suporte misto entre navegadores. Em `.filtros`, que é grid, `end` é a
+     palavra certa e ele não reclama; a diferença é do modo de layout, não
+     descuido de escrita. */
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.acoesSelecao {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.acoesSelecao button {
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.acoesSelecao button:hover {
+  border-color: var(--brand);
+  color: var(--text);
+}
+
+/* Os três números da decisão. `auto-fit` e não três colunas fixas: no celular
+   eles empilham, e empilhado é melhor que apertado quando o número tem oito
+   dígitos. */
+.resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.resumo > div {
+  display: grid;
+  gap: 3px;
+}
+.resumo strong {
+  font-size: 18px;
+  color: var(--text);
+  /* Tabular: a coluna de valores tem de alinhar entre uma linha e a seguinte
+     quando o número muda a cada clique. */
+  font-variant-numeric: tabular-nums;
+}
+.resumoRotulo {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.resumoTotal {
+  color: var(--brand);
+}
+
+.erro {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.aviso {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ---- Envio (confirmação nominal + botão) ---------------------------------- */
+.envio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.envio .campo {
+  min-width: 220px;
+}
+
+/* O botão que gasta oito dígitos. `:disabled` sem hover e com cursor de
+   bloqueio: enquanto a palavra não estiver digitada, ele tem de PARECER
+   inerte, não só se recusar a funcionar depois do clique. */
+.btnOfertar {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--grad-brand);
+  color: #04121f;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.btnOfertar:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+}
+.btnOfertar:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.sucesso {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--ok);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sucesso p {
+  margin: 0;
+}
+.sucesso a {
+  color: var(--brand);
+}
+
+/* ---- Lista da vitrine ----------------------------------------------------- */
+.notaTela {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+/* A carta marcada muda a BORDA e o fundo, não só a caixinha. Numa lista de 500
+   linhas, um checkbox de 14px é invisível ao correr o olho. */
+.itemMarcado {
+  border-color: var(--brand);
+  background: var(--surface-2);
+}
+/* O <label> inteiro é a área clicável — inclusive os dados da carta. Alvo de
+   toque de uma linha cheia, não de um quadradinho. */
+.itemLabel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.itemLabel input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.itemCorpo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.itemTopo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+  color: var(--text);
+}
+.itemDados {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+/* O valor ofertado da linha. `min-width` reservado mesmo quando vazio, para a
+   lista não dar um pulo lateral a cada carta marcada. */
+.itemValor {
+  flex: none;
+  min-width: 120px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- /fundo/ofertas — lista das ofertas do fundo -------------------------- */
+.listaOfertas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.ofertaTopo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.ofertaValor {
+  font-size: 18px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ofertaDados {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.ofertaRodape {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Contador da janela de 24h -------------------------------------------- */
+/* Tabular obrigatório: sem ele os dígitos têm larguras diferentes e o texto
+   inteiro treme a cada segundo, que é o jeito mais fácil de tornar um relógio
+   irritante de olhar. */
+.contador {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-amber);
+  font-variant-numeric: tabular-nums;
+}
+.contadorMorto {
+  font-size: 13px;
+  color: var(--text-muted);
+}
