@@ -27,7 +27,13 @@
 //                                última contagem boa desta fonte
 //   5) (transação/rollback fica na RPC/rota do cron, não aqui)
 // ============================================================================
-import { tipoDe, type CotaFonte, type Leitura } from "@/lib/cotas-source";
+import {
+  diagnosticarRaw,
+  estadoDoRaw,
+  tipoDe,
+  type CotaFonte,
+  type Leitura,
+} from "@/lib/cotas-source";
 
 const BASE_URL = (
   process.env.PLAYCONTEMPLADAS_URL ?? "https://playcontempladas.com.br/"
@@ -140,6 +146,12 @@ function parsearHtml(html: string): CotaFonte[] | null {
       valorParcela,
       qtdParcelas,
       entradaParceiro,
+      // SYNC-RAW-01: aqui o cru é condição de existência da linha — sem ele o
+      // `continue` acima já a descartou, e os 7% não teriam de que ser
+      // somados. Logo esta fonte só produz "recebido"; "ausente" é
+      // estruturalmente impossível. Ainda assim classificamos pela MESMA
+      // função das outras fontes, para não abrir uma segunda regra.
+      estadoRaw: estadoDoRaw("PLAYCONTEMPLADAS", entradaParceiro),
       administradora,
     });
   }
@@ -204,5 +216,8 @@ export async function lerCotasPlaycontempladas(
     }
   }
 
-  return { ok: true, origem, cotas };
+  // SYNC-RAW-01 (b): mesmo diagnóstico das fontes JSON. A URL literal é a do
+  // site do parceiro e `admin` sai false — não existe modo admin aqui, o cru
+  // vem na própria coluna 4 do HTML público.
+  return { ok: true, origem, cotas, raw: diagnosticarRaw(origem, BASE_URL, cotas) };
 }
