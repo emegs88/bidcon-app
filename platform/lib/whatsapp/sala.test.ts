@@ -21,6 +21,19 @@ import {
   mediana,
   duracaoCurta,
   resumirConversa,
+  offsetTzMinutos,
+  inicioDoDiaMs,
+  chaveDia,
+  lerPeriodo,
+  janelaPeriodo,
+  dentroDoPeriodo,
+  rotuloDia,
+  agruparPorDia,
+  separarSala,
+  identidadeCard,
+  previaComContexto,
+  PERIODO_PADRAO,
+  TZ_CASA,
   type ConversaSala,
 } from "./sala";
 
@@ -36,6 +49,7 @@ function conversa(over: Partial<ConversaSala> = {}): ConversaSala {
     ultimoPapel: "prosperito",
     ultimaFalaCliente: null,
     ultimaFalaClienteEm: null,
+    ultimaPerguntaBot: null,
     totalMensagens: 3,
     temAnexo: false,
     msPrimeiraResposta: null,
@@ -363,4 +377,300 @@ test("duracaoCurta — a escada", () => {
   assert.equal(duracaoCurta(12 * 60_000), "12 min");
   assert.equal(duracaoCurta(130 * 60_000), "2h 10");
   assert.equal(duracaoCurta(3 * 86_400_000), "3 dias");
+});
+
+// ===========================================================================
+// CONVERSAS-03 — período e legibilidade
+// ===========================================================================
+
+// --- o fuso, que é onde estava o defeito -----------------------------------
+
+test("offsetTzMinutos — São Paulo está a -180 do UTC fora do horário de verão", () => {
+  assert.equal(offsetTzMinutos(Date.parse("2026-08-11T15:00:00Z"), TZ_CASA), -180);
+});
+
+test("offsetTzMinutos — no horário de verão de 2018 o deslocamento era OUTRO", () => {
+  // 15/01/2018: o Brasil estava em horário de verão (15/10/2017 a 18/02/2018) e
+  // São Paulo em UTC-2. Este teste existe para provar que a tabela de fuso é
+  // consultada, e não que alguém cravou -180 no código. Se o horário de verão
+  // voltar, a casa não precisa lembrar de nada.
+  assert.equal(offsetTzMinutos(Date.parse("2018-01-15T12:00:00Z"), TZ_CASA), -120);
+});
+
+test("inicioDoDiaMs — às 22h de Brasília o dia AINDA é hoje (o defeito medido)", () => {
+  // O CASO QUE ESTE TESTE EXISTE PARA IMPEDIR, e que estava em produção:
+  // a página fazia `new Date().setHours(0,0,0,0)`, que usa o fuso do processo.
+  // A Vercel roda em UTC. Às 22h de Brasília o servidor já está no dia 12, e
+  // "conversas hoje" zerava três horas antes da virada — todo santo dia, na
+  // faixa da noite em que o WhatsApp mais fala.
+  const vinteEDuasEmBrasilia = Date.parse("2026-08-12T01:00:00Z");
+
+  assert.equal(chaveDia("2026-08-12T01:00:00Z", TZ_CASA), "2026-08-11");
+  assert.equal(
+    inicioDoDiaMs(vinteEDuasEmBrasilia, TZ_CASA),
+    Date.parse("2026-08-11T03:00:00Z")
+  );
+
+  // E a prova de que o defeito era real: em UTC, o mesmo instante é dia 12.
+  assert.equal(new Date(vinteEDuasEmBrasilia).toISOString().slice(0, 10), "2026-08-12");
+});
+
+test("inicioDoDiaMs — a meia-noite pertence ao dia que começa, não ao que acabou", () => {
+  const meiaNoite = Date.parse("2026-08-11T03:00:00Z"); // 00:00 em Brasília
+  assert.equal(inicioDoDiaMs(meiaNoite, TZ_CASA), meiaNoite);
+  assert.equal(chaveDia("2026-08-11T03:00:00Z", TZ_CASA), "2026-08-11");
+  // Um milissegundo antes ainda é o dia anterior.
+  assert.equal(chaveDia("2026-08-11T02:59:59.999Z", TZ_CASA), "2026-08-10");
+});
+
+test("chaveDia — data ausente ou ilegível é null, não a chave de hoje", () => {
+  // Devolver "hoje" empurraria a conversa para um dia em que ela não
+  // aconteceu, sob um cabeçalho que mente com cara de certeza.
+  assert.equal(chaveDia(null, TZ_CASA), null);
+  assert.equal(chaveDia("não é data", TZ_CASA), null);
+});
+
+// --- item 1: o filtro de período -------------------------------------------
+
+test("lerPeriodo — valor bom passa; lixo e vazio caem no padrão de 7 dias", () => {
+  assert.equal(lerPeriodo("hoje"), "hoje");
+  assert.equal(lerPeriodo("TUDO"), "tudo");
+  assert.equal(lerPeriodo("ontem "), "ontem");
+  // Link velho ou erro de digitação não pode virar tela de erro.
+  assert.equal(lerPeriodo("semana-passada"), PERIODO_PADRAO);
+  assert.equal(lerPeriodo(null), PERIODO_PADRAO);
+  assert.equal(lerPeriodo(undefined), PERIODO_PADRAO);
+  assert.equal(PERIODO_PADRAO, "7d");
+});
+
+test("janelaPeriodo — 'tudo' não tem fronteira nenhuma", () => {
+  const j = janelaPeriodo("tudo", Date.parse("2026-08-11T15:00:00Z"), TZ_CASA);
+  assert.equal(j.desdeMs, null);
+  assert.equal(j.ateMs, null);
+});
+
+test("janelaPeriodo — 'ontem' é fechado dos dois lados e não invade hoje", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z"); // 12h de Brasília
+  const j = janelaPeriodo("ontem", agora, TZ_CASA);
+  assert.equal(j.desdeMs, Date.parse("2026-08-10T03:00:00Z"));
+  assert.equal(j.ateMs, Date.parse("2026-08-11T03:00:00Z"));
+
+  // A fronteira superior é EXCLUSIVA: a meia-noite já é hoje.
+  assert.equal(dentroDoPeriodo("2026-08-11T03:00:00Z", j), false);
+  assert.equal(dentroDoPeriodo("2026-08-11T02:59:59.999Z", j), true);
+});
+
+test("janelaPeriodo — '7 dias' é hoje MAIS SEIS, em dias civis", () => {
+  // Não são "as últimas 168 horas". Os chips vizinhos são dias civis; uma
+  // janela deslizante no meio deles faria a conversa de terça de manhã sumir
+  // de "7 dias" na terça à tarde, sem nada ter acontecido.
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const j = janelaPeriodo("7d", agora, TZ_CASA);
+  assert.equal(j.desdeMs, Date.parse("2026-08-05T03:00:00Z"));
+  assert.equal(j.ateMs, null);
+
+  assert.equal(dentroDoPeriodo("2026-08-05T03:00:00Z", j), true);  // o 7º dia entra
+  assert.equal(dentroDoPeriodo("2026-08-04T23:00:00Z", j), false); // o 8º não
+});
+
+test("janelaPeriodo — o limite de cima fica ABERTO (relógio adiantado não some)", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const j = janelaPeriodo("hoje", agora, TZ_CASA);
+  // Aparelho com a hora adiantada carimba mensagem no futuro. Acontece, e a
+  // conversa não pode cair num limbo entre a janela e o amanhã.
+  assert.equal(dentroDoPeriodo("2026-08-11T18:00:00Z", j), true);
+});
+
+test("dentroDoPeriodo — conversa SEM data fica fora de janela datada, e dentro de 'tudo'", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  assert.equal(dentroDoPeriodo(null, janelaPeriodo("7d", agora, TZ_CASA)), false);
+  assert.equal(dentroDoPeriodo(null, janelaPeriodo("tudo", agora, TZ_CASA)), true);
+  assert.equal(dentroDoPeriodo("lixo", janelaPeriodo("7d", agora, TZ_CASA)), false);
+});
+
+// --- item 2: os separadores de dia -----------------------------------------
+
+test("rotuloDia — hoje e ontem têm nome; o resto tem dia da semana", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z"); // terça, 11/08/2026
+  assert.equal(rotuloDia("2026-08-11", agora, TZ_CASA), "Hoje");
+  assert.equal(rotuloDia("2026-08-10", agora, TZ_CASA), "Ontem");
+  assert.equal(rotuloDia("2026-08-08", agora, TZ_CASA), "Sáb 08/08");
+});
+
+test("rotuloDia — ano diferente aparece, porque em 'Tudo' a lista atravessa anos", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  assert.equal(rotuloDia("2025-08-08", agora, TZ_CASA), "Sex 08/08/2025");
+});
+
+test("agruparPorDia — dia mais recente primeiro, ordem preservada dentro do dia", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const itens = [
+    { id: "a", em: "2026-08-11T13:00:00Z" },
+    { id: "b", em: "2026-08-09T13:00:00Z" },
+    { id: "c", em: "2026-08-11T10:00:00Z" },
+  ];
+  const { grupos, semData } = agruparPorDia(itens, (i) => i.em, agora, TZ_CASA);
+
+  assert.deepEqual(grupos.map((g) => g.chave), ["2026-08-11", "2026-08-09"]);
+  assert.equal(grupos[0].rotulo, "Hoje");
+  // A lista já chega ordenada pela sala; reordenar aqui desfaria a fila.
+  assert.deepEqual(grupos[0].itens.map((i) => i.id), ["a", "c"]);
+  assert.equal(semData.length, 0);
+});
+
+test("agruparPorDia — quem não tem data é DEVOLVIDO, nunca engolido", () => {
+  // O pior defeito de tela que existe: não há erro, não há lista vazia, há uma
+  // lista plausível com uma linha a menos.
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const itens = [
+    { id: "a", em: "2026-08-11T13:00:00Z" },
+    { id: "orfa", em: null as string | null },
+  ];
+  const { grupos, semData } = agruparPorDia(itens, (i) => i.em, agora, TZ_CASA);
+  assert.equal(grupos.length, 1);
+  assert.deepEqual(semData.map((i) => i.id), ["orfa"]);
+});
+
+test("separarSala — a fila sai da linha do tempo (o desvio declarado)", () => {
+  // Agrupar por dia é ordenar por dia, e isso enterraria quem espera há três
+  // dias no cabeçalho da sexta-feira — desfazendo a CONVERSAS-02 em silêncio.
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const esperando = conversa({
+    id: "esperando",
+    ultimoPapel: "cliente",
+    ultimaEm: "2026-08-08T09:00:00Z",
+    ultimaFalaClienteEm: "2026-08-08T09:00:00Z",
+  });
+  const respondida = conversa({
+    id: "respondida",
+    ultimoPapel: "prosperito",
+    ultimaEm: "2026-08-11T14:00:00Z",
+  });
+
+  const { fila, resto } = separarSala([respondida, esperando], agora);
+  assert.deepEqual(fila.map((c) => c.id), ["esperando"]);
+  assert.deepEqual(resto.map((c) => c.id), ["respondida"]);
+});
+
+test("separarSala — a fila continua ordenada por espera, não por data", () => {
+  const agora = Date.parse("2026-08-11T15:00:00Z");
+  const h2 = conversa({
+    id: "h2",
+    ultimoPapel: "cliente",
+    ultimaFalaClienteEm: "2026-08-11T13:00:00Z",
+  });
+  const d3 = conversa({
+    id: "d3",
+    ultimoPapel: "cliente",
+    ultimaFalaClienteEm: "2026-08-08T15:00:00Z",
+  });
+  const { fila } = separarSala([h2, d3], agora);
+  assert.deepEqual(fila.map((c) => c.id), ["d3", "h2"]);
+});
+
+// --- item 3: a pastilha nunca repete o título ------------------------------
+
+test("identidadeCard — com nome, o contato é a linha fraca", () => {
+  const r = identidadeCard(conversa({ nome: "Emerson Gomes" }));
+  assert.equal(r.titulo, "Emerson Gomes");
+  assert.equal(r.subtitulo, "+55 19 99756-1909");
+  assert.equal(r.semNome, false);
+});
+
+test("identidadeCard — SEM nome, o telefone sobe e vira o título (sem linha dupla)", () => {
+  // A tela anterior escrevia "Sem nome" como título, o telefone embaixo e AINDA
+  // uma pastilha "sem nome" ao lado: três elementos para dizer duas coisas.
+  const r = identidadeCard(conversa({ nome: null }));
+  assert.equal(r.titulo, "+55 19 99756-1909");
+  assert.equal(r.subtitulo, null);
+  assert.equal(r.semNome, true);
+  assert.equal(r.tituloEhContato, true);
+});
+
+test("identidadeCard — sem nome E sem contato, o título diz o fato", () => {
+  const r = identidadeCard(conversa({ nome: null, telefone: null }));
+  assert.equal(r.titulo, "Sem contato");
+  assert.equal(r.subtitulo, null);
+  assert.equal(r.tituloEhContato, false);
+});
+
+test("identidadeCard — no Instagram o título é o ID, não um telefone inventado", () => {
+  const r = identidadeCard(
+    conversa({ nome: null, canal: "instagram", telefone: "1310819618770667" })
+  );
+  assert.equal(r.titulo, "ID 1310819618770667");
+  assert.ok(!r.titulo.includes("+55"));
+});
+
+// --- item 4: a prévia curta demais -----------------------------------------
+
+test("resumirConversa — guarda a pergunta que a fala do cliente responde", () => {
+  const r = resumirConversa([
+    { papel: "prosperito", conteudo: "Quantas parcelas restam?", criado_em: "2026-08-11T12:00:00Z" },
+    { papel: "cliente", conteudo: "2", criado_em: "2026-08-11T12:01:00Z" },
+  ]);
+  assert.equal(r.ultimaPerguntaBot, "Quantas parcelas restam?");
+  assert.equal(r.ultimaFalaCliente, "2");
+});
+
+test("resumirConversa — fala do bot DEPOIS da resposta não vira a pergunta", () => {
+  // A pergunta é a que veio ANTES. Pegar a última fala do bot faria a prévia
+  // ler "Vou verificar · 2", que inverte a conversa.
+  const r = resumirConversa([
+    { papel: "prosperito", conteudo: "Quantas parcelas restam?", criado_em: "2026-08-11T12:00:00Z" },
+    { papel: "cliente", conteudo: "2", criado_em: "2026-08-11T12:01:00Z" },
+    { papel: "prosperito", conteudo: "Vou verificar.", criado_em: "2026-08-11T12:02:00Z" },
+  ]);
+  assert.equal(r.ultimaPerguntaBot, "Quantas parcelas restam?");
+});
+
+test("resumirConversa — 'sistema' não é pergunta (é a nota de handoff)", () => {
+  // Exibi-la faria a prévia ler "Emerson assumiu · 2", que não quer dizer nada.
+  const r = resumirConversa([
+    { papel: "sistema", conteudo: "Conversa assumida por Emerson.", criado_em: "2026-08-11T12:00:00Z" },
+    { papel: "cliente", conteudo: "2", criado_em: "2026-08-11T12:01:00Z" },
+  ]);
+  assert.equal(r.ultimaPerguntaBot, null);
+});
+
+test("resumirConversa — cliente que ABRE a conversa não responde pergunta nenhuma", () => {
+  const r = resumirConversa([
+    { papel: "cliente", conteudo: "oi", criado_em: "2026-08-11T12:00:00Z" },
+  ]);
+  assert.equal(r.ultimaPerguntaBot, null);
+});
+
+test("previaComContexto — resposta curta ganha a pergunta ao lado", () => {
+  const p = previaComContexto("2", "Quantas parcelas restam?")!;
+  assert.equal(p.resposta, "2");
+  assert.equal(p.pergunta, "Quantas parcelas restam?");
+});
+
+test("previaComContexto — resposta que se explica sozinha NÃO repete a pergunta", () => {
+  // Pôr a pergunta em toda prévia dobraria a lista para repetir o que o bot já
+  // disse 27 vezes.
+  const p = previaComContexto(
+    "quero vender minha cota da Porto",
+    "Como posso ajudar?"
+  )!;
+  assert.equal(p.pergunta, null);
+  assert.equal(p.resposta, "quero vender minha cota da Porto");
+});
+
+test("previaComContexto — resposta curta SEM pergunta anterior não inventa contexto", () => {
+  const p = previaComContexto("2", null)!;
+  assert.equal(p.pergunta, null);
+  assert.equal(p.resposta, "2");
+});
+
+test("previaComContexto — cliente que nunca falou é null, não linha vazia", () => {
+  // A tela escreve "aguardando o cliente", que é outra coisa.
+  assert.equal(previaComContexto(null, "Olá!"), null);
+  assert.equal(previaComContexto("   ", "Olá!"), null);
+});
+
+test("previaComContexto — a pergunta é contexto, então tem teto próprio", () => {
+  const p = previaComContexto("sim", "a".repeat(200))!;
+  assert.equal(p.pergunta, "a".repeat(60) + "…");
+  assert.equal(p.resposta, "sim");
 });
