@@ -1,7 +1,7 @@
 // ============================================================================
 // Teste do núcleo de ofertas (FIDC-OFERTAS-01)
 // ----------------------------------------------------------------------------
-// Quatro grupos, em ordem de quanto dói errar.
+// Cinco grupos, em ordem de quanto dói errar.
 //
 // 1. LÉXICO. Medi em 12/08/2026 que "fidc" é palavra PROIBIDA em
 //    lib/lexico.ts — mecânica interna, nunca verbalizar. Este módulo produz
@@ -19,13 +19,19 @@
 //
 // 4. NOMES. O kill-switch precisa nascer desarmado e continuar se chamando o
 //    que a ordem disse que ele se chama.
+//
+// 5. COMISSÃO DA CASA. O percentual, o nome do modelo que vai para o banco e —
+//    desde 15/08/2026 — a INCIDÊNCIA: por cima da oferta, com o cedente
+//    recebendo o valor cheio. Este grupo já mudou de resposta uma vez; ele
+//    existe para que a próxima mudança seja deliberada.
 // ============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { garantirLexico, TERMOS_PROIBIDOS } from "@/lib/lexico";
 import {
-  COMISSAO_FUNDO_INCIDENCIA_DECIDIDA,
+  COMISSAO_FUNDO_BASE,
+  COMISSAO_FUNDO_INCIDENCIA,
   COMISSAO_FUNDO_PCT,
   ENV_KILL_SWITCH,
   JANELA_OFERTA_HORAS,
@@ -296,19 +302,37 @@ test("kill-switch: nome exato da ordem, e nasce desarmado", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. COMISSAO DA CASA (decisao de Emerson, 13/08/2026)
+// 5. COMISSAO DA CASA
+//    Decisao de Emerson em 13/08/2026 (3,5%), SUBSTITUIDA pela DECISAO 2 de
+//    15/08/2026: 7% do credito, pagos pelo fundo, por cima da oferta. Os
+//    testes abaixo prendem o numero NOVO; o porque da virada esta no cabecalho
+//    de lib/fidc-ofertas.ts, com as duas datas.
 // ---------------------------------------------------------------------------
 
-test("comissao: 3,5% do credito, e metade dos 7% do caminho da vitrine", () => {
-  assert.equal(COMISSAO_FUNDO_PCT, 3.5);
-  // A proporcao e o argumento da decisao, entao fica fixada: os 7% do
-  // marketplace de contempladas vivem em analista-grupos/route.ts como
-  // `credito * 0.07`. Se um dia alguem mexer no 3,5 sem mexer no 7, este
-  // teste cai e a conversa acontece antes do commit, nao depois da fatura.
-  assert.equal(COMISSAO_FUNDO_PCT * 2, 7);
+test("comissao: 7% do credito — o MESMO numero do caminho da vitrine", () => {
+  assert.equal(COMISSAO_FUNDO_PCT, 7);
+  // Este e o argumento da decisao de 15/08, e por isso fica preso aqui: existe
+  // UM SO preco do lado do comprador. Os 7% do marketplace de contempladas
+  // vivem em analista-grupos/route.ts como `credito * 0.07` e em
+  // playcontempladas-source.ts como MARGEM_CREDITO. Se um dia alguem mexer
+  // num sem mexer no outro, a conversa acontece antes do commit, nao depois
+  // da fatura.
+  assert.equal(COMISSAO_FUNDO_PCT / 100, 0.07);
 
-  assert.equal(comissaoFundo(100_000), 3_500);
-  assert.equal(comissaoFundo(428_036_434.53), 14_981_275.21);
+  assert.equal(comissaoFundo(100_000), 7_000);
+  assert.equal(comissaoFundo(428_036_434.53), 29_962_550.42);
+});
+
+test("comissao: o NOME do modelo carrega o numero do modelo", () => {
+  // `comissao_base` viaja para o banco ao lado de `comissao_valor` para que
+  // uma oferta antiga possa ser auditada sob um modelo que ja mudou. Um nome
+  // que sobrevive a troca do percentual e pior que nome nenhum: ele afirma um
+  // modelo que nao foi o aplicado. Entao o par fica preso.
+  assert.equal(COMISSAO_FUNDO_BASE, "credito_7pct");
+  assert.ok(
+    COMISSAO_FUNDO_BASE.includes(String(COMISSAO_FUNDO_PCT)),
+    "trocou o percentual? troque o nome do modelo junto"
+  );
 });
 
 test("comissao: sem base utilizavel devolve null, nunca zero", () => {
@@ -322,42 +346,99 @@ test("comissao: nao varia com o percentual ofertado", () => {
   // A comissao e sobre o CREDITO, nao sobre a oferta. No piso e no teto ela e
   // o mesmo numero — e e por isso que `comissaoFundo` nao aceita `pct`.
   const credito = 250_000;
-  assert.equal(comissaoFundo(credito), 8_750);
+  assert.equal(comissaoFundo(credito), 17_500);
   assert.notEqual(valorOfertado(credito, OFERTA_PISO_PCT), valorOfertado(credito, OFERTA_TETO_PCT));
 });
 
-test("comissao: pesa 17,5% da oferta no piso e 10% no teto", () => {
+test("comissao: pesa 35% da oferta no piso e 20% no teto", () => {
   // A nota de proporcao do cabecalho, fixada. Como comissao e oferta dividem a
-  // mesma base, a razao e 3,5/pct e independe do valor do credito: quanto mais
+  // mesma base, a razao e 7/pct e independe do valor do credito: quanto mais
   // barato o fundo compra, mais pesada ela fica sobre o dinheiro que anda.
   // A tolerancia e 1e-6, e nao zero, porque as duas pontas sao arredondadas a
-  // centavo ANTES da divisao. Em 517.333,31 a comissao vai de 18.106,66585 para
-  // 18.106,67 e a razao sai de 0,175 por ~4,3e-8. Conferido na mao: a primeira
-  // versao deste teste usava 1e-9 e reprovava a aritmetica correta.
+  // centavo ANTES da divisao. Conferido na mao quando a constante era 3,5: a
+  // primeira versao deste teste usava 1e-9 e reprovava a aritmetica correta.
   for (const credito of [100_000, 517_333.31, 2_000_000]) {
     const c = comissaoFundo(credito)!;
     const noPiso = valorOfertado(credito, OFERTA_PISO_PCT)!;
     const noTeto = valorOfertado(credito, OFERTA_TETO_PCT)!;
-    assert.ok(Math.abs(c / noPiso - 0.175) < 1e-6, `piso, credito ${credito}`);
-    assert.ok(Math.abs(c / noTeto - 0.10) < 1e-6, `teto, credito ${credito}`);
+    assert.ok(Math.abs(c / noPiso - 0.35) < 1e-6, `piso, credito ${credito}`);
+    assert.ok(Math.abs(c / noTeto - 0.20) < 1e-6, `teto, credito ${credito}`);
   }
 });
 
-test("lote: NAO soma nem subtrai comissao enquanto a incidencia nao for decidida", () => {
-  // O total e o numero que o fundo aprova na tela. Ate Emerson dizer se a
-  // comissao sai do meio ou entra por cima, somar ou subtrair aqui seria
-  // exibir um valor que a ordem nao autoriza. Este teste existe para que a
-  // mudanca, quando vier, seja deliberada — e nao apareca de carona.
-  assert.equal(COMISSAO_FUNDO_INCIDENCIA_DECIDIDA, false);
+test("INCIDENCIA: a comissao entra POR CIMA e o cedente recebe a oferta CHEIA", () => {
+  // ESTE E O TESTE DA DECISAO 2. Os numeros sao os do proprio Emerson, em
+  // 15/08/2026: "oferta 20% do credito R$ 40.000 + comissao Bidcon 7% do
+  // credito R$ 14.000 = desembolso R$ 54.000 (27% do credito)".
+  //
+  // Se algum dia alguem fizer a comissao sair do meio — o cedente recebendo
+  // R$ 26.000 em vez de R$ 40.000 —, ESTE TESTE CAI. E o piso de 20% existe
+  // exatamente para ser o que quem vende recebe.
+  assert.equal(COMISSAO_FUNDO_INCIDENCIA, "por_cima_da_oferta");
 
-  const lote = montarLote(
-    [
-      { id: "a", valorCredito: 100_000 },
-      { id: "b", valorCredito: 200_000 },
-    ],
-    OFERTA_PISO_PCT,
+  const lote = montarLote([{ id: "a", valorCredito: 200_000 }], OFERTA_PISO_PCT);
+  const i = lote.itens[0];
+
+  assert.equal(i.valorOfertado, 40_000, "o cedente recebe os 20% CHEIOS");
+  assert.equal(i.comissao, 14_000, "7% do credito, do fundo para a casa");
+  assert.equal(i.desembolso, 54_000, "o fundo paga oferta + comissao");
+  assert.equal(
+    i.desembolso / i.valorCredito,
+    0.27,
+    "27% do credito — e nao 20%, e nao 13%"
   );
-  assert.equal(lote.total, 60_000, "20% de 300.000, sem comissao embutida");
-  assert.equal(lote.itens[0].valorOfertado, 20_000);
-  assert.equal(lote.itens[1].valorOfertado, 40_000);
+
+  // A faixa 20–35 governa a OFERTA, nao o desembolso: 27% passar de 20 nao e
+  // violacao nenhuma, porque o que a constraint mede e `oferta_pct_credito`.
+  assert.equal(lote.recusa, null);
+
+  // E os tres totais do lote fecham com os tres numeros do item.
+  assert.equal(lote.total, 40_000, "total = o que os cedentes recebem");
+  assert.equal(lote.totalComissao, 14_000);
+  assert.equal(lote.totalDesembolso, 54_000);
+});
+
+test("INCIDENCIA: no teto o fundo desembolsa 42% do credito, e isso e legitimo", () => {
+  // A objecao que a leitura (B) carregava em 13/08 — "38,5% nao esta entre 20
+  // e 35" — morreu com a frase de 15/08: a constraint governa a OFERTA. Aqui
+  // o desembolso e 42% e o lote sai inteiro, de proposito.
+  const lote = montarLote([{ id: "a", valorCredito: 100_000 }], OFERTA_TETO_PCT);
+  assert.equal(lote.recusa, null);
+  assert.equal(lote.total, 35_000);
+  assert.equal(lote.totalComissao, 7_000);
+  assert.equal(lote.totalDesembolso, 42_000);
+});
+
+test("lote: os tres totais sao somas de itens JA arredondados", () => {
+  // Mesma invariante do total da oferta, agora nas tres colunas. Um desembolso
+  // calculado por fora (credito * 27/100) poderia diferir em centavos da conta
+  // decomposta que a tela mostra — e e a conta decomposta que a pessoa confere.
+  const cartas = [
+    { id: "a", valorCredito: 33.33 },
+    { id: "b", valorCredito: 66.67 },
+    { id: "c", valorCredito: 517_333.31 },
+  ];
+  const lote = montarLote(cartas, OFERTA_PISO_PCT);
+
+  const cent = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  assert.equal(lote.total, cent(lote.itens.reduce((s, i) => s + i.valorOfertado, 0)));
+  assert.equal(lote.totalComissao, cent(lote.itens.reduce((s, i) => s + i.comissao, 0)));
+  assert.equal(
+    lote.totalDesembolso,
+    cent(lote.itens.reduce((s, i) => s + i.desembolso, 0))
+  );
+  for (const i of lote.itens) {
+    assert.equal(i.desembolso, cent(i.valorOfertado + i.comissao));
+  }
+});
+
+test("lote: percentual recusado zera os TRES totais, nao so o da oferta", () => {
+  // O caminho da recusa devolve um objeto montado a mao. Quando os totais
+  // viraram tres, era exatamente ali que um deles ficaria de fora e a tela
+  // mostraria desembolso de lote nenhum.
+  const lote = montarLote([{ id: "a", valorCredito: 100_000 }], 18);
+  assert.ok(typeof lote.recusa === "string");
+  assert.equal(lote.total, 0);
+  assert.equal(lote.totalComissao, 0);
+  assert.equal(lote.totalDesembolso, 0);
 });

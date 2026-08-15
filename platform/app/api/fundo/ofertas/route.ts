@@ -25,17 +25,26 @@
 // consegue conferir depois.
 //
 // ----------------------------------------------------------------------------
-// DUAS DECISÕES QUE DECLARO, porque nenhuma das duas está na ordem.
+// A COMISSÃO, QUE ATÉ 15/08/2026 FICAVA NULA AQUI. A decisão ② chegou e fechou:
+// 7% do valor do crédito, pagos PELO FUNDO, SOMADOS POR CIMA da oferta — o
+// mesmo modelo do caminho da vitrine. O porquê da virada está inteiro em
+// `lib/fidc-ofertas.ts`, junto da constante; não se repete aqui para não haver
+// duas versões da mesma razão.
 //
-// (a) `comissao_base` e `comissao_valor` ficam NULAS.
-//     A decisão ② (Modelo B — 10% do ágio, piso R$ 2.500? percentual próprio?
-//     quem paga?) continua com o Emerson, e as colunas nasceram anuláveis na
-//     0078 exatamente por isso. Gravar zero seria pior que gravar nada: zero é
-//     um número e passa por regra decidida. Nulo é a verdade — "ainda não há
-//     regra" — e o dia em que houver, um UPDATE preenche o histórico sem
-//     precisar distinguir "comissão zero" de "comissão não definida".
+// O que muda NESTA rota é uma coisa só, e é a palavra do Emerson: "gravado como
+// FOTOGRAFIA no envio da oferta (nunca recalculado na leitura)". Por isso
+// `comissao_base` recebe o NOME do modelo (`credito_7pct`) e não o número: quem
+// ler esta linha em 2028, com o percentual da casa já em outro valor, precisa
+// saber qual regra foi aplicada NAQUELE dia — e o nome carrega o número.
 //
-// (b) O teto de cartas por oferta é `TETO_TELA` (500).
+// Nenhuma migração acompanha isto. A 0078 nasceu com as duas colunas `text` e
+// `numeric` sem CHECK de valor, e o cabeçalho dela já dizia por quê: as colunas
+// guardam o RESULTADO, o modelo é código.
+//
+// ----------------------------------------------------------------------------
+// UMA DECISÃO QUE DECLARO, porque não está na ordem.
+//
+// O teto de cartas por oferta é `TETO_TELA` (500).
 //     Não é limite de ordem; é coerência: o painel só consegue MOSTRAR 500, e
 //     ninguém pode ofertar às cegas no que não viu. O filtro que gerou a
 //     seleção fica gravado em `filtro_lote`, então "o que ele estava vendo?"
@@ -53,6 +62,7 @@
 import { NextResponse } from "next/server";
 import { checarFundoApi } from "@/lib/fidc-fundos";
 import {
+  COMISSAO_FUNDO_BASE,
   PALAVRA_OFERTAR,
   expiraEm,
   montarLote,
@@ -210,11 +220,19 @@ export async function POST(req: Request) {
         (corpo.filtro ?? {}) as Record<string, string | string[] | undefined>
       ),
       oferta_pct_credito: pct,
+      // O QUE OS CEDENTES RECEBEM, somado. Não é o custo do fundo — o custo é
+      // este mais a comissão, e quem quiser o custo soma as duas colunas que
+      // estão aqui do lado. Guardar o desembolso numa terceira coluna seria
+      // gravar um fato derivável e criar a chance de os três divergirem.
       valor_total_calculado: lote.total,
+      // A FOTOGRAFIA. O nome do modelo e o valor que ele produziu HOJE, para
+      // que a leitura de amanhã não precise recalcular nada — e não recalcule
+      // com uma regra que ainda não existia quando esta oferta foi enviada.
+      comissao_base: COMISSAO_FUNDO_BASE,
+      comissao_valor: lote.totalComissao,
       expira_em: expira.toISOString(),
       criado_em: agora.toISOString(),
       criado_por_email: acesso.email,
-      // comissao_base / comissao_valor: nulos de propósito — decisão ② aberta.
     })
     .select("id")
     .single();
@@ -261,7 +279,13 @@ export async function POST(req: Request) {
     ok: true,
     ofertaId: criada.id,
     cartas: lote.itens.length,
+    // OS TRÊS NÚMEROS, e não o desembolso sozinho. A tela mostra a conta
+    // decomposta porque é a conta que o fundo vai refazer de qualquer jeito;
+    // mandar só o total somado obrigaria o cliente a redividir o que o servidor
+    // já dividiu — e a primeira divisão errada erraria em silêncio.
     total: lote.total,
+    comissao: lote.totalComissao,
+    desembolso: lote.totalDesembolso,
     expiraEm: expira.toISOString(),
     // As duas listas do que ficou de fora, separadas porque as causas são
     // diferentes e a tela precisa dizer coisas diferentes.

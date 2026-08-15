@@ -21,6 +21,7 @@
 // ============================================================================
 import { useMemo, useState } from "react";
 import {
+  COMISSAO_FUNDO_PCT,
   OFERTA_PISO_PCT,
   OFERTA_TETO_PCT,
   PALAVRA_OFERTAR,
@@ -55,7 +56,12 @@ type Resposta = {
   ok?: true;
   ofertaId?: string;
   cartas?: number;
+  /** O que os cedentes recebem, somado. NÃO é o custo do fundo. */
   total?: number;
+  /** A comissão da casa, somada. */
+  comissao?: number;
+  /** O que o fundo desembolsa: `total + comissao`. */
+  desembolso?: number;
   expiraEm?: string;
   indisponiveis?: string[];
   descartadas?: { cartaId: string; motivo: string }[];
@@ -198,9 +204,15 @@ export function PainelFundo({
               </div>
             </div>
 
-            {/* O RESUMO. Três números e nada mais: quantas, quanto de crédito,
-                quanto o fundo paga. Nenhum deles é "desconto" ou "deságio" — a
-                conta é quanto se PAGA do crédito, e a frase acompanha a conta. */}
+            {/* O RESUMO, COM A CONTA ABERTA. Decisão ② de 15/08/2026, na letra
+                do Emerson: "somar sem mostrar seria esconder o que o fundo vai
+                perguntar de qualquer jeito". Então as três parcelas aparecem
+                separadas — o que o cedente recebe, o que a casa cobra, o que o
+                fundo desembolsa —, e é o desembolso que ganha o destaque, porque
+                é o número que sai da conta dele.
+
+                Nenhum destes é "desconto" ou "deságio": a conta é quanto se PAGA
+                do crédito, e a frase acompanha a conta. */}
             <div className={styles.resumo}>
               <div>
                 <span className={styles.resumoRotulo}>Cartas selecionadas</span>
@@ -216,11 +228,43 @@ export function PainelFundo({
               </div>
               <div>
                 <span className={styles.resumoRotulo}>
-                  O fundo paga ({pctBR(Number.isFinite(pct) ? pct : null)} do crédito)
+                  O cedente recebe ({pctBR(Number.isFinite(pct) ? pct : null)} do
+                  crédito)
                 </span>
-                <strong className={styles.resumoTotal}>{brl(previa.total)}</strong>
+                <strong>{brl(previa.total)}</strong>
+              </div>
+              <div>
+                <span className={styles.resumoRotulo}>
+                  Comissão Bidcon ({pctBR(COMISSAO_FUNDO_PCT)} do crédito)
+                </span>
+                <strong>{brl(previa.totalComissao)}</strong>
+              </div>
+              <div>
+                <span className={styles.resumoRotulo}>
+                  {/* O percentual do desembolso é `pct + 7`, e não
+                      desembolso ÷ crédito. Os dois dão o mesmo número, mas o
+                      primeiro é exato por construção (as duas parcelas incidem
+                      sobre a MESMA base) e não divide por zero quando não há
+                      carta selecionada. */}
+                  O fundo desembolsa (
+                  {pctBR(
+                    Number.isFinite(pct) ? pct + COMISSAO_FUNDO_PCT : null
+                  )}{" "}
+                  do crédito)
+                </span>
+                <strong className={styles.resumoTotal}>
+                  {brl(previa.totalDesembolso)}
+                </strong>
               </div>
             </div>
+
+            {previa.itens.length > 0 && previa.recusa === null && (
+              <p className={styles.aviso}>
+                A comissão da Bidcon entra POR CIMA da oferta: quem vende recebe{" "}
+                <strong>{brl(previa.total)}</strong> cheios, sem nada descontado
+                no meio.
+              </p>
+            )}
 
             {previa.recusa && (
               <p className={styles.erro} role="alert">
@@ -267,11 +311,16 @@ export function PainelFundo({
                 disabled={!podeEnviar}
                 onClick={enviar}
               >
+                {/* O RÓTULO CARREGA OS DOIS NÚMEROS. Este botão é a última
+                    coisa lida antes do clique irreversível, e os dois números
+                    respondem perguntas diferentes: quanto se oferta (o que
+                    prende a faixa de 20–35%) e quanto sai do caixa. Nomear só o
+                    primeiro faria a pessoa aprovar um valor e pagar outro. */}
                 {enviando
                   ? "Enviando…"
                   : `Ofertar ${brl(previa.total)} em ${previa.itens.length} ${
                       previa.itens.length === 1 ? "carta" : "cartas"
-                    }`}
+                    } · desembolso ${brl(previa.totalDesembolso)}`}
               </button>
             </div>
 
@@ -285,9 +334,19 @@ export function PainelFundo({
               <div className={styles.sucesso} role="status">
                 <p>
                   Oferta registrada: <strong>{resposta.cartas}</strong>{" "}
-                  {resposta.cartas === 1 ? "carta" : "cartas"} ·{" "}
-                  <strong>{brl(resposta.total ?? 0)}</strong>. Vale até{" "}
+                  {resposta.cartas === 1 ? "carta" : "cartas"}. Vale até{" "}
                   {dataHoraAnoBR(resposta.expiraEm)}.
+                </p>
+                {/* A MESMA CONTA DA PRÉVIA, agora com os números que o SERVIDOR
+                    apurou — que podem ser menores, se alguma carta saiu da
+                    vitrine entre a tela e o clique. Repetir a decomposição aqui
+                    é o que permite conferir; mostrar só o total somado deixaria
+                    a diferença invisível justamente onde ela importa. */}
+                <p>
+                  Cedentes recebem <strong>{brl(resposta.total ?? 0)}</strong> +
+                  comissão Bidcon <strong>{brl(resposta.comissao ?? 0)}</strong>{" "}
+                  = desembolso{" "}
+                  <strong>{brl(resposta.desembolso ?? 0)}</strong>.
                 </p>
                 {resposta.indisponiveis && resposta.indisponiveis.length > 0 && (
                   <p className={styles.aviso}>

@@ -206,9 +206,35 @@ export function valorOfertado(
 }
 
 /**
- * A COMISSÃO DA BIDCON no caminho do fundo. Emerson, 13/08/2026:
- * "comissao 3,5% do credito quando fundo faz e coloca na platforma mantem os 7".
+ * A COMISSÃO DA BIDCON no caminho do fundo: 7% DO VALOR DO CRÉDITO, pagos PELO
+ * FUNDO, SOMADOS POR CIMA da oferta.
  *
+ * ============================================================================
+ * ESTA CONSTANTE JÁ VALEU 3,5. O HISTÓRICO FICA AQUI — não some.
+ * ============================================================================
+ * 13/08/2026 — Emerson: "comissao 3,5% do credito quando fundo faz e coloca na
+ *   platforma mantem os 7". Gravado no commit `5e72373`. O raciocínio era por
+ *   ESFORÇO: o fundo compra em lote, a casa trabalha menos por carta, logo
+ *   metade.
+ *
+ * 15/08/2026 — Emerson, DECISÃO ②, que SUBSTITUI a de 13/08: "a comissão da
+ *   Bidcon no fluxo do fundo é 7% DO VALOR DO CRÉDITO da carta, paga PELO
+ *   FUNDO, somada por cima da oferta. Mesma regra da vitrine — um só modelo de
+ *   comissão do lado do comprador, seja ele pessoa ou fundo." O raciocínio é
+ *   por MODELO: existe UM SÓ PREÇO do lado do comprador.
+ *
+ * POR QUE O SEGUNDO PREVALECEU, por uma razão que este código já ensina em
+ * outros lugares: DUAS COMISSÕES PARA O MESMO LADO DA MESA DIVERGEM NA
+ * PRIMEIRA EDIÇÃO DE UMA SÓ. É o mesmo defeito dos dois leitores, aplicado a
+ * dinheiro — alguém corrige o percentual da vitrine, não corrige o do fundo, e
+ * a casa passa a cobrar dois preços sem que ninguém tenha decidido cobrar dois
+ * preços.
+ *
+ * E O ARGUMENTO DE 13/08 CONTINUA VERDADEIRO — só não conclui o que concluía.
+ * A Bidcon de fato não põe capital de aquisição nenhum, e isso justifica a
+ * Bidcon NÃO COMPRAR CARTA. Não justifica cobrar menos de quem compra.
+ *
+ * ----------------------------------------------------------------------------
  * BASE: o VALOR DO CRÉDITO — a mesma base da oferta, e a mesma base dos 7% do
  * caminho da vitrine. Três números sobre uma base só é o que torna a decisão
  * conferível de cabeça.
@@ -221,55 +247,70 @@ export function valorOfertado(
  *   - `lib/playcontempladas-source.ts:44` → `MARGEM_CREDITO = 0.07`, somado à
  *     entrada crua do parceiro antes de exibir.
  *   NÃO é o fee de `lib/reserve/fee-plan.ts` (10% contemplada / 6% cancelada,
- *   piso R$ 2.500) — aquele incide sobre o ÁGIO e é outro fluxo. Os dois
- *   coexistem hoje e continuam coexistindo; esta constante não toca neles.
+ *   piso R$ 2.500) — aquele é o Modelo B, incide sobre o ÁGIO e é outro fluxo.
+ *   Os dois coexistem hoje e continuam coexistindo; esta constante não toca
+ *   neles. O caminho do fundo é MODELO A, o mesmo da vitrine.
  *
  * Quem paga os 7% é o COMPRADOR, por cima da entrada. Aqui, quem compra é o
- * fundo — e é justamente aí que mora a pergunta ainda em aberto, abaixo.
- *
- * PROPORÇÃO: 3,5 é metade de 7, sobre a mesma base. Por carta, o caminho do
- * fundo rende à casa exatamente metade do caminho da vitrine. Coerente com o
- * que a ordem já dizia — o fundo compra em lote e a Bidcon não põe capital de
- * aquisição nenhum.
+ * fundo — e é exatamente por isso que o número é o mesmo.
  */
-export const COMISSAO_FUNDO_PCT = 3.5;
+export const COMISSAO_FUNDO_PCT = 7;
+
+/**
+ * O NOME DO MODELO que produziu a comissão, gravado em `fidc_ofertas.
+ * comissao_base` junto do valor. Guardar o nome ao lado do número é o que
+ * permite auditar uma oferta antiga sob um modelo que já mudou — e este
+ * arquivo acaba de provar que modelo muda.
+ *
+ * SE O PERCENTUAL MUDAR, ESTE NOME MUDA JUNTO. Há teste prendendo o par: o
+ * nome tem de conter o número. Um nome que sobrevive à troca do percentual é
+ * pior que nome nenhum — ele afirma, com todas as letras, um modelo que não
+ * foi o aplicado.
+ */
+export const COMISSAO_FUNDO_BASE = "credito_7pct";
 
 /**
  * ============================================================================
- * EM ABERTO — DE QUEM SAI A COMISSÃO. NÃO DECIDIDO EM 13/08/2026.
+ * A INCIDÊNCIA — DECIDIDA EM 15/08/2026. A COMISSÃO ENTRA POR CIMA.
  * ============================================================================
- * A ordem fixou o percentual e a base. Não disse a INCIDÊNCIA, e as duas
- * leituras possíveis brigam com a emenda dos 20–35%. Em crédito de R$ 100.000
- * com oferta no piso de 20% (R$ 20.000) e comissão de R$ 3.500:
+ * Em 13/08 esta pergunta estava aberta neste mesmo lugar, com duas leituras:
+ * (A) a comissão sai do meio e o cedente recebe menos que o piso; (B) a
+ * comissão entra por cima e o fundo desembolsa mais que o teto. A DECISÃO ②
+ * escolheu (B), com todas as letras:
  *
- *   (A) sai do meio — o cedente recebe R$ 16.500.
- *       O fundo desembolsa os 20% combinados, mas quem vende recebe 16,5% do
- *       crédito. O piso de 20% deixa de ser piso PARA QUEM VENDE, e é para
- *       quem vende que a tela promete o número.
+ *   "O CEDENTE RECEBE A OFERTA CHEIA. A comissão não sai do meio. O piso de
+ *    20% continua sendo o que o cedente recebe — que é a razão de ele existir."
  *
- *   (B) entra por cima — o fundo desembolsa R$ 23.500.
- *       O cedente recebe os 20% inteiros, mas o custo real do fundo vira 23,5%
- *       do crédito; no teto, 38,5%. A emenda diz "SEMPRE entre 20% e 35% DO
- *       VALOR DO CRÉDITO", e 38,5% não está entre 20 e 35.
+ * E resolveu, junto, a objeção que a leitura (B) carregava — o desembolso
+ * passar de 35%:
  *
- * Nenhuma das duas preserva ao mesmo tempo o piso como "o que o cedente
- * recebe" e o teto como "o que o fundo paga". É decisão de negócio, não de
- * engenharia, e chutar aqui seria inventar dinheiro de terceiro.
+ *   "A constraint de 20–35% continua governando a OFERTA, não o desembolso."
  *
- * POR ISSO `montarLote` NÃO SOMA NEM SUBTRAI COMISSÃO. O total que ele devolve
- * é o que a emenda define: a soma de `valor_credito × pct/100`. Enquanto a
- * incidência não for decidida, um total "com comissão" seria um número que a
- * ordem não autoriza — e é o número que o fundo aprova na tela.
+ * Ou seja: a faixa 20–35 nunca foi sobre o custo do fundo. É sobre o que quem
+ * vende recebe. O CHECK `fidc_ofertas_faixa_20_35_do_credito` incide sobre
+ * `oferta_pct_credito` e continua correto sem uma linha de migração.
  *
- * Nota de proporção, para a decisão: como comissão e oferta dividem a mesma
- * base, a comissão vale `3,5/pct` da oferta — 17,5% dela no piso de 20% e 10%
- * dela no teto de 35%. Quanto mais barato o fundo compra, mais pesada ela é
- * sobre o dinheiro que muda de mão.
+ * A CONTA, com os números do próprio Emerson:
+ *
+ *   crédito              R$ 200.000,00
+ *   oferta   20%   →     R$  40.000,00   ← o cedente recebe ISTO, cheio
+ *   comissão  7%   →     R$  14.000,00   ← do fundo para a Bidcon, por cima
+ *   ────────────────────────────────────
+ *   desembolso     →     R$  54.000,00   = 27% do crédito
+ *
+ * No teto, 35% + 7% = 42% do crédito. É o custo do fundo, e ele é MOSTRADO na
+ * tela, decomposto — "somar sem mostrar seria esconder o que o fundo vai
+ * perguntar de qualquer jeito".
+ *
+ * PROPORÇÃO, para quem for ler um lote: como comissão e oferta dividem a mesma
+ * base, a comissão vale `7/pct` da oferta — 35% dela no piso de 20% e 20% dela
+ * no teto de 35%. Quanto mais barato o fundo compra, mais pesada ela é sobre o
+ * dinheiro que muda de mão.
  */
-export const COMISSAO_FUNDO_INCIDENCIA_DECIDIDA = false;
+export const COMISSAO_FUNDO_INCIDENCIA = "por_cima_da_oferta" as const;
 
 /**
- * A comissão da casa por carta: `valorCredito × 3,5/100`.
+ * A comissão da casa por carta: `valorCredito × 7/100`.
  *
  * `null` em crédito não positivo, pelo mesmo motivo de `valorOfertado`: zero é
  * um número e número mente calado. Não recebe `pct` de propósito — a comissão
@@ -284,13 +325,33 @@ export function comissaoFundo(valorCredito: number): number | null {
 export type ItemCalculado = {
   cartaId: string;
   valorCredito: number;
+  /**
+   * O QUE O CEDENTE RECEBE, cheio. A comissão não sai daqui — decisão ② de
+   * 15/08/2026. Este é o número que a tela promete a quem vende, e é sobre ele
+   * que incide a faixa de 20–35%.
+   */
   valorOfertado: number;
+  /** 7% do crédito, do fundo para a Bidcon. Por cima, nunca do meio. */
+  comissao: number;
+  /** O QUE O FUNDO DESEMBOLSA: `valorOfertado + comissao`. */
+  desembolso: number;
 };
 
 export type TotalLote = {
   itens: ItemCalculado[];
-  /** Soma dos itens JÁ arredondados — ver nota abaixo. */
+  /**
+   * Soma das OFERTAS já arredondadas — ver nota abaixo. É o que os cedentes
+   * recebem, somado, e é o que a faixa 20–35 governa.
+   *
+   * NÃO é o custo do fundo. Quem quiser mostrar "quanto isto me custa" tem de
+   * usar `totalDesembolso`, e a tela mostra os três lado a lado exatamente
+   * para que ninguém confunda um com o outro.
+   */
   total: number;
+  /** Soma das comissões já arredondadas. */
+  totalComissao: number;
+  /** Soma dos desembolsos já arredondados — o que o fundo paga. */
+  totalDesembolso: number;
   /** Cartas que ficaram de fora, com o motivo. Nunca somem em silêncio. */
   descartadas: { cartaId: string; motivo: string }[];
   /**
@@ -307,9 +368,15 @@ export type TotalLote = {
 };
 
 /**
- * Monta o lote: valor carta a carta e o total.
+ * Monta o lote: valor carta a carta e os três totais.
  *
- * O total é a soma dos itens JÁ ARREDONDADOS, não o arredondamento da soma.
+ * TRÊS TOTAIS, e não um. A oferta (o que os cedentes recebem), a comissão (o
+ * que a casa cobra do fundo) e o desembolso (o que o fundo paga). Devolver só
+ * a soma das ofertas — como este arquivo fazia enquanto a incidência estava em
+ * aberto — obrigaria cada tela a refazer a conta do custo do fundo por conta
+ * própria, e a primeira que errasse erraria em silêncio.
+ *
+ * Cada total é a soma dos itens JÁ ARREDONDADOS, não o arredondamento da soma.
  * A diferença é de centavos e é exatamente por isso que importa: o total é o
  * número que o fundo aprova, e cada item é o número que um vendedor recebe. Se
  * o total fosse calculado por fora, a soma do que as pessoas recebem não
@@ -329,7 +396,14 @@ export function montarLote(
   // percentual que não vale.
   const veredito = checarPct(pct);
   if (!veredito.ok) {
-    return { itens: [], total: 0, descartadas: [], recusa: veredito.motivo };
+    return {
+      itens: [],
+      total: 0,
+      totalComissao: 0,
+      totalDesembolso: 0,
+      descartadas: [],
+      recusa: veredito.motivo,
+    };
   }
 
   const itens: ItemCalculado[] = [];
@@ -345,16 +419,29 @@ export function montarLote(
       continue;
     }
     const v = valorOfertado(c.valorCredito, pct);
-    if (v === null) {
+    const com = comissaoFundo(c.valorCredito);
+    if (v === null || com === null) {
       // Guarda de cinto e suspensório: com a faixa já conferida e o crédito
       // já positivo, não há caminho conhecido até aqui. Se um dia houver,
       // a carta sai nomeada em vez de virar oferta de valor errado.
       descartadas.push({ cartaId: c.id, motivo: "valor de crédito inválido" });
       continue;
     }
-    itens.push({ cartaId: c.id, valorCredito: c.valorCredito, valorOfertado: v });
+    itens.push({
+      cartaId: c.id,
+      valorCredito: c.valorCredito,
+      valorOfertado: v,
+      comissao: com,
+      // Soma de dois valores JÁ arredondados a centavo — nunca
+      // `centavos(credito * (pct+7)/100)`. Se o desembolso fosse calculado por
+      // fora, ele poderia diferir em um centavo da conta que a tela mostra
+      // decomposta, e seria a conta decomposta que a pessoa conferiria.
+      desembolso: centavos(v + com),
+    });
   }
 
   const total = centavos(itens.reduce((s, i) => s + i.valorOfertado, 0));
-  return { itens, total, descartadas, recusa: null };
+  const totalComissao = centavos(itens.reduce((s, i) => s + i.comissao, 0));
+  const totalDesembolso = centavos(itens.reduce((s, i) => s + i.desembolso, 0));
+  return { itens, total, totalComissao, totalDesembolso, descartadas, recusa: null };
 }
