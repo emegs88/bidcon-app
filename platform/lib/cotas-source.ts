@@ -23,6 +23,15 @@
 //   administradora) passa a ser lido a partir da fatia 0023; mecânica de
 //   margem segue não lida aqui.
 //
+// SYNC-RAW-01 (2026-08-15), MEDIDO CONTRA A FONTE VIVA: o ?admin=1 continua
+//   aceito (HTTP 200 em todos os endpoints), mas `entrada_parceiro` NÃO vem
+//   mais em NENHUMA das 1.332 cotas de /api/cotas-extra. O valor exibido (`e`)
+//   segue correto — 24 de 24 cartas conferidas batem com o que está gravado —,
+//   o que sumiu foi a PROVA, não o dinheiro. Por isso esta lib passa a nomear
+//   os três estados do cru (EstadoRaw) em vez de devolver um null mudo, e a
+//   rota do cron grava o diagnóstico por ciclo. A leitura NÃO é abortada por
+//   ausência de cru: as cartas continuam entrando.
+//
 // As 5 GUARDAS (por fonte; qualquer falha => aquela fonte é PULADA, sem escrever):
 //   1) HTTP != 200            -> aborta a fonte
 //   2) timeout (sem resposta) -> aborta a fonte
@@ -43,6 +52,94 @@ export type FonteMarca =
   | "SERVOPA"
   | "PLAYCONTEMPLADAS";
 
+// ----------------------------------------------------------------------------
+// SYNC-RAW-01 (a): ÚNICO lugar da casa onde mora a regra "esta fonte DEVERIA
+// mandar entrada_parceiro". Quem sincroniza e quem exibe leem daqui — duas
+// listas com o mesmo nome divergem na primeira edição.
+//
+// A regra é o contrato escrito na migration 0015 (linhas 45-47), verbatim:
+//   "entrada_parceiro_raw : valor CRU do parceiro (Opção B), admin-only. NULL
+//    para LANCE (a Lance já embute os 7% na origem — não há valor cru
+//    separado) e para cartas manuais. Preenchido só quando fonte-marca soma
+//    7% (as demais)."
+//
+// É Record (não Partial): FonteMarca nova NÃO COMPILA até alguém decidir se
+// ela manda o cru ou não. A regra não pode ser esquecida por omissão.
+// ----------------------------------------------------------------------------
+export const ESPERA_ENTRADA_PARCEIRO: Readonly<Record<FonteMarca, boolean>> = {
+  // A Lance já embute os 7% na origem: não existe valor cru separado para pedir.
+  LANCE: false,
+  // Somam 7% sobre a entrada crua; o cru viaja em ?admin=1 (contrato 0015).
+  CBC: true,
+  PIFFER: true,
+  CARTAS: true,
+  SERVOPA: true,
+  // Não há camada intermediária: o cru é lido da coluna 4 da tabela HTML e os
+  // 7% são somados aqui dentro (lib/playcontempladas-source.ts). Espera cru
+  // por construção — se faltar, o parse da linha já a descarta.
+  PLAYCONTEMPLADAS: true,
+};
+
+export function esperaEntradaParceiro(origem: FonteMarca): boolean {
+  return ESPERA_ENTRADA_PARCEIRO[origem];
+}
+
+/**
+ * SYNC-RAW-01: os TRÊS estados do valor cru. Antes disto havia um `null` só,
+ * que confundia "a fonte não manda por desenho" com "a fonte deveria mandar e
+ * parou" — e o segundo caso ficava mudo. Nulo calado deixa de existir.
+ *   nulo_por_desenho : fonte que não manda por desenho (LANCE; carta manual).
+ *                      Nulo legítimo e NOMEADO. Não é falha, não alarma.
+ *   recebido         : deveria mandar e mandou.
+ *   ausente          : deveria mandar e NÃO mandou. Contrato quebrado do outro
+ *                      lado — contado e reportado no painel de sync.
+ */
+export type EstadoRaw = "nulo_por_desenho" | "recebido" | "ausente";
+
+/** ÚNICO lugar que classifica o estado. Deriva da regra acima, nunca adivinha. */
+export function estadoDoRaw(origem: FonteMarca, valor: number | null): EstadoRaw {
+  if (!esperaEntradaParceiro(origem)) return "nulo_por_desenho";
+  return valor == null ? "ausente" : "recebido";
+}
+
+/**
+ * SYNC-RAW-01 (b): diagnóstico por fonte por ciclo. Carrega o LITERAL da URL
+ * chamada, com o ?admin=1 visível: sem isso ninguém consegue dizer se o
+ * contrato mudou no prospere-360 ou se fomos nós que paramos de pedir.
+ */
+export type DiagnosticoRaw = {
+  origem: FonteMarca;
+  url: string;        // literal, exatamente como foi chamada
+  admin: boolean;     // o ?admin=1 foi enviado nesta chamada?
+  espera: boolean;    // esta fonte deveria mandar o cru?
+  lidas: number;      // cotas que passaram nas guardas
+  recebidas: number;  // dessas, quantas vieram com o cru
+  faltando: number;   // dessas, quantas deveriam ter vindo e não vieram
+};
+
+/** Conta os três estados sobre as cotas já parseadas. Sem efeito colateral. */
+export function diagnosticarRaw(
+  origem: FonteMarca,
+  url: string,
+  cotas: CotaFonte[]
+): DiagnosticoRaw {
+  let recebidas = 0;
+  let faltando = 0;
+  for (const c of cotas) {
+    if (c.estadoRaw === "recebido") recebidas++;
+    else if (c.estadoRaw === "ausente") faltando++;
+  }
+  return {
+    origem,
+    url,
+    admin: url.includes("admin=1"),
+    espera: esperaEntradaParceiro(origem),
+    lidas: cotas.length,
+    recebidas,
+    faltando,
+  };
+}
+
 export type CotaFonte = {
   numero: number;        // id nativo da fonte (`n` na Lance, `id` nas demais) => numero_externo
   tipo: "imovel" | "veiculo";
@@ -53,11 +150,21 @@ export type CotaFonte = {
   // valor CRU do parceiro (Opção B), só nas fontes externas em ?admin=1.
   // null para LANCE (não há valor cru separado) e quando a fonte não trouxe.
   entradaParceiro: number | null;
+  // SYNC-RAW-01: qual dos três casos o null acima representa. Obrigatório —
+  // é o campo que impede o nulo de voltar a ser mudo.
+  estadoRaw: EstadoRaw;
   // nome da administradora, lido a partir da fatia 0023 (`adm` no envelope).
   administradora: string | null;
 };
 
-export type LeituraOk = { ok: true; origem: FonteMarca; cotas: CotaFonte[] };
+export type LeituraOk = {
+  ok: true;
+  origem: FonteMarca;
+  cotas: CotaFonte[];
+  // SYNC-RAW-01: acompanha toda leitura bem-sucedida; a rota do cron grava
+  // isto como evento por ciclo (eventos_sync).
+  raw: DiagnosticoRaw;
+};
 export type LeituraErro = { ok: false; origem: FonteMarca; motivo: string };
 export type Leitura = LeituraOk | LeituraErro;
 
@@ -165,7 +272,12 @@ function parsearEnvelope(texto: string, origem: FonteMarca): CotaFonte[] | null 
     }
 
     // valor cru do parceiro: só existe em ?admin=1 nas externas; nunca na Lance.
+    // SYNC-RAW-01: o null deixa de ser mudo — estadoDoRaw() separa "não manda
+    // por desenho" de "deveria mandar e não mandou". A leitura NÃO é abortada
+    // por ausência de cru: a carta entra na vitrine do mesmo jeito, e é o
+    // diagnóstico do ciclo que fica visível.
     const entradaParceiro = ehLance ? null : inteiro(r.entrada_parceiro);
+    const estadoRaw = estadoDoRaw(origem, entradaParceiro);
 
     // nome da administradora, lido a partir da fatia 0023 (`adm` no envelope).
     const administradora =
@@ -180,6 +292,7 @@ function parsearEnvelope(texto: string, origem: FonteMarca): CotaFonte[] | null 
       valorParcela,
       qtdParcelas,
       entradaParceiro,
+      estadoRaw,
       administradora,
       // ac / custoEfetivo / idParceiro / dedup: DESCARTADOS (compliance).
     });
@@ -260,7 +373,11 @@ export async function lerCotasFonte(
     }
   }
 
-  return { ok: true, origem, cotas };
+  // SYNC-RAW-01 (b): o diagnóstico viaja junto da leitura boa, com o LITERAL
+  // da `url` que acabou de ser chamada — inclusive o ?admin=1. Quem lê o
+  // evento depois consegue distinguir "o 360 parou de mandar" de "nós
+  // paramos de pedir" sem abrir o código.
+  return { ok: true, origem, cotas, raw: diagnosticarRaw(origem, url, cotas) };
 }
 
 // Ordem de ingestão. LANCE inclusa: passa a ser tratada uniforme (config de
