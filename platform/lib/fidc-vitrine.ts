@@ -42,6 +42,8 @@
 // nove dígitos.
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
+import { custoEfetivoCarta } from "@/lib/custo-efetivo";
+import { MARGEM_TETO_VIEW } from "@/lib/farol/selecao";
 
 /** O recorte que sai daqui. Nenhum campo a mais — ver cabeçalho. */
 export type CartaVitrine = {
@@ -156,7 +158,16 @@ export function normalizarFiltros(
 
 export type ResultadoVitrine = {
   cartas: CartaVitrine[];
-  /** Quantas cartas casaram com o filtro no banco — não quantas vieram. */
+  /**
+   * Quantas cartas casaram com o filtro — não quantas vieram na página.
+   *
+   * Quando `truncado` é falso, este número é EXATO: a página trouxe o conjunto
+   * inteiro, a peneira canônica rodou sobre ele todo, e o que sobrou é a
+   * verdade. Quando `truncado` é verdadeiro, é o total do BANCO, que conta
+   * também as cartas que a peneira canônica ainda derrubaria — ou seja, um
+   * TETO declarado, nunca um número menor do que o real. Preferi errar para
+   * cima e anunciar o corte a prometer exatidão que a consulta não tem.
+   */
   total: number;
   /** `true` quando `total > TETO_TELA`: a tela precisa dizer isso em voz alta. */
   truncado: boolean;
@@ -184,15 +195,93 @@ const CAMPOS =
  */
 
 /**
+ * A COLUNA `custo_am` DA VIEW NÃO DECIDE NADA AQUI. Ela é uma pista barata para
+ * o banco; quem julga é o motor canônico.
+ *
+ * POR QUE, com o número medido. A coluna é gravada pela trigger
+ * `bidcon_price_calcular`, que arredonda DUAS vezes: a função de TIR devolve
+ * `round(r, 6)` e a trigger arredonda de novo em 2 casas. Arredondar duas vezes
+ * cria empates que não existiam — um valor como 0,0117495 sobe para 0,011750
+ * na primeira rodada, e esse empate sobe de novo na segunda. O desvio contra o
+ * cálculo canônico (`custoEfetivoCarta`, bisseção sobre o VP da Price) chega a
+ * 0,005 p.p., e é SEMPRE PARA CIMA. Nunca para baixo.
+ *
+ * Medido em 14/08/2026 sobre as 2.422 cartas da vitrine viva, contra seis tetos
+ * realistas — quantas cartas entrariam SÓ pela coluna, e quantas SÓ pelo
+ * canônico:
+ *
+ *     teto 0,80%   só pela coluna:  2    só pelo canônico: 0
+ *     teto 0,90%   só pela coluna:  7    só pelo canônico: 0
+ *     teto 1,00%   só pela coluna:  5    só pelo canônico: 0
+ *     teto 1,10%   só pela coluna: 10    só pelo canônico: 0
+ *     teto 1,20%   só pela coluna:  6    só pelo canônico: 0
+ *     teto 1,50%   só pela coluna:  3    só pelo canônico: 0
+ *
+ * A coluna zerada na terceira coluna é o achado, e ele INVERTE o diagnóstico
+ * que eu esperava. Filtrar pela coluna não ESCONDE carta barata do fundo: ela
+ * MOSTRA carta cara. Um fundo que pede "custo até 1,00% a.m." recebia 5 cartas
+ * que estão acima de 1,00% — e ia ofertar 24 horas em cima delas acreditando no
+ * filtro que pediu. É por isso que a repeneira em memória existe: ela RETIRA
+ * cartas, não acrescenta.
+ *
+ * A MARGEM, e a honestidade sobre ela. `MARGEM_TETO_VIEW` (0,01) vem do FAROL,
+ * onde foi medida sobre a mesma coluna. Aqui ela é DEFENSIVA, não corretiva: o
+ * arredondamento só sobe, então hoje ela não resgata nenhuma carta — efeito
+ * medido: zero. Fica assim mesmo, por dois motivos que valem mais do que o
+ * ganho de hoje. Primeiro, ela custa nada e cobre o dia em que o arredondamento
+ * mudar de lado (TIR-ARREDONDA-01 vai tirar o `round(r, 6)` da origem, e aí a
+ * coluna passa a errar para os dois lados). Segundo, ela mantém esta peneira e a
+ * do FAROL com a MESMA forma — duas peneiras com formas diferentes é o começo
+ * de duas verdades. Importo a constante em vez de copiar o 0,01: cópia diverge
+ * no primeiro ajuste. Registro que o lugar natural dela é ao lado da view, e não
+ * dentro do FAROL; mudá-la de casa é fatia própria, não esta.
+ *
+ * O NÚMERO EXIBIDO PASSA A SER O MESMO QUE JULGA. Devolvo `custo_am` já
+ * substituído pelo canônico. Sem isso, o fundo pediria "até 1,00%", a peneira
+ * canônica aprovaria a carta, e a tela mostraria "1,01%" (a coluna, arredondada
+ * para cima) — uma contradição visível criada pela própria correção. Medido
+ * antes de trocar: das 2.422 cartas, ZERO perdem o número (coluna tem, canônico
+ * não) e ZERO ganham. A troca é segura; muda o dígito de algumas cartas, nunca
+ * a existência dele.
+ *
+ * CUSTO NULO: medi 1 carta com `custo_am` nulo, e é a MESMA carta cujo canônico
+ * é nulo (ref 147, parcelas = 0). Sem filtro de custo ela aparece — existe e é
+ * ofertável, só não tem número. COM filtro de custo ela sai, porque não dá para
+ * afirmar que está abaixo de um teto que não se sabe medir. Antes quem fazia
+ * isso era o Postgres sozinho (`null <= x` não é verdadeiro); agora a peneira
+ * canônica faz a mesma coisa explicitamente, e as duas concordam. Fica
+ * registrado que é o comportamento desejado, não um acidente.
+ *
+ * PURA de propósito: recebe lista e teto, devolve lista. Sem banco, sem rede.
+ * Peneira que decide oferta de 24 horas precisa de teste, e teste precisa de
+ * função que rode sozinha.
+ */
+export function peneirarPorCusto(
+  cartas: CartaVitrine[],
+  custoMax: number | null
+): CartaVitrine[] {
+  const canonicas = cartas.map((c) => ({
+    ...c,
+    custo_am: custoEfetivoCarta({
+      valor_credito: c.credito,
+      valor_entrada: c.entrada,
+      valor_parcela: c.parcela,
+      qtd_parcelas: c.parcelas,
+    }),
+  }));
+  if (custoMax === null) return canonicas;
+  return canonicas.filter((c) => c.custo_am !== null && c.custo_am <= custoMax);
+}
+
+/**
  * A consulta. Ordem: crédito desc (o fundo olha tamanho primeiro), com `id` como
  * desempate estável — sem ele, duas cartas de mesmo crédito podem trocar de
  * posição entre a contagem e a página, e a lista "pula" sem motivo visível.
  *
- * CUSTO NULO E O FILTRO DE CUSTO: medi 1 carta com `custo_am` nulo na vitrine
- * viva. Sem filtro de custo ela aparece — existe e é ofertável. COM filtro de
- * custo ela sai, porque não dá para afirmar que está abaixo de um teto que não
- * se sabe medir. O Postgres já faz isso sozinho (`null <= x` não é verdadeiro),
- * e fica registrado aqui que é o comportamento desejado, não um acidente.
+ * O filtro de custo é feito em DOIS tempos, no padrão do FAROL: o banco corta
+ * grosso pela coluna com a folga da margem, e a peneira canônica decide em
+ * memória. Ver o bloco acima de `peneirarPorCusto` para o porquê e para os
+ * números medidos.
  */
 export async function buscarVitrine(
   filtros: FiltrosVitrine
@@ -203,7 +292,9 @@ export async function buscarVitrine(
   if (filtros.tipo) q = q.eq("tipo", filtros.tipo);
   if (filtros.creditoMin !== null) q = q.gte("credito", filtros.creditoMin);
   if (filtros.creditoMax !== null) q = q.lte("credito", filtros.creditoMax);
-  if (filtros.custoMax !== null) q = q.lte("custo_am", filtros.custoMax);
+  if (filtros.custoMax !== null) {
+    q = q.lte("custo_am", filtros.custoMax + MARGEM_TETO_VIEW);
+  }
   if (filtros.administradora) {
     q = q.ilike("administradora", `%${filtros.administradora}%`);
   }
@@ -214,11 +305,33 @@ export async function buscarVitrine(
     .range(0, TETO_TELA - 1);
   if (error) throw error;
 
-  const total = count ?? 0;
+  const cartas = peneirarPorCusto(
+    (data ?? []) as unknown as CartaVitrine[],
+    filtros.custoMax
+  );
+
+  // O total do banco conta pela coluna crua, com a folga da margem. Quando a
+  // página NÃO foi cortada, ela trouxe o conjunto inteiro e a peneira canônica
+  // rodou sobre ele todo — então `cartas.length` é o número verdadeiro, e usá-lo
+  // é o que impede a tela de dizer "12 encontradas" mostrando 10. Quando foi
+  // cortada, só peneirei as 500 primeiras; o total do banco continua valendo
+  // como teto anunciado, e o `truncado` já obriga a tela a dizer isso em voz
+  // alta. Ver o contrato completo em `ResultadoVitrine.total`.
+  //
+  // EFEITO VISÍVEL, medido em 14/08/2026 e registrado para não virar surpresa:
+  // com teto 1,50% a página volta com 493 cartas, e não 500 — a peneira derrubou
+  // 7 das que o banco mandou. A tela mostra menos que o TETO_TELA mesmo com
+  // `truncado` verdadeiro. Poderia buscar mais para recompletar as 500, e não
+  // faço: seria um laço de repescagem para ganhar 7 linhas numa tela que já
+  // anuncia o corte em voz alta. Sete cartas a menos é honesto; sete cartas
+  // caras a mais é que era o problema.
+  const totalBanco = count ?? 0;
+  const truncado = totalBanco > TETO_TELA;
+
   return {
-    cartas: (data ?? []) as unknown as CartaVitrine[],
-    total,
-    truncado: total > TETO_TELA,
+    cartas,
+    total: truncado ? totalBanco : cartas.length,
+    truncado,
   };
 }
 
@@ -288,7 +401,14 @@ export async function buscarCartasPorId(
       .select(CAMPOS)
       .in("id", fatia);
     if (error) throw error;
-    for (const c of (data ?? []) as unknown as CartaVitrine[]) {
+    // Passa pela mesma normalização (sem teto: nada é filtrado aqui) para que
+    // `custo_am` signifique UMA coisa só em tudo que sai deste arquivo. Duas
+    // funções do mesmo módulo devolvendo números diferentes para a mesma carta
+    // é o tipo de incoerência que ninguém procura porque ninguém imagina.
+    for (const c of peneirarPorCusto(
+      (data ?? []) as unknown as CartaVitrine[],
+      null
+    )) {
       achadas.set(c.id, c);
     }
   }

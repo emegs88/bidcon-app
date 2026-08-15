@@ -16,9 +16,12 @@ import assert from "node:assert/strict";
 import {
   normalizarFiltros,
   fatiar,
+  peneirarPorCusto,
   LOTE_CONSULTA,
   TETO_TELA,
+  type CartaVitrine,
 } from "@/lib/fidc-vitrine";
+import { custoEfetivoCarta } from "@/lib/custo-efetivo";
 
 test("sem parâmetro nenhum: todos os filtros ausentes", () => {
   const f = normalizarFiltros({});
@@ -136,4 +139,92 @@ test("fatiar: tamanho zero é erro, não laço infinito", () => {
   // Sem esta guarda o `i += 0` trava o processo em silêncio — o pior modo de
   // falhar que existe, porque não deixa rastro nenhum para ler depois.
   assert.throws(() => fatiar([1, 2, 3], 0));
+});
+
+// ---- peneirarPorCusto: a coluna crua não decide -----------------------------
+// Medido em 14/08/2026 sobre as 2.422 cartas da vitrine viva: em SEIS tetos
+// diferentes, o número de cartas que entravam só pela coluna foi de 2 a 10, e o
+// número que entrava só pelo canônico foi ZERO em todos. O arredondamento duplo
+// da trigger só empurra para cima — então filtrar pela coluna nunca escondeu
+// carta barata, mas mostrava carta CARA a quem pediu teto. Estes testes travam
+// o conserto: a peneira canônica RETIRA.
+
+/** Carta de teste. Saldo 70.000 em 100x de R$ 1.000 → canônico ≈ 0,75% a.m. */
+function carta(over: Partial<CartaVitrine> = {}): CartaVitrine {
+  return {
+    id: "id-1",
+    ref: 1,
+    tipo: "imovel",
+    credito: 100000,
+    entrada: 30000,
+    parcela: 1000,
+    parcelas: 100,
+    custo_am: 0.7, // a COLUNA, deliberadamente mentindo para baixo
+    administradora: "Porto",
+    ...over,
+  };
+}
+
+const CANONICO = custoEfetivoCarta({
+  valor_credito: 100000,
+  valor_entrada: 30000,
+  valor_parcela: 1000,
+  qtd_parcelas: 100,
+});
+
+test("a carta de teste é mesmo um caso de sobra-inclusão", () => {
+  // Se esta âncora cair, os testes abaixo perdem o sentido e viram tautologia.
+  assert.ok(CANONICO !== null);
+  assert.ok(CANONICO! > 0.7, `canônico ${CANONICO} deveria passar de 0,70`);
+  assert.ok(CANONICO! < 0.8, `canônico ${CANONICO} deveria ficar abaixo de 0,80`);
+});
+
+test("o número devolvido é o canônico, não o da coluna", () => {
+  // A tela do fundo e a peneira precisam falar o MESMO número. Devolver a
+  // coluna aqui faria a carta aprovada por 0,75 aparecer escrita como 0,70.
+  const [c] = peneirarPorCusto([carta()], null);
+  assert.equal(c.custo_am, CANONICO);
+  assert.notEqual(c.custo_am, 0.7);
+});
+
+test("carta acima do teto é RETIRADA, mesmo com a coluna dizendo que cabe", () => {
+  // O defeito inteiro em uma linha: a coluna diz 0,70, o teto é 0,70, o banco
+  // deixaria passar — e o fundo ofertaria 24 horas numa carta de 0,75.
+  assert.deepEqual(peneirarPorCusto([carta()], 0.7), []);
+});
+
+test("carta dentro do teto continua entrando", () => {
+  // A peneira retira o que está acima; não pode ficar zelosa e derrubar o resto.
+  const saida = peneirarPorCusto([carta()], 0.8);
+  assert.equal(saida.length, 1);
+  assert.equal(saida[0].id, "id-1");
+});
+
+test("sem teto, ninguém é retirado e a ordem é a mesma", () => {
+  const entrada = [carta({ id: "a" }), carta({ id: "b" }), carta({ id: "c" })];
+  const saida = peneirarPorCusto(entrada, null);
+  assert.deepEqual(
+    saida.map((c) => c.id),
+    ["a", "b", "c"]
+  );
+});
+
+test("insumo incompleto: sem número, sai COM teto e fica SEM teto", () => {
+  // A carta ref 147 do estoque real (parcelas = 0). Ela existe e é ofertável,
+  // só não tem custo calculável. Sem filtro, aparece — esconder carta viva por
+  // falta de um número seria mentir por omissão. COM filtro, sai: não dá para
+  // afirmar que está abaixo de um teto que não se sabe medir.
+  const sem = carta({ id: "ref-147", parcelas: 0, custo_am: 0.5 });
+  const solta = peneirarPorCusto([sem], null);
+  assert.equal(solta.length, 1);
+  assert.equal(solta[0].custo_am, null, "a coluna 0,5 não pode sobreviver");
+  assert.deepEqual(peneirarPorCusto([sem], 1.5), []);
+});
+
+test("a peneira não altera a lista que recebeu", () => {
+  // Quem chama reusa a lista original. Mutar aqui trocaria o custo de uma carta
+  // por baixo dos panos, num lugar onde ninguém iria procurar.
+  const original = carta();
+  peneirarPorCusto([original], null);
+  assert.equal(original.custo_am, 0.7);
 });
