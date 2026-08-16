@@ -22,19 +22,24 @@
 //   1. PLAYCONTEMPLADAS com divergencias = 621, sem ninguém ser avisado.
 //   2. CARTAS com lidas = 198 e recebidas = 0 — e LANCE com espera = 0, que é
 //      o caso em que o RADAR precisa ficar CALADO apesar do zero.
-//   3. Estoque de 1008 cartas novas em 14/08 para 0 em 16/08, com o nível
-//      saudável em 2423 disponíveis — o vigia de nível calado, o de movimento
-//      falando.
+//   3. O fim de semana de 15–16/08, que é o caso em que o vigia de movimento
+//      precisa ficar CALADO. Eu tinha escrito aqui que "1008 cartas novas em
+//      14/08 para 0 em 16/08" provava uma parada; a medição desmentiu — 15/08 é
+//      sábado, 16/08 é domingo, e TODO domingo de seis semanas de histórico deu
+//      zero. O caso real que sobrou é o oposto do que eu afirmei, e por isso ele
+//      virou dois testes de silêncio: o fim de semana (62h corridas) e a noite
+//      comum (15h corridas), ambos abaixo do limiar quando contados em hora útil.
 //   4. FAROL sem publicar depois do horário do cron.
 //   5. As 21 linhas de 04/08, onze dias em `aguardando_template`.
 // ============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { horasUteisEntre } from "@/lib/radar/limiar";
 import {
   CICLOS_REINCIDENTE,
   DIAS_FILA_PARADA,
-  HORAS_SEM_MOVIMENTO,
+  HORAS_UTEIS_SEM_MOVIMENTO,
   HORA_COBRANCA_FAROL,
   QUARENTENA_DISTINTAS_DIA,
   QUEDA_AMOSTRA,
@@ -187,36 +192,123 @@ test("estoque nivel: baseline zero nao vira alerta eterno", () => {
   assert.equal(vigiaEstoqueNivel({ disponiveisAgora: 0, disponiveisBaseline: 0 }), null);
 });
 
-test("estoque movimento: o caso vivo — 0 cartas novas com 5 ciclos rodados", () => {
-  // 1008 novas em 14/08, 1 em 15/08, 0 em 16/08. O nivel nao caiu; a vitrine
-  // envelheceu em silencio.
-  const a = vigiaEstoqueSemMovimento({ horasSemCartaNova: 28, ciclosNoPeriodo: 5 });
+test("estoque movimento: sync sem falha e nada entrando vira alerta", () => {
+  const a = vigiaEstoqueSemMovimento({
+    horasUteisSemCartaNova: 42,
+    ciclosNoPeriodo: 5,
+    fontesOk: 5,
+    fontesFalha: 0,
+  });
   assert.ok(a);
   assert.equal(a.tipo, TIPO_ESTOQUE);
   assert.equal(a.chave, "sem_movimento", "mesma familia do nivel, condicao diferente");
-  assert.equal(a.severidade, "grave", "28h e mais que o dobro de 12h");
+  assert.equal(a.severidade, "grave", "42h uteis e mais que o dobro de 20");
   assert.equal(a.detalhe.ciclos, 5);
+  assert.equal(a.detalhe.fontes_falha, 0);
 });
 
 test("estoque movimento: sem ciclo rodado, o silencio e do cron — nao deste vigia", () => {
   // Alarmar aqui apontaria o dedo para o lugar errado. Quem cobra cron parado
   // e o heartbeat.
-  assert.equal(vigiaEstoqueSemMovimento({ horasSemCartaNova: 48, ciclosNoPeriodo: 0 }), null);
+  assert.equal(
+    vigiaEstoqueSemMovimento({ horasUteisSemCartaNova: 48, ciclosNoPeriodo: 0 }),
+    null
+  );
 });
 
 test("estoque movimento: SILENCIO logo abaixo do limite", () => {
   assert.equal(
-    vigiaEstoqueSemMovimento({ horasSemCartaNova: HORAS_SEM_MOVIMENTO - 0.1, ciclosNoPeriodo: 3 }),
+    vigiaEstoqueSemMovimento({
+      horasUteisSemCartaNova: HORAS_UTEIS_SEM_MOVIMENTO - 0.1,
+      ciclosNoPeriodo: 3,
+    }),
     null
   );
-  assert.ok(vigiaEstoqueSemMovimento({ horasSemCartaNova: HORAS_SEM_MOVIMENTO, ciclosNoPeriodo: 3 }));
+  assert.ok(
+    vigiaEstoqueSemMovimento({
+      horasUteisSemCartaNova: HORAS_UTEIS_SEM_MOVIMENTO,
+      ciclosNoPeriodo: 3,
+    })
+  );
+});
+
+// O TESTE QUE PEGA O DEFEITO DE 16/08, e ele falharia na versao anterior.
+//
+// Sexta 19h -> segunda 08h sao 62 HORAS CORRIDAS, o maior vao da serie inteira,
+// e nao ha nada de errado: o fornecedor nao publica em fim de semana (todo
+// domingo de seis semanas deu zero). Em hora util o mesmo vao mede 13, que e
+// noite comum. Com o limiar em hora corrida este caso alarmava; e como ele
+// acontece TODA SEMANA, o vigia tocaria todo sabado ate ninguem mais abrir.
+test("estoque movimento: o fim de semana inteiro NAO alarma", () => {
+  const sextaFim = new Date("2026-08-07T22:00:00Z"); // sex 19h SP
+  const segundaManha = new Date("2026-08-10T11:00:00Z"); // seg 08h SP
+  const corridas = (segundaManha.getTime() - sextaFim.getTime()) / 3_600_000;
+  const uteis = horasUteisEntre(sextaFim, segundaManha);
+
+  assert.ok(corridas > 60, "o vao corrido e mesmo enorme");
+  assert.ok(uteis < HORAS_UTEIS_SEM_MOVIMENTO, `em hora util sao ${uteis}, abaixo do limiar`);
+  assert.equal(
+    vigiaEstoqueSemMovimento({
+      horasUteisSemCartaNova: uteis,
+      ciclosNoPeriodo: 60,
+      fontesOk: 5,
+      fontesFalha: 0,
+    }),
+    null,
+    "fim de semana e o mundo normal, nao defeito nosso"
+  );
+});
+
+// A noite comum tambem nao alarma. Medido: 15h corridas e o maior vao NORMAL de
+// dia util (qui 18h -> sex 08h), e em hora util isso e o mesmo 15.
+test("estoque movimento: a noite comum de dia util NAO alarma", () => {
+  const quintaFim = new Date("2026-08-13T21:00:00Z"); // qui 18h SP
+  const sextaManha = new Date("2026-08-14T11:00:00Z"); // sex 08h SP
+  const uteis = horasUteisEntre(quintaFim, sextaManha);
+  assert.ok(uteis <= 15, `noite comum mede ${uteis} horas uteis`);
+  assert.equal(
+    vigiaEstoqueSemMovimento({ horasUteisSemCartaNova: uteis, ciclosNoPeriodo: 14 }),
+    null
+  );
+});
+
+test("estoque movimento: com fonte falhando, quem explica e o vigia de divergencia", () => {
+  // Duas linhas para um problema so e como um painel deixa de ser lido.
+  assert.equal(
+    vigiaEstoqueSemMovimento({
+      horasUteisSemCartaNova: 40,
+      ciclosNoPeriodo: 5,
+      fontesOk: 4,
+      fontesFalha: 1,
+    }),
+    null
+  );
+  // Zero fontes ok e sync que nao rodou, nao estoque parado.
+  assert.equal(
+    vigiaEstoqueSemMovimento({
+      horasUteisSemCartaNova: 40,
+      ciclosNoPeriodo: 5,
+      fontesOk: 0,
+      fontesFalha: 0,
+    }),
+    null
+  );
+});
+
+test("estoque movimento: quem nao mediu a saude do sync nao e obrigado a fingir", () => {
+  // `undefined` passa. O vigia continua valendo pela parada em si — o que nao
+  // pode e um ciclo com falha conhecida escapar da guarda por omissao.
+  assert.ok(vigiaEstoqueSemMovimento({ horasUteisSemCartaNova: 40, ciclosNoPeriodo: 5 }));
 });
 
 test("estoque: as duas condicoes podem estar abertas ao mesmo tempo", () => {
   // Mesmo `tipo`, `chave` diferente. E o par (tipo, chave) que o indice unico
   // parcial usa — sem chaves distintas, uma condicao apagaria a outra.
   const nivel = vigiaEstoqueNivel({ disponiveisAgora: 500, disponiveisBaseline: 1000 });
-  const parado = vigiaEstoqueSemMovimento({ horasSemCartaNova: 28, ciclosNoPeriodo: 5 });
+  const parado = vigiaEstoqueSemMovimento({
+    horasUteisSemCartaNova: 42,
+    ciclosNoPeriodo: 5,
+  });
   assert.ok(nivel && parado);
   assert.equal(nivel.tipo, parado.tipo);
   assert.notEqual(nivel.chave, parado.chave);
@@ -323,7 +415,7 @@ test("alerta: todo alerta aberto tem titulo legivel e detalhe com numeros", () =
     vigiaDivergenciaSync({ fonte: "PLAYCONTEMPLADAS", divergencias: 621, historico: PLAYCONTEMPLADAS }),
     vigiaProvaAmostra({ fonte: "CARTAS", lidas: 198, recebidas: 0, baselineTaxa: 1 }),
     vigiaEstoqueNivel({ disponiveisAgora: 500, disponiveisBaseline: 1000 }),
-    vigiaEstoqueSemMovimento({ horasSemCartaNova: 28, ciclosNoPeriodo: 5 }),
+    vigiaEstoqueSemMovimento({ horasUteisSemCartaNova: 28, ciclosNoPeriodo: 5 }),
     vigiaFarolSemPublicar({ horaSP: 17, publicadosHoje: 0 }),
     vigiaFilaSentinela({
       maisAntigaEm: new Date("2026-08-04T22:27:20.820Z"),

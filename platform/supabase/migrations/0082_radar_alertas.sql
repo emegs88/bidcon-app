@@ -3,6 +3,21 @@
 -- SENTINELA-RADAR-01, Parte 2. AUTORIZADO: Emerson, 15/08/2026.
 -- Projeto: xtv (xtvjpnyadcdeadhmzyff) — mesma casa do sync, do estoque e do
 -- Sentinela, que são as cinco coisas vigiadas.
+--
+-- APLICADA no xtv em 16/08/2026 pela coordenação, em passo único (nenhum enum
+-- novo aqui, então a partição que a 0081 exigiu não se aplica).
+--
+-- CONFERÊNCIA RECONFERIDA CONTRA O BANCO, não contra o arquivo:
+--   radar_alertas .................. RLS = true, 0 linhas, 0 policies
+--   radar_alertas_condicao_aberta .. UNIQUE (tipo, chave) WHERE resolvido_em IS NULL
+--   radar_registrar / radar_resolver ACL = service_role apenas
+--
+-- Zero POLICIES com RLS ligada é o desenho, não esquecimento: RLS sem policy
+-- nega para todo mundo, e service_role passa por cima dela. Ou seja, a mesa é
+-- fechada para anon e para usuário logado por CONSTRUÇÃO — não por uma policy
+-- que alguém pode afrouxar depois sem perceber. Se um dia o painel precisar ler
+-- direto do browser, a policy que nascer aí é uma decisão consciente, e vai ter
+-- de ser escrita; hoje quem lê é o servidor, com a service key.
 -- ----------------------------------------------------------------------------
 -- UM ALERTA POR CONDIÇÃO — E AQUI ISSO VIRA TRAVA, NÃO COMBINADO
 --

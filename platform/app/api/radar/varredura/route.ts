@@ -62,8 +62,8 @@
 // ============================================================================
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
-import { amostraDe, divergenciasDe } from "@/lib/radar/eventos";
-import { percentil, radarLigado, ENV_KILL_SWITCH } from "@/lib/radar/limiar";
+import { amostraDe, divergenciasDe, saudeSyncDe } from "@/lib/radar/eventos";
+import { horasUteisEntre, percentil, radarLigado, ENV_KILL_SWITCH } from "@/lib/radar/limiar";
 import {
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
@@ -205,7 +205,7 @@ export async function GET(req: Request) {
   }
 
   // --- 1c. estoque -------------------------------------------------------
-  const [disp, novas24h, saidas24h, ciclos24h, ultimaNova] = await Promise.all([
+  const [disp, novas24h, saidas24h, ciclos24h, ultimaNova, ultimoFim] = await Promise.all([
     db.from("cartas").select("id", { count: "exact", head: true }).eq("status", "disponivel"),
     db
       .from("eventos_sync")
@@ -229,6 +229,17 @@ export async function GET(req: Request) {
       .order("em", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // O último `sync_fim` carrega `fontes_ok` e `fontes_falha`. É o que autoriza
+    // o vigia de movimento a dizer "o sync está SAUDÁVEL e mesmo assim nada
+    // entrou" — sem isso ele diria só "nada entrou", que é metade da frase e a
+    // metade que não acusa ninguém.
+    db
+      .from("eventos_sync")
+      .select("detalhe")
+      .eq("tipo", "sync_fim")
+      .order("em", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   for (const [nome, r] of [
     ["cartas_disponiveis", disp],
@@ -236,6 +247,7 @@ export async function GET(req: Request) {
     ["carta_indisponivel_24h", saidas24h],
     ["sync_fim_24h", ciclos24h],
     ["ultima_carta_nova", ultimaNova],
+    ["ultimo_sync_fim", ultimoFim],
   ] as const) {
     if (r.error) avisos.push(`${nome}: ${r.error.message}`);
   }
@@ -313,9 +325,16 @@ export async function GET(req: Request) {
   const ciclosNoPeriodo = ciclos24h.count ?? 0;
   if (ultimaNovaEm) {
     marcar(TIPO_ESTOQUE, CHAVE_ESTOQUE_SEM_MOVIMENTO);
+    const saude = saudeSyncDe((ultimoFim.data as { detalhe: string } | null)?.detalhe);
     const a = vigiaEstoqueSemMovimento({
-      horasSemCartaNova: (agora.getTime() - new Date(ultimaNovaEm).getTime()) / MS_POR_HORA,
+      // HORA ÚTIL, não hora corrida — e a conta é `horasUteisEntre`, não uma
+      // subtração aqui. A subtração é o defeito que esta linha corrigiu: as
+      // noites normais medem 13 a 15 horas corridas e todo fim de semana mede
+      // 62, então em hora corrida não existe limiar que sirva.
+      horasUteisSemCartaNova: horasUteisEntre(new Date(ultimaNovaEm), agora),
       ciclosNoPeriodo,
+      fontesOk: saude.fontesOk ?? undefined,
+      fontesFalha: saude.fontesFalha ?? undefined,
     });
     if (a) alertas.push(a);
   } else {
