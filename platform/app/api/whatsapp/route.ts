@@ -80,6 +80,7 @@ import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-back
 import { etiquetasDaMensagem } from "@/lib/farol/cedente";
 import { etiquetasSemEntrada } from "@/lib/farol/sem-entrada";
 import { semEntradaLigado } from "@/lib/farol/pivo-sem-entrada";
+import { ehOptOut as regraOptOut } from "@/lib/opt-out";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -592,54 +593,23 @@ function contextoVercelSuportaWaitUntil(): boolean {
   return typeof contexto?.get?.()?.waitUntil === "function";
 }
 
-// Texto do quick reply de opt-out usado no template de marketing (carrossel
-// da vitrine). Ver docs/WHATSAPP-01-SPEC.md — botão precisa ter esse título
-// exato em todos os cards (a Meta exige botões idênticos entre cards). Já
-// normalizado (minúsculo, sem pontuação nas pontas) — comparar sempre via
-// normalizarTexto().
-const TEXTO_BOTAO_OPT_OUT = "não quero receber";
-
-// SENTINELA-01 (04/08/2026): o template de reativação instrui "responda
-// SAIR" — palavras universais de descadastro digitadas livremente também
-// marcam opt-out. Só valem em text.body como mensagem INTEIRA (após
-// normalizarTexto), o que zera falso positivo com frases longas tipo
-// "quero sair do consórcio". "cancelar" fica DE FORA de propósito: colide
-// com cancelamento de reserva no meio do fluxo. Variante sem acento
-// incluída porque normalizarTexto não remove acento.
-const PALAVRAS_OPT_OUT = new Set([
-  TEXTO_BOTAO_OPT_OUT,
-  "nao quero receber",
-  "sair",
-  "parar",
-  "pare",
-  "stop",
-  "descadastrar",
-]);
-
-/** trim + lowercase + remove aspas/pontuação nas pontas (ex.: `"Não quero
- *  receber."` → `não quero receber`), pra comparação tolerante a variações
- *  de digitação/formatação que a Meta ou o cliente podem introduzir. */
-function normalizarTexto(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/^[\s"'“”‘’.!?,;:]+|[\s"'“”‘’.!?,;:]+$/g, "");
-}
-
-/** true se a mensagem for o opt-out — cobre as três formas como ele pode
- *  chegar: quick reply de TEMPLATE de marketing (messages[].type="button",
- *  texto em button.text), quick reply de mensagem interativa comum
- *  (interactive.button_reply.title) e texto digitado livremente
- *  (text.body). Botões continuam por igualdade exata com o título do
- *  quick reply; texto digitado aceita também as PALAVRAS_OPT_OUT
- *  (SENTINELA-01 — o template promete "responda SAIR"). */
+/** De-para do envelope da Meta para a regra de opt-out, que mora em
+ *  lib/opt-out.ts e é a MESMA de todo canal (o Instagram lê de lá também).
+ *
+ *  Até 15/08/2026 as constantes e a normalização viviam duplicadas AQUI,
+ *  com a justificativa de que Route Handler não aceita export arbitrário —
+ *  verdade que justifica não exportar daqui, e nunca justificou copiar.
+ *  Os dois blocos foram comparados antes de unir (literal, lista, regex,
+ *  corpo e 9 casos): idênticos, 0 divergências. Ver OPTOUT-FONTE-UNICA-01.
+ *
+ *  O que sobrou aqui é só o que é DESTE canal: saber que quick reply de
+ *  template chega em `button.text` e o de interativa em
+ *  `interactive.button_reply.title`. */
 function ehOptOut(m: MensagemMeta): boolean {
-  const botoes = [m.button?.text, m.interactive?.button_reply?.title];
-  if (botoes.some((c) => !!c && normalizarTexto(c) === TEXTO_BOTAO_OPT_OUT)) {
-    return true;
-  }
-  const texto = m.text?.body;
-  return !!texto && PALAVRAS_OPT_OUT.has(normalizarTexto(texto));
+  return regraOptOut({
+    botoes: [m.button?.text, m.interactive?.button_reply?.title],
+    texto: m.text?.body,
+  });
 }
 
 // ============================================================================
