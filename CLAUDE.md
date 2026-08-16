@@ -45,6 +45,25 @@
   de PR; entregar o link de `compare` e dizer que a abertura é manual.
 - Integrar main em branch já empurrado é **`merge`, nunca `rebase`**: os commits
   são públicos e rebase reescreveria SHA já no servidor.
+- **Ramo mergeado não é ramo vivo.** `git fetch` e comparar com `origin/main`
+  ANTES de commitar em ramo antigo. Commit em ramo cujo PR já fechou nasce
+  órfão: fica 1 à frente da main, sem PR nenhum, e nada avisa —
+  `tsc`, testes e build passam todos, porque o defeito não é de código.
+  **Fatia nova nasce de ramo novo.**
+- Erro que gerou a regra (14/08): commitei FIDC-PENEIRA-01 (`aaa05f4`, 22:08Z)
+  em `fidc-ofertas-02`, cujo **PR #35 já tinha fechado às 20:54Z**. E relatei
+  "o PR cresceu um commit" — afirmação sobre estado remoto que eu não havia
+  medido, que é a **Regra 6 aplicada ao git**. É a mesma família do erro do
+  PR #9 (acima): as duas vezes, o que se descreveu foi um retrato velho.
+- **Portão rodado em ramo atrasado não é portão.** O número da suíte só vale
+  medido contra a main ATUAL. No mesmo incidente os três portões passaram numa
+  árvore **26 commits atrás** e eu reportei **745/745**; refeitos em ramo
+  nascido da main, **892/892** — 147 testes que eu simplesmente não tinha
+  rodado. Verde contra o passado não diz nada sobre o presente, e é um verde
+  que não grita (mesma família do "verde vazio" acima).
+- Conserto do incidente, para servir de receita: ramo novo de `origin/main`,
+  `cherry-pick` do commit órfão, três portões refeitos ali, push. Nunca
+  `push --force` em ramo já mergeado — o ramo antigo fica intacto.
 
 ## Verde local ≠ verde no CI (pós PR #10 vermelho, 09/08)
 - **Comando que depende de expansão muda de significado entre a máquina e o
@@ -307,6 +326,34 @@ a Vercel, fonte independente. Norma fixada por Emerson.)
   Canônicos: `lib/tir.ts` (`tirMensal`, `tirMensalMenorRaiz`) e
   `lib/custo-efetivo.ts` (`taxaEfetivaMensal`) — os dois por bisseção.
   Sempre "% a.m.", nunca % nominal, nunca "juros"/"CET".
+- **Arredondar duas vezes cria empates que não existiam. Arredonde uma vez, no
+  fim.** Medido em 14/08: `bidcon_tir_mensal_serie` devolve `round(r, 6)` e a
+  trigger `bidcon_price_calcular` grava `round(v_tir * 100, 2)`. A rodada do
+  meio empurra `0,0117495…` para `0,011750` — que É o empate — e o empate sobe.
+  **23 cartas publicadas com meio centésimo a mais.**
+  Dois fatos que só a medição dá, e que mudam a conclusão:
+  - **O desvio é sempre PARA CIMA, nunca para baixo.** A coluna publicada nunca
+    fica abaixo da verdade. Logo o defeito não escondia carta boa: ele
+    **admitia carta cara**. Um fundo pedindo "até 1,00% a.m." recebia 5 cartas
+    acima de 1,00%. Medido em seis tetos: "entra só pela coluna" = 2..10;
+    "entra só pelo canônico" = **0** em todos.
+  - **O motor está exonerado.** Newton cru e bisseção crua concordam a
+    6,6e-15; o desvio inteiro (≤ 5,0e-3 p.p.) nasce do arredondamento duplo.
+    Não confundir empate fabricado com motor instável.
+  Consequência de arquitetura, já em produção: **a coluna crua é pré-filtro
+  barato, nunca juiz.** Quem decide é o motor canônico, em memória —
+  `dentroDoTeto` (`lib/farol/selecao.ts`) e `peneirarPorCusto`
+  (`lib/fidc-vitrine.ts`), os dois filtrando no banco com
+  `MARGEM_TETO_VIEW` e **repeneirando** depois. Superfície que compara a coluna
+  com um teto sem repeneirar é defeito; superfície que só EXIBE, ORDENA ou
+  testa presença (`is not null`) está fora da regra.
+- **`ref` NÃO é chave única.** Medido: duas cartas vivas com `ref 779` —
+  Magalu e Bradesco, administradoras diferentes. A identidade é o `id` (uuid).
+  **Qualquer relatório, `Map`, dedup ou `group by` que use `ref` como chave
+  mistura cartas de administradoras diferentes** e o resultado parece certo.
+  É o mesmo defeito de identidade que o PR #28 consertou na vitrine, agora
+  vivo em relatório. `ref` serve para o humano citar uma carta em conversa —
+  e mesmo aí pede a administradora junto.
 - **`taxaEfetivaMensal` devolve `null` por dois motivos OPOSTOS:** dado
   faltando, e `parcela × prazo <= saldo` ("paga ≤ que recebe: sem custo").
   Na vitrine os dois viram "—" e tudo bem, porque a carta já foi conferida.
