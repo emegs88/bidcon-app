@@ -67,6 +67,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConversasSubNav } from "./ConversasSubNav";
 import { ConversaAcoes } from "./ConversaAcoes";
+import { FilaSentinela } from "./FilaSentinela";
 import {
   formatarContato,
   iniciais,
@@ -551,6 +552,12 @@ export default async function AdminConversas({
         <strong>não mudam</strong> com os filtros abaixo — nem com o período. Eles medem a sala
         inteira; os filtros mudam só a lista.
       </p>
+
+      {/* A fila do Sentinela fica ACIMA da busca, junto dos números que não
+          dependem de filtro, porque ela também não depende: é a sala inteira.
+          E fica visível sem ninguém procurar — foi a invisibilidade dela que
+          deixou 21 pessoas onze dias esperando sem que nenhuma tela dissesse. */}
+      <FilaSentinela />
 
       <form className={styles.busca} method="get" action="/admin/conversas" role="search">
         <label className="sr-only" htmlFor="q">

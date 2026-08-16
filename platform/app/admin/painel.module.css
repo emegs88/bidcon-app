@@ -184,3 +184,36 @@
 .alertaTexto {
   color: var(--text);
 }
+
+/* --- RADAR (SENTINELA-RADAR-01, Parte 2) --------------------------------- */
+.radarLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.radarItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.radarCorpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.radarTitulo {
+  color: var(--text);
+  font-weight: 600;
+}
+.radarMeta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.radarMeta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}

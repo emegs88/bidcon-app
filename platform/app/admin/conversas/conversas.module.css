@@ -626,3 +626,69 @@
   color: var(--text);
   text-decoration: underline;
 }
+
+/* --- Fila do Sentinela (SENTINELA-RADAR-01, item 1.4) --------------------- */
+.filaAviso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text);
+}
+.filaAviso code,
+.filaStatusNome code,
+.filaMotivos code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+}
+.filaTopo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.filaTitulo {
+  margin: 0;
+  font-size: 16px;
+}
+/* A linha que a tela existe para dizer: há quantos dias, e quantos toques. */
+.filaDestaque {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+.filaDestaque strong {
+  color: var(--text);
+}
+.filaAlarme {
+  margin: 8px 0 0;
+  color: var(--accent-amber);
+  font-size: 13px;
+}
+.filaStatus {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filaStatusItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filaStatusNome {
+  color: var(--text);
+}
+.filaStatusMeta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.filaMotivos {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
