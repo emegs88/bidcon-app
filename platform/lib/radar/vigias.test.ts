@@ -32,12 +32,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CICLOS_REINCIDENTE,
   DIAS_FILA_PARADA,
   HORAS_SEM_MOVIMENTO,
   HORA_COBRANCA_FAROL,
+  QUARENTENA_DISTINTAS_DIA,
   QUEDA_AMOSTRA,
   QUEDA_ESTOQUE,
   TIPOS_RADAR,
+  TIPO_QUARENTENA,
+  vigiaQuarentenaReincidente,
+  vigiaQuarentenaVolume,
   TIPO_AMOSTRA,
   TIPO_DIVERGENCIA,
   TIPO_ESTOQUE,
@@ -302,9 +307,12 @@ test("fila: vazia nao alarma, e 'sem data' tambem nao", () => {
 // O CONJUNTO
 // ---------------------------------------------------------------------------
 
-test("tipos: cinco condicoes, sem repetidos — o painel agrupa por aqui", () => {
-  assert.equal(TIPOS_RADAR.length, 5);
-  assert.equal(new Set(TIPOS_RADAR).size, 5, "tipo repetido misturaria vigias na tela");
+// Este numero e travado de proposito. Quando entrou o sexto tipo (quarentena),
+// o teste falhou e me obrigou a declarar a mudanca em vez de deixar um vigia
+// novo entrar de fininho no painel. Quem acrescentar o setimo passa por aqui.
+test("tipos: seis condicoes, sem repetidos — o painel agrupa por aqui", () => {
+  assert.equal(TIPOS_RADAR.length, 6);
+  assert.equal(new Set(TIPOS_RADAR).size, 6, "tipo repetido misturaria vigias na tela");
   for (const t of TIPOS_RADAR) {
     assert.ok(t.length > 0 && t === t.toLowerCase(), `tipo '${t}' fora do padrao snake_case`);
   }
@@ -331,4 +339,78 @@ test("alerta: todo alerta aberto tem titulo legivel e detalhe com numeros", () =
     assert.ok(!a.titulo.includes("undefined") && !a.titulo.includes("NaN"));
     assert.ok(Object.keys(a.detalhe).length > 0, "alerta sem numeros nao se sustenta");
   }
+});
+
+// ===========================================================================
+// VIGIAS 6 e 7 — quarentena. O caso que me pegou errado em 16/08/2026.
+// ---------------------------------------------------------------------------
+// Relatei "95 cartas barradas contra 1 aprovada" e conclui que a fonte tinha
+// desabado. Eram 4 cartas reinserindo 24 vezes. Estes testes existem para que
+// o erro nao possa voltar por descuido de quem escrever o proximo vigia.
+// ===========================================================================
+
+/** As 4 reais de 16/08, com os ciclos medidos. */
+const QUARENTENA_16_08 = [
+  { numeroExterno: 21, fonte: "PLAYCONTEMPLADAS", ciclos: 24 },
+  { numeroExterno: 78, fonte: "PLAYCONTEMPLADAS", ciclos: 24 },
+  { numeroExterno: 345, fonte: "PLAYCONTEMPLADAS", ciclos: 24 },
+  { numeroExterno: 1182, fonte: "PIFFER", ciclos: 23 },
+];
+
+test("o caso real: 95 eventos e 4 cartas distintas NAO abrem alerta de volume", () => {
+  // O numero que eu relatei errado entra aqui como `eventos`, e o vigia tem de
+  // ignora-lo. 4 distintas e o PISO da serie de 14 dias (p50 28, p90 47).
+  const a = vigiaQuarentenaVolume({ cartasDistintas: 4, eventos: 95 });
+  assert.equal(a, null, "95 eventos de 4 cartas nao e volume alto");
+});
+
+test("volume julga cartas distintas mesmo com contagem de eventos gigante", () => {
+  const alto = vigiaQuarentenaVolume({ cartasDistintas: QUARENTENA_DISTINTAS_DIA, eventos: 60 });
+  assert.ok(alto, "no limiar, alarma");
+  assert.equal(alto.tipo, TIPO_QUARENTENA);
+  assert.equal(alto.detalhe.cartas_distintas, QUARENTENA_DISTINTAS_DIA);
+  // `eventos` MENOR que as distintas e impossivel no mundo real, e mesmo assim
+  // o julgamento nao muda: quem manda e o campo certo.
+  assert.equal(alto.detalhe.eventos, 60);
+});
+
+test("silencio na fronteira: uma carta abaixo do limiar nao alarma", () => {
+  const a = vigiaQuarentenaVolume({ cartasDistintas: QUARENTENA_DISTINTAS_DIA - 1, eventos: 999 });
+  assert.equal(a, null, "p90 - 1 ainda e dia normal, mesmo com 999 eventos");
+});
+
+test("reincidencia: as 4 de hoje sao QUATRO alertas, um por carta", () => {
+  const alertas = QUARENTENA_16_08.map((c) => vigiaQuarentenaReincidente(c)).filter(Boolean);
+  // A PIFFER 1182 tem 23 ciclos: abaixo do limiar de 24. Sao 3, nao 4 — e essa
+  // diferenca de um ciclo e exatamente o que um limiar redondo esconderia.
+  assert.equal(alertas.length, 3, "23 ciclos ainda nao e um dia inteiro");
+  const chaves = new Set(alertas.map((a) => a!.chave));
+  assert.equal(chaves.size, 3, "uma condicao POR CARTA, senao o indice unico agrupa");
+  assert.ok(chaves.has("reincidente:21"));
+  assert.ok(!chaves.has("reincidente:1182"), "a de 23 ciclos ficou de fora");
+});
+
+test("reincidencia usa numero_externo, nunca o id da linha", () => {
+  const a = vigiaQuarentenaReincidente({ numeroExterno: 21, fonte: "PLAYCONTEMPLADAS", ciclos: 45 });
+  assert.ok(a);
+  // A armadilha medida: `count(distinct carta_id)` devolvia 95 porque cada
+  // ciclo grava linha nova. A identidade da carta no mundo e `numero_externo`.
+  assert.equal(a.detalhe.numero_externo, 21);
+  assert.ok(a.chave.endsWith("21"), "a chave tem de ser estavel entre ciclos");
+  assert.ok(a.titulo.includes("PLAYCONTEMPLADAS"), "a fonte no titulo: o conserto e do lado dela");
+});
+
+test("o lote anterior, de 161 ciclos, seria grave", () => {
+  const a = vigiaQuarentenaReincidente({ numeroExterno: 98, fonte: "PLAYCONTEMPLADAS", ciclos: 161 });
+  assert.ok(a);
+  assert.equal(a.severidade, "grave", "6,8 dias barrada nao e aviso");
+});
+
+test("uma quarentena isolada — o caso de 53% das cartas — fica em silencio", () => {
+  assert.equal(vigiaQuarentenaReincidente({ numeroExterno: 7, fonte: "CBC", ciclos: 1 }), null);
+  assert.equal(
+    vigiaQuarentenaReincidente({ numeroExterno: 7, fonte: "CBC", ciclos: CICLOS_REINCIDENTE - 1 }),
+    null,
+    "a fronteira: 23 ciclos calam"
+  );
 });

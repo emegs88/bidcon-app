@@ -268,6 +268,107 @@ export function vigiaFilaSentinela(entrada: {
 }
 
 // ---------------------------------------------------------------------------
+// VIGIA 6 e 7 — quarentena. CARTAS DISTINTAS, nunca eventos.
+// CORREÇÃO DA COORDENAÇÃO, 16/08/2026, e ela desfez um erro meu.
+// ---------------------------------------------------------------------------
+//
+// Eu relatei "95 cartas barradas em 24h contra 1 aprovada" e concluí que a
+// fonte tinha desabado. Estava errado. A medição, refeita:
+//
+//   95 eventos · 4 numero_externo distintos · 95 carta_id distintos
+//
+// São QUATRO cartas (PLAYCONTEMPLADAS 18531/30242/82515 e PIFFER 182340) se
+// reinserindo uma vez por ciclo, 24 ciclos. Não é a porta quebrada: é a porta
+// funcionando 24 vezes. O `sync_fim` com `fontes_falha=0` estava certo, e quem
+// estava errado era o meu relatório.
+//
+// A ARMADILHA, e ela é fina: deduplicar por `carta_id` NÃO resolve. Cada ciclo
+// grava uma linha nova, então `count(distinct carta_id)` também devolve 95. A
+// identidade da carta no mundo é `numero_externo`; `carta_id` é a identidade da
+// LINHA. Um vigia escrito com o campo de aparência mais óbvia — o que tem "id"
+// no nome — nasceria gritando 95 por um problema que são 4.
+//
+// E o volume de hoje não é alto: é o MENOR da série. Cartas distintas
+// quarentenadas por dia, 14 dias: mínimo 4, p50 28, p90 47, máximo 70. Os 4 de
+// hoje são o piso histórico. Ou seja: a quarentena não explica o estoque
+// parado, e eu tinha oferecido justamente ela como explicação.
+
+export const TIPO_QUARENTENA = "quarentena";
+export const CHAVE_QUARENTENA_VOLUME = "volume";
+
+/**
+ * 47 cartas distintas por dia = p90 medido em 14 dias (p50 28, máximo 70).
+ * O limiar nasce do banco, como o de divergência: abaixo do p90 este vigia
+ * alarmaria na metade dos dias normais, e alerta que toca todo dia é alerta
+ * que ninguém lê.
+ */
+export const QUARENTENA_DISTINTAS_DIA = 47;
+
+export function vigiaQuarentenaVolume(entrada: {
+  /**
+   * Cartas DISTINTAS por `numero_externo` na janela. Quem passar contagem de
+   * eventos aqui recebe um alerta falso de volume — é o erro que esta fatia
+   * corrigiu, e o nome do campo existe para não deixar repetir.
+   */
+  cartasDistintas: number;
+  /** Eventos brutos. Não entram no julgamento; entram no detalhe, para provar. */
+  eventos: number;
+  limite?: number;
+}): Alerta | null {
+  const { cartasDistintas, eventos, limite = QUARENTENA_DISTINTAS_DIA } = entrada;
+  if (!Number.isFinite(cartasDistintas) || cartasDistintas < limite) return null;
+  return {
+    tipo: TIPO_QUARENTENA,
+    chave: CHAVE_QUARENTENA_VOLUME,
+    severidade: cartasDistintas >= limite * 1.5 ? "grave" : "aviso",
+    titulo: `Quarentena alta: ${cartasDistintas} cartas distintas na janela (limiar ${limite})`,
+    // `eventos` ao lado de `cartas_distintas` de propósito: quem ler o alerta vê
+    // na hora que os dois números são diferentes, e por quê.
+    detalhe: { cartas_distintas: cartasDistintas, eventos, limite },
+  };
+}
+
+/**
+ * Reincidência é OUTRA natureza de problema, e por isso é outro alerta.
+ *
+ * Volume alto = a fonte piorou agora. Reincidência = uma carta específica é
+ * lixo permanente do lado do fornecedor, e nenhum ciclo nosso vai consertar:
+ * ela vai ser barrada de novo, e de novo, para sempre. O conserto é lá.
+ *
+ * 24 ciclos = um dia inteiro de sync horário. O limiar saiu da distribuição:
+ * das 260 cartas já quarentenadas, 137 (53%) aconteceram UMA vez só — o normal
+ * é quarentenar e sumir. p50=1, p90=17. Limiar 12 pegaria 55 cartas, limiar 18
+ * pegaria 25, limiar 24 pega 12 em toda a história, espalhadas por 4 dias. O
+ * cotovelo está entre 18 e 24, e 24 é o único que também significa alguma coisa
+ * fora da estatística: "barrada o dia inteiro".
+ *
+ * O alerta se resolve sozinho quando a carta para de aparecer — foi o que
+ * aconteceu com o lote anterior (98, 520, 413, 565), que reincidiu 161 ciclos
+ * por 6,8 dias e cessou em 10/08.
+ */
+export const CICLOS_REINCIDENTE = 24;
+
+export function vigiaQuarentenaReincidente(entrada: {
+  /** Identidade da carta NO MUNDO. Nunca `carta_id`, que muda a cada ciclo. */
+  numeroExterno: number;
+  fonte: string;
+  ciclos: number;
+  limite?: number;
+}): Alerta | null {
+  const { numeroExterno, fonte, ciclos, limite = CICLOS_REINCIDENTE } = entrada;
+  if (!Number.isFinite(ciclos) || ciclos < limite) return null;
+  return {
+    tipo: TIPO_QUARENTENA,
+    // Uma condição POR CARTA: cada uma é um conserto diferente, do lado do
+    // fornecedor. Agrupar as quatro numa linha só esconderia qual é qual.
+    chave: `reincidente:${numeroExterno}`,
+    severidade: ciclos >= limite * 2 ? "grave" : "aviso",
+    titulo: `${fonte} carta ${numeroExterno}: barrada em ${ciclos} ciclos seguidos — lixo permanente na fonte`,
+    detalhe: { numero_externo: numeroExterno, fonte, ciclos, limite },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Todos os tipos que o RADAR pode abrir. O painel usa para agrupar. */
 export const TIPOS_RADAR = [
@@ -276,6 +377,7 @@ export const TIPOS_RADAR = [
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
+  TIPO_QUARENTENA,
 ] as const;
 
 export type { Limiar };
