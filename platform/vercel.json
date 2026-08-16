@@ -48,6 +48,10 @@
     {
       "path": "/api/farol/carrossel",
       "schedule": "0 14 * * 6"
+    },
+    {
+      "path": "/api/radar/varredura",
+      "schedule": "20 */3 * * *"
     }
   ]
 }

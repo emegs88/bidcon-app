@@ -11,6 +11,7 @@ import { StatGrid, type Stat } from "@/components/StatGrid";
 import { Button } from "@/components/ui/Button";
 import { Balanca } from "@/components/Balanca";
 import { RankingCartas, AlertaOportunidade } from "@/components/RankingCartas";
+import { RadarAlertas } from "./RadarAlertas";
 import {
   fluxoDiario,
   resumoFluxo,
@@ -77,6 +78,12 @@ export default async function AdminPainel() {
       />
 
       <div className={styles.stack}>
+        {/* O RADAR vem ANTES dos números. Os cartões dizem como a operação está;
+            o RADAR diz se dá para confiar neles. Um estoque de 2423 cartas
+            parece saudável mesmo quando nenhuma carta nova entra há 21h — foi
+            exatamente esse par que ficou onze dias sem ninguém notar. */}
+        <RadarAlertas />
+
         <StatGrid stats={stats} />
 
         <AlertaOportunidade quantidade={oport.length} />
