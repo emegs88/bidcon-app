@@ -2,7 +2,26 @@
 -- 0081_sentinela_toque_por_linha — FATIA SENTINELA-RADAR-01, Parte 1 (1.3)
 -- AUTORIZADO: Emerson, 15/08/2026 ("max_toques por linha, default 2, 1 nos
 -- antigos... status encerrado_por_silencio").
--- NÃO APLICADA neste commit. Arquivo primeiro, apply só com ordem expressa.
+-- APLICADA no xtv em 16/08/2026 pela coordenação, EM DOIS PASSOS.
+--
+-- Quem reaplicar do zero precisa saber disto ANTES de rodar: Postgres recusa
+-- usar um valor de enum na mesma transação em que ele é criado. Se o executor
+-- envolver o arquivo inteiro num BEGIN/COMMIT — que é o que quase todo cliente
+-- faz — o passo 1 cria os três valores e qualquer uso posterior deles na mesma
+-- transação estoura com "unsafe use of new value of enum type". Por isso o
+-- apply real foi partido:
+--
+--   0081a — só os três `alter type ... add value` (linhas 59-61), commitados.
+--   0081b — todo o resto: coluna, constraint, comment, backfill, função, grants.
+--
+-- O arquivo continua único no repo de propósito: partir em dois arquivos faria
+-- a numeração mentir sobre quantas migrações existem. O que não podia ficar
+-- implícito era a ordem de execução — e agora não está.
+--
+-- DERIVA CONHECIDA entre este arquivo e o banco: o texto do comment da coluna
+-- `max_toques` foi corrigido aqui depois do apply (ver nota no item 2). O banco
+-- ainda carrega a redação antiga, que dizia "as 21". Reaplicar este arquivo
+-- acerta; até lá, a divergência é de texto de comentário, não de dado.
 -- ----------------------------------------------------------------------------
 -- POR QUE O TETO DE TOQUES DEIXA DE SER GLOBAL
 --
@@ -73,13 +92,27 @@ alter table sentinela_fila
   add constraint sentinela_fila_max_toques_faixa
   check (max_toques between 1 and 3);
 
+-- CORREÇÃO PÓS-APPLY (16/08, medida pela coordenação e reconferida aqui).
+-- A redação anterior dizia "as 21". O update pegou 25: o corte por carimbo
+-- alcançou também as 4 linhas já em 'excluido'. Não foi engano de alvo — as 25
+-- têm criado_em IDÊNTICO (min = max = 2026-08-04 22:27:20.820481+00), ou seja,
+-- as 4 excluídas são da MESMA captação que as 21 vivas. O recorte acertou o
+-- lote inteiro; o texto é que descrevia só a parte viva dele.
+-- Inofensivo por construção: 'excluido' não está no `where` de sentinela_a_tocar,
+-- então max_toques nessas 4 nunca é lido. Mas comentário que não bate com o dado
+-- é a semente da próxima medição errada, e por isso vale a linha.
 comment on column sentinela_fila.max_toques is
-  'SENTINELA-RADAR-01: teto de toques DESTA linha. Default 2. As 21 captadas em 04/08 levam 1 — onze dias de silencio nosso transformam o segundo toque em cobranca.';
+  'SENTINELA-RADAR-01: teto de toques DESTA linha. Default 2. As 25 do lote de 04/08 levam 1 (21 vivas em aguardando_template + 4 ja excluido, mesmo carimbo) — onze dias de silencio nosso transformam o segundo toque em cobranca.';
 
 -- 3. Backfill das antigas. O recorte é o carimbo, não o status: status muda,
---    criado_em não. A medição mostrou carimbos_distintos = 1 nas 21, então o
---    '<=' abaixo pega exatamente elas e nada do que entrou depois (o próximo
---    carimbo é 06/08).
+--    criado_em não. Medido DEPOIS do apply: o '<=' abaixo pegou 25 linhas, não
+--    21 — o lote de 04/08 tem 25 linhas com o mesmo carimbo, das quais 4 já
+--    estavam em 'excluido'. Nada do que entrou depois foi tocado (o próximo
+--    carimbo é 06/08 12:01, e as 6 de max_toques = 2 começam ali).
+--
+--    Registro o número real em vez de reescrever o filtro: mexer no `where`
+--    agora mudaria o alvo de um update JÁ APLICADO, e migração aplicada que
+--    muda de sentido no repo é pior que comentário desatualizado.
 update sentinela_fila
    set max_toques = 1
  where criado_em <= '2026-08-05 00:00:00+00'

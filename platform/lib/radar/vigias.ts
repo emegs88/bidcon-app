@@ -147,8 +147,31 @@ export const CHAVE_ESTOQUE_SEM_MOVIMENTO = "sem_movimento";
 
 /** Queda de nível que vira alerta (fração da linha de base). */
 export const QUEDA_ESTOQUE = 0.2;
-/** Horas sem carta nova antes de o silêncio virar alerta. */
-export const HORAS_SEM_MOVIMENTO = 12;
+
+/**
+ * Horas de DIA ÚTIL sem carta nova antes de o silêncio virar alerta.
+ *
+ * CORREÇÃO DE 16/08/2026, e ela desfez um defeito meu que já estava no ar.
+ * Este limiar nasceu 12, em HORA CORRIDA, escrito antes de eu medir o vão
+ * normal entre uma carta e a próxima. A medição, feita depois:
+ *
+ *   15h  qui 13/08 18h → sex 14/08 08h   noite comum
+ *   14h  ter 11/08 19h → qua 12/08 08h   noite comum
+ *   14h, 14h, 13h                        outras noites comuns
+ *   62h  sex 07/08 19h → seg 10/08 08h   fim de semana
+ *
+ * Ou seja: em hora corrida, 12 dispararia TODA NOITE, e duas vezes por fim de
+ * semana. Vigia que toca todo dia não é vigia — é o ruído que treina a pessoa a
+ * fechar a tela sem ler, e aí o dia em que ele estiver certo não vai importar.
+ *
+ * Contado em hora útil, a maior parada NORMAL é 15 (as noites continuam
+ * somando, porque a noite de terça é hora de quarta; o fim de semana some do
+ * denominador). 20 dá uma folga de um terço sobre o pior normal observado — o
+ * suficiente para não alarmar num feriado de emenda ou numa manhã lenta, e
+ * pouco o bastante para que uma segunda-feira inteira parada apareça no mesmo
+ * dia.
+ */
+export const HORAS_UTEIS_SEM_MOVIMENTO = 20;
 
 export function vigiaEstoqueNivel(entrada: {
   disponiveisAgora: number;
@@ -168,29 +191,85 @@ export function vigiaEstoqueNivel(entrada: {
 }
 
 /**
- * O estoque PARADO é um estado diferente do estoque caindo, e é o que estava
- * acontecendo sem aviso quando esta fatia foi escrita: 1008 cartas novas em
- * 14/08, 1 em 15/08, 0 em 16/08 com 5 ciclos rodados. O nível não tinha caído
- * — 2423 disponíveis, número saudável — e por isso um vigia só de nível teria
- * ficado calado enquanto a vitrine envelhecia.
+ * "SYNC SAUDÁVEL QUE NÃO MOVE NADA" — o vigia que a ordem chamou de mais
+ * importante de todos, e o único cuja primeira versão eu escrevi errado.
+ *
+ * A condição é esta: o sync se declara bem — fontes_ok, fontes_falha zero, os
+ * ciclos rodando de hora em hora — e mesmo assim nenhuma carta nova entra. É a
+ * mesma família do `sync_raw_ausente`: o sistema passa no próprio exame
+ * enquanto para de fazer o trabalho. O vigia de NÍVEL não pega isso, porque o
+ * nível não caiu; 2423 disponíveis é número saudável enquanto a vitrine
+ * envelhece por baixo.
+ *
+ * O QUE EU TINHA ESCRITO AQUI, E QUE A MEDIÇÃO DERRUBOU. A versão anterior
+ * dizia, como prova de que a condição era real: "1008 cartas novas em 14/08, 1
+ * em 15/08, 0 em 16/08". Medi depois, e não havia parada nenhuma. 15/08 é
+ * SÁBADO e 16/08 é DOMINGO. Em seis semanas de histórico, TODO domingo é zero —
+ * 12/07, 02/08, 09/08, 16/08, sem uma exceção — e sábado é zero em quatro dos
+ * seis. O fornecedor publica em dia útil. O silêncio do fim de semana é o
+ * comportamento normal do mundo, não um defeito do nosso lado.
+ *
+ * Por isso a contagem é em HORA ÚTIL (ver `horasUteisEntre`), e não em hora
+ * corrida: em hora corrida não existe limiar que sirva. Um que cale a noite
+ * (>15) ainda grita todo sábado; um que cale o fim de semana (>62) não vê uma
+ * segunda-feira inteira parada. O problema nunca foi o número — era o relógio.
+ *
+ * A GUARDA DE CONTRADIÇÃO. Só alarma quando o sync se diz SAUDÁVEL. Com fonte
+ * falhando, quem explica o silêncio é o vigia de divergência ou o de amostra,
+ * que sabem QUAL fonte caiu; este abriria uma segunda linha dizendo "nada se
+ * moveu" sem acrescentar nada, e duas linhas para um problema só é como um
+ * painel deixa de ser lido.
  */
 export function vigiaEstoqueSemMovimento(entrada: {
-  horasSemCartaNova: number;
+  /**
+   * Horas de DIA ÚTIL desde a última carta nova. O nome carrega a unidade de
+   * propósito: passar hora corrida aqui faz o vigia disparar toda noite, que
+   * foi exatamente o defeito corrigido em 16/08.
+   */
+  horasUteisSemCartaNova: number;
   ciclosNoPeriodo: number;
+  /** Fontes que responderam bem no último ciclo. */
+  fontesOk?: number;
+  /** Fontes que falharam. Qualquer número acima de zero cala este vigia. */
+  fontesFalha?: number;
   limiteHoras?: number;
 }): Alerta | null {
-  const { horasSemCartaNova, ciclosNoPeriodo, limiteHoras = HORAS_SEM_MOVIMENTO } = entrada;
-  if (!Number.isFinite(horasSemCartaNova) || horasSemCartaNova < limiteHoras) return null;
+  const {
+    horasUteisSemCartaNova,
+    ciclosNoPeriodo,
+    fontesOk,
+    fontesFalha,
+    limiteHoras = HORAS_UTEIS_SEM_MOVIMENTO,
+  } = entrada;
+  if (!Number.isFinite(horasUteisSemCartaNova) || horasUteisSemCartaNova < limiteHoras) {
+    return null;
+  }
   // Sem ciclo rodado no período, o silêncio é do cron, não do estoque — e quem
   // avisa disso é o heartbeat, não este vigia. Alarmar aqui apontaria o dedo
   // para o lugar errado.
   if (ciclosNoPeriodo <= 0) return null;
+
+  // A guarda de contradição. `undefined` passa: quem não mediu o estado das
+  // fontes não é obrigado a fingir que mediu, e o vigia continua valendo pela
+  // parada em si. Zero fontes ok, por outro lado, é sync que não rodou.
+  if (Number.isFinite(fontesFalha) && (fontesFalha as number) > 0) return null;
+  if (Number.isFinite(fontesOk) && (fontesOk as number) <= 0) return null;
+
   return {
     tipo: TIPO_ESTOQUE,
     chave: CHAVE_ESTOQUE_SEM_MOVIMENTO,
-    severidade: horasSemCartaNova >= limiteHoras * 2 ? "grave" : "aviso",
-    titulo: `Nenhuma carta nova há ${Math.floor(horasSemCartaNova)}h, com ${ciclosNoPeriodo} ciclos rodados`,
-    detalhe: { horas: horasSemCartaNova, ciclos: ciclosNoPeriodo, limite: limiteHoras },
+    severidade: horasUteisSemCartaNova >= limiteHoras * 2 ? "grave" : "aviso",
+    // "horas úteis" escrito na cara, porque quem lê o alerta às 22h de um
+    // domingo precisa entender por que o número é menor do que o relógio dele
+    // sugere.
+    titulo: `Sync sem falha e nenhuma carta nova há ${Math.floor(horasUteisSemCartaNova)}h úteis, com ${ciclosNoPeriodo} ciclos rodados`,
+    detalhe: {
+      horas_uteis: horasUteisSemCartaNova,
+      ciclos: ciclosNoPeriodo,
+      limite: limiteHoras,
+      fontes_ok: fontesOk ?? null,
+      fontes_falha: fontesFalha ?? null,
+    },
   };
 }
 

@@ -14,7 +14,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { amostraDe, divergenciasDe, fonteDe, lerDetalhe, numeroDe } from "@/lib/radar/eventos";
+import {
+  amostraDe,
+  divergenciasDe,
+  fonteDe,
+  lerDetalhe,
+  numeroDe,
+  saudeSyncDe,
+} from "@/lib/radar/eventos";
 
 /** Copiado de eventos_sync, tipo='ciclo_integridade_falhou', 14/08 22:01. */
 const CICLO_PLAY =
@@ -134,4 +141,59 @@ test("token que comeca com '=' nao vira chave vazia", () => {
   const lido = lerDetalhe("=lixo fonte=CBC");
   assert.equal(fonteDe(lido), "CBC");
   assert.equal("" in lido.campos, false, "chave vazia furaria a trava do banco");
+});
+
+// ===========================================================================
+// SAUDE DO SYNC — a metade da frase que acusa alguem.
+// ---------------------------------------------------------------------------
+// Sem estes dois campos, o vigia de movimento so consegue dizer "nada entrou".
+// Com eles, ele diz "o sync se declarou SAUDAVEL e mesmo assim nada entrou",
+// que e a condicao inteira: o sistema passando no proprio exame enquanto para
+// de fazer o trabalho.
+// ===========================================================================
+
+/** Copiado de eventos_sync, tipo='sync_fim', 16/08/2026. */
+const SYNC_FIM = "total_ms=22736 fontes_ok=5 fontes_falha=0";
+
+test("saudeSyncDe: le a gramatica medida do sync_fim", () => {
+  const s = saudeSyncDe(SYNC_FIM);
+  assert.equal(s.fontesOk, 5);
+  assert.equal(s.fontesFalha, 0);
+});
+
+test("saudeSyncDe: fonte falhando aparece, e e o que cala o vigia de movimento", () => {
+  const s = saudeSyncDe("total_ms=31002 fontes_ok=4 fontes_falha=1");
+  assert.equal(s.fontesOk, 4);
+  assert.equal(s.fontesFalha, 1);
+});
+
+// A DISTINCAO QUE SUSTENTA O VIGIA, e ela e a razao de a funcao existir em vez
+// de um `Number(...) || 0` na rota.
+//
+// `fontes_falha` AUSENTE significa "nao sei se alguma falhou".
+// `fontes_falha=0` significa "nenhuma falhou".
+//
+// Quem tratar o primeiro como o segundo deixa o vigia afirmar que o sync estava
+// saudavel num ciclo sobre o qual ele nao mediu nada — e alarmar sobre uma
+// suposicao e como o RADAR comeca a mentir.
+test("saudeSyncDe: campo ausente e null, nunca zero", () => {
+  const s = saudeSyncDe("total_ms=22736");
+  assert.equal(s.fontesOk, null, "ausente nao pode virar 'zero fontes ok'");
+  assert.equal(s.fontesFalha, null, "ausente nao pode virar 'nenhuma falhou'");
+});
+
+test("saudeSyncDe: string vazia, nula ou sem pares nao inventa numero", () => {
+  for (const lixo of [null, undefined, "", "   ", "sync terminou sem detalhe"]) {
+    const s = saudeSyncDe(lixo as never);
+    assert.equal(s.fontesOk, null, `fontesOk de ${JSON.stringify(lixo)}`);
+    assert.equal(s.fontesFalha, null, `fontesFalha de ${JSON.stringify(lixo)}`);
+  }
+});
+
+test("saudeSyncDe: valor nao numerico e null, nao NaN", () => {
+  // NaN comparado a qualquer limiar e falso: o vigia calaria em silencio, que e
+  // a falha pior — ninguem descobre que o alarme parou.
+  const s = saudeSyncDe("fontes_ok=cinco fontes_falha=");
+  assert.equal(s.fontesOk, null);
+  assert.equal(s.fontesFalha, null);
 });

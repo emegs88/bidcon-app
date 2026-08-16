@@ -36,6 +36,7 @@ import assert from "node:assert/strict";
 import {
   ENV_KILL_SWITCH,
   LIMIAR_PADRAO,
+  horasUteisEntre,
   houveRegressao,
   idadeEmDias,
   limiarDeDivergencia,
@@ -220,4 +221,82 @@ test("idadeEmDias: fracionaria, e a hora chega por parametro", () => {
   assert.equal(idadeEmDias(desde, new Date("2026-08-05T10:27:20.820Z")), 0.5);
   // As 21 linhas de 04/08, medidas em 16/08: onze dias e meio parados.
   assert.ok(idadeEmDias(desde, new Date("2026-08-16T04:00:00.000Z")) > 11);
+});
+
+// ===========================================================================
+// HORA UTIL — o relogio que salvou o vigia de movimento de nascer inutil.
+// ---------------------------------------------------------------------------
+// O problema que esta funcao resolve nao e de precisao, e de EXISTENCIA: em
+// hora corrida nao ha limiar que sirva. Medido sobre `cartas` em 16/08/2026, o
+// vao entre uma carta nova e a proxima tem duas familias que se sobrepoem:
+//
+//   noites comuns   13h a 15h corridas
+//   fins de semana  62h corridas
+//
+// Um limiar que cale a noite (>15) grita todo sabado; um que cale o fim de
+// semana (>62) nao ve uma segunda-feira inteira parada. Contando so hora util,
+// as duas familias colapsam numa so — e ai um numero basta. Estes testes
+// prendem exatamente esse colapso.
+// ===========================================================================
+
+test("horasUteisEntre: dentro de um dia util, e a subtracao mesmo", () => {
+  const inicio = new Date("2026-08-17T11:00:00Z"); // seg 08h SP
+  const fim = new Date("2026-08-17T21:00:00Z"); // seg 18h SP
+  assert.equal(horasUteisEntre(inicio, fim), 10);
+});
+
+// O CASO QUE JUSTIFICA A FUNCAO. Sexta 19h -> segunda 08h: 61 horas corridas,
+// o maior vao da serie inteira, e nada de errado aconteceu. Em hora util o
+// mesmo vao vira noite comum, porque sabado e domingo saem do denominador.
+test("horasUteisEntre: o fim de semana some do denominador", () => {
+  const sextaFim = new Date("2026-08-07T22:00:00Z"); // sex 07/08 19h SP
+  const segundaManha = new Date("2026-08-10T11:00:00Z"); // seg 10/08 08h SP
+
+  const corridas = (segundaManha.getTime() - sextaFim.getTime()) / 3_600_000;
+  const uteis = horasUteisEntre(sextaFim, segundaManha);
+
+  assert.ok(corridas > 60, `o vao corrido e ${corridas}h`);
+  assert.ok(uteis < 16, `em hora util sao ${uteis}h — noite comum`);
+  // E a prova de que a fixture distingue os dois casos: se um dia os numeros
+  // derem iguais, a funcao parou de contar semana e o teste apodreceu.
+  assert.notEqual(uteis, corridas);
+});
+
+// E o contra-teste: a noite de um dia util CONTINUA somando. Se ela nao
+// somasse, "hora util" viraria "hora comercial" e uma parada de tres dias
+// uteis levaria uma semana para aparecer.
+test("horasUteisEntre: a noite de terca e hora de quarta, e conta", () => {
+  const tercaFim = new Date("2026-08-18T22:00:00Z"); // ter 19h SP
+  const quartaManha = new Date("2026-08-19T11:00:00Z"); // qua 08h SP
+  assert.equal(horasUteisEntre(tercaFim, quartaManha), 13);
+});
+
+test("horasUteisEntre: um fim de semana inteiro sozinho da zero", () => {
+  const sabado = new Date("2026-08-22T06:00:00Z"); // sab 03h SP
+  const domingoNoite = new Date("2026-08-24T02:00:00Z"); // dom 23h SP
+  assert.equal(horasUteisEntre(sabado, domingoNoite), 0);
+});
+
+test("horasUteisEntre: janela invertida ou invalida da 0, nunca negativo", () => {
+  const a = new Date("2026-08-17T11:00:00Z");
+  const b = new Date("2026-08-17T21:00:00Z");
+  // Vigia que recebe numero negativo cala por acidente, e vigia que cala por
+  // acidente e a coisa exata que esta fatia existe para nao repetir.
+  assert.equal(horasUteisEntre(b, a), 0, "invertida");
+  assert.equal(horasUteisEntre(a, a), 0, "mesmo instante");
+  assert.equal(horasUteisEntre(new Date("nao e data"), b), 0, "invalida");
+  assert.equal(horasUteisEntre(a, new Date("nao e data")), 0, "invalida no fim");
+});
+
+test("horasUteisEntre: o teto de sanidade impede o laco de 400 mil voltas", () => {
+  // Uma coluna nula virando `new Date(0)` dentro de uma rota de cron. Sem o
+  // teto, isto seria um laco de decadas; com ele, o resultado e grande, finito
+  // e rapido — e um numero grande ja alarma, que e o comportamento certo.
+  const inicio = new Date(0);
+  const fim = new Date("2026-08-17T11:00:00Z");
+  const t = Date.now();
+  const uteis = horasUteisEntre(inicio, fim);
+  assert.ok(Number.isFinite(uteis) && uteis > 0);
+  assert.ok(uteis <= 90 * 24, `o teto e 90 dias de horas, veio ${uteis}`);
+  assert.ok(Date.now() - t < 2000, "nao pode segurar a rota de cron");
 });

@@ -91,6 +91,32 @@ export function divergenciasDe(texto: string | null | undefined): {
   return { fonte: fonteDe(lido), divergencias: numeroDe(lido, "divergencias") };
 }
 
+/**
+ * Atalho para o par que o vigia de "sync saudável que não move nada" consome.
+ *
+ * A gramática do `sync_fim`, medida em 16/08/2026 no xtv:
+ *   "total_ms=22736 fontes_ok=5 fontes_falha=0"
+ *
+ * Só pares, sem token nu, sem contagem por fonte — é por isso que a pergunta
+ * "quantas linhas cada fonte devolveu neste ciclo" não se responde por aqui, e
+ * sim pelos `sync_raw_*`.
+ *
+ * Devolve `null` em vez de zero quando o campo falta, e a distinção é o ponto:
+ * `fontes_falha` ausente significa "não sei se alguma falhou", enquanto zero
+ * significa "nenhuma falhou". Quem trata o primeiro como o segundo deixa o
+ * vigia alarmar em cima de um ciclo sobre o qual ele não mediu nada.
+ */
+export function saudeSyncDe(texto: string | null | undefined): {
+  fontesOk: number | null;
+  fontesFalha: number | null;
+} {
+  const lido = lerDetalhe(texto);
+  return {
+    fontesOk: numeroDe(lido, "fontes_ok"),
+    fontesFalha: numeroDe(lido, "fontes_falha"),
+  };
+}
+
 /** Atalho para o trio que o vigia 2 consome. */
 export function amostraDe(texto: string | null | undefined): {
   fonte: string | null;

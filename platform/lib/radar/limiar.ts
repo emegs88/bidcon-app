@@ -35,6 +35,7 @@
 // (48%) com 5 ou menos. Alarme que toca 274 vezes não é alarme, é ruído — e
 // ruído treina a pessoa a ignorar, que é o pior estado possível.
 // ============================================================================
+import { ehDiaUtilBR } from "../data-br";
 
 /** Kill-switch. Nasce desarmado: sem `RADAR=on`, nada disto opera. */
 export const ENV_KILL_SWITCH = "RADAR";
@@ -197,4 +198,61 @@ const MS_POR_DIA = 86_400_000;
  */
 export function idadeEmDias(desde: Date, agora: Date): number {
   return (agora.getTime() - desde.getTime()) / MS_POR_DIA;
+}
+
+// ---------------------------------------------------------------------------
+// HORA ÚTIL — o denominador do vigia de "sync saudável que não move nada"
+// ---------------------------------------------------------------------------
+// Medido em 16/08/2026 sobre `cartas`, e é a medição que salvou o vigia de
+// nascer inútil. O vão entre uma carta nova e a próxima, contado em horas
+// corridas, tem esta cara:
+//
+//   62h  sex 07/08 19h → seg 10/08 08h   (fim de semana)
+//   19h  sáb 15/08 20h → dom 16/08 14h   (fim de semana, o "estoque parado")
+//   15h  qui 13/08 18h → sex 14/08 08h   (noite comum)
+//   14h  ter 11/08 19h → qua 12/08 08h   (noite comum)
+//
+// Um limiar em horas corridas que cale a noite (>15) ainda grita todo sábado,
+// e um que cale o fim de semana (>62) não vê uma segunda-feira inteira parada.
+// Não existe número que resolva os dois — porque o problema não é o número, é
+// o RELÓGIO. Contando só hora útil, as noites continuam somando (a noite de
+// terça é hora de quarta) mas o fim de semana some do denominador, e aí um
+// único limiar serve.
+//
+// O maior vão NORMAL em hora útil é 15. É desse 15 que sai o limiar do vigia.
+// ---------------------------------------------------------------------------
+
+/**
+ * Quantas horas de DIA ÚTIL em São Paulo separam dois instantes.
+ *
+ * Conta a hora pelo instante em que ela COMEÇA, e caminha de hora em hora em
+ * vez de fazer aritmética de calendário: é o mesmo motivo pelo qual `data-br`
+ * usa `Intl` em lugar de subtrair três horas. Fuso e semana são calendário, e
+ * calendário não se calcula na mão.
+ *
+ * Janela invertida ou datas inválidas devolvem 0 — nunca negativo. Um vigia que
+ * recebe número negativo cala por acidente, e vigia que cala por acidente é a
+ * coisa exata que esta fatia inteira existe para não repetir.
+ */
+export function horasUteisEntre(inicio: Date, fim: Date): number {
+  const a = inicio.getTime();
+  const b = fim.getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return 0;
+
+  // Teto de sanidade: 90 dias de horas. Sem ele, um `inicio` de 1970 vindo de
+  // uma coluna nula viraria 400 mil voltas de laço dentro de uma rota de cron.
+  const MAX_VOLTAS = 90 * 24;
+
+  let horas = 0;
+  let voltas = 0;
+  // Começa no topo da hora do `inicio`, para que a contagem não dependa do
+  // minuto em que a medição rodou.
+  let cursor = new Date(Math.floor(a / 3_600_000) * 3_600_000);
+
+  while (cursor.getTime() < b && voltas < MAX_VOLTAS) {
+    if (ehDiaUtilBR(cursor)) horas += 1;
+    cursor = new Date(cursor.getTime() + 3_600_000);
+    voltas += 1;
+  }
+  return horas;
 }
