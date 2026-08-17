@@ -318,6 +318,23 @@ a Vercel, fonte independente. Norma fixada por Emerson.)
     ("piso mínimo aplicado"), nunca diluído dentro do preço.
   - `lib/comissao.ts` é falso amigo: não é custo do cliente e não entra em
     nenhum fluxo de TIR.
+- **`agio_120` / `agio_150` são MARGEM INTERNA, jamais superfície pública.**
+  Elas não guardam ágio de mercado: são a saída de `bidcon_agio_max`, uma
+  bisseção de 22 iterações que responde **quanto ainda cabe somar à entrada
+  antes de a TIR da carta bater o alvo** (0,012 → `agio_120`; 0,015 →
+  `agio_150`). Publicá-las seria publicar, carta a carta, quanto a Bidcon
+  ainda pode cobrar a mais. Só `/admin`.
+  **A mediana zero não é defeito, é aritmética esperada** — a função devolve
+  0 quando a carta já custa mais que o alvo, e as medianas publicadas do
+  Índice (1,28% a.m. imóvel, 3,33% a.m. veículo) já estão acima de 1,2% e
+  1,5%. Medido em 16/08/2026: 589 linhas com `agio_120 > 0` (máx. R$ 264.000)
+  e 1.175 com `agio_150 > 0` (máx. R$ 384.000) — as colunas não estão vazias,
+  estão zeradas onde a aritmética manda. Ordem que peça para "descobrir por
+  que estão zeradas" já tem resposta aqui: medir antes de investigar.
+  **Ágio de verdade ainda não tem coluna, e é proposital**: entra quando
+  houver N ≥ 30 observado com data e URL (EXTRATO-ANALISE-01 ou
+  RADAR-MERCADO-01), nunca por inferência sobre a margem da casa.
+  (Origem: ATLAS-BACEN-01 Entrega 3, decisão da coordenação de 16/08/2026.)
 - **TIR / custo efetivo — por BISSEÇÃO, nunca Newton-Raphson.**
   Newton foi diagnosticado e rejeitado **por escrito** em `lib/tir.ts`:
   estoura em fluxos com sinal trocando mais de uma vez, que é exatamente o
