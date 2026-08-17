@@ -1,8 +1,19 @@
--- 0080_administradoras_grafias_orfas.sql — vincula as grafias orfas vivas
+-- 0085_administradoras_grafias_orfas.sql — vincula as grafias orfas vivas
 -- PROJETO: xtv (xtvjpnyadcdeadhmzyff). NAO rodar na nnv.
 -- AUTORIZADO: PENDENTE. Escrita apos a pergunta de Emerson sobre o corte
 --   73 -> 36 da vw_vitrine_viva (13/08/2026). NAO APLICAR sem ordem expressa:
 --   esta migracao ESCREVE EM DADO VIVO, ao contrario da 0079.
+--
+-- RENUMERADA DE 0080 PARA 0085 EM 17/08/2026, por decisao de Emerson.
+-- Este arquivo nasceu 0080 e ficou parado no ramo enquanto a main andava 44
+-- commits. Nesse meio tempo a serie seguiu sem ele e o numero 0080 foi
+-- ocupado por 0080_fidc_comissao_decidida.sql, ja na main. Mesclar como
+-- estava poria DOIS arquivos 0080 no repositorio — e o ledger do xtv ja
+-- carrega numero repetido, que e justamente o defeito que torna impossivel
+-- ler a ordem em que as coisas foram aplicadas.
+-- O conteudo NAO mudou nesta renumeracao: so o nome do arquivo e este
+-- paragrafo. 0085 e o proximo livre depois da 0084 (buscar_cartas
+-- p_entrada_max), que entra pelo ramo atlas-bacen-01 antes deste.
 --
 -- POR QUE ELA EXISTE
 -- A view nao corta administradora nenhuma: o LEFT JOIN normaliza grafias.
