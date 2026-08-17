@@ -1,0 +1,17 @@
+#!/bin/sh
+# ==========================================================================
+# pre-commit — GUARDA-RAMO-01
+# --------------------------------------------------------------------------
+# Chama `scripts/guarda-ramo.mjs`, que RECUSA commit em ramo ja mesclado na
+# main e AVISA quando o ramo esta atrasado a ponto de os portoes medirem uma
+# arvore velha.
+#
+# Este arquivo e VERSIONADO de proposito. `.git/hooks/` nao entra no repo, e
+# hook que vive so na maquina de um nao e mecanismo — e sorte. Para ligar:
+#
+#     git config core.hooksPath .githooks
+#
+# Essa linha e da mao do Emerson: o agente nao escreve em git config.
+# Para pular em um commit especifico:  git commit --no-verify
+# ==========================================================================
+exec node "$(git rev-parse --show-toplevel)/scripts/guarda-ramo.mjs" "$@"
