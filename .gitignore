@@ -14,6 +14,11 @@ platform/node_modules
 platform/.vercel
 
 # artefatos de build/CLI gerados (não versionar)
+# GITIGNORE-RAIZ-01 — `.next/` SEM prefixo, para o caso de o build ser rodado um
+# nível acima de platform/. Aconteceu em 17/08/2026: sobrou um `.next/` na raiz
+# com trace/trace-build, e ele aparecia como não rastreado a cada `git status`
+# porque a linha `platform/.next` acima só cobre o caminho de dentro.
+.next/
 platform/next-env.d.ts
 platform/tsconfig.tsbuildinfo
 platform/supabase/.temp/
