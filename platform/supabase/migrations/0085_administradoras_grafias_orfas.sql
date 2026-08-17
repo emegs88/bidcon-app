@@ -1,8 +1,37 @@
 -- 0085_administradoras_grafias_orfas.sql — vincula as grafias orfas vivas
 -- PROJETO: xtv (xtvjpnyadcdeadhmzyff). NAO rodar na nnv.
--- AUTORIZADO: PENDENTE. Escrita apos a pergunta de Emerson sobre o corte
---   73 -> 36 da vw_vitrine_viva (13/08/2026). NAO APLICAR sem ordem expressa:
---   esta migracao ESCREVE EM DADO VIVO, ao contrario da 0079.
+-- APLICADA em 13/08/2026 20:02:50 sob o numero 0080 (ledger do xtv, version
+--   20260813200250). Renumerada para 0085 no repo porque 0080 ja estava
+--   ocupado. NAO reaplicar.
+--   Escrita apos a pergunta de Emerson sobre o corte 73 -> 36 da
+--   vw_vitrine_viva (13/08/2026). Ela ESCREVE EM DADO VIVO, ao contrario da
+--   0079 — e por isso o "nao reaplicar" acima nao e formalidade.
+--
+-- ESTE CABECALHO DIZIA "AUTORIZADO: PENDENTE. NAO APLICAR" ATE 17/08/2026.
+-- Era falso, e ficou falso por quatro dias. Corrigido por ordem de Emerson
+-- depois que a coordenacao conferiu o ledger: 2.474 cartas disponiveis
+-- vinculadas, 13 sem vinculo, aliases das grafias no lugar. A instrucao
+-- anterior ("aplica depois do merge") esta RETRATADA na origem.
+-- COMO O ERRO ACONTECEU, para nao repetir: em 17/08 eu renumerei este arquivo
+-- de 0080 para 0085 e escrevi na mensagem de commit que ele seguia pendente.
+-- Eu havia lido o arquivo inteiro e nao havia lido o ledger. Vale como regra
+-- da casa: O ARQUIVO DIZ O QUE SE PRETENDIA; SO O LEDGER DIZ O QUE ACONTECEU.
+-- Reaplicar seria no-op pelos guards. Conferido comando a comando em 17/08,
+-- porque a primeira redacao desta frase estava errada em tres pontos e nao
+-- vale trocar um cabecalho falso por outro:
+--   1 insert  (administradoras/Groscon) guardado por "on conflict do nothing";
+--   4 updates (os quatro array_append de alias) guardados por
+--     not (<alias> = any(aliases)) — e NAO por administradora_id is null,
+--     como eu havia escrito;
+--   1 update  (cartas) guardado por administradora_id is null;
+--   0 delete.
+-- Citado por CONTEUDO e nao por numero de linha de proposito: as duas
+-- primeiras versoes deste paragrafo traziam l.107 e l.115, e as duas estavam
+-- erradas — escrever o paragrafo empurra o corpo para baixo e invalida o
+-- numero no mesmo ato. Referencia que se quebra sozinha nao e referencia.
+-- "if not exists" nao aparece neste arquivo: eu o citei de cabeca, do
+-- vocabulario generico de migracao. Mas no-op por sorte de guard nao e o
+-- mesmo que nao rodar.
 --
 -- RENUMERADA DE 0080 PARA 0085 EM 17/08/2026, por decisao de Emerson.
 -- Este arquivo nasceu 0080 e ficou parado no ramo enquanto a main andava 44
