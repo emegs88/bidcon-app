@@ -279,6 +279,93 @@ bidcon.com.br devolveu a página anterior à fatia, servida de cache, e quase
 virou o relato de que o deploy não havia subido; o que desmentiu foi consultar
 a Vercel, fonte independente. Norma fixada por Emerson.)
 
+**Regra 10 — MIGRATION SE ENSAIA ANTES DE APLICAR.** Ler o arquivo não encontra
+o que executar encontra. Antes de qualquer apply, o DDL inteiro roda contra o
+banco-alvo assim:
+
+```sql
+begin;
+  <o DDL INTEIRO do arquivo, verbatim>
+  <inserções RUINS, uma por regra que se quer provar>
+  <inserções BOAS, ao menos uma>
+  raise exception '%', <relatório>;   -- dentro de um DO
+rollback;
+```
+
+**A exceção no fim é a garantia** — não o `rollback` da última linha. O `raise`
+aborta a transação de dentro; um `rollback` confiado à última linha depende de o
+cliente chegar até ela. Em banco vivo a garantia não pode depender disso.
+
+Inserção ruim vale por regra, e cada recusa é atribuída ao seu culpado por
+`get stacked diagnostics <v> = constraint_name`: sem isso "foi recusada" não é
+"foi recusada POR ESTA regra" — `sqlerrm` trunca e duas regras diferentes
+produzem o mesmo relato. Inserção boa é obrigatória: CHECK que recusa TUDO passa
+por CHECK que funciona (Regra 9, item 4).
+
+*Corolário — recusa por camada mais rasa não prova a regra.* Um tab literal
+dentro de string JSON é recusado pelo PARSER (`22P02`), antes de o CHECK ser
+avaliado; o caso parecia verde e testava outra coisa. Só o escape `"\t"` chega
+ao CHECK. Toda recusa se lê pelo CÓDIGO e pelo constraint, nunca por "deu erro".
+
+**CONTROLE OBRIGATÓRIO DO ENSAIO — sem ele o ensaio é encenação com cara de
+prova.** Verificar, na mesma saída, que os objetos criados pela migration NÃO
+EXISTEM ainda (`pg_class`/`pg_namespace`). Com `create table if not exists`,
+tabela preexistente faz o `create` pular em SILÊNCIO: o ensaio passa a exercitar
+os CHECKs VELHOS e dá verde sobre o schema errado. Depois do rollback, re-medir
+que nada sobrou. É a Regra 9 aplicada ao próprio instrumento.
+
+(Origem: 17/08, POLITICA-ADM-01. O ensaio de um draft de 4 tabelas e 2 views
+achou três defeitos que a leitura do arquivo não achava — incluindo uma view que
+consumia coluna criada por OUTRO draft, o que abortaria a migration inteira se a
+ordem de autorização fosse a outra. Norma fixada por Emerson.)
+
+**Regra 11 — SEÇÃO CERTA NÃO IMPLICA ARQUIVO CERTO.** DDL é sequencial: objeto
+criado DEPOIS de um bloco não recebe o efeito do bloco. Propriedade que pertence
+ao objeto — RLS, grant, index, trigger, `security_invoker` — não se confere
+lendo a seção que a liga; confere-se ENUMERANDO TODOS OS OBJETOS IRMÃOS JUNTOS,
+numa saída só, e comparando linha a linha. O irmão que discorda é o defeito.
+
+(Origem: 17/08, POLITICA-ADM-01 — a tabela de lacunas nasceu com `rls=false`
+enquanto as três irmãs nasciam `true`, porque era criada 30 linhas DEPOIS do
+bloco de `enable row level security`. Cada seção estava correta sozinha e a
+releitura não acusava nada; o que achou foi conferir `relrowsecurity` das quatro
+juntas. Norma fixada por Emerson.)
+
+**Adendo à Regra 11 (17/08) — O VERDE VAZIO TAMBÉM EXISTE DO LADO DA ESCRITA.**
+`insert into ... select ... from t where <nada casa>` grava **0 linhas e NÃO dá
+erro**. O apply passa verde, a tabela nasce vazia, a tela nasce vazia e ninguém
+sabe por quê — porque não houve falha nenhuma para investigar. Todo
+insert-from-select leva ANTES um bloco `do` que CONTA o alvo e `raise exception`
+se a conta não for a esperada; e esse bloco tem de ser visto disparando, senão
+ele é decoração (Regra 9).
+
+CORREÇÃO DE MECANISMO, medida no mesmo dia: **nome de coluna errado NÃO é o caso
+silencioso.** `select ... slug ... from administradoras` devolveu
+`42703: column "slug" does not exist` — alto, na hora, impossível de ignorar. O
+que grava 0 em silêncio é o `where` que não casa VALOR nenhum: medido com
+`where nome = 'Porto Segur'`, a grafia errada da administradora. Guardar o
+mecanismo certo importa porque a defesa é diferente — contra coluna errada o
+próprio banco defende; contra valor que não casa, só o `do` que conta antes.
+(Norma fixada por Emerson; o mecanismo, corrigido pela medição.)
+
+**Regra 12 — NULL FALHA NOS DOIS SENTIDOS, EM SILÊNCIO.** Mesmo NULL, modos
+opostos, ambos mudos:
+- **em CHECK**, expressão que dá NULL **ACEITA** a linha;
+- **em filtro de leitura**, comparação com NULL **DESCARTA** a linha.
+
+Daí: coluna booleana de view é NULL-safe (`coalesce(..., false)`) ou não se usa
+em filtro; e colunas IRMÃS sobre o mesmo dado têm de ter a MESMA política de
+NULL. Assimetria entre irmãs é o sintoma — uma devolvendo `false` e a outra
+`NULO` para a mesma linha é defeito, não estilo. Prova de aceite: a coluna tem
+de ser vista devolvendo os DOIS valores (Regra 9), senão o `coalesce` virou
+constante.
+
+(Origem: 17/08, POLITICA-ADM-01 — `e_condicional` era `valor = 'condicional'` e
+devolvia NULO em toda linha de tipo `lista`, onde `valor` é nulo por construção,
+enquanto a irmã `vale_como_sim` devolvia `false`. Medido: o filtro "o que NÃO é
+condicional" devolvia 4 de 6 linhas, descartando toda linha de lista sem avisar.
+Norma fixada por Emerson.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
