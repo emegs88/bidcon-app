@@ -381,7 +381,9 @@ que aquele arquivo declara.
 citaram `l.107` e depois `l.115`, e as duas estavam erradas — o parágrafo que
 corrigia o número empurrava o corpo para baixo e produzia o número errado
 seguinte. A terceira versão passou a citar por conteúdo e parou de se quebrar.
-Norma fixada por Emerson.)
+Norma fixada por Emerson. Escrita como Regra 10 no ramo
+`ledger-reconciliacao-01`; renumerada para 13 na resolução do conflito — ver
+Regra 17.)
 
 **Regra 14 — homônimo CONVERGENTE é o pior caso. Só a ORIGEM decide.** Nome
 igual + forma divergente **se denuncia sozinho**: ninguém confunde
@@ -407,7 +409,8 @@ por linhagem: **3 de 11 são homônimos** — `administradoras` convergente
 estava "convergindo o schema rico do motor de repasse"), `fornecedores` e
 `reservas` divergentes. A 0011 **mudou de grupo**: não rodou no xtv, e quem
 prova é a `0037_fornecedores_importacoes`, com `create table public.fornecedores`
-sem guarda e sucesso registrado no ledger. Norma fixada por Emerson.)
+sem guarda e sucesso registrado no ledger. Norma fixada por Emerson. Escrita
+como Regra 11; renumerada para 14 — ver Regra 17.)
 
 **Regra 15 — "só o ledger diz o que aconteceu" tem PISO.** A regra continua
 valendo acima do piso e **não vale abaixo dele**. O ledger do xtv começa em
@@ -424,7 +427,8 @@ Não se preenche lacuna de ledger por inferência plausível: um arquivo que
 (Origem: 17/08, LEDGER-RECONCILIACAO-01. Registrado como NÃO SABIDO quem criou
 `cartas.administradora_id` e `cartas.fornecedor_id` no xtv: a 0023 e a 0037
 apenas as pressupõem, e nenhuma das duas está abaixo do piso para ser
-consultada. Limite da própria regra, fixado por Emerson.)
+consultada. Limite da própria regra, fixado por Emerson. Escrita como Regra 12;
+renumerada para 15 — ver Regra 17.)
 
 **Regra 16 — idempotente não quer dizer seguro, quer dizer SEM FREIO.** Guarda
 (`if not exists`, `or replace`) remove o erro, não remove o efeito. Uma
@@ -449,7 +453,38 @@ que reproduzi-la no xtv "aborta na primeira policy já existente". Medido em
 os 2 `add column if not exists` viram no-op e os **3 `create policy` têm
 SUCESSO**, enxertando `fornecedores_admin_all` (`for all using (is_admin())`)
 numa `fornecedores` que é service-role-only por ausência deliberada de policy.
-Norma fixada por Emerson.)
+Norma fixada por Emerson. Escrita como Regra 13; renumerada para 16 — ver
+Regra 17.)
+
+**Regra 17 — numeração append-only COLIDE quando dois ramos escrevem a partir
+de bases diferentes.** Append-only impede renumerar; não impede dois ramos
+escolherem o MESMO próximo número. Antes de numerar uma regra, **sonde a MAIN,
+não o ramo** — `git show origin/main:CLAUDE.md` depois de `fetch`. "A última é
+a Regra 9" medido num ramo atrasado é **o mesmo verde vazio do portão rodado em
+árvore velha**: a resposta é verdadeira sobre um retrato antigo e falsa sobre o
+presente, e não grita.
+
+Quando a colisão já aconteceu, ela é de NÚMERO e não de conteúdo: **nenhuma
+regra cai.** Quem já está na main mantém o número (é a referência pública que
+diários e cabeçalhos podem estar citando); quem ainda está no ramo é renumerado
+para o próximo livre, na ordem em que foi escrito, e cada uma registra na
+origem o número que tinha. Depois, **varrer o repo atrás de citações do número
+antigo** — uma citação sobrevivente aponta para a regra errada em silêncio, que
+é o defeito que a própria seção proíbe.
+
+**E cite pela MATÉRIA, não pelo número.** "A regra do ensaio de migration"
+sobrevive à próxima renumeração; "Regra 10" não. Onde couber, cite as duas —
+`Regra 10 (ensaio de migration)` —, porque o número acha rápido e a matéria
+sobrevive. Uma citação só por número é uma referência que envelhece sem avisar:
+depois de uma renumeração ela continua bem-formada, continua apontando para uma
+regra que existe, e passa a dizer outra coisa. Citação que carrega a matéria
+DENUNCIA a si mesma quando o número desencontra.
+
+(Origem: 17/08. O #42 (POLITICA-ADM-01, já na main) trouxe as Regras 10, 11 e
+12; o ramo `ledger-reconciliacao-01` escreveu 10, 11, 12 e 13 antes de o #42
+entrar, sondando o próprio ramo. As quatro do ramo viraram 13, 14, 15 e 16. É
+literalmente o defeito dos dois arquivos `0080` — número reusado por duas
+frentes — cometido DENTRO do arquivo que o proíbe. Norma fixada por Emerson.)
 
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
