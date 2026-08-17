@@ -20,6 +20,7 @@ import {
   fonteDe,
   lerDetalhe,
   numeroDe,
+  quarentenaPorCarta,
   saudeSyncDe,
 } from "@/lib/radar/eventos";
 
@@ -196,4 +197,155 @@ test("saudeSyncDe: valor nao numerico e null, nao NaN", () => {
   const s = saudeSyncDe("fontes_ok=cinco fontes_falha=");
   assert.equal(s.fontesOk, null);
   assert.equal(s.fontesFalha, null);
+});
+
+// ===========================================================================
+// QUARENTENA — 4 contra 95
+// ---------------------------------------------------------------------------
+// Estes testes existem para uma frase que ja foi dita em voz alta e estava
+// errada: "95 cartas barradas em 24h contra 1 aprovada". Sao QUATRO cartas
+// reinserindo uma vez por ciclo. O numero 95 e a contagem de LINHAS.
+//
+// Cada teste abaixo falha se alguem trocar o campo de identidade de volta.
+// ===========================================================================
+
+/**
+ * A janela real, medida no xtv em 16/08/2026, reduzida na proporcao exata:
+ * quatro cartas (21, 78, 345 da PLAYCONTEMPLADAS e 1182 da PIFFER), cada uma
+ * reincidindo ciclo a ciclo. Os textos sao os que o gatilho `sync_aplicar_cotas`
+ * monta — e o numero dentro deles e o CREDITO, nao a carta.
+ */
+function janelaReal(): { numero_externo: number | null; detalhe: string | null }[] {
+  const linhas: { numero_externo: number | null; detalhe: string | null }[] = [];
+  const cartas: [number, string, number][] = [
+    [21, "PLAYCONTEMPLADAS", 18531],
+    [78, "PLAYCONTEMPLADAS", 30242],
+    [345, "PLAYCONTEMPLADAS", 82515],
+    [1182, "PIFFER", 182340],
+  ];
+  for (const [numero, fonte, credito] of cartas) {
+    const ciclos = numero === 1182 ? 23 : 24; // medido: a PIFFER entrou um ciclo depois
+    for (let i = 0; i < ciclos; i++) {
+      linhas.push({
+        numero_externo: numero,
+        detalhe: `${fonte} credito ${credito} nasceu indisponivel`,
+      });
+    }
+  }
+  return linhas;
+}
+
+test("quarentena: 95 linhas viram 4 cartas — nunca 95", () => {
+  const eventos = janelaReal();
+  assert.equal(eventos.length, 95, "a janela medida tem 95 EVENTOS");
+
+  const porCarta = quarentenaPorCarta(eventos);
+  assert.equal(porCarta.size, 4, "e QUATRO cartas — este numero e o que o vigia julga");
+
+  // O par completo, porque e a distancia entre os dois que desfaz o relatorio.
+  const somaCiclos = [...porCarta.values()].reduce((a, b) => a + b.ciclos, 0);
+  assert.equal(somaCiclos, eventos.length, "nenhuma linha some na agregacao");
+});
+
+test("quarentena: os ciclos por carta batem com a medicao", () => {
+  const porCarta = quarentenaPorCarta(janelaReal());
+  assert.deepEqual(
+    [...porCarta.entries()]
+      .map(([n, b]) => [n, b.fonte, b.ciclos])
+      .sort((a, b) => (a[0] as number) - (b[0] as number)),
+    [
+      [21, "PLAYCONTEMPLADAS", 24],
+      [78, "PLAYCONTEMPLADAS", 24],
+      [345, "PLAYCONTEMPLADAS", 24],
+      [1182, "PIFFER", 23],
+    ]
+  );
+});
+
+// A ARMADILHA CENTRAL, e o unico teste que importa de verdade aqui.
+//
+// `carta_id` esta na mesma linha do banco, tem nome de identidade e muda a cada
+// ciclo — o sync grava linha nova toda hora. Quem agrupasse por ele devolveria
+// uma carta por evento. Este teste reproduz esse engano com numeros e prova que
+// a funcao NAO faz isso: ela le `numero_externo`, que e a carta no mundo.
+test("quarentena: agrupar por identidade-de-linha daria 95 — e nao e o que acontece", () => {
+  const eventos = janelaReal();
+  const idsDeLinha = new Set(eventos.map((_, i) => `linha-${i}`));
+  assert.equal(idsDeLinha.size, 95, "e assim que se chega no 95: contando linhas");
+
+  const porCarta = quarentenaPorCarta(eventos);
+  assert.notEqual(porCarta.size, idsDeLinha.size);
+  assert.equal(porCarta.size, 4);
+});
+
+// A SEGUNDA ARMADILHA: o numero dentro do texto.
+//
+// Hoje ele da 4 distintos por coincidencia — as quatro cartas tem creditos
+// diferentes. Duas cartas de credito IGUAL colapsariam numa so, e o vigia de
+// reincidencia perderia uma carta sem que nada acusasse. Aqui as duas cartas
+// tem o mesmo credito de proposito.
+test("quarentena: duas cartas de credito igual continuam duas", () => {
+  const porCarta = quarentenaPorCarta([
+    { numero_externo: 21, detalhe: "PLAYCONTEMPLADAS credito 50000 nasceu indisponivel" },
+    { numero_externo: 21, detalhe: "PLAYCONTEMPLADAS credito 50000 nasceu indisponivel" },
+    { numero_externo: 78, detalhe: "PLAYCONTEMPLADAS credito 50000 nasceu indisponivel" },
+  ]);
+  assert.equal(porCarta.size, 2, "o credito e igual; as cartas nao sao");
+  assert.equal(porCarta.get(21)?.ciclos, 2);
+  assert.equal(porCarta.get(78)?.ciclos, 1);
+});
+
+// AUSENCIA DE IDENTIDADE NAO VIRA CARTA ZERO.
+//
+// `Number(null)` da 0, e uma carta zero fantasma abriria um alerta com chave
+// `reincidente:0` que nenhuma carta do mundo fecha. A linha sem identidade e
+// DESCARTADA, e a diferenca entre o total e a soma dos ciclos e o que denuncia
+// que havia linha assim.
+test("quarentena: linha sem numero_externo e descartada, nao vira carta 0", () => {
+  const eventos = [
+    { numero_externo: 21, detalhe: "PLAYCONTEMPLADAS credito 18531 nasceu indisponivel" },
+    { numero_externo: null, detalhe: "PLAYCONTEMPLADAS credito 99999 nasceu indisponivel" },
+    { numero_externo: 21, detalhe: "PLAYCONTEMPLADAS credito 18531 nasceu indisponivel" },
+  ];
+  const porCarta = quarentenaPorCarta(eventos);
+  assert.equal(porCarta.size, 1);
+  assert.equal(porCarta.has(0), false, "carta 0 abriria alerta que ninguem fecha");
+  const somaCiclos = [...porCarta.values()].reduce((a, b) => a + b.ciclos, 0);
+  assert.equal(somaCiclos, 2, "3 linhas, 2 com identidade — a diferenca e visivel");
+});
+
+test("quarentena: NaN e Infinity tambem sao descartados", () => {
+  const porCarta = quarentenaPorCarta([
+    { numero_externo: Number.NaN, detalhe: "X credito 1 nasceu indisponivel" },
+    { numero_externo: Number.POSITIVE_INFINITY, detalhe: "X credito 2 nasceu indisponivel" },
+    { numero_externo: 21, detalhe: "X credito 3 nasceu indisponivel" },
+  ]);
+  assert.deepEqual([...porCarta.keys()], [21]);
+});
+
+// A FONTE E ROTULAGEM, NUNCA JULGAMENTO.
+//
+// Se o formato do detalhe mudar amanha, o titulo do alerta sai com a fonte
+// errada e os NUMEROS continuam certos. E a ordem de importancia correta: o
+// vigia decide por ciclos, nao por nome de fonte.
+test("quarentena: detalhe ilegivel vira 'desconhecida' e os ciclos sobrevivem", () => {
+  const porCarta = quarentenaPorCarta([
+    { numero_externo: 345, detalhe: null },
+    { numero_externo: 345, detalhe: "   " },
+  ]);
+  assert.equal(porCarta.get(345)?.fonte, "desconhecida");
+  assert.equal(porCarta.get(345)?.ciclos, 2, "o numero que o vigia usa nao depende do rotulo");
+});
+
+test("quarentena: a fonte do primeiro evento vence e nao troca no meio", () => {
+  const porCarta = quarentenaPorCarta([
+    { numero_externo: 1182, detalhe: "PIFFER credito 182340 nasceu indisponivel" },
+    { numero_externo: 1182, detalhe: "OUTRAFONTE credito 182340 nasceu indisponivel" },
+  ]);
+  assert.equal(porCarta.get(1182)?.fonte, "PIFFER");
+  assert.equal(porCarta.get(1182)?.ciclos, 2);
+});
+
+test("quarentena: janela vazia devolve mapa vazio, nao explode", () => {
+  assert.equal(quarentenaPorCarta([]).size, 0);
 });
