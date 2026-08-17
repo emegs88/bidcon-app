@@ -296,6 +296,74 @@ corrigia o número empurrava o corpo para baixo e produzia o número errado
 seguinte. A terceira versão passou a citar por conteúdo e parou de se quebrar.
 Norma fixada por Emerson.)
 
+**Regra 11 — homônimo CONVERGENTE é o pior caso. Só a ORIGEM decide.** Nome
+igual + forma divergente **se denuncia sozinho**: ninguém confunde
+`fornecedores` de 8 colunas com `fornecedores` de 9 quando só 4 nomes
+genéricos coincidem. Nome igual + forma PARECIDA **passa na inspeção** e é
+aceito como linhagem — a semelhança vira a própria prova, e não é prova de
+nada. Quem decide é **quem criou a tabela**, nunca como ela se chama.
+
+**E existir não é prova.** `avancar_status_processo` existe nos dois bancos
+porque **nasce na 0006**; só o **CORPO** separa — o
+`update cartas set status = 'vendida'` está no nnv e não está no xtv.
+Perguntar "o nome existe?" e responder "o arquivo está aplicado" são duas
+perguntas com uma resposta só.
+
+Instrumento de datação que funciona: **`create table` SEM `if not exists` que
+teve SUCESSO prova que a tabela não existia naquele instante.** Um create com
+guarda não prova nada — vira no-op em silêncio.
+
+(Origem: 17/08, LEDGER-RECONCILIACAO-01. Eu havia reportado os 17 arquivos
+como "aplicados nos dois bancos" tendo medido só o NOME das tabelas. Re-medido
+por linhagem: **3 de 11 são homônimos** — `administradoras` convergente
+(9 de 10 nomes batem; a `0023_administradoras_v2` diz no próprio cabeçalho que
+estava "convergindo o schema rico do motor de repasse"), `fornecedores` e
+`reservas` divergentes. A 0011 **mudou de grupo**: não rodou no xtv, e quem
+prova é a `0037_fornecedores_importacoes`, com `create table public.fornecedores`
+sem guarda e sucesso registrado no ledger. Norma fixada por Emerson.)
+
+**Regra 12 — "só o ledger diz o que aconteceu" tem PISO.** A regra continua
+valendo acima do piso e **não vale abaixo dele**. O ledger do xtv começa em
+`0019_interesses` (`20260705140817`, 05/07): para **0001–0018 não existe
+registro nenhum** — foram aplicadas fora da ferramenta que escreve o ledger.
+
+Abaixo do piso a atribuição só pode ser feita por **linhagem de colunas**, e o
+que a linhagem não decidir fica **NÃO SABIDO**, escrito com essas palavras.
+Não se preenche lacuna de ledger por inferência plausível: um arquivo que
+*pressupõe* uma coluna não é quem a criou. Antes de invocar o ledger como juiz,
+**medir onde ele começa** — a primeira linha de
+`supabase_migrations.schema_migrations`.
+
+(Origem: 17/08, LEDGER-RECONCILIACAO-01. Registrado como NÃO SABIDO quem criou
+`cartas.administradora_id` e `cartas.fornecedor_id` no xtv: a 0023 e a 0037
+apenas as pressupõem, e nenhuma das duas está abaixo do piso para ser
+consultada. Limite da própria regra, fixado por Emerson.)
+
+**Regra 13 — idempotente não quer dizer seguro, quer dizer SEM FREIO.** Guarda
+(`if not exists`, `or replace`) remove o erro, não remove o efeito. Uma
+migration idempotente reproduzida no banco errado **não aborta** — ela roda
+limpa até o fim e enxerta o que não devia, sem nada gritar.
+
+**Ausência de policy é uma DECISÃO de segurança que parece um vazio a
+preencher.** Tabela sem policy com RLS ligado é service-role-only de propósito;
+`create policy` "idempotente" em cima dela **alarga acesso** e passa por
+higiene. Antes de reproduzir SQL contra um banco, medir o que já existe lá
+(`pg_policies`, `information_schema`) — sucesso sem erro não é sinal de que
+rodou no lugar certo.
+
+Corolário: `create or replace` **regride em silêncio** uma versão mais nova, e
+em Postgres a identidade da função é (nome, tipos dos argumentos) — reproduzir
+um arquivo antigo pode **ressuscitar uma sobrecarga já removida** sem conflito
+nenhum.
+
+(Origem: 17/08, LEDGER-RECONCILIACAO-01. Eu havia escrito no cabeçalho da 0011
+que reproduzi-la no xtv "aborta na primeira policy já existente". Medido em
+`pg_policies`: **não aborta** — os 2 `create table if not exists` viram no-op,
+os 2 `add column if not exists` viram no-op e os **3 `create policy` têm
+SUCESSO**, enxertando `fornecedores_admin_all` (`for all using (is_admin())`)
+numa `fornecedores` que é service-role-only por ausência deliberada de policy.
+Norma fixada por Emerson.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
