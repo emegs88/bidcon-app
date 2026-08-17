@@ -132,3 +132,57 @@ export function amostraDe(texto: string | null | undefined): {
     recebidas: numeroDe(lido, "recebidas"),
   };
 }
+
+// ---------------------------------------------------------------------------
+// QUARENTENA — a agregação que decide 4 contra 95
+// ---------------------------------------------------------------------------
+//
+// Esta função existe fora da rota por um motivo prático: ela é o ponto onde o
+// erro de identidade acontece, e dentro da rota nenhum teste a alcança.
+//
+// TRÊS CAMPOS PARECEM IDENTIDADE E SÓ UM É (medido no xtv, 16/08/2026, janela
+// de 24h com 95 eventos de `carta_nova_quarentenada`):
+//
+//   numero_externo ... 4 distintos   <- a carta NO MUNDO. É este.
+//   carta_id ......... 95 distintos  <- a identidade da LINHA. O sync grava uma
+//                                       nova a cada ciclo, então contar isto
+//                                       devolve o número de eventos com cara de
+//                                       número de cartas.
+//   o número no texto  4 distintos   <- coincidência. "PLAYCONTEMPLADAS credito
+//                                       18531 nasceu indisponivel" traz o VALOR
+//                                       DO CRÉDITO (o gatilho monta a frase com
+//                                       `r.vc`). Hoje bate por acaso, porque as
+//                                       quatro cartas têm créditos diferentes;
+//                                       duas cartas de crédito igual virariam
+//                                       uma só.
+//
+// O relatório "95 cartas barradas em 24h contra 1 aprovada" nasceu de contar o
+// campo errado. São QUATRO cartas (21, 78, 345 e 1182) reinserindo uma vez por
+// ciclo. Não é a porta quebrada: é a porta funcionando 24 vezes.
+export type EventoQuarentena = {
+  numero_externo: number | null;
+  detalhe: string | null;
+};
+
+export function quarentenaPorCarta(
+  eventos: EventoQuarentena[]
+): Map<number, { fonte: string; ciclos: number }> {
+  const porCarta = new Map<number, { fonte: string; ciclos: number }>();
+  for (const ev of eventos) {
+    const n = ev.numero_externo;
+    // `Number.isFinite` recusa null, undefined, NaN e Infinity de uma vez. Uma
+    // linha sem numero_externo não vira carta anônima nem carta zero: ela é
+    // descartada, e a diferença entre `eventos.length` e a soma dos ciclos é o
+    // que denuncia que havia linha sem identidade.
+    if (typeof n !== "number" || !Number.isFinite(n)) continue;
+    const balde = porCarta.get(n) ?? {
+      // Rotulagem, nunca julgamento. Se o formato do detalhe mudar, o título do
+      // alerta sai com a fonte errada e os NÚMEROS continuam certos.
+      fonte: fonteDe(lerDetalhe(ev.detalhe)) ?? "desconhecida",
+      ciclos: 0,
+    };
+    balde.ciclos++;
+    porCarta.set(n, balde);
+  }
+  return porCarta;
+}

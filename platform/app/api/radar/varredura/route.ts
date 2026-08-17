@@ -62,24 +62,33 @@
 // ============================================================================
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
-import { amostraDe, divergenciasDe, saudeSyncDe } from "@/lib/radar/eventos";
+import {
+  amostraDe,
+  divergenciasDe,
+  quarentenaPorCarta,
+  saudeSyncDe,
+} from "@/lib/radar/eventos";
 import { horasUteisEntre, percentil, radarLigado, ENV_KILL_SWITCH } from "@/lib/radar/limiar";
 import {
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
   CHAVE_FAROL_SEM_PUBLICAR,
   CHAVE_FILA_ENVELHECENDO,
+  CHAVE_QUARENTENA_VOLUME,
   TIPO_AMOSTRA,
   TIPO_DIVERGENCIA,
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
+  TIPO_QUARENTENA,
   vigiaDivergenciaSync,
   vigiaEstoqueNivel,
   vigiaEstoqueSemMovimento,
   vigiaFarolSemPublicar,
   vigiaFilaSentinela,
   vigiaProvaAmostra,
+  vigiaQuarentenaReincidente,
+  vigiaQuarentenaVolume,
   type Alerta,
 } from "@/lib/radar/vigias";
 
@@ -95,6 +104,20 @@ export const maxDuration = 60;
 const JANELA_CICLO_MS = 3 * 60 * 60 * 1000;
 /** Teto de eventos lidos por tipo. `ciclo_integridade_falhou` tem 274 no total. */
 const TETO_EVENTOS = 500;
+/**
+ * Teto próprio da quarentena, e ele é maior de propósito. `carta_nova_quarentenada`
+ * repete a MESMA carta uma vez por ciclo horário, então o volume em eventos é uma
+ * ordem de grandeza acima dos outros tipos: 2148 eventos em 14 dias, e o pior dia
+ * sozinho fez 266 (medido em 16/08/2026).
+ *
+ * 1500 é ~5,6x o pior dia conhecido. A folga não é conforto: se esta leitura
+ * cortar, ela corta os eventos MAIS ANTIGOS da janela e devolve uma contagem
+ * BAIXA — e contagem baixa aqui significa silêncio dos dois vigias exatamente no
+ * dia em que a quarentena explodiu. É o defeito de "se acostumar com o problema"
+ * pela porta da paginação. Por isso a fase 2 detecta a saturação e RECUSA julgar
+ * em vez de julgar com número curto.
+ */
+const TETO_QUARENTENA = 1500;
 const MS_POR_HORA = 3_600_000;
 
 function autorizado(req: Request): boolean {
@@ -276,6 +299,42 @@ export async function GET(req: Request) {
   if (fila.error) avisos.push(`sentinela_fila: ${fila.error.message}`);
   if (maisAntiga.error) avisos.push(`sentinela_fila_antiga: ${maisAntiga.error.message}`);
 
+  // --- 1f. quarentena ----------------------------------------------------
+  //
+  // A COLUNA, NÃO O TEXTO. `eventos_sync` tem `numero_externo` própria, e é ela
+  // que vale. O `detalhe` também carrega um número — "PLAYCONTEMPLADAS credito
+  // 18531 nasceu indisponivel" — mas esse é o VALOR DO CRÉDITO: o gatilho
+  // `sync_aplicar_cotas` monta a frase com `r.vc`, não com o número da carta.
+  // Medido em 16/08/2026: as quatro cartas em quarentena são 21, 78, 345 e 1182;
+  // 18531/30242/82515/182340 são os créditos delas. Quem parseasse o texto
+  // acharia que estava lendo identidade e estaria lendo dinheiro — e duas cartas
+  // de crédito igual colapsariam numa só.
+  //
+  // `carta_id` também está lá e também não serve: é a identidade da LINHA, e o
+  // sync grava linha nova a cada ciclo. Na janela de agora são 95 eventos, 95
+  // `carta_id` distintos e 4 `numero_externo` distintos. Um vigia escrito com o
+  // campo de nome mais óbvio nasceria gritando 95 por um problema que são 4.
+  const { data: quarentena, error: errQuar } = await db
+    .from("eventos_sync")
+    .select("numero_externo, detalhe")
+    .eq("tipo", "carta_nova_quarentenada")
+    .gte("em", desde24h.toISOString())
+    .order("em", { ascending: false })
+    .limit(TETO_QUARENTENA);
+  if (errQuar) avisos.push(`carta_nova_quarentenada: ${errQuar.message}`);
+
+  // As chaves de reincidência JÁ ABERTAS. A carta que para de reincidir some da
+  // janela de 24h, e condição que some da medição nunca é fechada pela fase 3 —
+  // o alerta ficaria aberto para sempre, contradizendo o que o próprio vigia
+  // documenta ("resolve sozinho quando a carta para de aparecer"). Ler as
+  // abertas é o que permite dizer "medi a janela inteira e esta não estava lá".
+  const { data: quarAbertos, error: errQuarAbertos } = await db
+    .from("radar_alertas")
+    .select("chave")
+    .eq("tipo", TIPO_QUARENTENA)
+    .is("resolvido_em", null);
+  if (errQuarAbertos) avisos.push(`radar_alertas quarentena: ${errQuarAbertos.message}`);
+
   // =========================================================================
   // FASE 2 — JULGAR. Daqui para baixo, nenhuma linha toca o banco.
   // =========================================================================
@@ -363,6 +422,59 @@ export async function GET(req: Request) {
     if (a) alertas.push(a);
   }
 
+  // 6. quarentena — volume e reincidência. Duas condições, duas naturezas:
+  //    volume alto = a fonte piorou AGORA; reincidência = uma carta específica é
+  //    lixo permanente do lado do fornecedor, e nenhum ciclo nosso conserta.
+  const quarLidos = (quarentena ?? []) as {
+    numero_externo: number | null;
+    detalhe: string | null;
+  }[];
+  let quarDistintas: number | null = null;
+  let quarEventos: number | null = null;
+
+  if (errQuar) {
+    // Já foi para `avisos` na fase 1. Sem medição não há julgamento, e não
+    // julgar é diferente de julgar "está bom": nada é marcado, nada é fechado.
+  } else if (quarLidos.length >= TETO_QUARENTENA) {
+    avisos.push(
+      `quarentena: nao julgado (leitura saturou em ${TETO_QUARENTENA} eventos)`
+    );
+  } else {
+    // A agregação mora em lib/radar/eventos.ts, testada. Aqui dentro ela seria
+    // inalcançável pelo harness — e é exatamente a linha onde o erro de
+    // identidade (95 linhas com cara de 95 cartas) acontece.
+    const porCarta = quarentenaPorCarta(quarLidos);
+
+    marcar(TIPO_QUARENTENA, CHAVE_QUARENTENA_VOLUME);
+    quarDistintas = porCarta.size;
+    quarEventos = quarLidos.length;
+    const aVolume = vigiaQuarentenaVolume({
+      cartasDistintas: porCarta.size,
+      eventos: quarLidos.length,
+    });
+    if (aVolume) alertas.push(aVolume);
+
+    for (const [numeroExterno, balde] of porCarta) {
+      marcar(TIPO_QUARENTENA, `reincidente:${numeroExterno}`);
+      const a = vigiaQuarentenaReincidente({
+        numeroExterno,
+        fonte: balde.fonte,
+        ciclos: balde.ciclos,
+      });
+      if (a) alertas.push(a);
+    }
+
+    // A carta que PAROU de reincidir não aparece na janela. Como a leitura não
+    // saturou, ausência aqui é medição de verdade — zero ciclos —, não silêncio.
+    // Só por isso é legítimo marcar a chave como julgada e deixar a fase 3
+    // fechá-la. Se tivesse saturado, este bloco inteiro não roda, e é o certo:
+    // fechar alerta com base em leitura cortada seria declarar resolvido o que
+    // não foi olhado.
+    for (const r of (quarAbertos ?? []) as { chave: string }[]) {
+      if (r.chave.startsWith("reincidente:")) marcar(TIPO_QUARENTENA, r.chave);
+    }
+  }
+
   // =========================================================================
   // FASE 3 — GRAVAR
   // =========================================================================
@@ -436,6 +548,11 @@ export async function GET(req: Request) {
       farol_publicados_hoje: publicadosHoje ?? null,
       hora_sp: horaSP(agora),
       fila_sentinela_esperando: fila.count ?? null,
+      // Os dois lado a lado, sempre. Foi a distância entre eles que desfez o
+      // relatório de "95 cartas barradas": são 95 EVENTOS e 4 CARTAS. Null aqui
+      // quer dizer "não julgado" — erro de leitura ou saturação —, nunca zero.
+      quarentena_cartas_distintas_24h: quarDistintas,
+      quarentena_eventos_24h: quarEventos,
     },
     alertas: alertas.map((a) => ({
       tipo: a.tipo,
