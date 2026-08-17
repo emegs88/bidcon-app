@@ -1,5 +1,27 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0014 · Fluxo pós-reserva do cliente
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido objeto a
+--   objeto em 17/08/2026: `checklist_modelos`, `checklist_itens`,
+--   `processo_documentos`, `contratos` e `pagamentos_sinal` existem no nnv
+--   (5/5) e NÃO existem no xtv (0/5).
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--   PERIGO — este é o arquivo que MAIS estraga se rodar no banco errado, porque
+--   quase tudo nele daria certo no xtv. As dependências (`cartas`, `processos`,
+--   `processo_eventos`, `administradoras`, `profiles`, `is_admin`) existem lá,
+--   porque 0001/0003/0011 rodaram nos dois. Consequências concretas:
+--     - `alter table public.cartas add column if not exists comissao_percentual`
+--       enxertaria uma coluna admin-only na tabela VIVA da vitrine, sem erro;
+--     - `alter table public.processos add column ... subetapa/prazo_em` idem;
+--     - as 3 policies de `storage.objects` pendurariam regra de processo no
+--       Storage da vitrine, para buckets que lá não existem.
+--   Nada disso levanta exceção. É poluição silenciosa em banco de produção.
+--   Aviso de reprodução: o `do $$ ... exception when duplicate_object` do enum,
+--   os `create table if not exists`, os `add column if not exists`, os `create
+--   index if not exists` e os `create or replace function` são guardados. Os
+--   15 `create policy` (12 de tabela + 3 de storage) NÃO são. Contra banco vivo
+--   aborta na primeira policy já existente — mas só DEPOIS de já ter aplicado as
+--   colunas aditivas, que não são revertidas pelo abort de um statement adiante.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. RODA NO DEV PELO EMERSON (SQL editor do Supabase).
 -- O agente NÃO aplica nada — aqui só validamos a sintaxe localmente.

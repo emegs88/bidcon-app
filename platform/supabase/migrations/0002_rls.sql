@@ -1,5 +1,18 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0002 · RLS (Fase 0)
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido objeto a objeto em
+--   17/08/2026: a função `is_admin` e as 13 policies abaixo existem nos DOIS
+--   bancos (14/14 em cada). Este arquivo NÃO é forasteiro nesta pasta — ele
+--   fechou a RLS do xtv também. NÃO mover, e NÃO pular numa reprodução do xtv:
+--   pular deixaria a vitrine com as tabelas da 0001 e SEM policy nenhuma.
+--   CONTRADIZ a expressão "Rascunho para revisão", logo abaixo, falsa desde a
+--   primeira aplicação. A frase fica no lugar como registro, não como
+--   instrução: o arquivo diz o que se pretendia, só o ledger diz o que
+--   aconteceu.
+--   Aviso de reprodução: os `create policy` abaixo NÃO têm guard (não existe
+--   `create policy if not exists` no Postgres). Reproduzir contra banco vivo
+--   aborta na primeira policy já existente — ruído honesto, não corrupção.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. Implementa a matriz §4 de docs/plataforma-arquitetura.md.
 -- Princípios:

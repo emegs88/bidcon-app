@@ -1,5 +1,69 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0011 · Administradoras + Fornecedores
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv).
+--
+--   CORREÇÃO DE 17/08/2026 — este cabeçalho já disse "xtv E nnv — APLICADA NOS
+--   DOIS", e estava ERRADO. A medição anterior perguntou se os NOMES existiam
+--   nos dois bancos (existem) e chamou isso de aplicada. Re-medido por LINHAGEM,
+--   isto é, por quem criou cada tabela e com que forma:
+--
+--   `administradoras` — no xtv NÃO nasceu aqui. Nasceu em
+--     `0023_administradoras_v2` (nativa do xtv, aplicada 08/07/2026), que a cria
+--     do zero com 3 colunas e depois acrescenta aliases/marca_logo/site_oficial/
+--     aceita_assuncao/segmentos/ativo/exigencia_garantia_pct. O comentário da
+--     própria 0023 diz "no xtv: no-op, tabela nasce vazia" — ela sabe que está
+--     criando, não estendendo. Resultado: 9 dos 10 nomes de coluna coincidem com
+--     os desta 0011, mas por CONVERGÊNCIA DELIBERADA (a 0023 se declara
+--     convergindo o schema do motor de repasse), não por descendência.
+--     É o homônimo mais traiçoeiro dos três, porque a forma quase idêntica
+--     PARECE prova de linhagem e não é.
+--
+--   `fornecedores` — no xtv nasceu em `0037_fornecedores_importacoes` (nativa do
+--     xtv, aplicada 09/07/2026), com `create table public.fornecedores` SEM
+--     guard e com outra forma:
+--       xtv (8 col.): id · nome · contato_nome · whatsapp · email ·
+--                     observacoes · ativo · criado_em
+--       nnv (9 col.): id · nome · portal_origem · canal_lance · resp_nome ·
+--                     resp_contato · obs · ativo · criado_em
+--     Coincidem 4 nomes — id, nome, ativo, criado_em —, todos genéricos. Nenhum
+--     campo de negócio casa.
+--
+--   O QUE NÃO CONSIGO ATRIBUIR, e registro como não sabido: `cartas.
+--   administradora_id` e `cartas.fornecedor_id` EXISTEM no xtv, e esta 0011 é o
+--   único arquivo da pasta que as acrescenta — mas o ledger do xtv
+--   (supabase_migrations.schema_migrations) COMEÇA em `0019_interesses`
+--   (05/07/2026) e não tem entrada nenhuma para 0001–0018. Tudo anterior foi
+--   aplicado à mão, fora do ledger. Então não dá para afirmar que foi este
+--   arquivo: 0023 e 0037 apenas PRESSUPÕEM as colunas prontas. Fica em aberto.
+--
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--
+--   PERIGO — e este cabeçalho também errou aqui. A versão anterior dizia que
+--   reproduzir contra banco vivo "aborta na primeira policy já existente".
+--   NÃO ABORTA. Medido no xtv em 17/08/2026: `fornecedores` tem RLS ligado e
+--   ZERO policies; `administradoras` tem só `administradoras_leitura_publica`
+--   (da 0023). Nenhum dos 3 nomes de policy deste arquivo colide com nada.
+--   Rodado contra o xtv, este arquivo vai do começo ao fim SEM UM ERRO:
+--     - os 2 `create table if not exists` viram no-op SILENCIOSO contra as
+--       tabelas de 0023/0037 — inclusive contra a `fornecedores` de FORMA
+--       DIFERENTE, que ele não corrige e não denuncia;
+--     - os 2 `add column if not exists` em `cartas` viram no-op;
+--     - e os 3 `create policy` SÃO CRIADOS, enxertando regra de acesso em
+--       tabelas que este arquivo não criou. `fornecedores_admin_all` é
+--       `for all using (is_admin())` sobre uma tabela que hoje, no xtv, é
+--       service-role-only por ausência DELIBERADA de policy: a 0037 fecha o
+--       acesso justamente não escrevendo policy nenhuma. Reproduzir esta 0011
+--       ABRE essa tabela para todo is_admin(), e o operador não vê um aviso.
+--   Sucesso sem erro não é sinal de que rodou no lugar certo.
+--
+--   PERIGO na frase "Aplicar primeiro no DEV (fpgimirtiryivnrjdyxb)", logo
+--   abaixo: aponta para o projeto prospere-360-dev, que hoje é o COFRE KYC
+--   (ACERVO-360) e está declarado INTOCÁVEL no CLAUDE.md. NÃO rode nada deste
+--   arquivo lá. O rótulo "DEV" envelheceu junto com o projeto.
+--   A frase "NÃO rodar em PROD sem autorização do Emerson" fica como registro,
+--   não como instrução: rodou no nnv, que é produção. O arquivo diz o que se
+--   pretendia, só o ledger diz o que aconteceu.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8 e BLOCO 9.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. NÃO rodar em PROD sem autorização do Emerson.
 -- Aplicar primeiro no DEV (fpgimirtiryivnrjdyxb), via SQL Editor do Supabase.

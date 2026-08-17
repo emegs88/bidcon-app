@@ -1,5 +1,22 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0004 · Sync de cotas (Fase 2)
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido objeto a objeto em
+--   17/08/2026: `eventos_sync` existe nos DOIS bancos, e com as MESMAS 7
+--   colunas (id, tipo, numero_externo, carta_id, detalhe, push_pendente, em) —
+--   não é homônimo, é a mesma tabela. As colunas de sync em `cartas` e o valor
+--   'indisponivel' do enum também estão nos dois. NÃO mover, e NÃO pular numa
+--   reprodução do xtv: pular deixaria a vitrine sem `numero_externo`, que é a
+--   chave de upsert de todo o sync.
+--   CONTRADIZ a expressão "Rascunho para revisão", logo abaixo, falsa desde a
+--   primeira aplicação. A frase fica no lugar como registro, não como
+--   instrução: o arquivo diz o que se pretendia, só o ledger diz o que
+--   aconteceu.
+--   Aviso de reprodução: quase tudo aqui é guardado (`if not exists`), MENOS
+--   `create policy eventos_sync_admin_all`. Reproduzir contra banco vivo aborta
+--   nessa linha — ruído honesto, não corrupção.
+--   Cuidado de leitura: `sync_aplicar_cotas` nasce AQUI e é substituída pela
+--   0015 (`create or replace`). Existir a função não prova que a 0015 rodou;
+--   só o corpo decide. Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. Conecta a fonte JÁ PROVADA do site
 -- (360prospere.vercel.app/cotas.js) à tabela `cartas` via cron horário.

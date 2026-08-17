@@ -1,5 +1,18 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0001 · Schema base (Fase 0)
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido objeto a objeto em
+--   17/08/2026: profiles, cartas, processos, indicacoes e comissoes existem nos
+--   DOIS bancos (5/5 em cada). Este arquivo NÃO é forasteiro nesta pasta — ele
+--   criou o núcleo do xtv também. NÃO mover, e NÃO pular numa reprodução do
+--   xtv: pular deixaria a vitrine sem `cartas` e sem `profiles`.
+--   CONTRADIZ a frase "Rascunho para revisão. NÃO foi aplicado em nenhum
+--   projeto Supabase", logo abaixo, falsa desde a primeira aplicação. A frase
+--   fica no lugar como registro, não como instrução: o arquivo diz o que se
+--   pretendia, só o ledger diz o que aconteceu.
+--   Aviso de reprodução: os `create type ... as enum` abaixo NÃO têm guard, e
+--   os `create table` também não. Reproduzir contra banco vivo aborta no
+--   primeiro tipo já existente — o que aqui é ruído honesto, não corrupção.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. NÃO foi aplicado em nenhum projeto Supabase.
 -- Decisões desta rodada (ver docs/plataforma-arquitetura.md):

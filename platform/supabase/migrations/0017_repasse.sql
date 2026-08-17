@@ -1,5 +1,33 @@
 -- ============================================================================
 -- 0017_repasse.sql — Fatia 1 do produto REPASSE (Assunção de Dívida)
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido em
+--   17/08/2026: as colunas de repasse em `reservas` e o CHECK ampliado de
+--   `reserva_legs.beneficiary_type` (11 valores) existem no nnv; no xtv não
+--   existe `reserva_legs` nenhuma, e a `reservas` de lá é OUTRA tabela.
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--
+--   PERIGO DO HOMÔNIMO `reservas` — é o motivo pelo qual este cabeçalho existe.
+--   Os dois bancos têm uma tabela chamada `reservas`, e elas NÃO são a mesma
+--   coisa: a do xtv é a reserva da vitrine (colunas em português, ~10); a do nnv
+--   é a reserva do motor de custódia da 0016 (colunas em inglês, ~27). Só 2
+--   nomes de coluna coincidem. Ver as duas formas lado a lado em
+--   ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 3.
+--   Consequência: o §2 abaixo é todo `add column if not exists`, que NÃO
+--   distingue tabela certa de homônima. Rodado contra o xtv, enxertaria 9
+--   colunas de repasse e 2 CHECKs na tabela de reserva da VITRINE, sem uma
+--   única mensagem de erro. É o caso em que "não deu erro" não significa nada.
+--   O que hoje segura isso é acidente, não projeto: o §1 aborta antes, porque
+--   `public.reserva_legs` não existe no xtv. Quem rodar o arquivo por partes, ou
+--   pular o §1, perde essa proteção.
+--
+--   ARMADILHA DE MEDIÇÃO no §3: `administradoras.exigencia_garantia_pct` EXISTE
+--   no xtv — e não veio daqui. Veio da migration nativa do xtv
+--   `0023_administradoras_v2.sql`. Como o §3 é um bloco condicional
+--   (`if to_regclass('public.administradoras') is not null`) e `administradoras`
+--   existe nos dois bancos, alguém que meça a aplicação desta migration por
+--   aquela coluna conclui "0017 rodou no xtv". NÃO rodou. Coluna presente não
+--   prova qual arquivo a criou.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- ADITIVA E IDEMPOTENTE. A 0016 (reserve_core) NÃO é tocada: nada é dropado,
 -- nenhuma coluna/tabela existente é removida, nenhum dado é alterado. Só:

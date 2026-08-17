@@ -1,5 +1,19 @@
 -- ============================================================================
 -- Bidcon — Migration 0013 · PROSPERE byAncora (simulador interno da equipe)
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido em
+--   17/08/2026: `ancora_tabela` existe no nnv (1/1) e NÃO existe no xtv (0/1).
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--   CONTRADIZ a frase "NÃO rodar em PROD", logo abaixo: rodou no nnv, que é
+--   banco de produção. A frase fica como registro, não como instrução — o
+--   arquivo diz o que se pretendia, só o ledger diz o que aconteceu.
+--   PERIGO na mesma frase: "Aplicar primeiro no DEV (fpgimirtiryivnrjdyxb)"
+--   aponta para o projeto prospere-360-dev, que hoje é o COFRE KYC (ACERVO-360)
+--   e está declarado INTOCÁVEL no CLAUDE.md. NÃO rode nada deste arquivo lá.
+--   O rótulo "DEV" envelheceu junto com o projeto.
+--   Aviso de reprodução: `create table if not exists` e `create index if not
+--   exists` são guardados, mas os 2 `create policy` NÃO. Reproduzir contra
+--   banco vivo aborta na primeira policy já existente.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. NÃO rodar em PROD. Aplicar primeiro no DEV
 -- (fpgimirtiryivnrjdyxb) via SQL Editor do Supabase, DEPOIS de 0010→0011→0012.

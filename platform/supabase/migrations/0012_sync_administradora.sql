@@ -1,5 +1,23 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0012 · Sync carimba administradora
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido em 17/08/2026:
+--   `sync_fonte_config` existe nos DOIS bancos (1/1 em cada). No xtv ela tem
+--   uma coluna A MAIS (`ativo`), acrescentada depois por migration nativa do
+--   xtv; o resto casa. NÃO mover, e NÃO pular numa reprodução do xtv: pular
+--   deixaria o sync sem a tabela que resolve administradora/fornecedor por
+--   fonte — e a 0015 depende dela.
+--   CONTRADIZ a frase "NÃO rodar em PROD sem autorização. DEV primeiro", logo
+--   abaixo: rodou nos dois bancos de produção. A frase fica como registro, não
+--   como instrução — o arquivo diz o que se pretendia, só o ledger diz o que
+--   aconteceu.
+--   Cuidado de leitura: a `sync_aplicar_cotas(p_cotas jsonb)` recriada aqui NÃO
+--   existe mais em banco NENHUM — a 0015 a derrubou por nome e assinatura
+--   (`drop function if exists sync_aplicar_cotas(jsonb)`). Reproduzir esta
+--   migration depois da 0015 RESSUSCITA a versão antiga ao lado da nova e cria
+--   ambiguidade de sobrecarga na chamada. Aplique na ordem, ou pule a §4.
+--   Aviso de reprodução: `create policy sync_fonte_config_admin_all` não tem
+--   guard; o resto é guardado ou idempotente.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. Depende de 0011 (tabelas + cartas.administradora_id /
 -- cartas.fornecedor_id). NÃO rodar em PROD sem autorização. DEV primeiro.

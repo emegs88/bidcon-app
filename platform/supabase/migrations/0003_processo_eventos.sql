@@ -1,5 +1,17 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0003 · Histórico de processo (Fase 1)
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido objeto a objeto em
+--   17/08/2026: `processo_eventos` existe nos DOIS bancos, e com as MESMAS 6
+--   colunas (id, processo_id, de_status, para_status, nota, em) — não é
+--   homônimo, é a mesma tabela. Este arquivo NÃO é forasteiro nesta pasta.
+--   NÃO mover, e NÃO pular numa reprodução do xtv.
+--   CONTRADIZ a expressão "Rascunho para revisão", logo abaixo, falsa desde a
+--   primeira aplicação. A frase fica no lugar como registro, não como
+--   instrução: o arquivo diz o que se pretendia, só o ledger diz o que
+--   aconteceu.
+--   Aviso de reprodução: `create table` e `create policy` abaixo NÃO têm guard.
+--   Reproduzir contra banco vivo aborta — ruído honesto, não corrupção.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. Tabela de eventos da timeline do processo.
 -- Decisões (docs/plataforma-fase1-plano.md §4, opção B):

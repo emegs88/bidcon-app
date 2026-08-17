@@ -1,5 +1,27 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0008 · Cadastro + KYC
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido objeto a
+--   objeto em 17/08/2026: `kyc_perfis` e `kyc_eventos` existem no nnv (2/2) e
+--   NÃO existem no xtv (0/2). O tipo `kyc_status` também não existe no xtv —
+--   e essa ausência tem consequência longe daqui: a §5 da 0015 declara
+--   `v_kyc kyc_status`, então ela não pôde rodar no xtv nem por acidente.
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem, e mover
+--   quebraria a correspondência ledger↔nome de arquivo.
+--   PERIGO na linha seguinte: "APLICAR PRIMEIRO NO DEV (fpgimirtiryivnrjdyxb)"
+--   aponta para o projeto prospere-360-dev, que hoje é o COFRE KYC (ACERVO-360)
+--   e está declarado INTOCÁVEL no CLAUDE.md. NÃO rode nada deste arquivo lá.
+--   O rótulo "DEV" envelheceu junto com o projeto — e a ironia é que o cofre
+--   guarda exatamente o tipo de dado que esta migration cria.
+--   Aviso de reprodução: `create type kyc_status as enum`, os dois `create
+--   table`, os `create index` e TODOS os `create policy` (inclusive os três de
+--   `storage.objects`) NÃO têm guard. Contra banco vivo, aborta no primeiro que
+--   já existir. Só `handle_new_user`, `kyc_decidir` e o `drop trigger if
+--   exists` são idempotentes.
+--   Cuidado de alcance: as policies do fim tocam `storage.objects`, que é
+--   schema COMPARTILHADO do projeto inteiro. Rodar isto no xtv não criaria só
+--   tabelas órfãs — penduraria policy de KYC no Storage da vitrine, para
+--   buckets que lá não existem.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. APLICAR PRIMEIRO NO DEV (fpgimirtiryivnrjdyxb) pelo
 -- Emerson (SQL editor do Supabase). O agente NÃO aplica nada no banco — aqui só
