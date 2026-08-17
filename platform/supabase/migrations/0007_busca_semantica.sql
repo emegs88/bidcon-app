@@ -1,5 +1,15 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0007 · Busca semântica (pgvector)
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido em 17/08/2026: a função
+--   `buscar_cartas_semantica` existe nos DOIS bancos (1/1 em cada). NÃO mover,
+--   e NÃO pular numa reprodução do xtv: pular deixaria a vitrine sem a coluna
+--   `embedding` e sem o índice HNSW, e o backfill não teria onde escrever.
+--   O aviso "RODA EM PRODUÇÃO PELO EMERSON", logo abaixo, CONFERE com o medido;
+--   o que envelheceu é só a expressão "Rascunho para revisão" que o precede.
+--   Aviso de reprodução: tudo aqui é guardado (`create extension if not
+--   exists`, `add column if not exists`, `create index if not exists`,
+--   `create or replace function`) — re-rodar contra banco vivo é seguro.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. RODA EM PRODUÇÃO PELO EMERSON (SQL editor do Supabase).
 -- O agente NÃO aplica nada em PROD — aqui só validamos a sintaxe localmente.

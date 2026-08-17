@@ -279,6 +279,23 @@ bidcon.com.br devolveu a página anterior à fatia, servida de cache, e quase
 virou o relato de que o deploy não havia subido; o que desmentiu foi consultar
 a Vercel, fonte independente. Norma fixada por Emerson.)
 
+**Regra 10 — cabeçalho não cita número de linha do próprio arquivo.** Cada
+correção do cabeçalho desloca as linhas que o cabeçalho cita, e o conserto vira
+laço: escrever o parágrafo invalida o número no mesmo ato. Cite por **CONTEÚDO**
+— o texto do statement, o nome da constraint, o nome da função —, que não
+desloca. Vale para qualquer bloco de comentário no topo de arquivo, não só
+migration.
+
+Corolário: referência que se quebra sozinha não é referência. O mesmo motivo
+proíbe citar linha de OUTRO arquivo vivo em comentário — cite o identificador
+que aquele arquivo declara.
+
+(Origem: 17/08, cabeçalho da 0085. Duas versões seguidas do mesmo parágrafo
+citaram `l.107` e depois `l.115`, e as duas estavam erradas — o parágrafo que
+corrigia o número empurrava o corpo para baixo e produzia o número errado
+seguinte. A terceira versão passou a citar por conteúdo e parou de se quebrar.
+Norma fixada por Emerson.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do

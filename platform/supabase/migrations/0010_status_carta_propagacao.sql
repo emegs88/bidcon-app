@@ -1,5 +1,22 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0010 · Propagação de status da carta
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido em
+--   17/08/2026 — e este é o arquivo em que EXISTIR NÃO DECIDE NADA:
+--   `avancar_status_processo` existe nos DOIS bancos, porque ela NASCE na 0006.
+--   Quem separa é o CORPO. A marca desta migration é a propagação
+--   `update cartas set status = 'vendida'` dentro do bloco de carta vinculada.
+--   Medido: o corpo do nnv TEM essa propagação; o do xtv NÃO tem — lá a função
+--   continua na versão da 0006, que só move o processo.
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--   PERIGO ESPECÍFICO: reproduzir isto contra o xtv NÃO aborta. Todos os objetos
+--   de que o corpo precisa (`processos`, `cartas`, `processo_eventos`, o enum
+--   com 'vendida') existem lá, porque 0001/0003/0006 rodaram nos dois. O
+--   resultado seria um `create or replace` bem-sucedido e SILENCIOSO, mudando o
+--   comportamento da vitrine: concluir processo passaria a marcar carta como
+--   vendida no xtv, regra que nunca foi decidida para aquele banco.
+--   Aviso de reprodução: `create or replace` é idempotente. Como na 0009, o
+--   risco não é abortar — é justamente não abortar.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. RODA EM PRODUÇÃO PELO EMERSON (SQL editor do Supabase).
 -- O agente NÃO aplica nada em PROD — aqui só validamos a sintaxe localmente.

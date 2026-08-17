@@ -1,5 +1,28 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0015 · Sync multi-fonte
+-- BANCO ALVO: nnv (INTEIRA) e xtv (PARCIAL) — é o único dos 17 aplicado pela
+--   metade. Medido seção a seção em 17/08/2026:
+--     §1 colunas `administradora_origem`/`entrada_parceiro_raw` em cartas e o
+--        índice `uniq_cartas_origem_numero` .......... nnv SIM · xtv SIM
+--     §2 `processos.status_confirmacao_parceiro` ..... nnv SIM · xtv NÃO
+--     §3 linhas de `sync_fonte_config` das 5 marcas .. nnv SIM · xtv SIM
+--     §4 `sync_aplicar_cotas` de 2 argumentos ........ nnv SIM · xtv SIM,
+--        e no xtv já evoluída para 3 argumentos (`p_varrer`) pelas migrations
+--        nativas 0050/0053/0056 — descendente desta, não concorrente
+--     §5 `reservar_carta` ............................ nnv SIM · xtv NÃO
+--   As duas ausências no xtv são PULO, não remoção: nenhuma migration da pasta
+--   dá `drop` nesses objetos (medido). E a §5 não PODERIA rodar lá: o corpo
+--   declara `v_kyc kyc_status`, e o tipo `kyc_status` (0008) não existe no xtv.
+--   NÃO mover, e NÃO reproduzir esta migration INTEIRA contra o xtv: ela aborta
+--   na §5 por tipo inexistente, depois de já ter aplicado §1–§4. Reproduzindo o
+--   xtv do zero, aplique §1, §3 e §4; §2 e §5 pertencem à jornada logada (nnv).
+--   Os três objetos da §1 nascem SÓ aqui em toda a pasta (medido) — é o que
+--   prova que esta migration tocou o xtv, e não uma homônima.
+--   CONTRADIZ a frase "NÃO rodar em PROD sem autorização do Emerson", logo
+--   abaixo: rodou nos dois bancos de produção. A frase fica no lugar como
+--   registro, não como instrução — o arquivo diz o que se pretendia, só o
+--   ledger diz o que aconteceu.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. NÃO rodar em PROD sem autorização do Emerson.
 -- Aplicar primeiro no DEV, DEPOIS de 0004→0011→0012→0013→0014.

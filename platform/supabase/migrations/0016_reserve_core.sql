@@ -1,5 +1,52 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0016 · Bidcon Reserve · Slice 1 (core)
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido em
+--   17/08/2026: `reserva_legs`, `reserva_conditions` e `reserva_eventos` existem
+--   no nnv (3/3) e NÃO existem no xtv (0/3). A quarta tabela, `reservas`, é o
+--   caso especial: EXISTE nos dois — e são tabelas diferentes (abaixo).
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--
+--   O ARQUIVO SE CONTRADIZ, e as duas frases estão neste mesmo arquivo. O
+--   cabeçalho abaixo diz "APLICADA EM PRODUÇÃO (nnv). Verificado por
+--   levantamento em 21/07/2026" — e está CERTO, é um dos dois dos 17 cujo texto
+--   de status bate com o banco. A última linha do arquivo diz "Nada
+--   aplicado/commitado/pushado por este arquivo" — e está ERRADA. Não apague
+--   nenhuma das duas: ficam como registro de que o arquivo sozinho não decide.
+--
+--   AQUI NASCE O HOMÔNIMO `reservas` — este é o arquivo que cria a `reservas` do
+--   nnv, e por isso as duas formas ficam lado a lado AQUI. Medido coluna a
+--   coluna em 17/08/2026:
+--     xtv (10 col., vitrine — reserva de LEAD, nascida em
+--          `0036_reservas_fingerprint_ttl`, nativa do xtv, aplicada 09/07/2026,
+--          com `create table public.reservas` SEM guard):
+--       id · carta_id · interesse_id · fingerprint · nome · telefone · origem ·
+--       status · criado_em · expira_em
+--     nnv (27 col., motor de custódia — esta 0016 + a 0017 + fatias posteriores):
+--       id · carta_id · buyer_id · seller_id · sourcing_partner_id ·
+--       selling_partner_id · price_total · signal_amount · fee_plan ·
+--       settlement_rail · rail_ref · state · valid_until · deposit_expires_at ·
+--       created_at · updated_at · (0017:) tipo · saldo_devedor · parcela ·
+--       parcelas_restantes · reajuste_anual · segmento · cet_alvo ·
+--       exigencia_garantia_pct · avaliacao_laudo · (posteriores:)
+--       cartorio_status · processo_id
+--   Coincidem 2 nomes: `id` e `carta_id`. Nada mais. A do xtv guarda nome e
+--   telefone de quem clicou; a do nnv guarda o plano de payout de um escrow.
+--   Ver também ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 3.
+--
+--   PERIGO — reproduzir isto contra o xtv é o pior caso dos 17, e por um motivo
+--   que parece uma proteção: `create table if not exists public.reservas` NÃO
+--   levanta erro contra o homônimo. Ele não cria e não avisa: é um no-op
+--   SILENCIOSO. A partir daí todo o resto do arquivo se pendura na tabela
+--   ERRADA — `reserva_legs.reserva_id references public.reservas(id)` apontaria
+--   para a reserva de lead da vitrine, e as RPCs (`reserva_criar`,
+--   `reserva_transicionar`) fariam `insert`/`update` de colunas que lá não
+--   existem. Some-se a isso os três `alter table public.cartas add column if not
+--   exists` (passport / origem / commission_plan) e a constraint
+--   `cartas_origem_chk`, que POUSAM sem erro na `cartas` VIVA da vitrine.
+--   E, ao contrário dos outros 16, aqui todo `create policy` vem precedido de
+--   `drop policy if exists` — a idempotência que este arquivo tem de propósito
+--   REMOVE o aborto acidental que segura os outros. Ele não pararia no meio:
+--   iria até o fim. Idempotente não quer dizer seguro; quer dizer sem freio.
 -- ----------------------------------------------------------------------------
 -- APLICADA EM PRODUÇÃO (nnv). Verificado por levantamento em 21/07/2026: as
 -- tabelas/RPCs abaixo existem no banco `nnv` (nnvjeijsrwpzsggwqpcu). Único

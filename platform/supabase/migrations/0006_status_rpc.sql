@@ -1,5 +1,17 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0006 · RPCs de mudança de status
+-- BANCO ALVO: xtv E nnv — APLICADA NOS DOIS. Medido em 17/08/2026: as 4
+--   funções (`avancar_status_processo`, `definir_status_carta`,
+--   `liberar_comissao`, `marcar_comissao_paga`) existem nos DOIS bancos (4/4 em
+--   cada). NÃO mover, e NÃO pular numa reprodução do xtv.
+--   O aviso "RODA EM PRODUÇÃO PELO EMERSON", logo abaixo, CONFERE com o medido;
+--   o que envelheceu é só a expressão "Rascunho para revisão" que o precede.
+--   Aviso de reprodução: tudo aqui é `create or replace` + grant — re-rodar
+--   contra banco vivo é seguro e idempotente. É dos poucos dos 17 assim.
+--   Cuidado: `create or replace` reescreve a versão vigente sem avisar. Se o
+--   banco alvo já tiver uma versão MAIS NOVA destas funções, reproduzir esta
+--   migration a REGRIDE em silêncio. Confira a assinatura antes.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. RODA EM PRODUÇÃO PELO EMERSON (SQL editor do Supabase).
 -- O agente NÃO aplica nada em PROD — aqui só validamos a sintaxe localmente.

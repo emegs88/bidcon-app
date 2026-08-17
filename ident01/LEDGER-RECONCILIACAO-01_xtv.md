@@ -309,6 +309,361 @@ mas a afirmação "não aplicada" que foi junto era falsa.
 
 ---
 
+## BLOCO 8 — CORREÇÕES E MEDIÇÕES DE 17/08/2026, DEPOIS DO COMMIT
+
+Este bloco é append-only na prática, não só na declaração: **nenhuma linha
+acima foi reescrita.** Cada item abaixo diz qual linha ele corrige.
+
+### L-0073-B · A ÚNICA ÓRFÃ NÃO ERA ÓRFÃ
+
+**Corrige: L-0073-A (BLOCO 1), a linha do BLOCO 0 que diz "Só
+`0073_farol_pauta_aprovacao` é órfã de verdade", L-COL-0073 (BLOCO 3), a
+entrada de `0073_farol_pauta_aprovacao` na lista de 26 numeradas do BLOCO 5, e
+o pedido nº 1.**
+
+O SQL **nunca esteve perdido**. Está em
+`painel-farol-01/MIGRATION_farol_pauta_aprovacao.sql` — 5.584 bytes,
+rastreado pelo git, commitado em `80bca90` ("PAINEL-FAROL-01: painel de
+conteúdo no portal admin"), em 08/08/2026. A migration foi aplicada no dia
+seguinte, 09/08 11:59:31.
+
+**Por que eu não o achei:** meu inventário varreu
+`platform/supabase/migrations/` e mais nada. Um arquivo de migration guardado
+na pasta da própria fatia era invisível para a medição. O documento diz, no
+"COMO FOI MEDIDO", que os arquivos foram varridos "em TODOS os refs" — o que é
+verdade quanto a *refs* e falso quanto a *caminhos*. **A varredura foi
+completa em ramos e estreita em pastas, e eu chamei isso de completa.**
+
+Três provas independentes de que este arquivo é o que o ledger aplicou:
+
+| prova | no arquivo | vivo no xtv |
+|---|---|---|
+| lista do CHECK | `'nova','usada','reprovada','aguardando_aprovacao','aprovada','reprovada_humano'` | **idêntica, na mesma ordem** |
+| índice parcial 1 | `farol_pauta_aprovada_idx` on `(dia) where status='aprovada'` | **presente, definição idêntica** |
+| índice parcial 2 | `farol_pauta_aguardando_idx` on `(dia desc) where status='aguardando_aprovacao'` | **presente, inclusive o `desc`** |
+
+O CHECK original, em `0071_farol_pauta.sql`, tem **3** valores
+(`'nova','usada','reprovada'`). Os 3 valores extras são todos de aprovação.
+Nenhum outro arquivo, em nenhum ref, altera esse CHECK — conferido com o
+literal SQL entre aspas, porque buscar `aprovada` sem aspas casa dentro de
+`reprovada` e devolve 1.227 falsos positivos.
+
+*Limite desta prova, declarado:* `farol_pauta` tem **0 linhas**. A evidência é
+de ESTRUTURA, não de uso. A migration rodou; ninguém usou o que ela abriu.
+
+**Efeito nos totais deste documento:** as ausências do BLOCO 5 caem de **39
+para 38** (26 numeradas viram 25). E das **4 entradas nomeadas na ordem
+original, as 4 têm arquivo** — nenhuma é órfã. A premissa da ordem estava
+errada não em 3 pontos, como diz o BLOCO 0, mas em 4.
+
+### L-0073-C · DUAS AFIRMAÇÕES FALSAS EM CÓDIGO DE PRODUÇÃO
+
+Consequência que **não é deste documento resolver**, e por isso vai como
+pedido nº 7. Dois arquivos vivos declaram que esta migration não foi aplicada:
+
+- `platform/lib/farol/painel.ts` — *"A migration está escrita e NÃO aplicada
+  (ver `painel-farol-01/` na raiz do repo). Ligar esta env antes de aplicar faz
+  o insert das 10h falhar no 23514."*
+- `platform/app/api/admin/farol/pauta/[id]/route.ts:42` — mesma afirmação.
+
+Os dois textos apontam para a pasta certa e tiram a conclusão errada. O
+pré-requisito que eles declaram **já está satisfeito**: o CHECK aceita os seis
+valores desde 09/08. `FAROL_PAUTA_APROVA` está desarmada há oito dias por uma
+premissa que deixou de valer no dia seguinte ao commit que a escreveu.
+
+Não armei a env e não editei os comentários: armar é ato em produção e não
+houve ordem. Fica reportado.
+
+### L-NNV-17 · OS 17 ARQUIVOS DO NNV, MEDIDOS NOS DOIS BANCOS
+
+**Complementa o BLOCO 6**, que dizia "17 deles estão no ledger do NNV" sem
+dizer o que aconteceu no xtv. Medido por existência das 22 tabelas que os 17
+arquivos criam:
+
+| arquivo | tabelas | nnv | xtv |
+|---|---|---|---|
+| `0001_schema` | profiles, cartas, processos, indicacoes, comissoes | **5/5** | **5/5** |
+| `0003_processo_eventos` | processo_eventos | **1/1** | **1/1** |
+| `0004_cartas_sync` | eventos_sync | **1/1** | **1/1** |
+| `0008_kyc` | kyc_perfis, kyc_eventos | **2/2** | **0/2** |
+| `0011_administradoras_fornecedores` | administradoras, fornecedores | **2/2** | **2/2** |
+| `0012_sync_administradora` | sync_fonte_config | **1/1** | **1/1** |
+| `0013_prospere_ancora` | ancora_tabela | **1/1** | **0/1** |
+| `0014_pos_reserva` | checklist_modelos, checklist_itens, processo_documentos, contratos, pagamentos_sinal | **5/5** | **0/5** |
+| `0016_reserve_core` | reservas, reserva_legs, reserva_conditions, reserva_eventos | **4/4** | **0/4** |
+
+**No nnv: 22 de 22.** Os 17 rodaram lá, como o ledger do nnv já dizia.
+
+**No xtv: 5 dos 9 arquivos que criam tabela rodaram TAMBÉM.** Não é
+"pasta errada" simples: `0001`, `0003`, `0004`, `0011` e `0012` fazem parte da
+história real do xtv — `cartas` e `administradoras` são o coração da vitrine.
+
+*Armadilha corrigida na própria medição:* a primeira leitura deu
+`reservas → SIM` no xtv, o que faria `0016_reserve_core` parecer parcialmente
+aplicado. As colunas desmentem: **xtv tem 10** (`carta_id, criado_em,
+expira_em, fingerprint, id, interesse_id, nome, origem, status, telefone`) e
+**nnv tem 27** (`fee_plan, settlement_rail, seller_id, buyer_id…`). Só `id` e
+`carta_id` coincidem. São tabelas homônimas e sem parentesco: `0016` tem
+**0/4** no xtv. Mesma armadilha do `profiles` em L-ARQ-0026, no mesmo dia, em
+sentido contrário — lá o homônimo faria alguém adotar a migration, aqui faria
+alguém aplicá-la de novo.
+
+**8 dos 17 não criam tabela** (`0002_rls`, `0005_cartas_vitrine`,
+`0006_status_rpc`, `0007_busca_semantica`, `0009_reserva`,
+`0010_status_carta_propagacao`, `0015_sync_multifonte`, `0017_repasse`) e
+**esta medição não os decide**. Eles fazem RLS, view e função; situá-los exige
+comparar policy e assinatura de função, que não foi feito. Registro para que a
+tabela acima não seja lida como se cobrisse os 17.
+
+**O que isto significa para o pedido nº 4 ("mover, ou deixar e anotar?"):**
+mover os 5 que rodaram nos DOIS bancos apagaria história do xtv. Nenhuma
+proposta aqui — a ordem foi medir e reportar antes de propor, e é o que este
+bloco faz.
+
+### L-0080-D · O CABEÇALHO DA 0085 FOI CORRIGIDO
+
+**Fecha o pedido nº 3 e a restrição "Não corrigir o cabeçalho da 0085 por
+conta própria".** A ordem veio em 17/08/2026. Commit `0e9ff0f` no ramo
+`administradoras-grafias-01`: 32 inserções, 3 deleções, **nenhuma linha
+executável tocada** — as 3 deleções são exatamente o bloco `AUTORIZADO:
+PENDENTE`. A frase antiga sobrevive no arquivo como citação datada, para que a
+correção não apague o registro de que houve erro.
+
+Três defeitos meus no próprio texto da correção, achados por medição antes do
+commit e anotados lá: eu escrevi "todos os insert" (há **um**), citei
+`if not exists` (**não aparece** naquele arquivo; controle: aparece 2× em
+`0071_farol_pauta.sql`) e atribuí a todos os `update` o guard
+`administradora_id is null` (vale para **1** dos 5; os outros 4 usam
+`not (<alias> = any(aliases))`). O arquivo já descrevia isso certo no parágrafo
+`IDEMPOTENTE`, mais abaixo — **eu escrevi um cabeçalho pior do que a descrição
+que o próprio arquivo já tinha, sem ter descido até ela.**
+
+---
+
+## BLOCO 9 — A RE-MEDIÇÃO POR LINHAGEM, E O QUE ELA DERRUBOU
+
+Também append-only: **nenhuma linha acima foi reescrita**, inclusive as que este
+bloco declara falsas. Cada item diz qual linha corrige.
+
+O BLOCO 8 mediu por EXISTÊNCIA DE NOME. Este mede por **LINHAGEM** — quem criou
+a tabela, e com que forma. São perguntas diferentes, e dão respostas diferentes.
+A primeira eu fiz e reportei como se fosse a segunda. Este bloco é o conserto.
+
+### L-ORDEM-A · A ORDEM DOS 17 CABEÇALHOS ESTÁ CUMPRIDA
+
+17 de 17 arquivos têm a linha `BANCO ALVO` no cabeçalho. Conferido em
+17/08/2026 arquivo a arquivo, com controle (`!!! SEM LINHA BANCO ALVO` para
+quem não tivesse) — o controle não disparou em nenhum.
+
+| grupo | arquivos | quantos |
+|---|---|---|
+| **A — aplicada nos DOIS** | 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0012 | **8** |
+| **B — só nnv** | 0008, 0009, 0010, 0011, 0013, 0014, 0016, 0017 | **8** |
+| **C — parcial, seção a seção** | 0015 | **1** |
+
+### L-NNV-17-B · A 0011 NÃO RODOU NO XTV — corrige L-NNV-17
+
+**Corrige duas coisas em L-NNV-17 (BLOCO 8):** a linha
+`| 0011_administradoras_fornecedores | administradoras, fornecedores | 2/2 | 2/2 |`,
+e a frase *"No xtv: 5 dos 9 arquivos que criam tabela rodaram TAMBÉM… `0001`,
+`0003`, `0004`, `0011` e `0012`"*.
+
+**O certo é 4 dos 9: `0001`, `0003`, `0004` e `0012`.** A 0011 sai da lista, e
+com ela o `2/2` no xtv vira **0/2**. As duas tabelas existem no xtv, mas
+nenhuma das duas nasceu neste arquivo:
+
+- **`administradoras`** nasce em **`0023_administradoras_v2`** — nativa do xtv,
+  aplicada em 08/07/2026. Ela cria a tabela do zero com 3 colunas e depois
+  acrescenta as outras 7 por `add column if not exists`. O comentário da própria
+  0023 entrega o jogo: *"Higiene (no xtv: no-op, tabela nasce vazia)"* — ela sabe
+  que está **criando**, não estendendo.
+- **`fornecedores`** nasce em **`0037_fornecedores_importacoes`** — nativa do
+  xtv, aplicada em 09/07/2026 (`20260709204303`), com
+  `create table public.fornecedores` **SEM `if not exists`**. Este é o
+  instrumento de datação mais limpo do bloco: um `create table` sem guard que
+  **teve sucesso** prova que a tabela não existia naquele instante. Se a 0011
+  tivesse rodado antes, a 0037 teria abortado.
+
+### L-LINHAGEM-11 · AS 11 TABELAS DE NOME COMPARTILHADO, MEDIDAS UMA A UMA
+
+A premissa da ordem dizia *"no xtv só existem homônimos"*. Medido: **3 de 11**
+são homônimos. As outras 8 são a mesma tabela, com uma ponta estendida de um
+lado ou do outro.
+
+| tabela | xtv | nnv | veredito |
+|---|---|---|---|
+| `profiles` | 7 | 8 | **MESMA** — xtv é a 0001 literal; nnv é 0001 + `cpf` |
+| `cartas` | 29 | 24 | **MESMA** — 20 nomes comuns; os dois lados estenderam |
+| `processos` | 9 | 12 | **MESMA** — xtv é subconjunto perfeito do nnv |
+| `indicacoes` | 5 | 5 | **MESMA**, idêntica |
+| `comissoes` | 8 | 13 | **MESMA** — xtv é subconjunto perfeito |
+| `processo_eventos` | 6 | 6 | **MESMA**, idêntica |
+| `eventos_sync` | 7 | 7 | **MESMA**, idêntica |
+| `sync_fonte_config` | 5 | 4 | **MESMA** — xtv = nnv + `ativo` (da `0045_sync_fonte_config_ativo`) |
+| `administradoras` | 10 | 9 | **HOMÔNIMO CONVERGENTE** |
+| `fornecedores` | 8 | 9 | **HOMÔNIMO DIVERGENTE** |
+| `reservas` | 10 | 27 | **HOMÔNIMO DIVERGENTE** |
+
+**A distinção que este bloco introduz, porque ela muda o risco:**
+
+- **Homônimo DIVERGENTE é o fácil.** `fornecedores` compartilha **4 nomes de
+  8/9** — `id`, `nome`, `ativo`, `criado_em` —, todos genéricos; nenhum campo de
+  negócio casa. `reservas` compartilha **2 de 10/27**. Abrir as duas lado a lado
+  desfaz a ilusão em cinco segundos.
+
+  ```
+  fornecedores  xtv (8): id · nome · contato_nome · whatsapp · email ·
+                         observacoes · ativo · criado_em          <- 0037
+                nnv (9): id · nome · portal_origem · canal_lance · resp_nome ·
+                         resp_contato · obs · ativo · criado_em   <- 0011
+
+  reservas      xtv (10): id · carta_id · interesse_id · nome · telefone ·
+                          origem · status · fingerprint · expira_em ·
+                          criado_em                               <- 0036
+                nnv (27): id · carta_id · buyer_id · seller_id · fee_plan ·
+                          settlement_rail · ...                   <- 0016 +
+  ```
+
+- **Homônimo CONVERGENTE é o traiçoeiro, e `administradoras` é o caso.**
+  **9 dos 10 nomes coincidem** (o xtv tem `aliases` a mais, da
+  `0026_administradoras_aliases`). A forma quase idêntica **parece prova de
+  linhagem e não é**: a 0023 se declara, no próprio cabeçalho, *"convergindo o
+  schema rico do motor de repasse"*. Ela chegou ao mesmo desenho de propósito,
+  por outro caminho. **Forma igual não prova origem comum** — e um homônimo
+  divergente se denuncia sozinho, enquanto um convergente passa na conferência.
+
+### L-LEDGER-PISO · O LEDGER DO XTV NÃO COBRE 0001–0018
+
+Fato medido que muda o que se pode afirmar em todo o documento: o
+`supabase_migrations.schema_migrations` do xtv **começa em `20260705140817` /
+`0019_interesses`**. Não há entrada nenhuma para 0001 a 0018.
+
+Tudo anterior a 05/07/2026 foi aplicado à mão, por fora da ferramenta que
+escreve o ledger. **Para essa faixa, "só o ledger diz o que aconteceu" não tem
+o que consultar** — e a linhagem por forma de coluna passa a ser o único
+instrumento disponível.
+
+**Uma pergunta que isto deixa aberta, e eu registro como não sabida:**
+`cartas.administradora_id` e `cartas.fornecedor_id` existem no xtv, e a 0011 é o
+único arquivo da pasta que as acrescenta. Mas 0023 e 0037 apenas **pressupõem**
+as colunas prontas (a 0037 chega a criar
+`constraint cartas_fornecedor_fk foreign key (fornecedor_id)`). Quem as criou no
+xtv não é determinável: quem saberia era o ledger, e o ledger começa depois.
+
+### L-ARQ-0026-B · O `profiles` DO XTV É A TABELA DA 0001 — corrige L-ARQ-0026
+
+**Corrige a frase** *"o xtv TEM uma tabela `profiles`, e ela não é a mesma
+coisa"* (BLOCO 6).
+
+Como **observação** ela está certa: o xtv não tem `cpf`, e quem medisse só
+"existe `profiles` no xtv?" tiraria a conclusão errada. Como **afirmação de
+linhagem** está errada. Medido no corpo da `0001_schema.sql`: ela define
+`profiles` com exatamente `id, nome, telefone, email, tipo, status, criado_em`
+— **as 7 colunas que o xtv tem**, na ordem. E `grep -n "cpf" 0001_schema.sql`
+devolve zero.
+
+Ou seja: **o `profiles` do xtv É a tabela da 0001**, literal. O do nnv é a mesma
+tabela mais a coluna que a `0026_profile_cpf.sql` acrescentou depois. Não são
+homônimas — são a mesma, com uma ponta a mais de um lado. A conclusão prática
+de L-ARQ-0026 (*"a migration do cpf não é do xtv"*) **continua de pé**; o que
+cai é o argumento pelo qual eu cheguei nela.
+
+### L-SEM-TABELA-8 · OS 8 QUE NÃO CRIAM TABELA, AGORA DECIDIDOS
+
+**Corrige** a frase de L-NNV-17: *"8 dos 17 não criam tabela … e **esta medição
+não os decide**"*. Foram medidos por policy, por assinatura de função e, onde
+existir não bastava, **pelo corpo da função**:
+
+| arquivo | como foi decidido | nnv | xtv |
+|---|---|---|---|
+| `0002_rls` | `is_admin` + as 13 policies | 14/14 | **14/14** |
+| `0005_cartas_vitrine` | policy `cartas_vitrine_select` | 1/1 | **1/1** |
+| `0006_status_rpc` | as 4 funções de status/comissão | 4/4 | **4/4** |
+| `0007_busca_semantica` | função `buscar_cartas_semantica` | 1/1 | **1/1** |
+| `0009_reserva` | função `reservar_carta` | 1/1 | **0/1** |
+| `0010_status_carta_propagacao` | **o CORPO** de `avancar_status_processo` | SIM | **NÃO** |
+| `0015_sync_multifonte` | **seção a seção** (§1–§5) | INTEIRA | **PARCIAL** |
+| `0017_repasse` | colunas de repasse + CHECK de `reserva_legs` | SIM | **NÃO** |
+
+**A 0010 é a lição do lote, e vale mais que o resultado dela.**
+`avancar_status_processo` existe nos DOIS bancos — e isso **não decide nada**,
+porque a função **nasce na 0006**, que rodou nos dois. Existir só provaria que a
+0006 rodou. Quem separa é a marca que a 0010 acrescenta ao corpo: o
+`update cartas set status = 'vendida'` dentro do bloco de carta vinculada. **O
+corpo do nnv tem; o do xtv não** — lá a função segue na versão da 0006. Sem
+descer ao corpo, eu teria contado a 0010 como aplicada nos dois.
+
+**A 0015, seção a seção** (única do lote com veredito misto):
+
+| seção | objeto | nnv | xtv |
+|---|---|---|---|
+| §1 | `administradora_origem`, `entrada_parceiro_raw`, índice `uniq_cartas_origem_numero` | SIM | **SIM** |
+| §2 | `processos.status_confirmacao_parceiro` | SIM | **NÃO** |
+| §3 | linhas de `sync_fonte_config` das 5 marcas | SIM | **SIM** |
+| §4 | `sync_aplicar_cotas` de 2 argumentos | SIM | **SIM** |
+| §5 | `reservar_carta` | SIM | **NÃO** |
+
+As duas ausências no xtv são **pulo, não remoção**: nenhuma migration da pasta
+dá `drop` nesses objetos. E a §5 **não poderia** ter rodado lá — o corpo declara
+`v_kyc kyc_status`, e o tipo `kyc_status` (da 0008) não existe no xtv. O
+Postgres valida corpo de plpgsql no `CREATE`, então falharia na hora.
+
+### L-REPRODUCAO · "SUCESSO SEM ERRO" NÃO É SINAL DE NADA
+
+Achado que só apareceu porque eu fui conferir uma frase minha, e que muda o
+aviso que os cabeçalhos precisavam dar.
+
+Eu havia escrito no cabeçalho da 0011 que reproduzi-la contra banco vivo
+*"aborta na primeira policy já existente"* — o raciocínio de que `create policy`
+não tem `if not exists`, logo colide. Medido em `pg_policies` do xtv em
+17/08/2026: **`fornecedores` tem RLS ligado e ZERO policies**; `administradoras`
+tem só `administradoras_leitura_publica`, da 0023. **Nenhum dos 3 nomes de
+policy da 0011 colide com coisa nenhuma.**
+
+Rodada contra o xtv, a 0011 vai **do começo ao fim sem um erro**:
+
+1. os 2 `create table if not exists` viram **no-op silencioso** contra as
+   tabelas de 0023/0037 — inclusive contra a `fornecedores` de forma diferente,
+   que ele não corrige e não denuncia;
+2. os 2 `add column if not exists` em `cartas` viram no-op;
+3. e os 3 `create policy` **são criados**, enxertando regra de acesso em tabelas
+   que este arquivo não criou.
+
+O item 3 é o dano. `fornecedores_admin_all` é `for all using (is_admin())` sobre
+uma tabela que hoje, no xtv, é **service-role-only por ausência DELIBERADA de
+policy** — a 0037 fecha o acesso justamente **não escrevendo policy nenhuma**.
+Reproduzir a 0011 **abre essa tabela para todo `is_admin()`**, e o operador não
+vê um aviso. Ausência de policy é uma decisão de segurança que parece um vazio a
+preencher.
+
+**A regra que fica:** idempotente não quer dizer seguro; quer dizer sem freio.
+
+### L-MEU-ERRO-0011 · TRÊS AFIRMAÇÕES MINHAS, FALSAS, NO CABEÇALHO QUE EU ESCREVI
+
+O cabeçalho da 0011 que eu publiquei em 17/08/2026 dizia três coisas erradas.
+As três foram achadas por medição minha, no mesmo dia, antes de qualquer
+consequência — e ficam registradas com o nome que têm:
+
+1. **"BANCO ALVO: xtv E nnv — APLICADA NOS DOIS."** Não rodou no xtv
+   (L-NNV-17-B).
+2. **"com lastro comum — não são homônimas."** As duas **são** homônimas: uma
+   convergente, uma divergente (L-LINHAGEM-11).
+3. **"aborta na primeira policy já existente."** Não aborta; roda limpa e alarga
+   acesso (L-REPRODUCAO). **Esta é a pior das três**: eu avisei um operador
+   futuro de que o arquivo pararia sozinho, quando ele não para.
+
+**A causa é uma só, e é a que este documento inteiro existe para pegar:** minha
+medição anterior perguntou *"o NOME existe nos dois bancos?"*, a resposta foi
+sim, e eu reportei isso como *"o arquivo está aplicado nos dois"*. Duas
+perguntas diferentes, uma resposta só. Cometi, dentro do conserto, o defeito que
+o conserto persegue.
+
+O cabeçalho da 0011 foi reescrito em 17/08/2026 com marca `CORREÇÃO DE
+17/08/2026` que **preserva a frase antiga citada**, para que a correção não
+apague o registro de que houve erro — mesmo procedimento de L-0080-D.
+
+---
+
 ## O QUE ESTE DOCUMENTO NÃO AUTORIZA
 
 - **Não reescrever o ledger.** Nenhum `insert`, `update` ou `delete` em
@@ -349,6 +704,48 @@ mas a afirmação "não aplicada" que foi junto era falsa.
    algo que está em produção há 4 dias. Corrigir para `APLICADA EM 13/08/2026`.
 4. Os 17 arquivos do nnv na pasta do xtv — mover, ou deixar e anotar?
 
+**Acrescentados em 17/08/2026, depois do commit** (append: nenhum item acima
+foi reescrito):
+
+7. **`FAROL_PAUTA_APROVA` está desarmada por uma premissa que deixou de valer.**
+   Este número é citado por L-0073-C desde que o bloco foi escrito, e **nunca
+   existiu nesta lista** — a citação apontava para o vazio. Fica criado aqui,
+   com o mesmo texto que L-0073-C já pedia: dois arquivos vivos
+   (`platform/lib/farol/painel.ts` e
+   `platform/app/api/admin/farol/pauta/[id]/route.ts`) declaram que a migration
+   *"está escrita e NÃO aplicada"*, e ela está aplicada desde 09/08/2026. O
+   CHECK aceita os seis valores. **Decisão pedida:** armar a env e corrigir os
+   dois comentários, ou manter desarmada por outro motivo. Armar é ato em
+   produção; não houve ordem e nada foi armado.
+   *Registro do defeito:* eu escrevi "vai como pedido nº 7" e não criei o
+   pedido nº 7. Uma referência a um item que não existe é pior que a ausência do
+   item, porque parece que alguém já cuidou.
+
+**RESPOSTA AO PEDIDO Nº 4 — 17/08/2026.** *Não risco o pedido 4.* O pedido 2 foi
+riscado enquanto o documento ainda era rascunho, antes do commit; a partir do
+commit a regra é linha nova, e é o que esta é.
+
+A decisão veio nominal: **DEIXAR E ANOTAR.** Motivo dado na ordem: mover quebra
+a correspondência ledger↔nome de arquivo, que é justamente o que esta
+reconciliação está consertando — *"trocaria uma confusão por outra"*. O conserto
+executado foi o barato e reversível: **os 17 ganharam a linha `BANCO ALVO` no
+cabeçalho** (L-ORDEM-A), e o homônimo `reservas` entrou nomeado, com as duas
+formas lado a lado (L-LINHAGEM-11).
+
+A medição do BLOCO 9 **reforça a decisão e enfraquece um dos argumentos dela**,
+e as duas coisas ficam ditas:
+- **Reforça:** 8 dos 17 rodaram nos DOIS bancos. Mover apagaria história do xtv
+  — a `0002_rls` fechou a RLS da vitrine, a `0012` deu ao xtv a
+  `sync_fonte_config`. Não são forasteiros.
+- **Enfraquece:** o argumento de que *"no xtv só existem homônimos"* vale para
+  **3 de 11** tabelas, não para todas (L-LINHAGEM-11). A premissa era mais forte
+  do que o fato. A decisão não depende dela — depende do custo de mover —, mas
+  fica registrado que ela foi medida e reduzida.
+
+**Efeito no pedido nº 6:** ele previa que a colisão do número 0026 *"some
+sozinha se a decisão 4 for mover"*. A decisão foi **não mover**, então **o
+pedido 6 continua aberto** e não some sozinho.
+
 ---
 
 ## REGISTRO DE ALTERAÇÕES (append-only)
@@ -368,3 +765,33 @@ mas a afirmação "não aplicada" que foi junto era falsa.
   Anoto as três porque o documento nasce dizendo que linha escrita não se
   reescreve — e estas foram reescritas. A regra vale a partir do commit; até lá é
   rascunho, e o rascunho também merece ter a emenda declarada.
+- **17/08/2026, depois do commit `6e73fa3`** — BLOCO 8: L-0073-B (a única órfã
+  tinha arquivo), L-0073-C (duas afirmações falsas em código vivo), L-NNV-17
+  (os 17 medidos nos dois bancos), L-0080-D (cabeçalho da 0085 corrigido).
+  **Nenhuma linha anterior foi tocada.**
+- **17/08/2026, ainda depois do commit** — **BLOCO 9**, a re-medição por
+  LINHAGEM. Este bloco existe porque o BLOCO 8 respondeu à pergunta errada: ele
+  mediu se o NOME da tabela existia nos dois bancos e reportou isso como "o
+  arquivo está aplicado nos dois". O que ele corrige, nomeadamente:
+  1. **L-NNV-17-B** corrige L-NNV-17 — a 0011 **não** rodou no xtv; "5 dos 9"
+     vira **4 dos 9**; o `2/2` dela no xtv vira **0/2**.
+  2. **L-ARQ-0026-B** corrige L-ARQ-0026 — o `profiles` do xtv **é** a tabela
+     da 0001, literal; "não é a mesma coisa" valia como observação e não como
+     afirmação de linhagem. A conclusão prática daquela linha continua de pé.
+  3. **L-SEM-TABELA-8** corrige *"esta medição não os decide"* — os 8 arquivos
+     sem tabela foram decididos, dois deles só pelo CORPO da função.
+  4. **L-LINHAGEM-11** reduz a premissa *"no xtv só existem homônimos"* de todas
+     para **3 de 11**, e separa homônimo **convergente** de **divergente**.
+  5. **L-LEDGER-PISO** registra que o ledger do xtv começa em `0019_interesses`
+     — 0001 a 0018 não têm registro nenhum, e para essa faixa não existe ledger
+     a consultar.
+  6. **L-REPRODUCAO** desmente uma frase minha: reproduzir a 0011 contra o xtv
+     **não aborta**, roda limpa e alarga o acesso a `fornecedores`.
+  7. **L-MEU-ERRO-0011** assume as três afirmações falsas que eu publiquei no
+     cabeçalho da 0011, e nomeia a causa comum.
+  8. Criado o **pedido nº 7**, citado por L-0073-C desde sempre e inexistente
+     na lista. Respondido o **pedido nº 4** (DEIXAR E ANOTAR) por linha nova,
+     **sem riscar** — riscar foi procedimento de rascunho, e o rascunho acabou.
+  **Nenhuma linha anterior foi tocada.** As afirmações erradas continuam
+  legíveis onde foram escritas, cada uma com a linha que a corrige apontando
+  para ela.

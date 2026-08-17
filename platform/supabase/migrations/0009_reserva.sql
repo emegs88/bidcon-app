@@ -1,5 +1,19 @@
 -- ============================================================================
 -- Bidcon — plataforma logada · Migration 0009 · Reserva de carta pelo cliente
+-- BANCO ALVO: nnv (aplicada lá; NÃO reproduzir contra xtv). Medido em
+--   17/08/2026: `reservar_carta` existe no nnv (1/1) e NÃO existe no xtv (0/1).
+--   NÃO mover: o arquivo vive na pasta do xtv por acidente de origem.
+--   Não roda no xtv nem se alguém tentar: o corpo declara `v_kyc kyc_status` e
+--   lê `kyc_perfis`, e nenhum dos dois existe lá (0008 nunca rodou no xtv). O
+--   Postgres valida corpo de plpgsql no CREATE, então falha na hora — ruído
+--   honesto, não corrupção silenciosa.
+--   PERIGO DE ORDEM: a §5 da 0015 dá `create or replace` nesta MESMA assinatura
+--   (`reservar_carta(p_carta_id uuid)`) com um corpo mais novo. Reproduzir esta
+--   0009 DEPOIS da 0015 REGRIDE a função em silêncio — sem erro, sem aviso, e a
+--   versão nova some. Aplique na ordem, ou pule este arquivo.
+--   Aviso de reprodução: `create or replace` + revoke/grant são idempotentes;
+--   o risco aqui não é abortar, é justamente NÃO abortar.
+--   Ver ident01/LEDGER-RECONCILIACAO-01_xtv.md, BLOCO 8.
 -- ----------------------------------------------------------------------------
 -- Rascunho para revisão. RODA NO DEV (e, com "autorizo", em PROD pelo Emerson).
 --
