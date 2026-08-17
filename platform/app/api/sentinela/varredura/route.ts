@@ -158,7 +158,33 @@ export async function GET(req: Request) {
     // quem for ler o histórico tem de aceitar os dois.
     paradas: { respondeu: 0, opt_out: 0, encerrado_por_silencio: 0 },
     envios: { feitos: 0, falhas: 0, pulados: 0 },
-    aguardando_template: 0,
+    // DEDUP-SENTINELA-01 — a chave `aguardando_template` SAIU daqui, e o motivo
+    // é um diagnóstico errado que ela causou. Ela gravava 15 no log enquanto a
+    // fila tinha 21 vivas e 27 elegíveis: 15 era o LIMIT da página, escrito como
+    // se fosse população. Quem leu o log concluiu "situação normal" — e estava
+    // lendo o número certo com o nome errado.
+    //
+    // Os três campos abaixo não admitem essa leitura:
+    //   elegiveis_total ......... quantas PESSOAS podem ser tocadas agora (já
+    //                             deduplicadas por telefone, vem do SQL)
+    //   tratados_nesta_pagina ... quantas esta execução de fato pegou
+    //   limite_da_pagina ........ o teto da janela. Sem ele não dá para
+    //                             distinguir "a página encheu, tem mais atrás"
+    //                             de "a população é esse número mesmo".
+    //
+    // Mesmo tratamento que `esgotado` → `encerrado_por_silencio` recebeu acima:
+    // as linhas antigas de sentinela_log guardam a chave velha, e quem for ler
+    // o histórico tem de aceitar as duas.
+    fila: {
+      elegiveis_total: 0,
+      tratados_nesta_pagina: 0,
+      limite_da_pagina: MAX_ENVIOS_POR_EXECUCAO,
+    },
+    // Irmão de `fora_horario` e `domingo`: diz POR QUE a execução não enviou.
+    // Substitui a contagem que existia aqui — o motivo é um estado (o template
+    // não está configurado), não uma quantidade, e escrever estado como número
+    // foi o que produziu o log ilegível.
+    sem_template: false,
     fora_horario: false,
     domingo: false,
     detalhes: [] as Array<Record<string, unknown>>,
@@ -317,10 +343,29 @@ export async function GET(req: Request) {
     );
   }
 
+  // A POPULAÇÃO, medida separada da página. `aEnviar` já vem cortado em 15 pelo
+  // limite, então contar o array responde "quantas couberam", nunca "quantas
+  // existem" — foi exatamente essa confusão que pôs 15 no log.
+  //
+  // Falha aqui NÃO derruba a varredura: o total é instrumento de leitura, e
+  // parar de tocar 26 pessoas porque um contador não respondeu seria trocar o
+  // trabalho pela medição do trabalho. Fica -1 e o log diz que não foi medido —
+  // nunca 0, que seria indistinguível de "fila vazia".
+  const { data: totalElegiveis, error: errTotal } = await db.rpc(
+    "sentinela_elegiveis_total"
+  );
+  if (errTotal) {
+    resumo.fila.elegiveis_total = -1;
+    await log(null, "erro_total_elegiveis", { erro: errTotal.message });
+  } else {
+    resumo.fila.elegiveis_total = Number(totalElegiveis ?? 0);
+  }
+  resumo.fila.tratados_nesta_pagina = (aEnviar ?? []).length;
+
   if (!templateName) {
     // GATE: sem template aprovado configurado, nada sai. Marca o motivo.
+    resumo.sem_template = true;
     for (const f of (aEnviar ?? []) as FilaRow[]) {
-      resumo.aguardando_template++;
       if (!dryRun && f.status !== "aguardando_template") {
         await db
           .from("sentinela_fila")
