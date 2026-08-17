@@ -74,6 +74,21 @@ const FMT_DIA_ISO = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+const FMT_DIA_SEMANA = new Intl.DateTimeFormat("en-US", {
+  timeZone: TZ_BR,
+  weekday: "short",
+});
+
+/**
+ * Tabela em vez de aritmética sobre `getUTCDay()`: o dia da semana em São Paulo
+ * NÃO é o dia da semana em UTC. Domingo 16/08 às 22h de SP é segunda 17/08 em
+ * UTC, e um vigia que use `getUTCDay()` acha que domingo à noite é dia útil —
+ * exatamente a hora em que o fornecedor mais claramente não está trabalhando.
+ */
+const ISO_POR_SIGLA: Record<string, number> = {
+  Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7,
+};
+
 /**
  * Aceita o que as telas realmente têm em mãos e devolve `null` no que não é
  * data. Timestamp do Supabase chega como string ISO; `Date` chega dos cálculos;
@@ -142,4 +157,31 @@ export function diaBR(v: string | number | Date | null | undefined): string | nu
   const p = FMT_DIA_ISO.formatToParts(d);
   const parte = (t: Intl.DateTimeFormatPartTypes) => p.find((x) => x.type === t)?.value ?? "";
   return `${parte("year")}-${parte("month")}-${parte("day")}`;
+}
+
+/**
+ * Dia da semana ISO no relógio de São Paulo: 1 = segunda ... 7 = domingo.
+ *
+ * A mesma convenção do `extract(isodow ...)` do Postgres, de propósito: as
+ * medições que originaram os limiares foram feitas em SQL, e um código que
+ * numerasse a semana ao contrário do banco obrigaria a traduzir mentalmente
+ * toda vez que alguém comparasse os dois.
+ *
+ * POR QUE ISTO EXISTE. Medido em 16/08/2026 sobre `cartas`, seis semanas de
+ * histórico: TODO domingo teve zero cartas novas — 12/07, 02/08, 09/08, 16/08,
+ * sem exceção — e sábado teve zero em quatro dos seis. O fornecedor publica em
+ * dia útil, entre 08h e 19h de São Paulo. Qualquer vigia de "nada se moveu"
+ * que ignore isso dispara todo fim de semana e vira ruído até ninguém abrir.
+ */
+export function diaSemanaBR(v: string | number | Date | null | undefined): number | null {
+  const d = paraData(v);
+  if (!d) return null;
+  const sigla = FMT_DIA_SEMANA.format(d);
+  return ISO_POR_SIGLA[sigla] ?? null;
+}
+
+/** Segunda a sexta no relógio de São Paulo. Data inválida devolve `false`. */
+export function ehDiaUtilBR(v: string | number | Date | null | undefined): boolean {
+  const dow = diaSemanaBR(v);
+  return dow !== null && dow <= 5;
 }

@@ -25,7 +25,37 @@
 // AGREGAÇÃO SEM LAÇO POR CONVERSA. São 4 consultas de tamanho fixo, não uma por
 // conversa: as mensagens vêm em UM bloco por tabela e são agrupadas em memória
 // numa passada. Nenhuma consulta dentro de `map`.
+//
+// ----------------------------------------------------------------------------
+// CONVERSAS-03 — período e legibilidade
+// AUTORIZADO: Emerson Gomes dos Santos — 11/08/2026:
+//   "melhor filtro por dia, não deixar confuso, melhorar painel"
+//
+// O DEFEITO QUE ESTA FATIA CONSERTA JÁ ESTAVA EM PRODUÇÃO, NESTE ARQUIVO. As
+// linhas do bloco dos números faziam:
+//
+//     const inicioDoDia = new Date();
+//     inicioDoDia.setHours(0, 0, 0, 0);
+//
+// `setHours` usa o fuso do PROCESSO, e a Vercel roda em UTC. Das 21h à
+// meia-noite de Brasília, "conversas hoje" já tinha virado o dia seguinte no
+// servidor: o número zerava três horas antes da virada, todo dia, justamente na
+// faixa da noite em que o WhatsApp mais fala. Ninguém ia notar — um contador em
+// 0 parece um dia parado, não um dia errado. Agora quem decide o dia é
+// `inicioDoDiaMs` de `lib/whatsapp/sala.ts`, que pergunta o fuso ao Intl e tem
+// teste para as 22h de Brasília.
+//
+// DUAS SEÇÕES, NÃO UMA — DESVIO DECLARADO A EMERSON. Separador por dia (item 2)
+// e a ordenação da CONVERSAS-02 ("quem esperou mais vem no topo") se
+// contradizem: agrupar por dia jogaria a fila para dentro do histórico. Quem
+// espera resposta humana sai da linha do tempo e vira um bloco fixo no topo,
+// sem cabeçalho de dia; o RESTO, que é histórico, é o que ganha os separadores.
+// Ver `separarSala`.
+//
+// NADA SOME CALADO. O que o filtro de período escondeu é CONTADO e IMPRESSO, e
+// conversa sem data aparece sob "Sem data" em vez de evaporar.
 // ============================================================================
+import Link from "next/link";
 import { IBM_Plex_Mono } from "next/font/google";
 import { exigirAdminConsolePagina } from "@/lib/admin-console";
 import { createXtvClient } from "@/lib/supabase-xtv";
@@ -37,17 +67,26 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConversasSubNav } from "./ConversasSubNav";
 import { ConversaAcoes } from "./ConversaAcoes";
+import { FilaSentinela } from "./FilaSentinela";
 import {
   formatarContato,
   iniciais,
-  resumirFala,
+  identidadeCard,
+  previaComContexto,
   resumirConversa,
   tempoRelativo,
   esperandoHumano,
   esperaMs,
-  ordenarSala,
+  separarSala,
   mediana,
   duracaoCurta,
+  inicioDoDiaMs,
+  lerPeriodo,
+  janelaPeriodo,
+  dentroDoPeriodo,
+  agruparPorDia,
+  PERIODOS,
+  PERIODO_PADRAO,
   type CanalSala,
   type ConversaSala,
   type MensagemCrua,
@@ -119,7 +158,7 @@ function agrupar<T>(linhas: T[], chave: (l: T) => string, valor: (l: T) => Mensa
 export default async function AdminConversas({
   searchParams,
 }: {
-  searchParams: { canal?: string; foco?: string; q?: string };
+  searchParams: { canal?: string; foco?: string; q?: string; periodo?: string };
 }) {
   const { nome } = await exigirAdminConsolePagina();
   const supabase = createXtvClient();
@@ -237,11 +276,19 @@ export default async function AdminConversas({
   const todas = [...linhasWa, ...linhasSite];
 
   // ---------------------------------------------------------------------
-  // Os quatro números do topo (Entrega 3)
+  // Os quatro números do topo (Entrega 3 da CONVERSAS-02)
   // ---------------------------------------------------------------------
-  const inicioDoDia = new Date();
-  inicioDoDia.setHours(0, 0, 0, 0);
-  const inicioDoDiaMs = inicioDoDia.getTime();
+  // ITEM 6 DA CONVERSAS-03, MEDIDO ANTES DE MEXER: estes quatro já liam `todas`,
+  // que é a lista ANTES de qualquer filtro. Eles nunca dependeram do canal, do
+  // foco nem da busca — e não passam a depender do período. Ou seja: o que a OS
+  // pediu ("ficam fixos") já era verdade na aritmética. O que faltava era a
+  // tela DIZER isso, porque um número que não se move quando o filtro muda
+  // parece quebrado. A correção do item 6 é, portanto, de legenda, não de
+  // cálculo — e está declarada assim para Emerson em vez de virar um "corrigi".
+  //
+  // O dia é o dia civil de BRASÍLIA. Ver o cabeçalho do arquivo: aqui havia um
+  // `new Date().setHours(0,0,0,0)`, que usa o fuso do processo — UTC na Vercel.
+  const inicioHojeMs = inicioDoDiaMs(agoraMs);
   const seteDiasMs = agoraMs - 7 * 24 * 60 * 60 * 1000;
 
   // "Conversas hoje" conta ATIVIDADE de hoje, não conversas criadas hoje: a
@@ -249,7 +296,7 @@ export default async function AdminConversas({
   // ontem que voltou a falar entrou na sala hoje.
   const conversasHoje = todas.filter((l) => {
     const t = l.ultimaEm ? new Date(l.ultimaEm).getTime() : NaN;
-    return Number.isFinite(t) && t >= inicioDoDiaMs;
+    return Number.isFinite(t) && t >= inicioHojeMs;
   }).length;
 
   const aguardando = todas.filter((l) => esperandoHumano(l));
@@ -290,6 +337,14 @@ export default async function AdminConversas({
   const foco = searchParams.foco;
   const busca = (searchParams.q ?? "").trim();
 
+  // ITEM 1 — o período. `lerPeriodo` cai no padrão de 7 dias diante de qualquer
+  // coisa que não reconheça, então `?periodo=banana` mostra a sala em vez de uma
+  // tela vazia inexplicável. O link é deep-linkável porque o valor vive só na
+  // URL: sem estado de cliente, sem cookie, e o operador pode mandar o endereço
+  // para outra pessoa e os dois verem a MESMA lista.
+  const periodo = lerPeriodo(searchParams.periodo);
+  const janela = janelaPeriodo(periodo, agoraMs);
+
   // Busca por nome OU telefone. Compara também o telefone só-dígitos, para que
   // quem digita "(19) 99756" ou "19997561909" encontre a mesma pessoa que quem
   // digita o número como o banco o guardou.
@@ -308,22 +363,138 @@ export default async function AdminConversas({
   if (foco === "cedente") lista = lista.filter((l) => l.cedente);
   if (foco === "anexo") lista = lista.filter((l) => l.temAnexo);
 
-  lista = ordenarSala(lista, agoraMs) as Linha[];
+  // O PERÍODO É O ÚLTIMO FILTRO, e a diferença é guardada. Não porque a OS
+  // pediu, mas porque um filtro que esconde sem dizer quanto escondeu faz o
+  // operador concluir "não tem nada" quando a resposta certa é "não tem nada
+  // NESTA janela". As duas frases levam a decisões opostas.
+  const antesDoPeriodo = lista.length;
+  lista = lista.filter((l) => dentroDoPeriodo(l.ultimaEm, janela));
+  const ocultasPeriodo = antesDoPeriodo - lista.length;
+
+  // ITEM 2 — a fila sai da linha do tempo (ver o desvio no cabeçalho), e só o
+  // histórico é agrupado por dia.
+  const { fila, resto } = separarSala(lista, agoraMs);
+  const historico = agruparPorDia(resto, (l) => l.ultimaEm, agoraMs);
 
   const qtdAtencao = aguardando.length;
   const qtdCedente = todas.filter((l) => l.cedente).length;
   const qtdAnexo = todas.filter((l) => l.temAnexo).length;
 
-  function href(over: { canal?: string | null; foco?: string | null }): string {
+  // Todo link de filtro CARREGA os outros filtros. É o que faz "combinável" da
+  // OS ser verdade: trocar o período não apaga o canal, nem a busca, nem o foco.
+  // O período só entra na URL quando não é o padrão — assim o endereço limpo
+  // continua sendo `/admin/conversas`, e um `?periodo=7d` explícito só aparece
+  // se alguém o escreveu.
+  function href(over: {
+    canal?: string | null;
+    foco?: string | null;
+    periodo?: string | null;
+  }): string {
     const p = new URLSearchParams();
     const c = over.canal === undefined ? filtroCanal : over.canal;
     const f = over.foco === undefined ? foco : over.foco;
+    const d = over.periodo === undefined ? periodo : over.periodo;
     if (c) p.set("canal", c);
     if (f) p.set("foco", f);
+    if (d && d !== PERIODO_PADRAO) p.set("periodo", d);
     if (busca) p.set("q", busca);
     const qs = p.toString();
     return qs ? `/admin/conversas?${qs}` : "/admin/conversas";
   }
+
+  // UM desenhista de card, três blocos (fila, dias, sem data). Duplicar esta
+  // marcação três vezes seria a receita para os três divergirem na primeira
+  // manutenção — e divergirem em silêncio, porque nada aqui é testado.
+  const cartao = (l: Linha) => {
+    const info = statusInfo(l.status);
+    const contato = formatarContato(l.telefone, l.canal);
+    const ident = identidadeCard(l);
+    const sigla = iniciais(l.nome);
+    const espera = esperaMs(l, agoraMs);
+    const previa = previaComContexto(l.ultimaFalaCliente, l.ultimaPerguntaBot);
+    return (
+      <Card key={`${l.canal}-${l.id}`} as="li">
+        <div className={styles.topo}>
+          <div className={styles.identidade}>
+            <span className={styles.avatar} aria-hidden="true">
+              {sigla ?? "—"}
+            </span>
+            {/* ITEM 3 — sem nome, o TELEFONE vira o título e a segunda linha
+                desaparece, em vez de repetir o mesmo dado duas vezes. A pastilha
+                "sem nome" saiu junto: o título já diz que não há nome, e pastilha
+                que repete o título é ruído com cara de informação. */}
+            <span className={styles.nomes}>
+              <span
+                className={`${styles.nomeLead} ${ident.tituloEhContato ? styles.nomeLeadContato : ""}`}
+              >
+                {ident.titulo}
+              </span>
+              {ident.subtitulo ? (
+                <span className={styles.contato}>{ident.subtitulo}</span>
+              ) : null}
+            </span>
+          </div>
+          <div className={styles.etiquetas}>
+            <span className={`${styles.canal} ${CLASSE_CANAL[l.canal]}`}>
+              <span className={styles.canalPonto} aria-hidden="true" />
+              {ROTULO_CANAL[l.canal]}
+            </span>
+            <Badge tone={info.tone}>{info.label}</Badge>
+            {l.cedente ? <Badge tone="amber">cedente</Badge> : null}
+            {l.temAnexo ? <Badge tone="info">com anexo</Badge> : null}
+          </div>
+        </div>
+
+        {/* ITEM 4 — resposta curta ganha a pergunta ao lado. "2" sozinho é
+            ruído; "Bot: Quantas parcelas restam? · Cliente: 2" é informação. */}
+        {previa ? (
+          <p className={styles.fala}>
+            {previa.pergunta ? (
+              <span className={styles.falaPergunta}>Bot: {previa.pergunta} · </span>
+            ) : null}
+            <span className={styles.falaAutor}>Cliente: </span>
+            {previa.resposta}
+          </p>
+        ) : (
+          <p className={styles.semFala}>
+            {l.totalMensagens === 0
+              ? "Sem mensagens carregadas — conversa antiga demais para o teto de leitura, ou registro sem thread."
+              : "O cliente ainda não escreveu nada nesta conversa."}
+          </p>
+        )}
+
+        <div className={styles.rodape}>
+          <span className={styles.tempo}>
+            <span className={espera !== null ? styles.tempoEsperando : ""}>
+              {espera !== null
+                ? `esperando há ${duracaoCurta(espera)}`
+                : l.fonteAtividade === "mensagem"
+                  ? `última mensagem ${tempoRelativo(l.ultimaEm, agoraMs)}`
+                  : `registro de ${tempoRelativo(l.ultimaEm, agoraMs)} · sem mensagem lida`}
+            </span>
+            <span className={styles.sinais}>
+              {" · "}
+              {l.totalMensagens} {l.totalMensagens === 1 ? "mensagem" : "mensagens"}
+            </span>
+          </span>
+          {/* O canal da ROTA não é o canal do CARD: Instagram vive em
+              `wa_conversas` e é atendido pelas rotas /whatsapp/. Por isso a
+              confirmação recebe `contato` já formatado — ver o bloco de
+              comentário em ConversaAcoes.tsx. */}
+          <ConversaAcoes
+            canal={l.canal === "site" ? "site" : "whatsapp"}
+            conversaId={l.id}
+            status={l.status}
+            telefone={l.telefone ?? undefined}
+            nome={l.nome}
+            contato={l.telefone ? contato.texto : null}
+            href={l.href}
+            compacto
+          />
+        </div>
+      </Card>
+    );
+  };
 
   return (
     <AppShell nome={nome} equipeAdminConsole>
@@ -337,7 +508,9 @@ export default async function AdminConversas({
         <div className={styles.numero}>
           <span className={styles.numeroValor}>{conversasHoje}</span>
           <span className={styles.numeroRotulo}>conversas hoje</span>
-          <span className={styles.numeroNota}>com atividade desde a meia-noite</span>
+          <span className={styles.numeroNota}>
+            hoje · com atividade desde a meia-noite de Brasília
+          </span>
         </div>
         <div className={styles.numero}>
           <span
@@ -346,15 +519,17 @@ export default async function AdminConversas({
             {qtdAtencao}
           </span>
           <span className={styles.numeroRotulo}>aguardando resposta</span>
-          <span className={styles.numeroNota}>o cliente falou e ninguém respondeu depois</span>
+          <span className={styles.numeroNota}>
+            agora, sem janela · o cliente falou e ninguém respondeu depois
+          </span>
         </div>
         <div className={styles.numero}>
           <span className={styles.numeroValor}>{cedentesSemana}</span>
           <span className={styles.numeroRotulo}>cedentes na semana</span>
           <span className={styles.numeroNota}>
             {qtdCedente === 0
-              ? `zero porque o detector nasceu em ${DETECTOR_CEDENTE_DESDE} — nenhuma conversa anterior foi marcada`
-              : "pela etiqueta gravada em wa_conversas.tags"}
+              ? `últimos 7 dias · zero porque o detector nasceu em ${DETECTOR_CEDENTE_DESDE} — nenhuma conversa anterior foi marcada`
+              : "últimos 7 dias · pela etiqueta gravada em wa_conversas.tags"}
           </span>
         </div>
         <div className={styles.numero}>
@@ -362,11 +537,27 @@ export default async function AdminConversas({
           <span className={styles.numeroRotulo}>mediana até a 1ª resposta</span>
           <span className={styles.numeroNota}>
             {medianaResposta === null
-              ? "sem conversa respondida nos últimos 7 dias"
+              ? "últimos 7 dias · sem conversa respondida na janela"
               : `últimos 7 dias · ${temposResposta.length} ${temposResposta.length === 1 ? "conversa" : "conversas"} · quem ainda não foi respondido não entra`}
           </span>
         </div>
       </section>
+
+      {/* ITEM 6. Estes quatro números nunca dependeram de filtro nenhum — leem a
+          sala inteira. A legenda existe porque um número que não se move quando
+          o filtro muda parece quebrado, e a suspeita de painel quebrado custa
+          mais caro do que a linha de texto que a desfaz. */}
+      <p className={styles.numerosLegenda}>
+        Os quatro números acima têm janela própria, escrita em cada um, e{" "}
+        <strong>não mudam</strong> com os filtros abaixo — nem com o período. Eles medem a sala
+        inteira; os filtros mudam só a lista.
+      </p>
+
+      {/* A fila do Sentinela fica ACIMA da busca, junto dos números que não
+          dependem de filtro, porque ela também não depende: é a sala inteira.
+          E fica visível sem ninguém procurar — foi a invisibilidade dela que
+          deixou 21 pessoas onze dias esperando sem que nenhuma tela dissesse. */}
+      <FilaSentinela />
 
       <form className={styles.busca} method="get" action="/admin/conversas" role="search">
         <label className="sr-only" htmlFor="q">
@@ -383,6 +574,11 @@ export default async function AdminConversas({
         />
         {filtroCanal ? <input type="hidden" name="canal" value={filtroCanal} /> : null}
         {foco ? <input type="hidden" name="foco" value={foco} /> : null}
+        {/* Sem este campo, buscar jogaria o período de volta ao padrão sem
+            avisar — o formulário faz GET e só manda o que ele mesmo carrega. */}
+        {periodo !== PERIODO_PADRAO ? (
+          <input type="hidden" name="periodo" value={periodo} />
+        ) : null}
         <Button type="submit" variant="ghost" size="sm">
           Buscar
         </Button>
@@ -392,6 +588,25 @@ export default async function AdminConversas({
           </Button>
         ) : null}
       </form>
+
+      {/* ITEM 1 — o período, em fileira PRÓPRIA. Período é um eixo diferente de
+          canal e de foco: misturar os três numa fileira só é a confusão que a
+          OS mandou desfazer ("não deixar confuso"). Separados, cada fileira
+          responde a uma pergunta, e o `aria-label` diz qual. */}
+      <nav className={styles.periodos} aria-label="Filtrar por período">
+        <span className={styles.periodosRotulo}>Período</span>
+        {PERIODOS.map((p) => (
+          <Button
+            key={p.valor}
+            href={href({ periodo: p.valor })}
+            variant={periodo === p.valor ? "primary" : "ghost"}
+            size="sm"
+            aria-current={periodo === p.valor ? "true" : undefined}
+          >
+            {p.rotulo}
+          </Button>
+        ))}
+      </nav>
 
       <nav className={areaStyles.filtros} aria-label="Filtrar conversas">
         <Button href={href({ canal: null })} variant={!filtroCanal ? "primary" : "ghost"} size="sm">
@@ -446,89 +661,90 @@ export default async function AdminConversas({
           icon="💬"
           title="Nenhuma conversa"
           description={
-            busca
-              ? `Nada encontrado para “${busca}”. A busca cobre nome e telefone.`
-              : "Nenhuma conversa encontrada com este filtro."
+            /* A ORDEM DAS RAZÕES IMPORTA. Vazio por período é a causa mais
+               provável agora que o padrão é 7 dias, e é a única que tem
+               conserto de um clique. Dizer "nenhuma conversa" sem dizer "nesta
+               janela" seria mentir por omissão para quem acabou de chegar. */
+            ocultasPeriodo > 0
+              ? `Nada nesta janela de tempo — ${ocultasPeriodo} ${ocultasPeriodo === 1 ? "conversa está" : "conversas estão"} fora dela.`
+              : busca
+                ? `Nada encontrado para “${busca}”. A busca cobre nome e telefone.`
+                : "Nenhuma conversa encontrada com este filtro."
+          }
+          action={
+            ocultasPeriodo > 0 ? (
+              <Button href={href({ periodo: "tudo" })} variant="ghost" size="sm">
+                Ver tudo
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <ul className={areaStyles.list}>
-          {lista.map((l) => {
-            const info = statusInfo(l.status);
-            const contato = formatarContato(l.telefone, l.canal);
-            const sigla = iniciais(l.nome);
-            const espera = esperaMs(l, agoraMs);
-            const fala = resumirFala(l.ultimaFalaCliente);
-            return (
-              <Card key={`${l.canal}-${l.id}`} as="li">
-                <div className={styles.topo}>
-                  <div className={styles.identidade}>
-                    <span className={styles.avatar} aria-hidden="true">
-                      {sigla ?? "—"}
-                    </span>
-                    <span className={styles.nomes}>
-                      <span className={styles.nomeLead}>{l.nome ?? "Sem nome"}</span>
-                      <span className={styles.contato}>{contato.texto}</span>
-                    </span>
-                  </div>
-                  <div className={styles.etiquetas}>
-                    <span className={`${styles.canal} ${CLASSE_CANAL[l.canal]}`}>
-                      <span className={styles.canalPonto} aria-hidden="true" />
-                      {ROTULO_CANAL[l.canal]}
-                    </span>
-                    <Badge tone={info.tone}>{info.label}</Badge>
-                    {l.cedente ? <Badge tone="amber">cedente</Badge> : null}
-                    {l.temAnexo ? <Badge tone="info">com anexo</Badge> : null}
-                    {!l.nome ? <Badge tone="muted">sem nome</Badge> : null}
-                  </div>
-                </div>
+        <>
+          {/* BLOCO 1 — A FILA. Sem cabeçalho de dia, de propósito: ver o desvio
+              declarado no cabeçalho do arquivo. Quem espera resposta humana não
+              pertence à linha do tempo; pertence ao topo, ordenado por espera. */}
+          {fila.length > 0 ? (
+            <section className={styles.grupo}>
+              <h2 className={`${styles.separador} ${styles.separadorFila}`}>
+                <span className={styles.separadorRotulo}>Esperando resposta</span>
+                <span className={styles.separadorConta}>
+                  {fila.length} {fila.length === 1 ? "conversa" : "conversas"}
+                </span>
+              </h2>
+              <p className={styles.separadorNota}>
+                Fora da linha do tempo abaixo, em ordem de espera — quem espera há mais tempo vem
+                primeiro.
+              </p>
+              <ul className={areaStyles.list}>{fila.map(cartao)}</ul>
+            </section>
+          ) : null}
 
-                {fala ? (
-                  <p className={styles.fala}>
-                    <span className={styles.falaAutor}>Cliente: </span>
-                    {fala}
-                  </p>
-                ) : (
-                  <p className={styles.semFala}>
-                    {l.totalMensagens === 0
-                      ? "Sem mensagens carregadas — conversa antiga demais para o teto de leitura, ou registro sem thread."
-                      : "O cliente ainda não escreveu nada nesta conversa."}
-                  </p>
-                )}
+          {/* BLOCO 2 — O HISTÓRICO, por dia civil de Brasília. */}
+          {historico.grupos.map((g) => (
+            <section key={g.chave} className={styles.grupo}>
+              <h2 className={styles.separador}>
+                <span className={styles.separadorRotulo}>{g.rotulo}</span>
+                <span className={styles.separadorConta}>
+                  {g.itens.length} {g.itens.length === 1 ? "conversa" : "conversas"}
+                </span>
+              </h2>
+              <ul className={areaStyles.list}>{g.itens.map(cartao)}</ul>
+            </section>
+          ))}
 
-                <div className={styles.rodape}>
-                  <span className={styles.tempo}>
-                    <span className={espera !== null ? styles.tempoEsperando : ""}>
-                      {espera !== null
-                        ? `esperando há ${duracaoCurta(espera)}`
-                        : l.fonteAtividade === "mensagem"
-                          ? `última mensagem ${tempoRelativo(l.ultimaEm, agoraMs)}`
-                          : `registro de ${tempoRelativo(l.ultimaEm, agoraMs)} · sem mensagem lida`}
-                    </span>
-                    <span className={styles.sinais}>
-                      {" · "}
-                      {l.totalMensagens} {l.totalMensagens === 1 ? "mensagem" : "mensagens"}
-                    </span>
-                  </span>
-                  {/* O canal da ROTA não é o canal do CARD: Instagram vive em
-                      `wa_conversas` e é atendido pelas rotas /whatsapp/. Por
-                      isso a confirmação recebe `contato` já formatado — ver o
-                      bloco de comentário em ConversaAcoes.tsx. */}
-                  <ConversaAcoes
-                    canal={l.canal === "site" ? "site" : "whatsapp"}
-                    conversaId={l.id}
-                    status={l.status}
-                    telefone={l.telefone ?? undefined}
-                    nome={l.nome}
-                    contato={l.telefone ? contato.texto : null}
-                    href={l.href}
-                    compacto
-                  />
-                </div>
-              </Card>
-            );
-          })}
-        </ul>
+          {/* BLOCO 3 — SEM DATA. Não deveria existir, e é exatamente por isso
+              que aparece: registro sem `ultimaEm` é defeito de dado, e defeito
+              de dado escondido continua defeito. `agruparPorDia` devolve estes
+              itens em vez de engoli-los; a tela devolve o favor. */}
+          {historico.semData.length > 0 ? (
+            <section className={styles.grupo}>
+              <h2 className={styles.separador}>
+                <span className={styles.separadorRotulo}>Sem data</span>
+                <span className={styles.separadorConta}>
+                  {historico.semData.length}{" "}
+                  {historico.semData.length === 1 ? "conversa" : "conversas"}
+                </span>
+              </h2>
+              <p className={styles.separadorNota}>
+                Registro sem data de atividade legível — aparece aqui em qualquer período, inclusive
+                nos filtrados, para não sumir da tela.
+              </p>
+              <ul className={areaStyles.list}>{historico.semData.map(cartao)}</ul>
+            </section>
+          ) : null}
+
+          {/* O QUE O PERÍODO ESCONDEU, DITO EM NÚMERO. Um filtro que corta em
+              silêncio faz o operador concluir "não tem" quando a resposta certa
+              é "não tem NESTA janela". */}
+          {ocultasPeriodo > 0 ? (
+            <p className={styles.ocultas}>
+              {ocultasPeriodo} {ocultasPeriodo === 1 ? "conversa está" : "conversas estão"} fora
+              deste período e não {ocultasPeriodo === 1 ? "aparece" : "aparecem"} acima.{" "}
+              <Link href={href({ periodo: "tudo" })}>Ver tudo</Link>.
+            </p>
+          ) : null}
+        </>
       )}
 
       {/* Estados vazios com o MOTIVO. A OS: "campo sem fonte aparece vazio com

@@ -13,15 +13,44 @@
 //                 do template pela Meta.
 //
 // REGRAS DE PARADA (duras):
-//   - máx. MAX_TOQUES por lead (2), espaçados de ESPACAMENTO_HORAS (72h);
-//     depois do 2º toque sem resposta → 'esgotado', nunca mais tocado
+//   - teto de toques POR LINHA (sentinela_fila.max_toques, default 2),
+//     espaçados de 72h; atingido o teto sem resposta →
+//     'encerrado_por_silencio', nunca mais tocado
 //   - cliente respondeu (site OU WhatsApp) → 'respondeu', nunca mais tocado
 //   - opt_out em wa_conversas → 'excluido'. Dupla checagem: aqui (guard #1)
 //     E dentro do sendTemplate (guard #2) — mesmo padrão do DISPARO-01
 //   - NUMERO_EXCLUIDO hard-coded (número de produção da casa), sem exceção
 //   - horário: só envia entre 9h e 20h America/Sao_Paulo (o cron 12,18 UTC
 //     já cai dentro; o guard cobre execução manual fora de hora)
+//   - domingo: não envia. Nunca.
 //   - MAX_ENVIOS_POR_EXECUCAO com throttle de 1 msg / 2s (padrão DISPARO-01)
+//
+// ----------------------------------------------------------------------------
+// SENTINELA-RADAR-01 (1.3) — O QUE MUDOU AQUI, E POR QUÊ
+//
+// 1. O TETO DE TOQUES DEIXOU DE SER CONSTANTE DESTE ARQUIVO. Era `MAX_TOQUES=2`
+//    para todo mundo. Passou a ser `sentinela_fila.max_toques`, por linha, e as
+//    21 linhas captadas em 04/08 levam 1. Elas ficaram ONZE DIAS sem um toque
+//    porque o template nunca existiu — a falha foi nossa. Onze dias depois,
+//    insistência é lida como cobrança: um segundo toque não soa como cuidado,
+//    soa como sistema. A honestidade é a única coisa que ainda reabre a
+//    conversa nesse ponto — e a frase que abre é a que assume o erro, não a que
+//    oferece carta.
+//
+// 2. A SELEÇÃO DA FASE C VIROU RPC (`sentinela_a_tocar`). Não é gosto: com o
+//    teto virando coluna, `tentativas < max_toques` compara duas colunas, o que
+//    PostgREST não faz. Filtrar depois, em JS, deixaria linhas inelegíveis
+//    ocupando as 15 vagas da janela — e como as 21 antigas têm criado_em
+//    IDÊNTICO e vêm primeiro, elas ocupariam as 15 sempre, e as 5 novas nunca
+//    seriam olhadas. O desempate por `id` mora dentro da RPC pelo mesmo motivo.
+//
+// 3. 'esgotado' VIROU 'encerrado_por_silencio'. 'esgotado' dizia "acabou" sem
+//    dizer por quê, e por quê é a única parte que serve pra decidir o que fazer
+//    com a linha depois.
+//
+// 4. DOMINGO NÃO ENVIA. A guarda de 9h–20h já existia e não cobre isso: 14h de
+//    domingo passa nela. Mensagem de empresa em domingo não é urgência de quem
+//    recebe, é conveniência de quem manda.
 //
 // dry_run=1 na query → zero efeito colateral (nenhum insert/update/envio),
 // só relata o que aconteceria. Toda ação real vira linha em sentinela_log.
@@ -39,12 +68,19 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const NUMERO_EXCLUIDO = "5511973202967"; // mesmo hard-exclude do DISPARO-01
-const MAX_TOQUES = 2;
 const ESPACAMENTO_MS = 72 * 60 * 60 * 1000; // 72h entre toques
 const MAX_ENVIOS_POR_EXECUCAO = 15; // 15 × 2s = 30s, folga no maxDuration
 const THROTTLE_MS = 2000;
 const HORA_INICIO_SP = 9;
 const HORA_FIM_SP = 20; // exclusivo: 20h em diante não envia
+const DOMINGO = 0; // Date#getDay() em SP — ver diaSemanaSP()
+
+// Rede de segurança para linha que chegue sem o teto preenchido. O default
+// real é do banco (sentinela_fila.max_toques default 2); este número só entra
+// se a coluna vier null, e existe para o código nunca cair em `0` implícito —
+// `tentativas < 0` seria falso sempre e a linha nunca mais seria tocada, em
+// silêncio. Falha visível é melhor que fila que para sozinha.
+const TETO_TOQUES_FALLBACK = 2;
 
 function autorizado(req: Request): boolean {
   const secret = process.env.SENTINELA_SECRET || process.env.CRON_SECRET;
@@ -62,6 +98,17 @@ function horaLocalSP(): number {
   );
 }
 
+// Dia da semana em São Paulo, 0 = domingo. Vem do MESMO caminho da hora
+// (Intl com timeZone explícito) e não de `new Date().getDay()`, que devolveria
+// o dia do relógio do servidor — em UTC, sábado 21h em SP já é domingo.
+function diaSemanaSP(): number {
+  const nome = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "short",
+  }).format(new Date());
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(nome);
+}
+
 function primeiroNome(nome: string | null): string {
   const p = (nome ?? "").trim().split(/\s+/)[0] ?? "";
   if (!p) return "tudo bem"; // "Olá, tudo bem!" — fallback sem nome
@@ -76,9 +123,19 @@ type FilaRow = {
   telefone: string;
   status: string;
   tentativas: number;
+  /** Teto DESTA linha. Null só se a coluna vier vazia — ver TETO_TOQUES_FALLBACK. */
+  max_toques: number | null;
   ultimo_envio_em: string | null;
   proximo_toque_em: string | null;
 };
+
+/** Teto efetivo da linha, com a rede de segurança aplicada num lugar só. */
+function tetoDe(f: FilaRow): number {
+  return f.max_toques ?? TETO_TOQUES_FALLBACK;
+}
+
+const COLUNAS_FILA =
+  "id, conversa_site_id, wa_conversa_id, nome, telefone, status, tentativas, max_toques, ultimo_envio_em, proximo_toque_em";
 
 export async function GET(req: Request) {
   if (!autorizado(req)) {
@@ -96,10 +153,40 @@ export async function GET(req: Request) {
     ok: true,
     dry_run: dryRun,
     captadas: 0,
-    paradas: { respondeu: 0, opt_out: 0, esgotado: 0 },
+    // `encerrado_por_silencio` substitui a chave `esgotado` das varreduras
+    // anteriores. As linhas antigas de sentinela_log guardam o nome velho —
+    // quem for ler o histórico tem de aceitar os dois.
+    paradas: { respondeu: 0, opt_out: 0, encerrado_por_silencio: 0 },
     envios: { feitos: 0, falhas: 0, pulados: 0 },
-    aguardando_template: 0,
+    // DEDUP-SENTINELA-01 — a chave `aguardando_template` SAIU daqui, e o motivo
+    // é um diagnóstico errado que ela causou. Ela gravava 15 no log enquanto a
+    // fila tinha 21 vivas e 27 elegíveis: 15 era o LIMIT da página, escrito como
+    // se fosse população. Quem leu o log concluiu "situação normal" — e estava
+    // lendo o número certo com o nome errado.
+    //
+    // Os três campos abaixo não admitem essa leitura:
+    //   elegiveis_total ......... quantas PESSOAS podem ser tocadas agora (já
+    //                             deduplicadas por telefone, vem do SQL)
+    //   tratados_nesta_pagina ... quantas esta execução de fato pegou
+    //   limite_da_pagina ........ o teto da janela. Sem ele não dá para
+    //                             distinguir "a página encheu, tem mais atrás"
+    //                             de "a população é esse número mesmo".
+    //
+    // Mesmo tratamento que `esgotado` → `encerrado_por_silencio` recebeu acima:
+    // as linhas antigas de sentinela_log guardam a chave velha, e quem for ler
+    // o histórico tem de aceitar as duas.
+    fila: {
+      elegiveis_total: 0,
+      tratados_nesta_pagina: 0,
+      limite_da_pagina: MAX_ENVIOS_POR_EXECUCAO,
+    },
+    // Irmão de `fora_horario` e `domingo`: diz POR QUE a execução não enviou.
+    // Substitui a contagem que existia aqui — o motivo é um estado (o template
+    // não está configurado), não uma quantidade, e escrever estado como número
+    // foi o que produziu o log ilegível.
+    sem_template: false,
     fora_horario: false,
+    domingo: false,
     detalhes: [] as Array<Record<string, unknown>>,
   };
 
@@ -165,9 +252,7 @@ export async function GET(req: Request) {
   // ------------------------------------------------------------------ FASE B
   const { data: enviados } = await db
     .from("sentinela_fila")
-    .select(
-      "id, conversa_site_id, wa_conversa_id, nome, telefone, status, tentativas, ultimo_envio_em, proximo_toque_em"
-    )
+    .select(COLUNAS_FILA)
     .eq("status", "enviado");
 
   for (const f of (enviados ?? []) as FilaRow[]) {
@@ -216,16 +301,25 @@ export async function GET(req: Request) {
       }
       continue;
     }
-    // esgotou: 2º toque feito, espaçamento vencido, nenhuma resposta
+    // Teto DESTA linha atingido, espaçamento vencido, nenhuma resposta.
+    // O espaçamento é parte da condição de propósito: sem ele, uma linha
+    // encerraria no mesmo minuto do último toque, antes de a pessoa ter tido
+    // chance de responder.
     if (
-      f.tentativas >= MAX_TOQUES &&
+      f.tentativas >= tetoDe(f) &&
       f.ultimo_envio_em &&
       agora.getTime() - new Date(f.ultimo_envio_em).getTime() > ESPACAMENTO_MS
     ) {
-      resumo.paradas.esgotado++;
+      resumo.paradas.encerrado_por_silencio++;
       if (!dryRun) {
-        await db.from("sentinela_fila").update({ status: "esgotado" }).eq("id", f.id);
-        await log(f.id, "parada_esgotado", { tentativas: f.tentativas });
+        await db
+          .from("sentinela_fila")
+          .update({ status: "encerrado_por_silencio" })
+          .eq("id", f.id);
+        await log(f.id, "parada_encerrado_por_silencio", {
+          tentativas: f.tentativas,
+          max_toques: tetoDe(f),
+        });
       }
     }
   }
@@ -233,21 +327,45 @@ export async function GET(req: Request) {
   // ------------------------------------------------------------------ FASE C
   const templateName = process.env.SENTINELA_TEMPLATE;
 
-  const { data: aEnviar } = await db
-    .from("sentinela_fila")
-    .select(
-      "id, conversa_site_id, wa_conversa_id, nome, telefone, status, tentativas, ultimo_envio_em, proximo_toque_em"
-    )
-    .in("status", ["pendente", "aguardando_template", "enviado"])
-    .lt("tentativas", MAX_TOQUES)
-    .or(`proximo_toque_em.is.null,proximo_toque_em.lte.${agora.toISOString()}`)
-    .order("criado_em", { ascending: true })
-    .limit(MAX_ENVIOS_POR_EXECUCAO);
+  // Teto por linha + ordem com desempate, tudo no SQL. Ver item 2 do cabeçalho:
+  // afrouxar aqui e refinar em JS devolveria a janela de 15 para as antigas.
+  const { data: aEnviar, error: errATocar } = await db.rpc("sentinela_a_tocar", {
+    limite: MAX_ENVIOS_POR_EXECUCAO,
+  });
+  if (errATocar) {
+    // Falhar alto. Uma seleção quebrada devolve lista vazia, e lista vazia é
+    // indistinguível de "não há ninguém a tocar" — o Sentinela pararia sem
+    // ninguém saber, que é exatamente o defeito que esta fatia veio corrigir.
+    await log(null, "erro_selecao", { erro: errATocar.message });
+    return NextResponse.json(
+      { ok: false, erro: `rpc_a_tocar: ${errATocar.message}` },
+      { status: 500 }
+    );
+  }
+
+  // A POPULAÇÃO, medida separada da página. `aEnviar` já vem cortado em 15 pelo
+  // limite, então contar o array responde "quantas couberam", nunca "quantas
+  // existem" — foi exatamente essa confusão que pôs 15 no log.
+  //
+  // Falha aqui NÃO derruba a varredura: o total é instrumento de leitura, e
+  // parar de tocar 26 pessoas porque um contador não respondeu seria trocar o
+  // trabalho pela medição do trabalho. Fica -1 e o log diz que não foi medido —
+  // nunca 0, que seria indistinguível de "fila vazia".
+  const { data: totalElegiveis, error: errTotal } = await db.rpc(
+    "sentinela_elegiveis_total"
+  );
+  if (errTotal) {
+    resumo.fila.elegiveis_total = -1;
+    await log(null, "erro_total_elegiveis", { erro: errTotal.message });
+  } else {
+    resumo.fila.elegiveis_total = Number(totalElegiveis ?? 0);
+  }
+  resumo.fila.tratados_nesta_pagina = (aEnviar ?? []).length;
 
   if (!templateName) {
     // GATE: sem template aprovado configurado, nada sai. Marca o motivo.
+    resumo.sem_template = true;
     for (const f of (aEnviar ?? []) as FilaRow[]) {
-      resumo.aguardando_template++;
       if (!dryRun && f.status !== "aguardando_template") {
         await db
           .from("sentinela_fila")
@@ -256,6 +374,16 @@ export async function GET(req: Request) {
         await log(f.id, "aguardando_template", {});
       }
     }
+    return finalizar();
+  }
+
+  // Domingo antes da hora: a guarda de 9h–20h sozinha aprova domingo às 14h.
+  // Nada aqui é urgente o bastante para justificar isso — a fila espera
+  // segunda. Fica ANTES porque, sendo domingo, a hora nem importa.
+  const dia = diaSemanaSP();
+  if (dia === DOMINGO) {
+    resumo.domingo = true;
+    await log(null, "domingo", {});
     return finalizar();
   }
 

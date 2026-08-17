@@ -34,7 +34,12 @@
 // ============================================================================
 import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
-import { lerCotasFonte, FONTES, type FonteMarca } from "@/lib/cotas-source";
+import {
+  lerCotasFonte,
+  FONTES,
+  type DiagnosticoRaw,
+  type FonteMarca,
+} from "@/lib/cotas-source";
 import { lerCotasPlaycontempladas } from "@/lib/playcontempladas-source";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +58,78 @@ function autorizado(req: Request): boolean {
   return auth === `Bearer ${secret}`;
 }
 
+// Tipos de evento do diagnóstico do valor cru (SYNC-RAW-01). Um deles é
+// gravado por fonte por ciclo. `eventos_sync.tipo` é text sem check constraint
+// (medido) — por isso nenhuma migration é necessária para estreá-los.
+const RAW_JA_MANDOU = ["sync_raw_ok", "sync_raw_parcial"] as const;
+
+/**
+ * SYNC-RAW-01 (b): grava UM evento por fonte por ciclo com o diagnóstico do
+ * valor cru. Best-effort como todos os outros inserts daqui: falha ao logar
+ * nunca derruba o sync.
+ *
+ * O TIPO do evento é o alarme, e ele separa duas coisas que num contador
+ * pareceriam iguais:
+ *   sync_raw_desenho   : fonte que não manda cru por desenho (LANCE embute os
+ *                        7% na origem). Nulo legítimo e NOMEADO. Não alarma.
+ *   sync_raw_ok        : esperava o cru e veio em todas.
+ *   sync_raw_parcial   : esperava e veio em parte. Contrato meio honrado.
+ *   sync_raw_ausente   : esperava, veio ZERO, e nunca se viu esta fonte
+ *                        mandando. Zero absoluto — NÃO alarma.
+ *   sync_raw_regressao : esperava, veio ZERO, e esta fonte JÁ MANDOU antes.
+ *                        Queda de N para zero — ALARMA.
+ *
+ * LIMITE DECLARADO: a memória do "já mandou antes" é o próprio eventos_sync, e
+ * ela começa vazia no primeiro ciclo depois deste deploy. CBC/PIFFER/CARTAS —
+ * que hoje mandam zero e que o contrato da migration 0015 diz terem mandado no
+ * passado — vão sair como `ausente`, não `regressao`, até que o 360 mande uma
+ * vez. O instrumento não inventa passado que não mediu, e quem lê o painel
+ * precisa saber disso.
+ *
+ * O `detalhe` é UMA linha grepável (eventos_sync não tem coluna jsonb) e
+ * carrega o LITERAL da URL chamada, com o ?admin=1 visível: sem ele ninguém
+ * consegue dizer se o contrato mudou no 360prospere ou se fomos nós que
+ * paramos de pedir.
+ */
+async function registrarRaw(
+  db: ReturnType<typeof createXtvClient>,
+  raw: DiagnosticoRaw
+): Promise<void> {
+  try {
+    let tipo: string;
+    if (!raw.espera) {
+      tipo = "sync_raw_desenho";
+    } else if (raw.faltando === 0) {
+      tipo = "sync_raw_ok";
+    } else if (raw.recebidas > 0) {
+      tipo = "sync_raw_parcial";
+    } else {
+      // Zero recebidas: só é regressão se esta fonte já apareceu mandando.
+      // O espaço no fim do prefixo evita casar uma fonte com nome maior.
+      const { count } = await db
+        .from("eventos_sync")
+        .select("id", { count: "exact", head: true })
+        .in("tipo", RAW_JA_MANDOU as unknown as string[])
+        .like("detalhe", "fonte=" + raw.origem + " %");
+      tipo = (count ?? 0) > 0 ? "sync_raw_regressao" : "sync_raw_ausente";
+    }
+
+    await db.from("eventos_sync").insert({
+      tipo,
+      detalhe:
+        "fonte=" + raw.origem +
+        " espera=" + (raw.espera ? 1 : 0) +
+        " lidas=" + raw.lidas +
+        " recebidas=" + raw.recebidas +
+        " faltando=" + raw.faltando +
+        " admin=" + (raw.admin ? 1 : 0) +
+        " url=" + raw.url,
+    });
+  } catch {
+    // silencioso de propósito: logging é best-effort, não pode quebrar o sync
+  }
+}
+
 type ResultadoFonte = {
   origem: FonteMarca;
   ok: boolean;
@@ -64,6 +141,9 @@ type ResultadoFonte = {
   novas?: number;
   atualizadas?: number;
   indisponibilizadas?: number;
+  // SYNC-RAW-01: o diagnóstico do valor cru viaja também na resposta do cron,
+  // não só no eventos_sync — quem lê o painel vê o número sem abrir o banco.
+  raw?: DiagnosticoRaw;
 };
 
 export async function GET(req: Request) {
@@ -125,6 +205,12 @@ export async function GET(req: Request) {
         resultados.push({ origem, ok: false, motivo: leitura.motivo, contagemAnterior });
         continue;
       }
+
+      // (3c) SYNC-RAW-01: diagnóstico do valor cru DESTA leitura. Vem aqui, e
+      // não depois de aplicar, de propósito: o que ele mede é a LEITURA, e o
+      // fato continua valendo mesmo que a RPC falhe adiante. A leitura NUNCA é
+      // abortada por ausência de cru — as cartas entram do mesmo jeito.
+      await registrarRaw(db, leitura.raw);
 
       // (3b) ABERTURA DO CICLO (D6). Um único t0 por fonte, compartilhado por
       // TODOS os lotes e pela varredura final. Precisa vir do relógio do BANCO:
@@ -194,6 +280,7 @@ export async function GET(req: Request) {
             motivo: "rpc lote " + indice + ": " + error.message,
             contagemAnterior,
             lidas: payload.length,
+            raw: leitura.raw,
           });
           falhouLote = true;
           break;
@@ -233,6 +320,7 @@ export async function GET(req: Request) {
           lidas: payload.length,
           novas,
           atualizadas,
+          raw: leitura.raw,
         });
         continue;
       }
@@ -247,6 +335,7 @@ export async function GET(req: Request) {
         novas,
         atualizadas,
         indisponibilizadas: typeof varridas === "number" ? varridas : 0,
+        raw: leitura.raw,
       });
     } catch (e) {
       // rede de segurança: erro inesperado numa fonte não derruba as outras
@@ -271,9 +360,13 @@ export async function GET(req: Request) {
       acc.novas += r.novas ?? 0;
       acc.atualizadas += r.atualizadas ?? 0;
       acc.indisponibilizadas += r.indisponibilizadas ?? 0;
+      // SYNC-RAW-01: soma só o que DEVERIA ter vindo e não veio. LANCE não
+      // entra nesta conta — nulo por desenho não é falta.
+      acc.rawFaltando += r.raw?.faltando ?? 0;
+      acc.rawRecebidas += r.raw?.recebidas ?? 0;
       return acc;
     },
-    { novas: 0, atualizadas: 0, indisponibilizadas: 0 }
+    { novas: 0, atualizadas: 0, indisponibilizadas: 0, rawFaltando: 0, rawRecebidas: 0 }
   );
 
   // (7) telemetria de fim (fatia 0027): se este evento não existir numa

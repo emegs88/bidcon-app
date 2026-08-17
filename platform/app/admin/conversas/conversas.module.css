@@ -495,3 +495,200 @@
   color: var(--text);
   text-decoration: underline;
 }
+
+/* ==========================================================================
+   CONVERSAS-03 — período e legibilidade
+   ========================================================================== */
+
+/* Item 6. Explica por que os quatro números de cima não se mexem quando o
+   filtro muda. Fica logo abaixo deles e acima da busca, na costura entre "o
+   que não muda" e "o que muda" — é o lugar onde a dúvida nasce. */
+.numerosLegenda {
+  margin: -6px 0 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.numerosLegenda strong {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+/* Item 1 — a fileira do período, SEPARADA da fileira de canal/foco. Período é
+   outro eixo; misturar os três numa fileira só é a confusão que a OS mandou
+   desfazer. O rótulo à esquerda existe para a fileira não virar mais um punhado
+   de pastilhas sem dono. */
+.periodos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.periodosRotulo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+/* Item 3 — quando o TÍTULO é o telefone (conversa sem nome), ele não deve
+   herdar o peso 700 de um nome próprio: seria dar cara de identidade a um dado
+   que é só endereço. Fica com peso menor e números alinhados. Sem família
+   monoespaçada de propósito: `--font-mono` só está em escopo na seção dos
+   números; `tabular-nums` já resolve o alinhamento e funciona em qualquer
+   fonte. */
+.nomeLeadContato {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Item 4 — a pergunta do bot é CONTEXTO, não a fala. Vai apagada e sem negrito
+   para que o olho continue caindo primeiro na resposta do cliente, que é a
+   informação nova. */
+.falaPergunta {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Item 2 — os separadores de dia. */
+.grupo {
+  margin-bottom: 22px;
+}
+.separador {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.separadorRotulo {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.separadorConta {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A fila é o único bloco que não é um dia. A faixa âmbar à esquerda diz isso
+   sem precisar de mais uma frase — e âmbar é a mesma cor que `.tempoEsperando`
+   já usa para espera, então o operador só precisa aprender o código uma vez. */
+.separadorFila {
+  border-bottom-color: var(--accent-amber);
+  padding-left: 10px;
+  border-left: 3px solid var(--accent-amber);
+}
+.separadorFila .separadorRotulo {
+  color: var(--accent-amber);
+}
+.separadorNota {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* O que o período escondeu. Não é erro, então não usa vermelho; é um fato que
+   precisa estar na tela para o vazio não ser lido como ausência. */
+.ocultas {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.ocultas a {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Item 5 — o Encerrar rebaixado. Já é `variant="link"` (sem borda, sem fundo);
+   esta classe tira o resto do peso: cor apagada e o sublinhado só no hover,
+   para o alvo não parecer par do Assumir. Continua sendo um <button> de
+   verdade, com foco visível — rebaixar peso visual não é esconder do teclado. */
+.encerrar {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.encerrar:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* --- Fila do Sentinela (SENTINELA-RADAR-01, item 1.4) --------------------- */
+.filaAviso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text);
+}
+.filaAviso code,
+.filaStatusNome code,
+.filaMotivos code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+}
+.filaTopo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.filaTitulo {
+  margin: 0;
+  font-size: 16px;
+}
+/* A linha que a tela existe para dizer: há quantos dias, e quantos toques. */
+.filaDestaque {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+.filaDestaque strong {
+  color: var(--text);
+}
+.filaAlarme {
+  margin: 8px 0 0;
+  color: var(--accent-amber);
+  font-size: 13px;
+}
+.filaStatus {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filaStatusItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filaStatusNome {
+  color: var(--text);
+}
+.filaStatusMeta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.filaMotivos {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}

@@ -69,27 +69,64 @@
   background: rgba(54, 197, 240, .08);
 }
 
-/* --- chips (filtro de administradora) --- */
+/* --- chips (filtro de administradora) ---
+   CHIPS-LEGIBILIDADE-01: a versao anterior desta regra nao declarava `color`
+   nem `font-family`. O chip e um <button> e o index.html nao tem reset de
+   button, entao o rotulo caia no padrao do navegador (ButtonText, preto) sobre
+   o fundo real do chip (#182238, que e o rgba(143,183,255,.06) resolvido sobre
+   --carvao #10182B): 1.32:1 medido. Dai o sintoma "o texto some no navy" — e
+   dai o unico chip legivel ser o ativo, a UNICA das tres regras que declarava
+   cor. Herdar cor de um <button> nao funciona: cor declarada, sempre. */
 .bc-chip {
   display: inline-flex;
   align-items: center;
-  padding: 7px 14px;
+  gap: 7px;                 /* separa o rotulo da pastilha de contagem */
+  padding: 8px 13px;
   border-radius: 999px;
-  border: 1px solid rgba(143, 183, 255, .3);
+  border: 1px solid rgba(143, 183, 255, .55);  /* 3.37:1 vs chip — WCAG 1.4.11 pede 3.0 */
   background: rgba(143, 183, 255, .06);
+  color: #D6DEEE;           /* 11.73:1 sobre #182238 */
+  font-family: inherit;     /* <button> tambem nao herda a fonte do documento */
   font-size: 12.5px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: border-color .15s ease, background .15s ease, color .15s ease;
   white-space: nowrap;
 }
 .bc-chip:hover {
   border-color: var(--bc-grad-mid);
+  color: #fff;
 }
+/* O ativo usa so a metade CLARA do --bc-grad, nao o gradiente inteiro: medido,
+   o texto navy sobre a parada final #1E6FE6 da 4.1:1 e reprova AA, enquanto
+   sobre #8FB7FF e #36C5F0 da 9.52 e 9.54. Nenhuma cor de texto passa AA sobre
+   o gradiente inteiro — nem navy nem branco. Sao as mesmas duas paradas e o
+   mesmo angulo da casa; o --bc-grad em si fica intocado, porque .bc-btn,
+   .bc-credito-grad, .bc-selo-exclusiva e .bc-card.bc-exclusiva dependem dele. */
 .bc-chip.on {
-  background: var(--bc-grad);
+  background: linear-gradient(100deg, #8FB7FF, #36C5F0);
   border-color: transparent;
   color: var(--bc-navy);
+  font-weight: 700;
+}
+
+/* Pastilha da contagem dentro do chip. Antes era um <span style="opacity:.55">
+   que media 2.31:1 e, sem separacao visual, lia como sufixo do nome:
+   "Porto Seguro543". Opacidade baixa nao separa — separa fundo proprio. */
+.bc-chip-n {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(8, 17, 31, .5);
+  color: #A9B6CE;           /* 8.51:1 sobre o fundo resolvido da pastilha */
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.bc-chip.on .bc-chip-n {
+  background: rgba(10, 14, 26, .16);
+  color: var(--bc-navy);    /* 6.96 e 6.98 sobre as duas paradas claras */
 }
 
 /* --- selos do card --- */

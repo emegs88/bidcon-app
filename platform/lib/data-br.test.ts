@@ -19,7 +19,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { dataHoraBR, dataHoraAnoBR, dataBR, diaBR, TZ_BR } from "./data-br";
+import {
+  dataHoraBR,
+  dataHoraAnoBR,
+  dataBR,
+  diaBR,
+  diaSemanaBR,
+  ehDiaUtilBR,
+  TZ_BR,
+} from "./data-br";
 
 // Formatador em UTC — é o que a Vercel produzia. Serve para PROVAR que a
 // fixture distingue os dois casos, sem depender do fuso de quem roda o teste.
@@ -121,4 +129,61 @@ test("o fuso e fixo e nao vem de env", () => {
   // Se isto virar `process.env.TZ` algum dia, a preview passa a divergir da
   // produção em silêncio. Fixo é decisão, está no cabeçalho.
   assert.equal(TZ_BR, "America/Sao_Paulo");
+});
+
+// ===========================================================================
+// DIA DA SEMANA — a mesma classe de defeito das provas do Emerson, um nivel
+// abaixo. Ali o erro aparecia como hora errada na tela; aqui ele apareceria
+// como um vigia gritando no domingo a noite, que ninguem associaria a fuso.
+// ===========================================================================
+
+test("diaSemanaBR: a convencao e a do Postgres — 1=segunda, 7=domingo", () => {
+  // 17/08/2026 e uma segunda. Meio-dia de SP, longe de qualquer virada.
+  assert.equal(diaSemanaBR("2026-08-17T15:00:00Z"), 1, "segunda");
+  assert.equal(diaSemanaBR("2026-08-18T15:00:00Z"), 2, "terca");
+  assert.equal(diaSemanaBR("2026-08-19T15:00:00Z"), 3, "quarta");
+  assert.equal(diaSemanaBR("2026-08-20T15:00:00Z"), 4, "quinta");
+  assert.equal(diaSemanaBR("2026-08-21T15:00:00Z"), 5, "sexta");
+  assert.equal(diaSemanaBR("2026-08-22T15:00:00Z"), 6, "sabado");
+  assert.equal(diaSemanaBR("2026-08-23T15:00:00Z"), 7, "domingo");
+});
+
+// A ARMADILHA, e ela e o motivo de a funcao existir em vez de um `getUTCDay()`.
+//
+// Domingo 16/08 as 22h em Sao Paulo ja e segunda 17/08 em UTC. Quem numerar a
+// semana por `getUTCDay()` le "segunda" e conclui "dia util" — justamente na
+// hora em que o fornecedor mais claramente nao esta trabalhando. O vigia de
+// movimento contaria essas horas no denominador e alarmaria no domingo, toda
+// semana, para sempre.
+test("diaSemanaBR: domingo 22h de SP NAO e segunda, embora o UTC diga que sim", () => {
+  const domingoNoite = new Date("2026-08-17T01:00:00Z"); // dom 16/08 22h SP
+
+  assert.equal(domingoNoite.getUTCDay(), 1, "o atalho errado leria segunda");
+  assert.equal(diaSemanaBR(domingoNoite), 7, "em Sao Paulo ainda e domingo");
+  assert.equal(ehDiaUtilBR(domingoNoite), false, "e a hora em que ninguem publica");
+});
+
+// O espelho da armadilha: sabado 00h30 de SP e sabado, apesar de o UTC ja ter
+// virado. Se so o primeiro caso estivesse travado, uma implementacao que
+// somasse um dia em vez de converter passaria.
+test("diaSemanaBR: sabado de madrugada em SP continua sabado", () => {
+  const sabadoMadrugada = new Date("2026-08-22T03:30:00Z"); // sab 22/08 00h30 SP
+  assert.equal(diaSemanaBR(sabadoMadrugada), 6);
+  assert.equal(ehDiaUtilBR(sabadoMadrugada), false);
+});
+
+test("ehDiaUtilBR: segunda a sexta sim, fim de semana nao", () => {
+  assert.equal(ehDiaUtilBR("2026-08-17T15:00:00Z"), true, "segunda");
+  assert.equal(ehDiaUtilBR("2026-08-21T15:00:00Z"), true, "sexta");
+  assert.equal(ehDiaUtilBR("2026-08-22T15:00:00Z"), false, "sabado");
+  assert.equal(ehDiaUtilBR("2026-08-23T15:00:00Z"), false, "domingo");
+});
+
+test("ehDiaUtilBR: data invalida e false, nao dia util por acidente", () => {
+  // O default importa. Se lixo virasse `true`, uma coluna nula somaria horas
+  // uteis que nunca existiram e o vigia alarmaria sobre um vao inventado.
+  for (const lixo of [null, undefined, "", "ontem", "2026-13-45", NaN]) {
+    assert.equal(ehDiaUtilBR(lixo as never), false, `ehDiaUtilBR(${String(lixo)})`);
+    assert.equal(diaSemanaBR(lixo as never), null, `diaSemanaBR(${String(lixo)})`);
+  }
 });

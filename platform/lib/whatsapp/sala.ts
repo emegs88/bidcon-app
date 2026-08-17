@@ -60,6 +60,12 @@ export type ConversaSala = {
   ultimaFalaCliente: string | null;
   /** Quando o cliente falou por último. Base do tempo de espera. */
   ultimaFalaClienteEm: string | null;
+  /**
+   * A última coisa que o bot (ou o humano) disse ANTES dessa fala do cliente —
+   * ou seja, a pergunta que ela provavelmente responde. `null` quando o cliente
+   * abriu a conversa. Só serve à prévia; ver `previaComContexto`.
+   */
+  ultimaPerguntaBot: string | null;
   totalMensagens: number;
   temAnexo: boolean;
   /**
@@ -88,6 +94,7 @@ export type ResumoConversa = Pick<
   | "ultimoPapel"
   | "ultimaFalaCliente"
   | "ultimaFalaClienteEm"
+  | "ultimaPerguntaBot"
   | "totalMensagens"
   | "temAnexo"
   | "msPrimeiraResposta"
@@ -122,6 +129,17 @@ export type ResumoConversa = Pick<
  * A comparação é POR POSIÇÃO na lista ordenada, não por subtração de datas.
  * Duas mensagens no mesmo instante são um empate que a data não resolve, e a
  * ordem em que elas chegaram é a informação que sobra.
+ *
+ * A PERGUNTA ANTERIOR (CONVERSAS-03, item 4). Guarda também a última fala de
+ * quem NÃO é o cliente imediatamente antes da última fala dele. Serve a um
+ * problema medido na tela: metade das prévias da sala é resposta de um dígito
+ * — "2", "sim", "125mil" — e um dígito solto na lista não é informação, é
+ * ruído. Com a pergunta ao lado, "2" vira "quantas parcelas restam: 2".
+ *
+ * 'sistema' fica de fora desta captura pelo mesmo motivo que fica de fora da
+ * primeira resposta: é a nota de handoff que o próprio painel escreve
+ * ("Emerson assumiu"), não uma pergunta feita ao cliente. Exibi-la como
+ * pergunta faria a prévia ler "Emerson assumiu · 2", que não quer dizer nada.
  */
 export function resumirConversa(msgs: MensagemCrua[]): ResumoConversa {
   const ordenadas = [...msgs].sort(
@@ -130,9 +148,15 @@ export function resumirConversa(msgs: MensagemCrua[]): ResumoConversa {
 
   let ultimaFalaCliente: string | null = null;
   let ultimaFalaClienteEm: string | null = null;
+  let ultimaPerguntaBot: string | null = null;
   let temAnexo = false;
   let primeiraClienteEm: string | null = null;
   let msPrimeiraResposta: number | null = null;
+
+  // O que o bot/humano falou por último ATÉ AQUI. Vira `ultimaPerguntaBot` no
+  // instante em que o cliente responde — depois disso, uma fala nova do bot
+  // sobrescreve este rascunho sem tocar no que já foi respondido.
+  let rascunhoPergunta: string | null = null;
 
   for (const m of ordenadas) {
     if (m.temAnexo) temAnexo = true;
@@ -140,8 +164,14 @@ export function resumirConversa(msgs: MensagemCrua[]): ResumoConversa {
     if (m.papel === "cliente") {
       ultimaFalaCliente = m.conteudo ?? null;
       ultimaFalaClienteEm = m.criado_em;
+      ultimaPerguntaBot = rascunhoPergunta;
       if (!primeiraClienteEm) primeiraClienteEm = m.criado_em;
       continue;
+    }
+
+    if (m.papel === "prosperito" || m.papel === "humano") {
+      const t = (m.conteudo ?? "").trim();
+      if (t) rascunhoPergunta = t;
     }
 
     // Resposta só conta se veio DEPOIS de uma pergunta, e só a primeira.
@@ -162,6 +192,7 @@ export function resumirConversa(msgs: MensagemCrua[]): ResumoConversa {
     ultimoPapel: ultima?.papel ?? null,
     ultimaFalaCliente,
     ultimaFalaClienteEm,
+    ultimaPerguntaBot,
     totalMensagens: ordenadas.length,
     temAnexo,
     msPrimeiraResposta,
@@ -424,4 +455,482 @@ export function duracaoCurta(ms: number | null): string {
   if (h < 24) return resto ? `${h}h ${String(resto).padStart(2, "0")}` : `${h}h`;
   const d = Math.floor(h / 24);
   return `${d} ${d === 1 ? "dia" : "dias"}`;
+}
+
+// ===========================================================================
+// CONVERSAS-03 — período e legibilidade
+// AUTORIZADO: Emerson Gomes dos Santos — 11/08/2026:
+//   "melhor filtro por dia, não deixar confuso, melhorar painel"
+// ---------------------------------------------------------------------------
+// O DEFEITO QUE ESTA SEÇÃO CONSERTA, MEDIDO ANTES DE ESCREVER UMA LINHA.
+//
+// A página calculava o começo do dia assim:
+//
+//     const inicioDoDia = new Date();
+//     inicioDoDia.setHours(0, 0, 0, 0);
+//
+// `setHours` usa o fuso do PROCESSO. A Vercel roda em UTC; o Brasil está em
+// UTC-3. Todo dia, das 21h à meia-noite de Brasília, "conversas hoje" já
+// virou o dia seguinte no servidor — o número zerava três horas antes da
+// virada, na faixa da noite em que o WhatsApp mais fala. Ninguém ia notar:
+// um contador que mostra 0 parece um dia parado, não um dia errado.
+//
+// Enquanto o único consumidor era um número de cabeçalho, o estrago era um
+// número torto. Com filtro por dia e separadores por dia, a mesma conta passa
+// a decidir o que a lista MOSTRA e sob qual cabeçalho — e aí conversa some.
+// Por isso a fronteira do dia é calculada aqui, em `America/São_Paulo`
+// explícito, com teste, e não com o relógio de quem estiver rodando o
+// processo.
+// ===========================================================================
+
+/**
+ * O fuso da casa, escrito por extenso e num só lugar.
+ *
+ * Não é `-03:00` fixo de propósito. O Brasil já teve horário de verão e pode
+ * ter de novo; um deslocamento cravado no código atravessaria a mudança
+ * mentindo, e mentindo em silêncio. `Intl` carrega a tabela e acerta sozinho.
+ */
+export const TZ_CASA = "America/Sao_Paulo";
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+function dois(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+type PartesData = {
+  ano: number;
+  mes: number;
+  dia: number;
+  hora: number;
+  min: number;
+  seg: number;
+};
+
+/**
+ * Quebra um instante nas partes do calendário CIVIL de um fuso.
+ *
+ * `hourCycle: "h23"` e não `hour12: false`: com `hour12: false` alguns motores
+ * devolvem hora "24" para a meia-noite, e 24 vira o dia seguinte na hora de
+ * remontar. O ciclo h23 fecha essa porta.
+ */
+function partesTz(ms: number, tz: string): PartesData {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(ms));
+
+  const ler = (tipo: string): number => {
+    const achado = p.find((x) => x.type === tipo)?.value ?? "0";
+    const n = Number(achado);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  return {
+    ano: ler("year"),
+    mes: ler("month"),
+    dia: ler("day"),
+    hora: ler("hour") % 24,
+    min: ler("minute"),
+    seg: ler("second"),
+  };
+}
+
+/**
+ * Quanto o fuso está deslocado do UTC, em minutos, NAQUELE instante.
+ *
+ * Negativo a oeste: São Paulo devolve -180. Depende do instante porque é
+ * exatamente isso que o horário de verão muda.
+ */
+export function offsetTzMinutos(ms: number, tz: string = TZ_CASA): number {
+  const p = partesTz(ms, tz);
+  const comoSeFosseUtc = Date.UTC(p.ano, p.mes - 1, p.dia, p.hora, p.min, p.seg);
+  // O arredondamento come os milissegundos que `comoSeFosseUtc` não carrega;
+  // deslocamento de fuso é sempre minuto inteiro, então nada se perde.
+  return Math.round((comoSeFosseUtc - ms) / 60000);
+}
+
+/**
+ * O instante (em ms UTC) da meia-noite civil do dia em que `ms` cai, no fuso.
+ *
+ * DUAS PASSADAS, e a segunda não é preciosismo. A primeira usa o deslocamento
+ * do instante consultado; se o horário de verão virar no meio daquele dia, o
+ * deslocamento à meia-noite é OUTRO, e a primeira conta erra por uma hora —
+ * o bastante para a fronteira cair no dia anterior. A segunda passada refaz a
+ * conta com o deslocamento do candidato e só o aceita se ele de fato cair às
+ * 00:00 do mesmo dia civil.
+ *
+ * Quando a meia-noite simplesmente NÃO EXISTE (madrugada que pula da 23:59
+ * para a 01:00), nenhum candidato satisfaz o teste e a função devolve a
+ * primeira conta. É a resposta menos errada disponível: um começo de dia
+ * deslocado numa hora, uma vez por ano, contra uma exceção lançada na cara do
+ * operador.
+ */
+export function inicioDoDiaMs(ms: number, tz: string = TZ_CASA): number {
+  const p = partesTz(ms, tz);
+  const meiaNoiteComoUtc = Date.UTC(p.ano, p.mes - 1, p.dia, 0, 0, 0, 0);
+
+  const primeira = meiaNoiteComoUtc - offsetTzMinutos(ms, tz) * 60000;
+  const segunda = meiaNoiteComoUtc - offsetTzMinutos(primeira, tz) * 60000;
+
+  const q = partesTz(segunda, tz);
+  const bate =
+    q.ano === p.ano &&
+    q.mes === p.mes &&
+    q.dia === p.dia &&
+    q.hora === 0 &&
+    q.min === 0 &&
+    q.seg === 0;
+
+  return bate ? segunda : primeira;
+}
+
+/** A meia-noite civil do dia SEGUINTE ao de `ms`. */
+function proximoDiaMs(ms: number, tz: string): number {
+  // +36h e não +24h: com 24h, a virada do horário de verão para trás cairia de
+  // volta no mesmo dia civil e a janela do "hoje" ficaria vazia.
+  return inicioDoDiaMs(inicioDoDiaMs(ms, tz) + 36 * 60 * 60 * 1000, tz);
+}
+
+function chaveDeMs(ms: number, tz: string): string {
+  const p = partesTz(ms, tz);
+  return `${p.ano}-${dois(p.mes)}-${dois(p.dia)}`;
+}
+
+/**
+ * A chave de agrupamento de um dia: `"2026-08-11"` no fuso da casa.
+ *
+ * `null` para data ausente ou impossível de ler — e quem chama tem de decidir
+ * o que fazer com isso. Devolver a chave de hoje seria empurrar a conversa
+ * para um dia em que ela não aconteceu.
+ */
+export function chaveDia(iso: string | null, tz: string = TZ_CASA): string | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  return chaveDeMs(t, tz);
+}
+
+// ---------------------------------------------------------------------------
+// Item 1 — o filtro de período
+// ---------------------------------------------------------------------------
+
+export type Periodo = "hoje" | "ontem" | "7d" | "30d" | "tudo";
+
+/**
+ * O padrão pedido na OS. Sete dias, e não "tudo", porque a sala é uma fila de
+ * trabalho: conversa de março não está esperando ninguém, está esperando ser
+ * esquecida. Quem precisar dela pede "tudo" num clique.
+ */
+export const PERIODO_PADRAO: Periodo = "7d";
+
+export const PERIODOS: { valor: Periodo; rotulo: string }[] = [
+  { valor: "hoje", rotulo: "Hoje" },
+  { valor: "ontem", rotulo: "Ontem" },
+  { valor: "7d", rotulo: "7 dias" },
+  { valor: "30d", rotulo: "30 dias" },
+  { valor: "tudo", rotulo: "Tudo" },
+];
+
+/**
+ * Lê o `?periodo=` da URL. Valor desconhecido cai no padrão, sem reclamar:
+ * um link velho ou um erro de digitação não pode virar tela de erro.
+ */
+export function lerPeriodo(bruto: string | null | undefined): Periodo {
+  const v = (bruto ?? "").trim().toLowerCase();
+  const achado = PERIODOS.find((p) => p.valor === v);
+  return achado ? achado.valor : PERIODO_PADRAO;
+}
+
+/**
+ * A janela de um período. `desdeMs` inclusivo, `ateMs` EXCLUSIVO — a meia-noite
+ * pertence ao dia que começa, nunca aos dois.
+ *
+ * `null` nos dois lados é "sem fronteira daquele lado".
+ */
+export type Janela = { desdeMs: number | null; ateMs: number | null };
+
+/**
+ * Traduz o chip escolhido em fronteiras de relógio.
+ *
+ * "7 dias" é HOJE MAIS OS SEIS ANTERIORES, não "as últimas 168 horas". Os
+ * chips vizinhos são "Hoje" e "Ontem", que são dias civis; misturar uma janela
+ * deslizante no meio de dias civis faria a conversa de terça de manhã sumir de
+ * "7 dias" na terça à tarde, sem nada ter acontecido.
+ *
+ * O limite superior fica ABERTO em tudo que inclui hoje. Mensagem com carimbo
+ * no futuro (relógio de aparelho adiantado — acontece) continua visível em vez
+ * de cair num limbo entre a janela e o amanhã.
+ */
+export function janelaPeriodo(
+  periodo: Periodo,
+  agoraMs: number,
+  tz: string = TZ_CASA
+): Janela {
+  if (periodo === "tudo") return { desdeMs: null, ateMs: null };
+
+  const inicioHoje = inicioDoDiaMs(agoraMs, tz);
+
+  if (periodo === "hoje") return { desdeMs: inicioHoje, ateMs: null };
+
+  if (periodo === "ontem") {
+    // -12h em vez de -24h: cai no meio de ontem, longe de qualquer fronteira,
+    // e portanto imune à hora que o horário de verão come ou devolve.
+    const inicioOntem = inicioDoDiaMs(inicioHoje - 12 * 60 * 60 * 1000, tz);
+    return { desdeMs: inicioOntem, ateMs: inicioHoje };
+  }
+
+  const dias = periodo === "7d" ? 7 : 30;
+  const desdeMs = inicioDoDiaMs(inicioHoje - (dias - 1) * MS_DIA + MS_DIA / 2, tz);
+  return { desdeMs, ateMs: null };
+}
+
+/**
+ * A conversa cai na janela?
+ *
+ * SEM DATA NÃO ENTRA EM JANELA DATADA, e isso é deliberado: uma conversa sem
+ * `ultimaEm` não tem dia, então não há dia sob o qual mostrá-la. Ela reaparece
+ * inteira em "Tudo". A página CONTA quantas foram escondidas e escreve o
+ * número na tela — sumiço silencioso é o defeito que esta função poderia
+ * introduzir, e a conta na tela é o que impede.
+ */
+export function dentroDoPeriodo(iso: string | null, j: Janela): boolean {
+  if (j.desdeMs === null && j.ateMs === null) return true;
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return false;
+  if (j.desdeMs !== null && t < j.desdeMs) return false;
+  if (j.ateMs !== null && t >= j.ateMs) return false;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Item 2 — os separadores de dia
+// ---------------------------------------------------------------------------
+
+/**
+ * Abreviações fixas, e não `Intl.DateTimeFormat(..., { weekday: "short" })`.
+ *
+ * Duas razões, nesta ordem: o pt-BR do ICU devolve "sex." — minúsculo e com
+ * ponto, que não é o rótulo que a tela quer; e a saída do ICU varia com a
+ * versão dos dados de locale, o que faria um teste passar aqui e falhar na
+ * Vercel. Sete strings numa constante não têm versão.
+ */
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+/**
+ * O cabeçalho de um grupo: "Hoje", "Ontem", "Sex 08/08" — e "Sex 08/08/2025"
+ * quando o ano não é o corrente, porque em "Tudo" a lista atravessa anos e
+ * "08/08" sozinho seria ambíguo justamente onde a ambiguidade engana.
+ */
+export function rotuloDia(
+  chave: string,
+  agoraMs: number,
+  tz: string = TZ_CASA
+): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(chave);
+  if (!m) return chave;
+
+  const hoje = chaveDeMs(agoraMs, tz);
+  if (chave === hoje) return "Hoje";
+
+  const inicioHoje = inicioDoDiaMs(agoraMs, tz);
+  const ontem = chaveDeMs(inicioHoje - 12 * 60 * 60 * 1000, tz);
+  if (chave === ontem) return "Ontem";
+
+  const ano = Number(m[1]);
+  const mes = Number(m[2]);
+  const dia = Number(m[3]);
+  const semana = DIAS_SEMANA[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()];
+  const base = `${semana} ${dois(dia)}/${dois(mes)}`;
+  return ano === Number(hoje.slice(0, 4)) ? base : `${base}/${ano}`;
+}
+
+export type GrupoDia<T> = { chave: string; rotulo: string; itens: T[] };
+
+/**
+ * O que sobra depois de agrupar. `semData` é devolvido, não descartado.
+ *
+ * A versão fácil desta função devolveria só os grupos e engoliria quem não tem
+ * data. Item sumido é o pior defeito de tela que existe: não há erro, não há
+ * lista vazia, há uma lista plausível com uma linha a menos.
+ */
+export type Agrupamento<T> = { grupos: GrupoDia<T>[]; semData: T[] };
+
+/**
+ * Agrupa por dia civil, do mais recente para o mais antigo, PRESERVANDO a
+ * ordem de entrada dentro de cada dia — a lista já chega ordenada pela sala, e
+ * reordenar aqui desfaria a fila em silêncio.
+ */
+export function agruparPorDia<T>(
+  itens: T[],
+  data: (i: T) => string | null,
+  agoraMs: number,
+  tz: string = TZ_CASA
+): Agrupamento<T> {
+  const mapa = new Map<string, T[]>();
+  const semData: T[] = [];
+
+  for (const item of itens) {
+    const chave = chaveDia(data(item), tz);
+    if (!chave) {
+      semData.push(item);
+      continue;
+    }
+    const atual = mapa.get(chave);
+    if (atual) atual.push(item);
+    else mapa.set(chave, [item]);
+  }
+
+  const grupos = [...mapa.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([chave, lista]) => ({
+      chave,
+      rotulo: rotuloDia(chave, agoraMs, tz),
+      itens: lista,
+    }));
+
+  return { grupos, semData };
+}
+
+/**
+ * Separa a fila do resto — e este é o DESVIO que declaro ao Emerson.
+ *
+ * Os separadores de dia (item 2) e a ordenação da CONVERSAS-02 ("quem esperou
+ * mais vem no topo") se contradizem: agrupar por dia é ordenar por dia, e isso
+ * enterra a pessoa que espera há três dias lá embaixo, no cabeçalho da
+ * terça-feira. Uma das duas ordens tem de ceder, e nenhuma delas é decorativa.
+ *
+ * A saída escolhida não sacrifica nenhuma: quem espera resposta humana sai da
+ * linha do tempo e vira um bloco fixo no topo, sem cabeçalho de dia; o RESTO,
+ * que é histórico, é o que ganha os separadores. A fila continua sendo fila e
+ * a linha do tempo continua legível — ao preço de a tela ter duas seções em vez
+ * de uma, que é o preço que se declara em vez de se esconder.
+ */
+// GENÉRICA DE PROPÓSITO. A página empacota cada conversa num tipo mais largo
+// (`Linha`, com href, criadoEm, cedente…) e precisa desses campos de volta para
+// desenhar o card. Sem o genérico, a chamada teria de terminar em
+// `as { fila: Linha[]; resto: Linha[] }` — um casto na PÁGINA, que a suíte não
+// varre. Com o genérico, o único casto fica aqui dentro, uma linha abaixo, onde
+// há teste: e ele é honesto, porque `ordenarSala` devolve uma cópia ordenada dos
+// MESMOS objetos, sem construir nenhum.
+export function separarSala<T extends ConversaSala>(
+  lista: T[],
+  agoraMs: number
+): { fila: T[]; resto: T[] } {
+  const ordenada = ordenarSala(lista, agoraMs) as T[];
+  const fila: T[] = [];
+  const resto: T[] = [];
+  for (const c of ordenada) {
+    if (esperandoHumano(c)) fila.push(c);
+    else resto.push(c);
+  }
+  return { fila, resto };
+}
+
+// ---------------------------------------------------------------------------
+// Item 3 — a pastilha nunca repete o título
+// ---------------------------------------------------------------------------
+
+export type IdentidadeCard = {
+  /** A linha forte do card. */
+  titulo: string;
+  /** A linha fraca. `null` quando repetiria o título. */
+  subtitulo: string | null;
+  /** Sem nome cadastrado — para o avatar, não para pastilha nenhuma. */
+  semNome: boolean;
+  /** O título é um telefone de verdade (muda a tipografia, não o texto). */
+  tituloEhContato: boolean;
+};
+
+/**
+ * Quem é esta conversa, em uma ou duas linhas.
+ *
+ * A REGRA, na formulação do Emerson: "pastilha nunca repete o que o título
+ * diz". A tela anterior escrevia "Sem nome" como título, o telefone embaixo e
+ * ainda uma pastilha "sem nome" ao lado — três elementos para dizer duas
+ * coisas, e a mais inútil delas repetida. Sem nome, o TELEFONE sobe e vira o
+ * título: é o único identificador que existe, e é o que o operador vai discar.
+ *
+ * Sem nome E sem contato o título vira "Sem contato" — que é fato, não rótulo
+ * de ausência: essa conversa realmente não tem por onde ser respondida, e o
+ * card precisa dizer isso onde se lê primeiro.
+ */
+export function identidadeCard(
+  c: Pick<ConversaSala, "nome" | "telefone" | "canal">
+): IdentidadeCard {
+  const contato = formatarContato(c.telefone, c.canal);
+  const nome = (c.nome ?? "").trim();
+
+  if (nome) {
+    return {
+      titulo: nome,
+      subtitulo: contato.texto,
+      semNome: false,
+      tituloEhContato: false,
+    };
+  }
+
+  const vazio = contato.texto === "sem contato";
+  return {
+    titulo: vazio ? "Sem contato" : contato.texto,
+    subtitulo: null,
+    semNome: true,
+    tituloEhContato: !vazio,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Item 4 — a prévia curta demais
+// ---------------------------------------------------------------------------
+
+/**
+ * Abaixo disto, a fala do cliente não se sustenta sozinha. A OS pediu "uns 12
+ * caracteres", e o número resiste ao teste da lista real: "2", "sim", "ok",
+ * "125 mil" e "Porto Seguro" (12, no limite, e já legível) ficam de um lado; a
+ * primeira frase de verdade fica do outro.
+ */
+export const LIMITE_FALA_CURTA = 12;
+
+/** Teto da pergunta do bot na prévia. Ela é contexto, não protagonista. */
+export const LIMITE_PERGUNTA = 60;
+
+export type Previa = {
+  /** A pergunta do bot, só quando a resposta não se explica sozinha. */
+  pergunta: string | null;
+  /** A fala do cliente, sempre. */
+  resposta: string;
+};
+
+/**
+ * Monta a prévia do card.
+ *
+ * Devolve `null` quando o cliente nunca falou — e a tela escreve "aguardando o
+ * cliente", que é diferente de linha vazia.
+ *
+ * A pergunta só entra quando a resposta é curta demais para se explicar. Pôr
+ * a pergunta em TODA prévia dobraria o tamanho da lista para repetir o que o
+ * bot já disse 27 vezes; pôr só onde falta contexto é o conserto do ruído sem
+ * criar ruído novo.
+ */
+export function previaComContexto(
+  ultimaFalaCliente: string | null,
+  ultimaPerguntaBot: string | null,
+  limiteCurta: number = LIMITE_FALA_CURTA,
+  limite: number = LIMITE_FALA
+): Previa | null {
+  const resposta = resumirFala(ultimaFalaCliente, limite);
+  if (!resposta) return null;
+
+  const cru = (ultimaFalaCliente ?? "").replace(/\s+/g, " ").trim();
+  if (cru.length >= limiteCurta) return { pergunta: null, resposta };
+
+  const pergunta = resumirFala(ultimaPerguntaBot, LIMITE_PERGUNTA);
+  return { pergunta, resposta };
 }
