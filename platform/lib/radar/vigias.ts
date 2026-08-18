@@ -289,18 +289,40 @@ export const HORA_COBRANCA_FAROL = 16;
 
 export function vigiaFarolSemPublicar(entrada: {
   horaSP: number;
-  publicadosHoje: number;
+  /** `null` = NÃO CONSEGUI MEDIR, que não é a mesma coisa que zero. Quem chama
+   *  lê uma contagem do banco; leitura que falhou volta null, e null aqui faz o
+   *  vigia se calar E o chamador não marcar a condição como julgada — porque
+   *  fechar alerta na força de uma leitura que não aconteceu é pior do que não
+   *  ter vigia. Antes deste campo ser anulável, a rota fazia `?? 0` e o vigia
+   *  gritava "não publicou" quando a verdade era "não perguntei". */
+  publicadosHoje: number | null;
   horaLimite?: number;
+  /** Início do dia SP considerado na contagem, só para o detalhe: quem lê o
+   *  alerta precisa saber qual janela foi medida, não só o resultado. */
+  desde?: string;
 }): Alerta | null {
-  const { horaSP, publicadosHoje, horaLimite = HORA_COBRANCA_FAROL } = entrada;
+  const { horaSP, publicadosHoje, horaLimite = HORA_COBRANCA_FAROL, desde } = entrada;
+  if (publicadosHoje === null || !Number.isFinite(publicadosHoje)) return null;
   if (!Number.isFinite(horaSP) || horaSP < horaLimite) return null;
   if (publicadosHoje > 0) return null;
   return {
     tipo: TIPO_FAROL,
     chave: CHAVE_FAROL_SEM_PUBLICAR,
     severidade: "aviso",
-    titulo: `FAROL não publicou nada até as ${horaSP}h`,
-    detalhe: { hora_sp: horaSP, limite: horaLimite, publicados: publicadosHoje },
+    /* O título NÃO embute a hora da observação. `radar_registrar` reescreve
+     * `titulo` a cada ocorrência (`titulo = p_titulo` no ramo do UPDATE), então
+     * o título seguia a ÚLTIMA varredura enquanto o painel imprime, ao lado,
+     * "aberta há X" vindo de `primeira_vez`. O resultado era uma linha que se
+     * contradizia: "até as 21h", aberta desde as 18h. O limite é CONSTANTE, a
+     * hora corrente não — então só a constante entra no título, e a hora da
+     * medição fica no detalhe, onde ser sobrescrita é o comportamento certo. */
+    titulo: `FAROL não publicou nada hoje (cobrança a partir das ${horaLimite}h)`,
+    detalhe: {
+      hora_sp: horaSP,
+      limite: horaLimite,
+      publicados: publicadosHoje,
+      ...(desde ? { desde } : {}),
+    },
   };
 }
 

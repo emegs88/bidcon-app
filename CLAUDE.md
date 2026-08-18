@@ -486,6 +486,54 @@ entrar, sondando o próprio ramo. As quatro do ramo viraram 13, 14, 15 e 16. É
 literalmente o defeito dos dois arquivos `0080` — número reusado por duas
 frentes — cometido DENTRO do arquivo que o proíbe. Norma fixada por Emerson.)
 
+**Regra 18 — "ENTREGUE" significa "ESTÁ NUM RAMO DO ORIGIN".** Documento lido,
+arquivo auditado em sandbox e anexo de chat **não são entrega**. Sem isso, os
+dois lados ficam confiantes sobre coisas diferentes e nenhum mede.
+
+Aconteceu duas vezes no mesmo dia, nos dois sentidos: o agente afirmou ter
+visto uma ordem que não existia, e a coordenação afirmou que um pacote existia
+na árvore quando ele só existia num anexo. **A defesa é a mesma nos dois
+casos: medir a árvore, com controle que sabe gritar** — `git ls-remote`, ou
+`git show origin/<ramo>:<caminho>`, nunca o ref local `origin/*`, que é um
+retrato do último `fetch` e envelhece sem avisar.
+
+**Corolário:** antes de dizer "integra o que existe", provar que existe **onde
+o outro lado consegue ler**. E vale para nós: quando o Emerson vai aplicar uma
+migration pelo MCP, ele precisa LER o arquivo no origin — logo o ramo sobe
+antes, não depois.
+
+(Origem: 17/08. Norma fixada por Emerson.)
+
+**Regra 19 — coalescer leitura para zero apaga a diferença entre "medi e deu
+zero" e "não consegui medir".** É a família do verde vazio (`09b6434`), só que
+do lado da **ESCRITA do alerta**: `?? 0` num contador de vigia transforma
+silêncio de medição em veredito de ausência, e **o registro nasce mentindo com
+número plausível** — que é o pior tipo de mentira, porque não parece defeito.
+
+O defeito tem dois lados, e o segundo é mais grave que o primeiro:
+
+- **Falso alarme.** `publicadosHoje ?? 0` fez o RADAR abrir "FAROL não publicou
+  nada" num dia em que o FAROL publicou quatro vezes. A contagem voltou `null`,
+  virou `0`, e o vigia acreditou.
+- **Falso silêncio + fechamento automático.** Pior, e invisível: quando a rota
+  **marca a condição como julgada ANTES de saber se mediu**, a leitura que
+  falhou vira "a condição passou", e a fase de resolução **fecha um alerta
+  legítimo** na força de uma leitura que não aconteceu. Um vigia que nunca
+  alarma é indistinguível de uma casa saudável.
+
+**Norma:** contador que alimenta julgamento é `number | null`; `null` faz o
+vigia **não julgar** e a condição **não entrar em `julgadas`**; e o relatório
+guarda a contagem **ao lado de um booleano `*_julgado`**, porque a contagem
+sozinha volta a confundir "zero" com "não medi". Marcar julgamento vem DEPOIS
+da guarda, nunca antes. Teste com controle dos **três** estados — grita, cala
+porque mediu, cala porque não mediu —, e o controle de mutação: remova a guarda
+e o teste TEM de falhar, senão ele não guarda nada.
+
+(Origem: 17/08. Alerta falso do FAROL em `radar_alertas`, ramo
+`vigia-farol-nulo-01`. A varredura da mesma rota achou 9 coalescências reais,
+5 delas alimentando julgamento — 4 do lado do falso silêncio. Norma fixada por
+Emerson.)
+
 ## Ambientes Supabase (mapa canônico — 4 projetos)
 - **xtv** `xtvjpnyadcdeadhmzyff` = PROD **vitrine** (catálogo `cartas` full
   do sync multifonte, Bidcon Price, `interesses`/`conversas`/`mensagens` do
