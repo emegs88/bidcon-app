@@ -62,6 +62,43 @@ export const NOME_SENTINELA_DOCUMENTADO = "sentinela_retomada_01";
  */
 export const IDIOMAS_QUE_FALHAM = ["pt-BR", "pt", "pt_br", "PT_BR", "pt_BR "] as const;
 
+/**
+ * A WABA de onde o Sentinela ENVIA — e, desde 19/08/2026, também onde o
+ * template vive. As duas coisas precisavam ser a mesma, e agora são.
+ *
+ * Proveniência do número: provado por comportamento em 05/08/2026 (LEIAME
+ * SENTINELA-01 — outbound entregue, único registro Conectado do número, e o
+ * phone_number_id conferido na tela da Meta). Não é palpite.
+ *
+ * POR QUE ESTA CONSTANTE SAIU DA ROTA. Ela morava como literal dentro de
+ * `app/api/whatsapp/template-info/route.ts`, e o arnês varre `lib/` e só —
+ * o mesmo defeito de fundo que deixou `pt_BR` sem rede e custou 75 envios.
+ * Um dedo errado num dígito faria o instrumento de diagnóstico consultar
+ * OUTRA conta e responder "o template não existe" com toda a segurança do
+ * mundo, mandando quem lê atrás da causa errada.
+ *
+ * É TAMBÉM A RESPOSTA À CAUSA ③. A hipótese aberta pelo #132001 era
+ * "aprovado noutra WABA que não a que envia". Enquanto o número da consulta
+ * e o número do envio forem este mesmo literal, a hipótese não pode voltar
+ * pela porta dos fundos.
+ */
+export const WABA_SENTINELA = "1569741627872302";
+
+/**
+ * O ID do modelo recriado pelo Emerson em 19/08/2026, status "Em análise".
+ *
+ * NÃO VAI NO FIO, e é importante entender por quê: a Graph envia template por
+ * (name, language), nunca por ID. Este número existe como ÂNCORA — é o que
+ * transforma "o template foi recriado" em "o template 2147898602425568 na
+ * WABA 1569741627872302 foi recriado", que é uma afirmação que alguém pode
+ * conferir daqui a seis meses sem depender da memória de ninguém.
+ *
+ * E o status importa: "Em análise" NÃO é aprovado. Enquanto a Meta não
+ * aprovar, o #132001 continua sendo a resposta esperada, e as linhas seguem
+ * voltando para `aguardando_template` — que é reversível, e é o desenho certo.
+ */
+export const TEMPLATE_ID_SENTINELA = "2147898602425568";
+
 export type ParTemplate = {
   /** Vai em `template.name` no corpo da Graph. */
   name: string;

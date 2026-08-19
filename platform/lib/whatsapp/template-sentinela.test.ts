@@ -27,6 +27,8 @@ import {
   IDIOMA_SENTINELA,
   IDIOMAS_QUE_FALHAM,
   NOME_SENTINELA_DOCUMENTADO,
+  TEMPLATE_ID_SENTINELA,
+  WABA_SENTINELA,
   parDoSentinela,
 } from "@/lib/whatsapp/template-sentinela";
 
@@ -74,6 +76,37 @@ test("NOME: o documentado bate com docs/TEMPLATE-sentinela_retomada_01.md, len 2
    * é o que transforma "parece igual" em "é igual". */
   assert.equal(NOME_SENTINELA_DOCUMENTADO, "sentinela_retomada_01");
   assert.equal(NOME_SENTINELA_DOCUMENTADO.length, 21);
+});
+
+// ---------------------------------------------------------------------------
+// A ÂNCORA — onde o template foi recriado, 19/08/2026
+// ---------------------------------------------------------------------------
+//
+// Emerson recriou o modelo na WABA 1569741627872302, ID 2147898602425568,
+// status "Em análise". Nenhum dos dois números vai no fio — a Graph envia por
+// (name, language), nunca por ID. Eles estão aqui porque transformam "o
+// template foi recriado" numa afirmação conferível daqui a seis meses.
+
+test("ÂNCORA: a WABA da consulta é a MESMA de onde o Sentinela envia", () => {
+  /* Esta era a causa ③ do #132001 — "aprovado noutra WABA que não a que
+   * envia". Enquanto o instrumento de diagnóstico e o registro do template
+   * apontarem para este mesmo literal, a hipótese não volta pela porta dos
+   * fundos. O número tem proveniência medida (05/08/2026), não é palpite. */
+  assert.equal(WABA_SENTINELA, "1569741627872302");
+});
+
+test("ÂNCORA: os dois IDs são só dígitos — cola de tela não passa", () => {
+  /* O modo real de errar isto não é digitar um número errado: é copiar a
+   * linha inteira da tela da Meta ("ID do modelo 2147898602425568") ou um
+   * pedaço truncado. Ambos passariam no tsc como string. Aqui não passam. */
+  for (const [nome, id] of [
+    ["WABA_SENTINELA", WABA_SENTINELA],
+    ["TEMPLATE_ID_SENTINELA", TEMPLATE_ID_SENTINELA],
+  ] as const) {
+    assert.match(id, /^[0-9]{15,17}$/, `${nome} nao parece um ID da Meta: ${JSON.stringify(id)}`);
+  }
+  assert.equal(TEMPLATE_ID_SENTINELA, "2147898602425568");
+  assert.notEqual(WABA_SENTINELA, TEMPLATE_ID_SENTINELA, "sao coisas diferentes");
 });
 
 // ---------------------------------------------------------------------------
