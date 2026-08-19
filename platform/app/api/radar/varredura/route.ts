@@ -283,6 +283,15 @@ export async function GET(req: Request) {
     .like("acao", "%publicado")
     .gte("criado_em", inicioDia.toISOString());
   if (errFarol) avisos.push(`farol_posts: ${errFarol.message}`);
+  /* MEDI E DEU ZERO ≠ NÃO CONSEGUI MEDIR. `count` volta `number | null`, e null
+   * acontece sem `error` — head+count desativado, resposta sem o header, RLS
+   * cortando a contagem. O código antigo escrevia `publicadosHoje ?? 0` na
+   * entrada do vigia: a leitura falha virava o veredito "publicou zero", o
+   * vigia gritava, e o alerta nascia com um número plausível e falso. Uma
+   * variável só, calculada uma vez, usada nos dois lugares (julgamento e
+   * relatório), para que não exista caminho onde eles discordem. */
+  const farolContagem: number | null =
+    !errFarol && typeof publicadosHoje === "number" ? publicadosHoje : null;
 
   // --- 1e. fila do Sentinela ---------------------------------------------
   const ESPERANDO = ["pendente", "aguardando_template", "enviado"];
@@ -401,13 +410,22 @@ export async function GET(req: Request) {
   }
 
   // 4. FAROL
-  if (!errFarol) {
+  /* `marcar()` entra DEPOIS da guarda, não antes. Marcar é dizer "esta condição
+   * foi julgada nesta rodada", e a FASE 3 fecha todo alerta aberto cuja condição
+   * foi julgada e não alarmou. Marcar sem ter medido faz o silêncio da medição
+   * fechar um alerta legítimo — o mesmo defeito do `?? 0`, só que do lado de
+   * fora. Sem contagem, a condição não é julgada e o alerta que estiver aberto
+   * continua aberto, que é o comportamento honesto. */
+  if (farolContagem !== null) {
     marcar(TIPO_FAROL, CHAVE_FAROL_SEM_PUBLICAR);
     const a = vigiaFarolSemPublicar({
       horaSP: horaSP(agora),
-      publicadosHoje: publicadosHoje ?? 0,
+      publicadosHoje: farolContagem,
+      desde: inicioDia.toISOString(),
     });
     if (a) alertas.push(a);
+  } else {
+    avisos.push("farol: nao julgado (contagem de farol_posts indisponivel)");
   }
 
   // 5. fila do Sentinela
@@ -545,7 +563,12 @@ export async function GET(req: Request) {
       cartas_saidas_24h: saidas,
       ciclos_24h: ciclosNoPeriodo,
       ultima_carta_nova_em: ultimaNovaEm,
-      farol_publicados_hoje: publicadosHoje ?? null,
+      farol_publicados_hoje: farolContagem,
+      // O par que o `?? 0` escondia: a contagem sozinha não distingue "publicou
+      // zero" de "não medi", porque as duas viram null aqui. `farol_julgado`
+      // diz qual das duas foi — e é o único registro disso, já que log de
+      // runtime some e o alerta (ou a ausência dele) não conta essa história.
+      farol_julgado: farolContagem !== null,
       hora_sp: horaSP(agora),
       fila_sentinela_esperando: fila.count ?? null,
       // Os dois lado a lado, sempre. Foi a distância entre eles que desfez o

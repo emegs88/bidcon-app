@@ -335,6 +335,73 @@ test("farol: publicou uma vez, nao cobra — nem as 23h", () => {
   assert.equal(vigiaFarolSemPublicar({ horaSP: 23, publicadosHoje: 1 }), null);
 });
 
+/* O TERCEIRO ESTADO. Os dois testes acima ja provavam que o vigia grita e que
+ * ele cala — o que faltava era a diferenca entre CALAR PORQUE MEDIU e CALAR
+ * PORQUE NAO MEDIU. A rota passava `publicadosHoje ?? 0`, e foi assim que em
+ * 17/08/2026 nasceu um alerta dizendo que o FAROL nao publicou num dia em que
+ * ele publicou: a contagem voltou null, virou 0, e o vigia acreditou. */
+test("farol: contagem null NAO julga — nao sei nao e zero", () => {
+  assert.equal(
+    vigiaFarolSemPublicar({ horaSP: 23, publicadosHoje: null }),
+    null,
+    "leitura que falhou nao pode virar veredito de ausencia"
+  );
+  // CONTROLE do teste acima: o mesmo horario, com contagem medida em zero,
+  // TEM de gritar. Sem esta linha, o null passar seria indistinguivel de um
+  // vigia quebrado que nunca alarma.
+  assert.ok(
+    vigiaFarolSemPublicar({ horaSP: 23, publicadosHoje: 0 }),
+    "as 23h com zero MEDIDO o vigia tem de cobrar"
+  );
+});
+
+test("farol: 17/08/2026 — o dia real que gerou o alerta falso", () => {
+  // O que o banco tinha naquele dia: 4 publicados. As duas varreduras que
+  // passam da hora de cobranca (18h e 21h SP) tinham de ficar caladas.
+  assert.equal(vigiaFarolSemPublicar({ horaSP: 18, publicadosHoje: 4 }), null);
+  assert.equal(vigiaFarolSemPublicar({ horaSP: 21, publicadosHoje: 4 }), null);
+  // E o contrafactual, para provar que o silencio acima e do dado e nao do
+  // vigia: o mesmo instante, com zero medido, alarma.
+  assert.ok(vigiaFarolSemPublicar({ horaSP: 21, publicadosHoje: 0 }));
+});
+
+/* `radar_registrar` reescreve `titulo` a cada ocorrencia (`titulo = p_titulo`
+ * no ramo do UPDATE), enquanto o painel imprime, na mesma linha, "aberta ha X"
+ * vindo de `primeira_vez`. Titulo que embute o relogio da observacao produz a
+ * contradicao que apareceu no painel: "ate as 21h", aberta desde as 18h. */
+test("farol: titulo e estavel entre varreduras; a hora vive no detalhe", () => {
+  const as18 = vigiaFarolSemPublicar({ horaSP: 18, publicadosHoje: 0 });
+  const as21 = vigiaFarolSemPublicar({ horaSP: 21, publicadosHoje: 0 });
+  assert.ok(as18 && as21);
+  assert.equal(
+    as18.titulo,
+    as21.titulo,
+    "o titulo e reescrito a cada ocorrencia: se variar, contradiz primeira_vez"
+  );
+  assert.ok(!as21.titulo.includes("21"), "a hora corrente nao entra no titulo");
+  assert.ok(
+    as21.titulo.includes(String(HORA_COBRANCA_FAROL)),
+    "o limite, que e constante, pode e deve estar no titulo"
+  );
+  // CONTROLE: o que foi tirado do titulo tem de continuar existindo em algum
+  // lugar. Se sumir dos dois, a mudanca apagou informacao em vez de move-la.
+  assert.equal((as18.detalhe as { hora_sp: number }).hora_sp, 18);
+  assert.equal((as21.detalhe as { hora_sp: number }).hora_sp, 21);
+});
+
+test("farol: 'desde' entra no detalhe quando informado, e some quando nao", () => {
+  const com = vigiaFarolSemPublicar({
+    horaSP: 21,
+    publicadosHoje: 0,
+    desde: "2026-08-17T03:00:00.000Z",
+  });
+  assert.ok(com);
+  assert.equal((com.detalhe as { desde?: string }).desde, "2026-08-17T03:00:00.000Z");
+  const sem = vigiaFarolSemPublicar({ horaSP: 21, publicadosHoje: 0 });
+  assert.ok(sem);
+  assert.ok(!("desde" in (sem.detalhe as object)), "sem janela medida, sem campo");
+});
+
 // ---------------------------------------------------------------------------
 // VIGIA 5 — fila do Sentinela
 // ---------------------------------------------------------------------------
