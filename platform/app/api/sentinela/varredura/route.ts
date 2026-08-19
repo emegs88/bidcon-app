@@ -62,6 +62,8 @@ import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { sendTemplate } from "@/lib/whatsapp/graph";
 import { normalizarTelefoneBR } from "@/lib/telefone";
+import { parDoSentinela } from "@/lib/whatsapp/template-sentinela";
+import { efeitoDoEnvio } from "@/lib/sentinela/efeito-envio";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -325,7 +327,12 @@ export async function GET(req: Request) {
   }
 
   // ------------------------------------------------------------------ FASE C
-  const templateName = process.env.SENTINELA_TEMPLATE;
+  // O PAR (name, language) sai de lib/whatsapp/template-sentinela.ts, e não de
+  // literais soltos aqui. Motivo medido: 75 envios recusados com #132001
+  // "Template name does not exist in the translation" entre 17 e 19/08/2026,
+  // com o `languageCode` cravado como literal nesta rota — onde
+  // `scripts/testes.mjs` não alcança. Ver o cabeçalho daquele arquivo.
+  const diagTemplate = parDoSentinela(process.env.SENTINELA_TEMPLATE);
 
   // Teto por linha + ordem com desempate, tudo no SQL. Ver item 2 do cabeçalho:
   // afrouxar aqui e refinar em JS devolveria a janela de 15 para as antigas.
@@ -362,8 +369,17 @@ export async function GET(req: Request) {
   }
   resumo.fila.tratados_nesta_pagina = (aEnviar ?? []).length;
 
-  if (!templateName) {
-    // GATE: sem template aprovado configurado, nada sai. Marca o motivo.
+  if (!diagTemplate.ok) {
+    // GATE: sem template em condição de ir, nada sai. Marca o motivo.
+    //
+    // MUDANÇA DECLARADA: antes o gate só olhava "env vazia". Agora nome com
+    // espaço em volta também para aqui, em vez de ser aparado e enviado.
+    // Aparar esconderia uma env mal colada — o envio falharia na Meta, 15
+    // mensagens mortas por ciclo, e o operador nunca saberia que o erro foi
+    // dele. `aguardando_template` é reversível e visível, e a medição de
+    // 19/08/2026 provou que essas linhas VOLTAM sozinhas: a
+    // `sentinela_a_tocar` inclui esse status no WHERE (20 de 20 alcançadas,
+    // com controle — `excluido` e `duplicado_telefone` ficaram de fora).
     resumo.sem_template = true;
     for (const f of (aEnviar ?? []) as FilaRow[]) {
       if (!dryRun && f.status !== "aguardando_template") {
@@ -371,10 +387,18 @@ export async function GET(req: Request) {
           .from("sentinela_fila")
           .update({ status: "aguardando_template" })
           .eq("id", f.id);
-        await log(f.id, "aguardando_template", {});
+        await log(f.id, "aguardando_template", { motivo: diagTemplate.motivo });
       }
     }
     return finalizar();
+  }
+
+  const templateName = diagTemplate.par.name;
+  // DIVERGÊNCIA NÃO BLOQUEIA, mas não fica muda: a env é a fonte da verdade do
+  // envio, e trocar para um `_02` é legítimo. O que não pode é a troca passar
+  // sem rastro — quem lê o log decide se foi dedo no lugar errado.
+  if (diagTemplate.divergeDoDoc) {
+    await log(null, "template_diverge_do_doc", { nome_no_fio: templateName });
   }
 
   // Domingo antes da hora: a guarda de 9h–20h sozinha aprova domingo às 14h.
@@ -465,7 +489,11 @@ export async function GET(req: Request) {
       telefone,
       agente: "sentinela",
       templateName,
-      languageCode: "pt_BR",
+      // NÃO volte a cravar o literal aqui. Ele fica em
+      // lib/whatsapp/template-sentinela.ts porque lá o teste alcança; aqui,
+      // trocar `pt_BR` por `pt-BR` passa no tsc, passa no build e derruba a
+      // fila inteira em silêncio — foi o que aconteceu.
+      languageCode: diagTemplate.par.language,
       components: [
         {
           type: "body",
@@ -475,29 +503,25 @@ export async function GET(req: Request) {
       textoRegistro: `[sentinela] ${templateName} toque ${toque}`,
     });
 
-    if (envio.ok) {
-      resumo.envios.feitos++;
-      await db
-        .from("sentinela_fila")
-        .update({
-          status: "enviado",
-          tentativas: toque,
-          ultimo_envio_em: agora.toISOString(),
-          proximo_toque_em: new Date(agora.getTime() + ESPACAMENTO_MS).toISOString(),
-        })
-        .eq("id", f.id);
-      await log(f.id, "envio_ok", { waMessageId: envio.waMessageId, toque });
-    } else if (envio.erro === "opt_out") {
-      resumo.envios.pulados++;
-      await db.from("sentinela_fila").update({ status: "excluido" }).eq("id", f.id);
-      await log(f.id, "parada_opt_out", {});
-    } else {
-      // Falha transitória: status fica como está e a próxima varredura tenta
-      // de novo. Falha permanente (ex. template rejeitado) aparece repetida
-      // no sentinela_log — é o sinal pra intervir manualmente.
-      resumo.envios.falhas++;
-      await log(f.id, "envio_falha", { erro: envio.erro });
+    // A chave `if` que decidia o destino da linha virou função pura em
+    // lib/sentinela/efeito-envio.ts, sob teste de mutação. A regra que ela
+    // guarda: **o contador de toques só anda quando a mensagem SAI**. Com
+    // `max_toques = 1` nas 20 linhas antigas, um único incremento no caminho
+    // de falha tornaria `tentativas < max_toques` falso para sempre e essas
+    // pessoas sumiriam da `sentinela_a_tocar` sem erro, sem alerta, sem
+    // ninguém perceber. Por isso o efeito de falha tem `patch: null` — que é
+    // NÃO ESCREVER, e não "escrever um patch vazio".
+    const efeito = efeitoDoEnvio({
+      envio,
+      toque,
+      agora,
+      espacamentoMs: ESPACAMENTO_MS,
+    });
+    resumo.envios[efeito.contador]++;
+    if (efeito.patch) {
+      await db.from("sentinela_fila").update(efeito.patch).eq("id", f.id);
     }
+    await log(f.id, efeito.log.acao, efeito.log.detalhe);
 
     await new Promise((r) => setTimeout(r, THROTTLE_MS));
   }

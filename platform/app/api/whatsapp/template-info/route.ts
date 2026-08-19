@@ -29,7 +29,12 @@ export async function GET(req: Request) {
   const name = new URL(req.url).searchParams.get("name");
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/${WABA_ID}/message_templates` +
-    `?fields=name,status,category,components&limit=50` +
+    // `language` É O CAMPO QUE O #132001 ACUSA. Sem ele nos fields, este
+    // instrumento respondia "o template existe" sem dizer em QUAL tradução —
+    // que é a única pergunta que decide a causa. Medido em 19/08/2026: 75
+    // envios recusados com "Template name does not exist in the translation",
+    // e a rota que existe para diagnosticar isso não pedia a tradução.
+    `?fields=name,language,status,category,components&limit=50` +
     (name ? `&name=${encodeURIComponent(name)}` : "");
 
   const resp = await fetch(url, {

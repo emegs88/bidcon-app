@@ -82,6 +82,7 @@ import {
   type AmostraDaFonte,
 } from "@/lib/radar/medida";
 import {
+  CHAVE_ENVIO_FALHANDO,
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
   CHAVE_FAROL_SEM_PUBLICAR,
@@ -89,11 +90,13 @@ import {
   CHAVE_QUARENTENA_VOLUME,
   TIPO_AMOSTRA,
   TIPO_DIVERGENCIA,
+  TIPO_ENVIO_SENTINELA,
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
   TIPO_QUARENTENA,
   vigiaDivergenciaSync,
+  vigiaEnvioSentinela,
   vigiaEstoqueNivel,
   vigiaEstoqueSemMovimento,
   vigiaFarolSemPublicar,
@@ -103,6 +106,17 @@ import {
   vigiaQuarentenaVolume,
   type Alerta,
 } from "@/lib/radar/vigias";
+/* A UNIDADE DO VIGIA 8 É O CICLO, E RECONSTRUIR O CICLO MORA EM lib/.
+ *
+ * Não é organização: é a única forma de o arnês alcançar a regra. E a regra
+ * é traiçoeira — o Sentinela roda 2x/dia (12h e 18h) e esta varredura roda
+ * 8x/dia (de 3 em 3 horas). Ambos os horários estão em vercel.json. Uma
+ * janela fixa de horas faria seis das oito passagens diárias não encontrarem
+ * ciclo nenhum, e "não encontrei" viraria
+ * `falhas = 0`, condição marcada como julgada, e a FASE 3 FECHANDO o alerta
+ * grave que a passagem anterior abriu. O vigia se desmentiria sozinho seis
+ * vezes por dia. Por isso o ciclo é reconstruído por LACUNA entre linhas. */
+import { ultimoCicloDeEnvio } from "@/lib/sentinela/ciclo-envio";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -130,6 +144,19 @@ const TETO_EVENTOS = 500;
  * em vez de julgar com número curto.
  */
 const TETO_QUARENTENA = 1500;
+/**
+ * Teto das linhas de envio do Sentinela em 24h. O maior ciclo já medido teve
+ * 15 envios (19/08/2026), e cabem no máximo dois ciclos na janela — 30 linhas
+ * no pior caso conhecido. 2000 é ~66x isso, folga para a fila crescer muito
+ * antes de o teto voltar a importar.
+ *
+ * A folga existe pelo mesmo motivo da quarentena: aqui, cortar a leitura
+ * devolveria um ciclo com MENOS falhas do que houve, e falha a menos é
+ * SILÊNCIO — o vigia emudeceria exatamente no dia em que o estrago foi maior.
+ * Por isso a fase 2 detecta a saturação e recusa julgar, em vez de julgar com
+ * número curto.
+ */
+const TETO_ENVIOS = 2000;
 const MS_POR_HORA = 3_600_000;
 
 function autorizado(req: Request): boolean {
@@ -326,7 +353,30 @@ export async function GET(req: Request) {
   if (fila.error) avisos.push(`sentinela_fila: ${fila.error.message}`);
   if (maisAntiga.error) avisos.push(`sentinela_fila_antiga: ${maisAntiga.error.message}`);
 
-  // --- 1f. quarentena ----------------------------------------------------
+  // --- 1f. envios do Sentinela (VIGIA 8) ---------------------------------
+  //
+  // POR QUE 24h E NÃO A JANELA DO CICLO DO RADAR. O maior intervalo entre duas
+  // execuções do Sentinela é de 18h (a das 18h até a das 12h do dia seguinte).
+  // Uma janela de 3h — a do sync — deixaria a maioria das passagens sem ciclo
+  // nenhum para ler. 24h garante que SEMPRE haja pelo menos um ciclo dentro,
+  // se é que houve envio; e quando houver dois, `ultimoCicloDeEnvio` pega o
+  // último, que é o único sobre o qual se pode afirmar alguma coisa agora.
+  //
+  // A ORDEM É DESCENDENTE DE PROPÓSITO, e casa com o teto: se esta leitura
+  // cortar, ela corta as linhas MAIS ANTIGAS e preserva o ciclo mais recente,
+  // que é o que o vigia julga. Ainda assim, saturar não vira julgamento — ver
+  // a FASE 2. `ultimoCicloDeEnvio` reordena por conta própria, então a ordem
+  // aqui é só sobre O QUE sobrevive ao corte, nunca sobre o resultado.
+  const { data: enviosLog, error: errEnvios } = await db
+    .from("sentinela_log")
+    .select("acao, criado_em")
+    .in("acao", ["envio_ok", "envio_falha"])
+    .gte("criado_em", desde24h.toISOString())
+    .order("criado_em", { ascending: false })
+    .limit(TETO_ENVIOS);
+  if (errEnvios) avisos.push(`sentinela_log envios: ${errEnvios.message}`);
+
+  // --- 1g. quarentena ----------------------------------------------------
   //
   // A COLUNA, NÃO O TEXTO. `eventos_sync` tem `numero_externo` própria, e é ela
   // que vale. O `detalhe` também carrega um número — "PLAYCONTEMPLADAS credito
@@ -480,7 +530,49 @@ export async function GET(req: Request) {
     avisos.push("fila_sentinela: nao julgado (contagem indisponivel)");
   }
 
-  // 6. quarentena — volume e reincidência. Duas condições, duas naturezas:
+  // 6. envios do Sentinela (VIGIA 8) — a condição que faltou em 19/08/2026.
+  /* POR QUE ESTE VIGIA EXISTE, E POR QUE O 5 NÃO BASTOU. Naquele dia a Meta
+   * recusou 75 envios com #132001 e o RADAR ficou mudo. Não foi defeito do
+   * vigia 5: ele mede a IDADE da fila, e a fila não estava envelhecendo — as
+   * linhas eram novas e voltavam para `aguardando_template` a cada ciclo. A
+   * condição "o canal recusa tudo o que tentamos" simplesmente não tinha
+   * quem a olhasse.
+   *
+   * OS TRÊS RAMOS ABAIXO SÃO A REGRA 19 INTEIRA, e a diferença entre eles é o
+   * ponto: só o primeiro marca a condição como julgada. Sem ciclo medido não
+   * se afirma nada — e não afirmar nada tem de incluir NÃO FECHAR. Um ciclo
+   * ausente não é um ciclo limpo: pode ser a fila seca (ninguém elegível),
+   * que não é notícia boa nenhuma sobre o canal de envio. */
+  const enviosLidos = listaMedida<{ acao: string; criado_em: string }>({
+    data: enviosLog as { acao: string; criado_em: string }[] | null,
+    error: errEnvios,
+  });
+  let envioCiclo: ReturnType<typeof ultimoCicloDeEnvio> = null;
+
+  if (errEnvios) {
+    // Já foi para `avisos` na fase 1. Sem medição não há julgamento.
+  } else if (enviosLidos !== null && enviosLidos.length >= TETO_ENVIOS) {
+    // Leitura cortada devolveria falhas A MENOS, e falha a menos aqui é
+    // silêncio. Ver o comentário do TETO_ENVIOS.
+    avisos.push(`envio_sentinela: nao julgado (leitura saturou em ${TETO_ENVIOS} linhas)`);
+  } else {
+    // `ultimoCicloDeEnvio` devolve null nos DOIS casos que não se pode julgar:
+    // leitura nula (não medi) e janela sem envio nenhum (fila seca). O
+    // chamador trata os dois igual de propósito — em ambos, calar sem fechar.
+    envioCiclo = ultimoCicloDeEnvio(enviosLidos);
+    if (envioCiclo === null) {
+      avisos.push("envio_sentinela: nao julgado (nenhum ciclo de envio na janela)");
+    } else {
+      marcar(TIPO_ENVIO_SENTINELA, CHAVE_ENVIO_FALHANDO);
+      const a = vigiaEnvioSentinela({
+        falhas: envioCiclo.falhas,
+        feitos: envioCiclo.feitos,
+      });
+      if (a) alertas.push(a);
+    }
+  }
+
+  // 7. quarentena — volume e reincidência. Duas condições, duas naturezas:
   //    volume alto = a fonte piorou AGORA; reincidência = uma carta específica é
   //    lixo permanente do lado do fornecedor, e nenhum ciclo nosso conserta.
   /* `?? []` era o mais traiçoeiro dos quatro: lista vazia não é um número
@@ -624,6 +716,16 @@ export async function GET(req: Request) {
       hora_sp: horaSP(agora),
       fila_sentinela_esperando: filaEsperando,
       fila_sentinela_julgada: filaEsperando !== null,
+      // O ÚLTIMO CICLO, não a soma das 24h. Somar daria um número que nenhuma
+      // execução tentou: em 19/08/2026 diria 75, quando o que se pode afirmar
+      // é "o último ciclo tentou 15 e entregou 0". E é a diferença que decide
+      // o alerta — consertado o template, o ciclo seguinte zera as falhas e o
+      // vigia cala, enquanto uma soma de 24h continuaria gritando o passado.
+      envio_ciclo: envioCiclo,
+      // Idêntico ao par do FAROL: sem esta linha, "não alarmou" fica
+      // indistinguível de "ninguém olhou". `envio_ciclo: null` acontece por
+      // três motivos diferentes, e o de cada vez está em `avisos`.
+      envio_sentinela_julgado: envioCiclo !== null,
       // Os dois lado a lado, sempre. Foi a distância entre eles que desfez o
       // relatório de "95 cartas barradas": são 95 EVENTOS e 4 CARTAS. Null aqui
       // quer dizer "não julgado" — erro de leitura ou saturação —, nunca zero.
