@@ -11,7 +11,15 @@ import styles from "./CartaCard.module.css";
 // NUNCA inclui fornecedor (de quem compramos) — esse é segredo admin-only.
 export type AdministradoraVitrine = {
   nome: string;
-  aceita_assuncao: boolean;
+  // `null` = NÃO SEI, e isso é diferente de `false`. A vitrine unificada
+  // (CATALOGO-UNIFICA-01) lê `vw_vitrine_viva`, que NÃO carrega esta coluna; o
+  // valor vem de um dicionário à parte, casado por nome. Quando o nome não bate
+  // — ou quando o dicionário não respondeu — escrever `false` afirmaria à
+  // pessoa que a administradora não aceita assunção sem ninguém ter medido
+  // isso. `null` é falsy, então o selo abaixo e o filtro "Só aceita assunção"
+  // seguem se comportando; a diferença é que a casa não passa a mentir.
+  // Ver lib/vitrine.ts → adaptarCarta.
+  aceita_assuncao: boolean | null;
 };
 
 export type CartaVitrine = {
@@ -27,6 +35,11 @@ export type CartaVitrine = {
   bidcon_custo_am: number | null;
   // pode ser null quando a carta ainda não tem administradora vinculada.
   administradora: AdministradoraVitrine | null;
+  // Carta de cliente direto (`fonte = 'cliente_direto'` na origem). É o EIXO
+  // OFICIAL da partição — nunca mais comparar a string "BIDCON_DIRETO". Aqui o
+  // campo é só EXIBIÇÃO (o selo é marca); quem decide a ORDEM é
+  // `ordenarExclusivaPrimeiro` em lib/vitrine.ts.
+  exclusiva?: boolean;
 };
 
 export function CartaCard({ carta }: { carta: CartaVitrine }) {
@@ -62,9 +75,15 @@ export function CartaCard({ carta }: { carta: CartaVitrine }) {
       )}
       <p className={styles.seloNota}>Referência de planejamento, não é oferta de investimento.</p>
 
-      {carta.administradora?.aceita_assuncao && (
+      {/* Selo de marca. Quem ORDENA é `ordenarExclusivaPrimeiro`; aqui é só a
+          etiqueta que a pessoa vê. Se um dia a ordem sumir e o selo continuar,
+          é sinal de que alguém trocou a partição — não de que o selo mentiu. */}
+      {(carta.exclusiva || carta.administradora?.aceita_assuncao) && (
         <div className={styles.atributos}>
-          <Badge tone="ok">Aceita assunção</Badge>
+          {carta.exclusiva && <Badge tone="amber">BIDCON DIRETO</Badge>}
+          {carta.administradora?.aceita_assuncao && (
+            <Badge tone="ok">Aceita assunção</Badge>
+          )}
         </div>
       )}
 

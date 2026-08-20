@@ -1,18 +1,40 @@
+// ============================================================================
 // /cartas — vitrine logada de cartas contempladas disponíveis.
-// Server Component. Lê via Supabase (RLS): a leitura pública das cartas
-// 'disponivel' depende da policy da migration 0005 (cartas_vitrine_select).
-// Filtro opcional por tipo via query param (?tipo=imovel|veiculo).
+// ----------------------------------------------------------------------------
+// CATALOGO-UNIFICA-01 · FASE 2 — esta tela MUDOU DE FONTE, e só isso.
+//
+// Antes ela lia `nnv.cartas` sob RLS. Medido em 19/08/2026: 2 linhas, ZERO
+// disponíveis. Quem logava via "Nenhuma carta disponível agora" — enquanto o
+// site público, lendo o xtv, mostrava milhares. Duas fontes, uma verdade só.
+// Agora lê `xtv.vw_vitrine_viva` pelo MESMO cliente do site (`createXtvClient`,
+// server-side), via `lib/vitrine-fonte.ts`. Medido hoje: 2.295 linhas.
+//
+// A AUTENTICAÇÃO continua no nnv e continua acima de tudo: `createClient()`
+// (sessão do usuário) decide se a página existe. A vitrine é catálogo público
+// de produto — não há linha de cliente nela, não há `fornecedor_id` nela.
+//
+// A ORDENAÇÃO da lista é a mesma de sempre (ágio 150 desc, crédito asc) de
+// propósito: se a ordem mudasse junto com a fonte, um resultado estranho na
+// tela teria duas causas possíveis e nenhum jeito de separar as duas.
+//
+// REGRA 19 — o motivo real desta reescrita. O código antigo era:
+//     const { data: cartas } = await query;      // o erro ia para o lixo
+//     const lista = (cartas ?? []).map(...)      // e a falha virava lista vazia
+// Falha de fonte e catálogo vazio ficavam IDÊNTICOS na tela, e o que o cliente
+// lia era que a Bidcon não tem carta. Agora são três estados separados, e o
+// terceiro (falha) tem mensagem própria e log próprio.
+// ============================================================================
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
-import { type CartaVitrine } from "@/components/CartaCard";
 import { CartasExplorer } from "@/components/CartasExplorer";
+import { lerCartasVitrine } from "@/lib/vitrine-fonte";
+import { MSG_FALHA_VITRINE, MSG_VAZIO_VITRINE, WA_PROSPERITO } from "@/lib/vitrine";
 import styles from "./cartas.module.css";
 
-const WA = "5519997561909";
 const TIPOS = ["imovel", "veiculo"] as const;
 
 export default async function CartasPage({
@@ -38,38 +60,11 @@ export default async function CartasPage({
     ? (searchParams.tipo as string)
     : null;
 
-  // Join SÓ com administradoras (marca pública do bem; RLS libera p/ logado).
-  // NUNCA selecionar fornecedor_id/fornecedores aqui — é segredo admin-only.
-  // O embed do PostgREST devolve `administradora` como objeto (ou null).
-  let query = supabase
-    .from("cartas")
-    .select(
-      "id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, bidcon_agio_150, bidcon_agio_120, bidcon_custo_am, administradora:administradora_id ( nome, aceita_assuncao )"
-    )
-    .eq("status", "disponivel")
-    .order("bidcon_agio_150", { ascending: false, nullsFirst: false })
-    .order("valor_credito", { ascending: true });
-
-  if (tipoFiltro) query = query.eq("tipo", tipoFiltro);
-
-  const { data: cartas } = await query;
-  // PostgREST tipa o embed como array; normalizamos para objeto | null.
-  const lista: CartaVitrine[] = (cartas ?? []).map((c) => {
-    const adm = (c as { administradora?: unknown }).administradora;
-    const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
-    return {
-      id: c.id,
-      tipo: c.tipo,
-      valor_credito: c.valor_credito,
-      valor_entrada: c.valor_entrada,
-      valor_parcela: c.valor_parcela,
-      qtd_parcelas: c.qtd_parcelas,
-      bidcon_agio_150: c.bidcon_agio_150,
-      bidcon_agio_120: c.bidcon_agio_120,
-      bidcon_custo_am: c.bidcon_custo_am,
-      administradora: administradora as CartaVitrine["administradora"],
-    };
-  });
+  // A leitura da vitrine (xtv) e a partição por `exclusiva` moram em
+  // `lib/vitrine-fonte.ts`. Aqui só sobra o que é de TELA. O log da falha já
+  // saiu lá dentro, com o motivo cru; o que chega aqui é a decisão.
+  const leitura = await lerCartasVitrine({ tipo: tipoFiltro });
+  const lista = leitura.ok ? leitura.dados : [];
 
   return (
     <AppShell nome={nome} tipo={tipo}>
@@ -101,12 +96,29 @@ export default async function CartasPage({
         </Button>
       </nav>
 
-      {lista.length === 0 ? (
+      {/* Os TRÊS estados da Regra 19, nesta ordem — a falha primeiro, porque é
+          ela que o `?? []` engolia. `EmptyState` não aceita `role`, então o
+          alerta vem no invólucro: leitor de tela precisa saber que isto é um
+          problema do sistema, e não uma resposta sobre o catálogo. */}
+      {!leitura.ok ? (
+        <div role="alert">
+          <EmptyState
+            icon="⚠️"
+            title={MSG_FALHA_VITRINE}
+            description="O catálogo continua de pé — foi a leitura que não voltou. Se persistir, fale com o atendimento."
+            action={
+              <Button href={`https://wa.me/${WA_PROSPERITO}`}>Falar com o atendimento</Button>
+            }
+          />
+        </div>
+      ) : lista.length === 0 ? (
         <EmptyState
           icon="🔎"
-          title="Nenhuma carta disponível agora"
+          title={MSG_VAZIO_VITRINE}
           description="No momento não há cartas que atendam a este filtro. Fale com o atendimento para receber novas oportunidades."
-          action={<Button href={`https://wa.me/${WA}`}>Falar com o atendimento</Button>}
+          action={
+            <Button href={`https://wa.me/${WA_PROSPERITO}`}>Falar com o atendimento</Button>
+          }
         />
       ) : (
         <CartasExplorer cartas={lista} />
