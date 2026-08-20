@@ -53,6 +53,9 @@ import {
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
+  TIPO_ENVIO_SENTINELA,
+  FALHAS_NO_CICLO,
+  vigiaEnvioSentinela,
   vigiaDivergenciaSync,
   vigiaEstoqueNivel,
   vigiaEstoqueSemMovimento,
@@ -468,10 +471,15 @@ test("fila: vazia nao alarma, e 'sem data' tambem nao", () => {
 
 // Este numero e travado de proposito. Quando entrou o sexto tipo (quarentena),
 // o teste falhou e me obrigou a declarar a mudanca em vez de deixar um vigia
-// novo entrar de fininho no painel. Quem acrescentar o setimo passa por aqui.
-test("tipos: seis condicoes, sem repetidos — o painel agrupa por aqui", () => {
-  assert.equal(TIPOS_RADAR.length, 6);
-  assert.equal(new Set(TIPOS_RADAR).size, 6, "tipo repetido misturaria vigias na tela");
+// novo entrar de fininho no painel. Quem acrescentar o oitavo passa por aqui.
+//
+// SETIMO, DECLARADO: `sentinela_envio` (VIGIA 8), 19/08/2026. Este teste
+// falhou 7 !== 6 quando o tipo entrou, que e exatamente o que ele existe para
+// fazer — a trava funcionou e me obrigou a escrever esta linha em vez de
+// deixar um vigia novo aparecer no painel sem ninguem ter decidido.
+test("tipos: sete condicoes, sem repetidos — o painel agrupa por aqui", () => {
+  assert.equal(TIPOS_RADAR.length, 7);
+  assert.equal(new Set(TIPOS_RADAR).size, 7, "tipo repetido misturaria vigias na tela");
   for (const t of TIPOS_RADAR) {
     assert.ok(t.length > 0 && t === t.toLowerCase(), `tipo '${t}' fora do padrao snake_case`);
   }
@@ -489,6 +497,8 @@ test("alerta: todo alerta aberto tem titulo legivel e detalhe com numeros", () =
       quantasEsperando: 21,
       agora: AGORA,
     }),
+    // O ciclo real de 19/08/2026: 15 recusas, nenhuma entrega.
+    vigiaEnvioSentinela({ falhas: 15, feitos: 0 }),
   ];
   for (const a of abertos) {
     assert.ok(a, "fixture montada para abrir alerta");
@@ -572,4 +582,90 @@ test("uma quarentena isolada — o caso de 53% das cartas — fica em silencio",
     null,
     "a fronteira: 23 ciclos calam"
   );
+});
+
+// ---------------------------------------------------------------------------
+// VIGIA 8 — o Sentinela envia e a Meta recusa
+// ---------------------------------------------------------------------------
+//
+// O CASO REAL, e ele é o mais constrangedor da lista: durante cinco ciclos,
+// entre 17 e 19/08/2026, o Sentinela recusou 75 envios seguidos (#132001) e
+// NENHUM vigia abriu a boca. O VIGIA 5 estava de pé e calado — corretamente,
+// porque ele mede IDADE da fila, e a fila não envelhecia: a varredura passava
+// por ela a cada seis horas. O sistema fazia barulho de trabalho sem entregar
+// nada, e vigiar a fila não é vigiar o envio.
+
+test("VIGIA 8 — os cinco ciclos de 15 recusas e 0 entregas: grave, e teria gritado no primeiro", () => {
+  /* O número exato do ciclo de 2026-08-17 12:00. Com este vigia de pé, o
+   * alerta sairia dois dias e meio antes de alguém perguntar. */
+  const a = vigiaEnvioSentinela({ falhas: 15, feitos: 0 });
+  assert.ok(a);
+  assert.equal(a.tipo, TIPO_ENVIO_SENTINELA);
+  assert.equal(a.severidade, "grave", "nada saiu do ciclo — isso e pane, nao aviso");
+  assert.equal(a.detalhe.falhas, 15);
+  assert.equal(a.detalhe.feitos, 0);
+  assert.ok(TIPOS_RADAR.includes(TIPO_ENVIO_SENTINELA), "o painel precisa saber agrupar o tipo novo");
+});
+
+test("VIGIA 8 — a chave e estavel entre ciclos: uma condicao, nao uma por falha", () => {
+  /* Doutrina da casa: um alerta por CONDIÇÃO. Se a chave carregasse o número
+   * de falhas, cada ciclo abriria um alerta novo e o painel viraria um mural
+   * de 75 linhas dizendo a mesma coisa. */
+  const c1 = vigiaEnvioSentinela({ falhas: 15, feitos: 0 });
+  const c2 = vigiaEnvioSentinela({ falhas: 12, feitos: 0 });
+  assert.ok(c1 && c2);
+  assert.equal(c1.chave, c2.chave);
+});
+
+test("VIGIA 8 — ciclo PEQUENO todo falho tambem alarma: 3 de 3", () => {
+  /* Por que o limiar é baixo. A janela envia no máximo 15, e conforme a fila
+   * drena os ciclos encolhem. Um limiar de 10 ficaria cego exatamente no ciclo
+   * de 3 pessoas em que as 3 falham — que é tão sistêmico quanto 15 de 15 e
+   * muito mais fácil de não notar. */
+  const a = vigiaEnvioSentinela({ falhas: 3, feitos: 0 });
+  assert.ok(a);
+  assert.equal(a.severidade, "grave");
+});
+
+test("VIGIA 8 — falhou o bastante MAS algo saiu: aviso, nao grave", () => {
+  /* O canal funciona; o defeito é por destinatário (número morto, bloqueio).
+   * Merece olhar, não merece acordar ninguém — e tratar isso como pane faria
+   * o alerta mentir, que é como se ensina a ignorar alerta. */
+  const a = vigiaEnvioSentinela({ falhas: 4, feitos: 11 });
+  assert.ok(a);
+  assert.equal(a.severidade, "aviso");
+  assert.ok(a.titulo.includes("15"), "o titulo tem de dizer de quantos tentados");
+});
+
+test("VIGIA 8 — SILENCIO na fronteira: 2 falhas nao sao pane", () => {
+  /* O silêncio testado onde importa, colado no gatilho. Uma falha é rotina;
+   * duas podem ser o mesmo segundo ruim da Graph. */
+  assert.equal(vigiaEnvioSentinela({ falhas: FALHAS_NO_CICLO - 1, feitos: 0 }), null);
+  assert.equal(vigiaEnvioSentinela({ falhas: 1, feitos: 14 }), null);
+});
+
+test("VIGIA 8 — SILENCIO no ciclo limpo e no ciclo vazio", () => {
+  // CONTROLE do silêncio: casa saudável não gera linha.
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 15 }), null);
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 0 }), null);
+});
+
+test("VIGIA 8 — REGRA 19: falhas nao medidas NAO julgam", () => {
+  /* `?? 0` aqui faria a leitura falha do sentinela_log virar "nenhuma falha",
+   * e o vigia calaria justamente no dia em que o log não respondeu — que é um
+   * dia suspeito, não um dia limpo. */
+  assert.equal(vigiaEnvioSentinela({ falhas: null, feitos: 0 }), null);
+  assert.equal(vigiaEnvioSentinela({ falhas: Number.NaN, feitos: 0 }), null);
+});
+
+test("VIGIA 8 — REGRA 19: feitos nao medidos ainda ALARMAM, com o null visivel", () => {
+  /* A outra ponta da regra, e a mais fácil de errar para o lado errado: as
+   * falhas FORAM medidas. Calar sobre 15 recusas porque o outro contador nao
+   * veio seria trocar um alerta certo por um silencio comodo. O que cai e a
+   * severidade — nao da para afirmar "nada saiu" sem ter medido. */
+  const a = vigiaEnvioSentinela({ falhas: 15, feitos: null });
+  assert.ok(a, "15 falhas medidas nao podem ficar caladas");
+  assert.equal(a.severidade, "aviso", "sem medir entregas nao se afirma pane");
+  assert.equal(a.detalhe.feitos, null, "o null tem de viajar visivel ate quem le");
+  assert.ok(a.titulo.includes("não medidos"));
 });
