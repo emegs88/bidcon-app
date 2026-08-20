@@ -238,12 +238,30 @@ export function refCarta(ref: number | null | undefined, id: string): string {
 // errada — não uma integração. No dia em que virar integração, ela nasce com
 // teste e com nome próprio.
 //
-// O número é o que o app logado já usa em cinco arquivos (`app/reservar`,
-// `app/minha-carta`, `app/meu-processo`, `app/cartas`, `app/cartas/[id]`).
-// ATENÇÃO MEDIDA: o site público usa OUTRO (5511973202967). Divergência real,
-// reportada ao Emerson; aqui fica o do app, que é o canal de quem já está logado.
+// O NÚMERO, e por que é ESTE (decisão do Emerson, 20/08/2026 — critério de
+// funil, não de gosto): 5511973202967 é a linha da WABA VIVA, onde o cérebro do
+// Prosperito atende, onde o `[carta <uuid>]` do prefill é lido por gente e onde
+// a conversa vira `wa_conversas`. O 5519997561909 é porta sem ninguém atrás:
+// quem chega lá não encontra agente, não entra na fila e não vira lead
+// rastreável. Mandar o cliente para uma porta dessas é pior do que não ter
+// botão — ele acha que falou com a casa.
+//
+// ARQUEOLOGIA, porque este número já foi trocado cinco vezes e alguém vai
+// querer "consertar" de novo. Medido no git: 11/07 migrou 5519→5511 · 14/07
+// voltou para 5519 (bloqueio no WhatsApp Business) · 14/07 voltou para 5511
+// (bloqueio resolvido) · 15/07 voltou para 5519 (novo bloqueio) · 03/08
+// `ee26b1d` fixou 5511 como "WhatsApp canônico" — mas tocou 18 arquivos, TODOS
+// em `public/` e `scripts/`, NENHUM em `platform/`. A divergência não era
+// política de dois canais: era uma migração que parou no meio, e ficou 17 dias
+// mandando cliente logado para a porta vazia. Esta linha fecha a migração.
+//
+// Estes são os cinco pontos do app logado: `app/reservar`, `app/minha-carta`,
+// `app/meu-processo`, `app/cartas` e `app/cartas/[id]`. Todos importam DAQUI —
+// nenhum guarda literal próprio, para que a sexta troca seja uma linha só.
+// (`lib/whatsapp/sala.test.ts` também contém 5519997561909, e deve continuar
+// contendo: lá é telefone de CONTATO num caso de teste, não a linha da casa.)
 // ---------------------------------------------------------------------------
-export const WA_PROSPERITO = "5519997561909";
+export const WA_PROSPERITO = "5511973202967";
 
 /** Texto honesto da tela. Sem promessa de contemplação, sem léxico de mercado. */
 export const NOTA_RESERVA_PONTE = "Reserva acompanhada pelo Time Prosperito";
