@@ -52,6 +52,26 @@
 //    domingo passa nela. Mensagem de empresa em domingo não é urgência de quem
 //    recebe, é conveniência de quem manda.
 //
+// ----------------------------------------------------------------------------
+// TENTATIVAS-01 (19/08/2026) — O ORÇAMENTO DE RELÓGIO
+//
+// Em 19/08 às 18:01 UTC esta rota devolveu 504. A causa não foi carga: foi um
+// comentário errado virando dimensionamento. `MAX_ENVIOS_POR_EXECUCAO = 15`
+// carregava "15 × 2s = 30s, folga no maxDuration" — a conta contava SÓ o
+// throttle. MEDIDO nos deltas de sentinela_log: uma iteração de envio_ok custa
+// 4,13–4,61s (média 4,25s), throttle incluído. 15 × 4,25 = 63,8s, contra um
+// teto de 60s. A página nunca coube.
+//
+// SUBIR O TETO NÃO É O CONSERTO. Entre o `sendTemplate` e o `update` da fila há
+// uma janela em que a Meta já entregou e a linha ainda não foi marcada; morrer
+// ali faz a varredura seguinte reenviar para a mesma pessoa. Um teto maior só
+// MUDA ESSA JANELA DE LUGAR. O conserto é recusar-se a COMEÇAR uma iteração que
+// não cabe — `cabeMaisUmaIteracao` no topo do laço de envio.
+//
+// A aritmética mora em lib/sentinela/orcamento.ts porque scripts/testes.mjs
+// varre `lib/` e NÃO varre rotas: conta dentro de route.ts é conta sem teste.
+// ----------------------------------------------------------------------------
+//
 // dry_run=1 na query → zero efeito colateral (nenhum insert/update/envio),
 // só relata o que aconteceria. Toda ação real vira linha em sentinela_log.
 //
@@ -62,15 +82,43 @@ import { NextResponse } from "next/server";
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { sendTemplate } from "@/lib/whatsapp/graph";
 import { normalizarTelefoneBR } from "@/lib/telefone";
+import {
+  cabeMaisUmaIteracao,
+  iteracoesQueCabem,
+  type Orcamento,
+} from "@/lib/sentinela/orcamento";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+
+// TENTATIVAS-01 — 60 → 300. O 504 de 19/08 às 18:01 UTC não foi azar: a página
+// de 15 NÃO CABIA em 60s, e o comentário abaixo dizia que cabia. O cinto de
+// 300s é o teto, não o plano; quem impede o estouro é o ORCAMENTO.
+export const maxDuration = 300;
 
 const NUMERO_EXCLUIDO = "5511973202967"; // mesmo hard-exclude do DISPARO-01
 const ESPACAMENTO_MS = 72 * 60 * 60 * 1000; // 72h entre toques
-const MAX_ENVIOS_POR_EXECUCAO = 15; // 15 × 2s = 30s, folga no maxDuration
+
+// O comentário que estava aqui — "15 × 2s = 30s, folga no maxDuration" — era
+// FICÇÃO: contava só o throttle e ignorava a ida à Graph API e os quatro
+// round-trips ao banco de cada iteração. MEDIDO nos deltas de sentinela_log em
+// 19/08/2026: envio_ok 4,13–4,61s (média 4,25s); envio_falha 2,82–3,87s
+// (média 3,42s), throttle JÁ incluído. 15 × 4,25 = 63,8s contra um teto de 60s
+// — o 504 estava escrito na aritmética desde o primeiro dia.
+const MAX_ENVIOS_POR_EXECUCAO = 15;
 const THROTTLE_MS = 2000;
+
+// Orçamento de relógio. `tetoMs` deriva de `maxDuration` — uma fonte só, para
+// que os dois não possam divergir em silêncio quando alguém mexer num deles.
+// `custoIteracaoMs` é o PIOR CASO medido (4,61s) arredondado para cima, e não a
+// média: dimensionar pela média deixa metade das iterações estourando o teto.
+// `reservaFinalMs` é o que sobra para `finalizar()` gravar o heartbeat — sem
+// ela, a varredura morre sem deixar bilhete, que é o pior dos dois mundos.
+const ORCAMENTO: Orcamento = {
+  tetoMs: maxDuration * 1000,
+  custoIteracaoMs: 5000,
+  reservaFinalMs: 3000,
+};
 const HORA_INICIO_SP = 9;
 const HORA_FIM_SP = 20; // exclusivo: 20h em diante não envia
 const DOMINGO = 0; // Date#getDay() em SP — ver diaSemanaSP()
@@ -149,6 +197,7 @@ export async function GET(req: Request) {
 
   const db = createXtvClient();
   const agora = new Date();
+  const iniciadoEm = Date.now();
   const resumo = {
     ok: true,
     dry_run: dryRun,
@@ -187,6 +236,23 @@ export async function GET(req: Request) {
     sem_template: false,
     fora_horario: false,
     domingo: false,
+    // TENTATIVAS-01 — o relógio, com o mesmo cuidado de nomes que a seção
+    // `fila` acima: número escrito com o nome errado foi o que pôs `15` no log
+    // como se fosse população.
+    //   teto_ms .................. o cinto (maxDuration), não o plano
+    //   orcamento_iteracoes ...... quantas iterações CABEM no pior caso medido
+    //   decorrido_ms ............. preenchido em finalizar(), não antes
+    //   interrompido_por_tempo ... a varredura PAROU por orçamento (não morreu)
+    //   nao_tratados_por_tempo ... quantos ficaram na página sem serem tocados.
+    //                              É o que distingue "parou e sobrou 9" de
+    //                              "parou e não sobrou ninguém".
+    tempo: {
+      teto_ms: ORCAMENTO.tetoMs,
+      orcamento_iteracoes: iteracoesQueCabem(ORCAMENTO),
+      decorrido_ms: 0,
+      interrompido_por_tempo: false,
+      nao_tratados_por_tempo: 0,
+    },
     detalhes: [] as Array<Record<string, unknown>>,
   };
 
@@ -203,6 +269,10 @@ export async function GET(req: Request) {
   // log carregando o resumo. É o que permite ao agente Sentinela (console)
   // auditar se o cron está vivo — ausência de heartbeat > 26h = cron morto.
   const finalizar = async () => {
+    // O decorrido é medido AQUI, no fecho, e não em cada ponto de saída: assim
+    // as três saídas antecipadas (sem_template, domingo, fora_horario) e o
+    // caminho completo assinam o mesmo número, medido do mesmo jeito.
+    resumo.tempo.decorrido_ms = Date.now() - iniciadoEm;
     const { detalhes: _d, ...resumoLog } = resumo;
     await log(null, "varredura_ok", resumoLog);
     return NextResponse.json(resumo);
@@ -394,7 +464,31 @@ export async function GET(req: Request) {
     return finalizar();
   }
 
-  for (const f of (aEnviar ?? []) as FilaRow[]) {
+  const paraEnviar = (aEnviar ?? []) as FilaRow[];
+  for (let i = 0; i < paraEnviar.length; i++) {
+    const f = paraEnviar[i];
+
+    // ORÇAMENTO — a guarda mora AQUI, no topo, e não no fim do laço. Entre o
+    // `sendTemplate` e o `update` que grava status:"enviado" existe uma janela
+    // em que a Meta JÁ ENTREGOU e a linha ainda não foi marcada; morrer ali faz
+    // a próxima varredura reenviar a mesma mensagem para a mesma pessoa.
+    // Subir o `maxDuration` só MUDA DE LUGAR essa janela. Quem a fecha é
+    // recusar-se a COMEÇAR uma iteração que não cabe.
+    //
+    // Parar assim é visível: o heartbeat sai com `interrompido_por_tempo` e com
+    // quantos ficaram para trás. O 504 não deixa bilhete nenhum.
+    if (!cabeMaisUmaIteracao(ORCAMENTO, Date.now() - iniciadoEm)) {
+      resumo.tempo.interrompido_por_tempo = true;
+      resumo.tempo.nao_tratados_por_tempo = paraEnviar.length - i;
+      await log(null, "interrompido_por_tempo", {
+        decorrido_ms: Date.now() - iniciadoEm,
+        teto_ms: ORCAMENTO.tetoMs,
+        tratados: i,
+        nao_tratados: paraEnviar.length - i,
+      });
+      break;
+    }
+
     const telefone = normalizarTelefoneBR(f.telefone);
     if (!telefone) {
       resumo.envios.pulados++;

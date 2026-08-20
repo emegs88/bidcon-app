@@ -470,6 +470,120 @@ export function vigiaQuarentenaReincidente(entrada: {
 }
 
 // ---------------------------------------------------------------------------
+// VIGIA 8 — o Sentinela ENVIA e a Meta recusa
+// AUTORIZADO: Emerson, 19/08/2026 — "vigia envio_falha >= N no Radar — 60
+// falhas em silêncio nunca mais".
+// ---------------------------------------------------------------------------
+//
+// O QUE ACONTECEU, E POR QUE NENHUM VIGIA VIU
+//
+// Entre 17 e 19/08/2026 a Meta recusou 75 envios com #132001 "Template name
+// does not exist in the translation". Cinco ciclos, quinze recusas cada, zero
+// entregues:
+//
+//   2026-08-17 12:00   falhas 15   entregues 0
+//   2026-08-17 18:00   falhas 15   entregues 0
+//   2026-08-18 12:00   falhas 15   entregues 0
+//   2026-08-18 18:00   falhas 15   entregues 0
+//   2026-08-19 12:00   falhas 15   entregues 0
+//
+// O VIGIA 5 estava de pé e ficou mudo o tempo todo — corretamente, aliás: ele
+// olha a IDADE da fila, e a fila não envelhecia, porque a varredura passava
+// por ela a cada seis horas. O sistema parecia trabalhar. Fazia barulho de
+// trabalho. Só não entregava nada.
+//
+// A lição, e ela é geral: vigiar a fila não é vigiar o envio. Uma fila que
+// gira e não entrega é indistinguível de uma fila saudável para quem só mede
+// idade.
+//
+// O LIMIAR, E POR QUE ELE NÃO NASCEU DO BANCO
+//
+// A doutrina da casa é tirar limiar de percentil do histórico — foi assim com
+// QUARENTENA_DISTINTAS_DIA (47) e HORAS_UTEIS_SEM_MOVIMENTO (20). Aqui não deu,
+// e o motivo é que a série medida é degenerada: `ciclos_com_envio 5 · min 15 ·
+// p50 15 · p90 15 · max 15 · ciclos_limpos 0`. TODO o histórico de envio deste
+// sistema é a própria pane. Não existe período saudável do qual extrair
+// normalidade, e fabricar um percentil de uma amostra sem variância seria
+// dar cara de estatística a um chute.
+//
+// Então o número é escolhido por PROPÓSITO, e isto fica escrito: ver
+// FALHAS_NO_CICLO abaixo.
+
+export const TIPO_ENVIO_SENTINELA = "sentinela_envio";
+export const CHAVE_ENVIO_FALHANDO = "falhando";
+
+/**
+ * TRÊS falhas no mesmo ciclo.
+ *
+ * Uma falha é rotina: número que não existe mais, pessoa que bloqueou, um
+ * timeout. Duas podem ser coincidência no mesmo segundo de instabilidade da
+ * Graph. Três, no mesmo ciclo, deixa de ser sobre as pessoas e passa a ser
+ * sobre nós — token, template, WABA, payload.
+ *
+ * O número precisa ser BAIXO por uma razão que o teto da janela impõe: a
+ * varredura envia no máximo 15 por execução (MAX_ENVIOS_POR_EXECUCAO), e à
+ * medida que a fila drena os ciclos ficam pequenos. Um limiar de 10 ou 15
+ * ficaria cego justamente no ciclo de 4 pessoas em que 4 falham — que é tão
+ * sistêmico quanto 15 de 15, e mais difícil de perceber.
+ */
+export const FALHAS_NO_CICLO = 3;
+
+/**
+ * Abre alerta quando o ciclo de envio do Sentinela falha em volume.
+ *
+ * REGRA 19 APLICADA NOS DOIS CONTADORES. `falhas` e `feitos` são
+ * `number | null`, e null é "não consegui medir", não zero:
+ *
+ *   `falhas === null`  ⇒ não julga. Um `?? 0` aqui faria a leitura falha
+ *                        virar "nenhuma falha" e o vigia calaria exatamente
+ *                        no dia em que o log não respondesse — que é um dia
+ *                        suspeito, não um dia limpo.
+ *
+ *   `feitos === null`  ⇒ julga as falhas, que FORAM medidas, mas não afirma
+ *                        "nada passou". A severidade cai para aviso e o null
+ *                        viaja visível no detalhe. Calar sobre 15 falhas
+ *                        medidas porque o outro contador não veio seria pior
+ *                        que a imprecisão da severidade.
+ *
+ * A SEVERIDADE separa duas coisas que a contagem crua confunde:
+ *
+ *   grave  — falhou o bastante E **nada saiu** (`feitos === 0`). É a
+ *            assinatura da pane sistêmica: o problema não é de quem recebe,
+ *            é do que mandamos. Foi este o caso dos cinco ciclos.
+ *
+ *   aviso  — falhou o bastante mas ALGO saiu. O canal funciona; o defeito é
+ *            por destinatário. Merece olhar, não merece acordar ninguém.
+ */
+export function vigiaEnvioSentinela(entrada: {
+  falhas: number | null;
+  feitos: number | null;
+  limite?: number;
+}): Alerta | null {
+  const { falhas, feitos, limite = FALHAS_NO_CICLO } = entrada;
+  if (falhas === null || !Number.isFinite(falhas)) return null;
+  if (falhas < limite) return null;
+
+  const nadaSaiu = feitos === 0;
+  const total = feitos === null || !Number.isFinite(feitos) ? null : feitos + falhas;
+  return {
+    tipo: TIPO_ENVIO_SENTINELA,
+    chave: CHAVE_ENVIO_FALHANDO,
+    severidade: nadaSaiu ? "grave" : "aviso",
+    titulo: nadaSaiu
+      ? `Sentinela: ${falhas} envios recusados e NENHUM entregue no ciclo`
+      : `Sentinela: ${falhas} envios recusados no ciclo` +
+        (total === null ? " (entregues não medidos)" : ` de ${total} tentados`),
+    detalhe: {
+      falhas,
+      // Viaja como null de propósito. Quem ler o alerta precisa distinguir
+      // "zero entregues" de "não sei quantos entregaram".
+      feitos: feitos === null || !Number.isFinite(feitos) ? null : feitos,
+      limite,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Todos os tipos que o RADAR pode abrir. O painel usa para agrupar. */
 export const TIPOS_RADAR = [
@@ -478,6 +592,7 @@ export const TIPOS_RADAR = [
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
+  TIPO_ENVIO_SENTINELA,
   TIPO_QUARENTENA,
 ] as const;
 

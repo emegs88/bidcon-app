@@ -5,10 +5,17 @@
 // Conectado do número + phone_number_id conferido na tela da Meta).
 import { NextResponse } from "next/server";
 
+import { WABA_SENTINELA } from "@/lib/whatsapp/template-sentinela";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const WABA_ID = "1569741627872302";
+// O literal saiu daqui para `lib/` em 19/08/2026. Não é arrumação: o arnês
+// varre `lib/` e só, então enquanto o número morasse nesta rota, um dedo
+// errado num dígito passaria pelos três portões e este instrumento passaria a
+// consultar OUTRA conta — respondendo "o template não existe" com toda a
+// segurança do mundo e mandando quem lê atrás da causa errada.
+const WABA_ID = WABA_SENTINELA;
 // Mesmo literal usado internamente por lib/whatsapp/graph.ts (GRAPH_VERSION,
 // não exportado de lá) — conferido, não inventado.
 const GRAPH_VERSION = "v21.0";
@@ -29,7 +36,12 @@ export async function GET(req: Request) {
   const name = new URL(req.url).searchParams.get("name");
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/${WABA_ID}/message_templates` +
-    `?fields=name,status,category,components&limit=50` +
+    // `language` É O CAMPO QUE O #132001 ACUSA. Sem ele nos fields, este
+    // instrumento respondia "o template existe" sem dizer em QUAL tradução —
+    // que é a única pergunta que decide a causa. Medido em 19/08/2026: 75
+    // envios recusados com "Template name does not exist in the translation",
+    // e a rota que existe para diagnosticar isso não pedia a tradução.
+    `?fields=name,language,status,category,components&limit=50` +
     (name ? `&name=${encodeURIComponent(name)}` : "");
 
   const resp = await fetch(url, {
