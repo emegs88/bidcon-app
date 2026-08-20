@@ -664,6 +664,198 @@ apague o registro de que houve erro — mesmo procedimento de L-0080-D.
 
 ---
 
+## BLOCO 10 — A 0086, E O QUE O LEDGER ANDOU DEPOIS DE 17/08
+
+Append-only como os anteriores: **nenhuma linha acima foi tocada.** Cada item diz
+qual linha corrige.
+
+O ledger tinha **87** entradas em 17/08/2026. Hoje, 19/08/2026, tem **92**. As
+cinco novas são o assunto deste bloco — e uma delas não é da 0086.
+
+```
+20260818000743  0084_buscar_cartas_entrada_max
+20260818003849  agenda_01_agendamentos
+20260818003935  agenda_01_touch_security_invoker
+20260819232113  0086a_agendamentos_reconciliacao_enum
+20260819232141  0086b_agendamentos_delta
+```
+
+### L-DIV-0086 · A QUINTA DIVISÃO a/b — corrige BLOCO 2 e BLOCO 3
+
+**Corrige:** a frase do BLOCO 0 *"**4 divisões a/b** (mesmo assunto partido)"*, a
+lista do BLOCO 2 (que enumera 0023, 0024, 0081, 0083) e a linha do BLOCO 3
+*"### Divisões a/b … : 4"*. **São 5.**
+
+**L-DIV-0086** · `0086a_agendamentos_reconciliacao_enum` @20260819232113 +
+`0086b_agendamentos_delta` @20260819232141 · **28 segundos de diferença**, na
+ordem certa (o `a` antes do `b`, ao contrário de L-DIV-0024) → um arquivo,
+`platform/supabase/migrations/0086_agendamentos.sql` ·
+
+*Motivo:* **MEDIDO, e é o mesmo defeito do Postgres de L-DIV-0081 e L-DIV-0083.**
+A SEÇÃO 1 do arquivo (linha 245) faz
+`alter type agenda_status add value if not exists 'reservando' before 'pendente'`
+e a SEÇÃO 2.2 **usa** esse valor, ao reconstruir a constraint de exclusão. Uso do
+valor novo na mesma transação que o cria = `55P03`. Por isso o apply foi partido.
+O arquivo **não** foi partido, pelo mesmo motivo já registrado em L-DIV-0081:
+*"partir em dois arquivos faria a numeração mentir sobre quantas migrações
+existem"*.
+
+**O que esta divisão tem de diferente das quatro anteriores, e vale registrar:**
+em 0023, 0024, 0081 e 0083 o motivo foi *reconstruído depois*, lendo o arquivo —
+e em 0023 e 0024 não foi reconstruído coisa nenhuma (*"não determinado"*). Aqui o
+motivo foi **escrito no cabeçalho antes do apply**, junto com a ordem das duas
+metades. É a primeira divisão a/b deste banco que nasce declarada em vez de
+deduzida.
+
+### L-NOME-0086 · AS DUAS METADES TÊM ARQUIVO COM OUTRO NOME — complementa BLOCO 4
+
+**Complementa** a tabela do BLOCO 4, que tinha 13 linhas e passa a ter 15. Não
+corrige nada: nenhuma daquelas 13 estava errada.
+
+| ledger | arquivo no repo | como foi casado |
+|---|---|---|
+| `0086a_agendamentos_reconciliacao_enum` | `0086_agendamentos.sql` | assunto (metade a — L-DIV-0086) |
+| `0086b_agendamentos_delta` | `0086_agendamentos.sql` | assunto (metade b — L-DIV-0086) |
+
+Diferença em relação a 0081/0083: lá **só a metade `b`** divergia do nome do
+arquivo (a metade `a` também, mas o BLOCO 4 só registrou a `b`). Aqui **as duas**
+divergem, porque nenhuma das duas repete o assunto do arquivo (`agendamentos`
+seco). Fica registrado para que a próxima busca por *"cadê o arquivo da 0086a"*
+termine aqui.
+
+### L-AGENDA-01 · AS DUAS `agenda_01_*` DE 18/08 — a linha nasce aqui, não é anotada
+
+A ordem que gerou este bloco pedia que *"a linha das duas órfãs `agenda_01_*` de
+18/08 ganhe a nota «reconciliadas pela 0086a»"*. **Essa linha não existia.** Não
+por esquecimento: este documento foi medido em **17/08/2026** e as duas entradas
+foram aplicadas em **18/08/2026 00:38:49 e 00:39:35** — um dia depois. Elas nunca
+puderam estar no BLOCO 5, e o BLOCO 5 não fica errado por não as ter. **Anotar
+uma linha que não existe seria inventar histórico; a linha nasce agora.**
+
+**L-AGENDA-01** · `agenda_01_agendamentos` @20260818003849 +
+`agenda_01_touch_security_invoker` @20260818003935 ·
+**SEM NÚMERO** — assinatura de apply direto por MCP/painel, o mesmo padrão dos 13
+do BLOCO 5 ·
+**RECONCILIADAS PELA 0086a** em 19/08/2026 23:21:13.
+
+*O que "reconciliada" quer dizer aqui, com precisão:* a SEÇÃO 0 do
+`0086_agendamentos.sql` é a **construtora** dos objetos que essas duas entradas
+já haviam criado à mão. Ela não os altera — ela passa a **descrevê-los**, para que
+um ambiente novo nasça igual ao xtv. Medido objeto a objeto em 19/08/2026, antes
+do apply:
+
+| objeto da SEÇÃO 0 | vivo no xtv antes do apply | efeito da SEÇÃO 0 |
+|---|---|---|
+| `type agenda_status` | 6 valores idênticos | do-block pula |
+| `table agendamentos` | existe, 20 colunas, uma a uma iguais ao `create table` | `if not exists` pula |
+| `agendamentos_sem_sobreposicao` | existe, predicado idêntico | do-block pula |
+| 2 índices únicos + 4 índices | existem, `indexdef` idêntico | `if not exists` pula |
+| `table agenda_log` + 2 índices | existem | pula |
+| RLS nas duas | ligada, **zero policies** | já era o desenho |
+| `tg_agendamentos_touch` | `prosecdef=false`, `search_path=''` | `or replace` idêntico |
+| `trigger agendamentos_touch` | mesmo nome, mesmo corpo | `or replace` idêntico |
+
+**Só dois comandos da SEÇÃO 0 escrevem, e os dois são `or replace` que produzem
+objeto idêntico ao que já estava lá.** O conserto de segurança que a
+`agenda_01_touch_security_invoker` fez em 18/08 (tirar o `security definer` e
+fixar `search_path`) **não regride** — a SEÇÃO 0 o reescreve igual. É por isso
+que o cabeçalho pôde declarar *"no-op no xtv e construtora em qualquer ambiente
+novo"*, e é isso que a medição confirma.
+
+**Uma consequência que fica:** as duas `agenda_01_*` continuam **sem arquivo
+próprio**, e continuarão. O arquivo delas é o `0086_agendamentos.sql`, por
+adoção, não por origem. Quem procurar `agenda_01_agendamentos.sql` não vai achar
+— e é para isso que esta linha existe.
+
+### L-ARQ-0084-B · A 0084 FOI APLICADA — corrige L-ARQ-0084 (BLOCO 6)
+
+**Corrige** a linha *"**L-ARQ-0084** · `0084_buscar_cartas_entrada_max.sql` ·
+**corretamente ausente** do ledger… **Não foi aplicada, e não devia ter sido:
+aguarda ordem.** Esta linha existe para que a ausência dela conste como esperada,
+e não seja «descoberta» como defeito daqui a um mês."*
+
+Não fez um mês: fez **dois dias**. Ela foi aplicada em **18/08/2026 00:07:43**.
+
+**O controle que a própria L-ARQ-0084 escreveu disparou.** Ela mandava medir
+`select count(*) from pg_proc where proname='buscar_cartas' and pronargs=6`, e
+registrava o resultado de 17/08 como **0**. Medido de novo em 19/08/2026:
+
+```
+buscar_cartas com 6 argumentos ...... 1     (era 0 em 17/08)
+buscar_cartas com qualquer aridade .. 1
+aridades existentes ................. 6
+```
+
+A aridade 6 é a única que existe — ou seja, a função de 6 argumentos não convive
+com uma anterior, **substituiu**. Não há sobrecarga velha pendurada.
+
+**O que esta linha NÃO afirma:** que a aplicação foi indevida. L-ARQ-0084 dizia
+*"aguarda ordem"*, e **se a ordem veio, este documento não a viu** — ordem chega
+por chat, não por banco. O que a medição estabelece é só o fato e a data. Fica
+como pedido nº 8.
+
+*Registro do que isto ensina sobre o próprio documento:* L-ARQ-0084 é a única
+linha do ledger inteiro que foi escrita **prevendo o próprio disparo** — ela
+anotou o comando e o valor esperado, e por isso a mudança foi detectável em uma
+consulta, sem investigação. Todas as outras ausências do BLOCO 5 estão anotadas
+sem controle: se qualquer uma delas ganhar arquivo ou efeito amanhã, nada avisa.
+
+### L-VIGIA-ZERO · O ZERO DO VIGIA É O ZERO DA MESA VAZIA
+
+A pós-checagem do apply mediu `agenda_orfaos_google()` → **0 órfãos**, e o número
+está certo. **Ele não prova que o vigia funciona.**
+
+```
+agendamentos ........ 0 linhas
+agenda_log .......... 0 linhas
+agenda_orfaos_google() → 0
+```
+
+Uma função que varre uma tabela vazia devolve zero **por construção**, tenha ela
+lógica ou não. Pela regra da casa — *todo zero afirmado precisa de um controle
+que possa disparar* — este zero é **não informativo**, e fica declarado como tal
+em vez de contado como aprovação.
+
+O que **foi** verificado, por leitura do corpo e não por execução: a função tem
+dois braços reais (`reserva_expirada` para `status='reservando'` com
+`reserva_expira_em < now()`, e `pendente_sem_evento` para `status='pendente'` sem
+`google_event_id` além da carência), é `STABLE`, **não** é `security definer`,
+tem `search_path='public'` e a ACL é `postgres` + `service_role` — nem `anon` nem
+`authenticated`.
+
+**O controle que falta**, para quando houver ordem: inserir uma linha em
+`'reservando'` com `reserva_expira_em` no passado, confirmar que a função devolve
+**1**, e remover. Sem isso, o vigia está escrito e **nunca foi visto detectar
+nada**. Não executei: escrever em produção é ato, e não houve ordem.
+
+### L-RESERVA-SEGURA · O QUE A 0086b MUDOU NO RISCO DA GRADE
+
+Medido depois do apply:
+
+```
+enum ..... reservando < pendente < confirmado < cancelado < realizado < nao_compareceu < erro
+EXCLUDE .. tstzrange(inicio_em, fim_em, '[)') WITH &&
+           WHERE status IN ('reservando','pendente','confirmado')
+CHECK .... status <> 'reservando' OR reserva_expira_em IS NOT NULL
+colunas .. 20 -> 23
+```
+
+A constraint de exclusão agora **segura o horário durante a reserva** — que é a
+trava 3 inteira, e a razão de o `'reservando'` ter entrado **antes** do
+`'pendente'` na ordem do enum.
+
+**O efeito colateral que isso cria, e que precisa de dono:** uma reserva que
+morreu no meio do caminho **bloqueia o horário** enquanto estiver em
+`'reservando'`, e o `CHECK` garante que ela tem prazo, mas **nada faz o prazo
+vencer sozinho**. A `agenda_orfaos_google()` **detecta** e não age — desvio já
+declarado no cabeçalho da 0086 (o RADAR é dono do ciclo de vida do alerta, porque
+`agenda_log` não tem `resolvido_em`). Ou seja: **enquanto não existir o varredor
+que expira reserva, um horário perdido some da grade e ninguém é avisado.** Esse
+varredor é o item `RESERVA-EXPIRA-01` da fila, e esta linha existe para que a
+ligação entre os dois não se perca.
+
+---
+
 ## O QUE ESTE DOCUMENTO NÃO AUTORIZA
 
 - **Não reescrever o ledger.** Nenhum `insert`, `update` ou `delete` em
@@ -746,6 +938,29 @@ e as duas coisas ficam ditas:
 sozinha se a decisão 4 for mover"*. A decisão foi **não mover**, então **o
 pedido 6 continua aberto** e não some sozinho.
 
+**Acrescentados em 19/08/2026** (append: nenhum item acima foi reescrito):
+
+8. **A `0084_buscar_cartas_entrada_max` foi aplicada em 18/08/2026 00:07:43, e
+   L-ARQ-0084 dizia «aguarda ordem».** A ordem existiu? Este documento só vê o
+   banco; ordem chega por chat. **Decisão pedida:** confirmar que houve ordem — e,
+   se houve, L-ARQ-0084-B basta como registro. Se não houve, o que fica em aberto
+   não é a migration (ela está aplicada e a aridade 6 é a única que existe), é
+   **como uma migration marcada «não aplicar» foi aplicada**. Nada a desfazer foi
+   proposto aqui.
+
+9. **Os 38 casos de ausência do BLOCO 5 não têm controle.** L-ARQ-0084 disparou
+   sozinha porque foi a única linha escrita com o comando e o valor esperado ao
+   lado. As outras ausências estão anotadas em prosa: se qualquer uma ganhar
+   arquivo ou efeito amanhã, **nada avisa**. **Decisão pedida:** vale escrever o
+   controle das 38, ou o custo não paga? Não escrevi nenhum — é trabalho, e
+   trabalho precisa de ordem.
+
+10. **O vigia `agenda_orfaos_google()` nunca foi visto detectar nada**
+    (L-VIGIA-ZERO). O zero medido é o zero de uma tabela vazia. **Decisão
+    pedida:** autorizar o controle (inserir uma reserva vencida, conferir que a
+    função devolve 1, remover), ou deixar o vigia sem prova até o primeiro
+    agendamento real. Escrever em produção é ato; nada foi executado.
+
 ---
 
 ## REGISTRO DE ALTERAÇÕES (append-only)
@@ -795,3 +1010,27 @@ pedido 6 continua aberto** e não some sozinho.
   **Nenhuma linha anterior foi tocada.** As afirmações erradas continuam
   legíveis onde foram escritas, cada uma com a linha que a corrige apontando
   para ela.
+- **19/08/2026** — **BLOCO 10**, escrito depois do apply da 0086 (ordem nominal,
+  aplicada pela coordenação por MCP às 23:21:13 e 23:21:41 UTC). O ledger foi de
+  **87 para 92** entradas. O que este bloco acrescenta e corrige:
+  1. **L-DIV-0086** corrige BLOCO 0, BLOCO 2 e BLOCO 3 — as divisões a/b passam
+     de **4 para 5**. É a primeira cujo motivo do enum foi **declarado antes** do
+     apply, e não reconstruído depois.
+  2. **L-NOME-0086** complementa BLOCO 4 — de 13 para **15** entradas com nome
+     divergente do arquivo. Aqui **as duas** metades divergem, não só a `b`.
+  3. **L-AGENDA-01** cria a linha das duas `agenda_01_*` de 18/08 e a marca
+     **reconciliadas pela 0086a**, com a tabela objeto-a-objeto que sustenta o
+     "no-op no xtv". *A ordem pedia para ANOTAR essa linha; ela não existia —
+     este documento é de 17/08 e as entradas são de 18/08. Anotar linha
+     inexistente seria inventar histórico, então ela nasce, datada.*
+  4. **L-ARQ-0084-B** corrige L-ARQ-0084 — a 0084 **foi aplicada** em 18/08, e o
+     controle que aquela própria linha escreveu disparou (`pronargs=6`: 0 → 1).
+     Gera o pedido nº 8.
+  5. **L-VIGIA-ZERO** declara que os "0 órfãos" da pós-checagem são o zero de uma
+     **tabela vazia** — número certo, prova nenhuma. Gera o pedido nº 10.
+  6. **L-RESERVA-SEGURA** registra o que a 0086b mudou no risco da grade, e liga
+     a reserva órfã ao item `RESERVA-EXPIRA-01`, que ainda não existe.
+  7. Criados os pedidos **8, 9 e 10**. O nº 9 nasce de uma observação sobre este
+     documento: das 38 ausências do BLOCO 5, **nenhuma tem controle**; a única
+     linha que tinha (L-ARQ-0084) foi a única que avisou sozinha.
+  **Nenhuma linha anterior foi tocada.**
