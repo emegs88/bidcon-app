@@ -584,6 +584,124 @@ export function vigiaEnvioSentinela(entrada: {
 }
 
 // ---------------------------------------------------------------------------
+// VIGIA 9 — HANDOFF MUDO: o bastão passou e ninguém pegou
+// AUTORIZADO: coordenação, 21/08/2026 — HANDOFF-01 item (c).
+// ---------------------------------------------------------------------------
+//
+// A CONDIÇÃO
+//
+// `wa_conversas.agente_ativo` foi trocado, algum agente de conversa já havia
+// falado, e o agente que está ativo AGORA nunca falou uma linha. O cliente ficou
+// olhando para a última fala de quem se despediu. Ninguém do outro lado.
+//
+// Isto é dinheiro parado, não higiene: cada linha aqui é uma pessoa que pediu
+// alguma coisa e foi transferida para o silêncio.
+//
+// POR QUE CHAVE ÚNICA DE VOLUME, E NÃO UMA POR CONVERSA
+//
+// Medido em 21/08 em produção: 16 conversas neste estado. O painel corta em 12
+// linhas (`TETO_LINHAS` em RadarAlertas.tsx). Uma chave por conversa abriria 16
+// alertas de uma vez e empurraria os outros oito vigias para fora da tela —
+// dívida histórica apagando a vigilância corrente. Um alerta, contagem no
+// título, quebra por agente no detalhe. Mesmo padrão de CHAVE_QUARENTENA_VOLUME.
+//
+// O LIMIAR É 1, E ISSO NÃO É PREGUIÇA DE MEDIR
+//
+// Em quarentena e em estoque o limiar sai de percentil porque existe um volume
+// NORMAL: quarentenar cartas é o sistema funcionando. Aqui não existe volume
+// normal. A abertura ativa do handoff leva segundos; qualquer conversa parada
+// neste estado por mais de meia hora é defeito, não ritmo. O valor saudável é
+// zero, e um percentil de uma série cujo valor saudável é zero não é
+// estatística, é enfeite. Declarado, como em FALHAS_NO_CICLO.
+//
+// O QUE A MEDIÇÃO DE HOJE DIZ SOBRE O CORTE DE 30 MINUTOS
+//
+// Nenhuma das 16 é recente: a mais nova tem 49,7h e a mais velha 384,3h
+// (valentina 10 · caetano 3 · tobias 2 · bento 1). Ou seja, hoje o corte de
+// meia hora não separa nada — todas passam. Ele fica assim mesmo, porque é a
+// definição certa da condição e porque, depois que a abertura ativa entrar no
+// ar, é justamente ele que vai distinguir "acabou de passar o bastão" de
+// "passou e morreu".
+
+export const TIPO_HANDOFF = "handoff";
+export const CHAVE_HANDOFF_MUDO = "mudo";
+
+/**
+ * Minutos que uma conversa pode ficar com agente novo calado antes de contar.
+ *
+ * Vive aqui, e não solto na consulta, porque quem MEDE (a rota de varredura) e
+ * quem JULGA (esta função) precisam concordar no mesmo número. Se a consulta
+ * filtrar 30 e o título disser 60, o alerta mente sobre a própria régua.
+ */
+export const MINUTOS_HANDOFF_MUDO = 30;
+
+/** Conversas mudas a partir das quais o vigia abre. Ver o bloco acima. */
+export const HANDOFF_MUDO_MINIMO = 1;
+
+/** Horas de espera a partir das quais deixa de ser aviso e vira grave. */
+export const HORAS_HANDOFF_GRAVE = 24;
+
+export function vigiaHandoffMudo(entrada: {
+  /**
+   * Conversas com agente ativo que nunca falou, já filtradas por
+   * MINUTOS_HANDOFF_MUDO. `null` = NÃO CONSEGUI MEDIR (Regra 19): a leitura
+   * falhou. Um `?? 0` aqui transformaria banco mudo em "nenhuma conversa
+   * parada" — e o chamador ainda fecharia o alerta legítimo que estivesse
+   * aberto, porque teria marcado a condição como julgada.
+   */
+  mudas: number | null;
+  /** Idade da mais antiga, em horas. `null` quando não medida. */
+  maisAntigaHoras: number | null;
+  /** Quebra por agente que ficou parado. Só detalhe; não entra no julgamento. */
+  porAgente?: Readonly<Record<string, number>>;
+  limite?: number;
+  horasGrave?: number;
+}): Alerta | null {
+  const {
+    mudas,
+    maisAntigaHoras,
+    porAgente,
+    limite = HANDOFF_MUDO_MINIMO,
+    horasGrave = HORAS_HANDOFF_GRAVE,
+  } = entrada;
+  if (mudas === null || !Number.isFinite(mudas)) return null;
+  if (mudas < limite) return null;
+
+  // Idade não medida NÃO promove a grave: severidade alta precisa de prova.
+  const velha =
+    maisAntigaHoras !== null &&
+    Number.isFinite(maisAntigaHoras) &&
+    maisAntigaHoras >= horasGrave;
+
+  const sufixo =
+    maisAntigaHoras === null || !Number.isFinite(maisAntigaHoras)
+      ? " (idade da mais antiga não medida)"
+      : ` — a mais antiga há ${Math.floor(maisAntigaHoras)}h`;
+
+  return {
+    tipo: TIPO_HANDOFF,
+    chave: CHAVE_HANDOFF_MUDO,
+    severidade: velha ? "grave" : "aviso",
+    titulo: `${mudas} conversa(s) com agente novo que nunca falou${sufixo}`,
+    detalhe: {
+      mudas,
+      // null viaja visível: "zero horas" e "não sei há quanto tempo" são coisas
+      // diferentes, e quem lê o alerta precisa poder distinguir.
+      mais_antiga_horas:
+        maisAntigaHoras === null || !Number.isFinite(maisAntigaHoras)
+          ? null
+          : Math.floor(maisAntigaHoras),
+      minutos_minimos: MINUTOS_HANDOFF_MUDO,
+      limite,
+      horas_grave: horasGrave,
+      ...(porAgente && Object.keys(porAgente).length > 0
+        ? { por_agente: porAgente }
+        : {}),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Todos os tipos que o RADAR pode abrir. O painel usa para agrupar. */
 export const TIPOS_RADAR = [
@@ -594,6 +712,7 @@ export const TIPOS_RADAR = [
   TIPO_FILA_SENTINELA,
   TIPO_ENVIO_SENTINELA,
   TIPO_QUARENTENA,
+  TIPO_HANDOFF,
 ] as const;
 
 export type { Limiar };

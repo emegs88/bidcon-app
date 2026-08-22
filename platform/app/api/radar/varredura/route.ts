@@ -74,18 +74,22 @@ import {
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
   CHAVE_FAROL_SEM_PUBLICAR,
   CHAVE_FILA_ENVELHECENDO,
+  CHAVE_HANDOFF_MUDO,
   CHAVE_QUARENTENA_VOLUME,
+  MINUTOS_HANDOFF_MUDO,
   TIPO_AMOSTRA,
   TIPO_DIVERGENCIA,
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
+  TIPO_HANDOFF,
   TIPO_QUARENTENA,
   vigiaDivergenciaSync,
   vigiaEstoqueNivel,
   vigiaEstoqueSemMovimento,
   vigiaFarolSemPublicar,
   vigiaFilaSentinela,
+  vigiaHandoffMudo,
   vigiaProvaAmostra,
   vigiaQuarentenaReincidente,
   vigiaQuarentenaVolume,
@@ -344,6 +348,61 @@ export async function GET(req: Request) {
     .is("resolvido_em", null);
   if (errQuarAbertos) avisos.push(`radar_alertas quarentena: ${errQuarAbertos.message}`);
 
+  // --- 1g. handoff mudo (HANDOFF-01 item c) ------------------------------
+  //
+  // POR QUE RPC E NÃO CONSULTA AQUI: a condição é "o agente que está ativo
+  // AGORA já falou alguma vez NESTA thread?" — subconsulta correlacionada por
+  // conversa, que o PostgREST não expressa. A alternativa era puxar
+  // wa_conversas e wa_mensagens inteiras para cá e cruzar na memória, o que
+  // cresce com o histórico e um dia estoura o `maxDuration` da varredura. Ver
+  // supabase/migrations/0089_radar_handoff_mudo.sql.
+  //
+  // SE A 0089 NÃO ESTIVER APLICADA neste banco, o PostgREST devolve erro de
+  // função inexistente. Isso cai em `avisos`, a condição NÃO é marcada como
+  // julgada e a fase 3 não fecha nada por conta dela. É o mesmo princípio do
+  // bloco "tabela não existe" de RadarAlertas.tsx: ausência de alerta por
+  // ausência de instrumento não pode se parecer com boa notícia.
+  const { data: handoff, error: errHandoff } = await db.rpc("radar_handoff_mudo", {
+    p_minutos: MINUTOS_HANDOFF_MUDO,
+  });
+  if (errHandoff) avisos.push(`radar_handoff_mudo: ${errHandoff.message}`);
+
+  // `returns table` chega como array de uma linha.
+  const handoffLinha =
+    (
+      handoff as
+        | {
+            mudas: number | null;
+            mais_antiga_horas: number | string | null;
+            por_agente: Record<string, number> | null;
+          }[]
+        | null
+    )?.[0] ?? null;
+
+  /* Regra 19 outra vez, e aqui ela é literal: `mudas` só vale se veio número de
+   * uma leitura sem erro. Sem essa guarda, RPC ausente ou falha de rede viraria
+   * `0` — o veredito "nenhuma conversa muda" —, a condição seria marcada como
+   * julgada e a fase 3 FECHARIA um alerta legítimo. A falha de leitura teria
+   * apagado o alerta que ela deveria ter aberto. */
+  const handoffMudas: number | null =
+    !errHandoff && typeof handoffLinha?.mudas === "number" ? handoffLinha.mudas : null;
+
+  /* `numeric` pode chegar como string dependendo do serializador; `Number` em
+   * cima e checagem de finitude, porque NaN aqui promoveria a severidade por
+   * acidente — e severidade alta sem prova é exatamente o que o vigia recusa.
+   * Null é o estado NORMAL quando `mudas = 0`: max() de conjunto vazio. */
+  const handoffHorasCru =
+    handoffLinha?.mais_antiga_horas === null || handoffLinha?.mais_antiga_horas === undefined
+      ? null
+      : Number(handoffLinha.mais_antiga_horas);
+  const handoffHoras: number | null =
+    handoffHorasCru !== null && Number.isFinite(handoffHorasCru) ? handoffHorasCru : null;
+
+  const handoffPorAgente =
+    handoffLinha?.por_agente && typeof handoffLinha.por_agente === "object"
+      ? handoffLinha.por_agente
+      : null;
+
   // =========================================================================
   // FASE 2 — JULGAR. Daqui para baixo, nenhuma linha toca o banco.
   // =========================================================================
@@ -493,6 +552,27 @@ export async function GET(req: Request) {
     }
   }
 
+  // 7. handoff mudo — o bastão passou e o agente novo nunca abriu a boca.
+  //
+  // CHAVE ÚNICA DE VOLUME, e não uma por conversa. Medido em 21/08/2026 são 16
+  // conversas neste estado; o painel corta em TETO_LINHAS = 12
+  // (app/admin/RadarAlertas.tsx), então uma chave por conversa empurraria os
+  // outros vigias para fora da tela por dívida histórica. Um alerta que apaga
+  // os outros alertas é pior do que nenhum.
+  //
+  // `marcar()` DEPOIS da guarda, pelo mesmo motivo do FAROL logo acima.
+  if (handoffMudas !== null) {
+    marcar(TIPO_HANDOFF, CHAVE_HANDOFF_MUDO);
+    const a = vigiaHandoffMudo({
+      mudas: handoffMudas,
+      maisAntigaHoras: handoffHoras,
+      porAgente: handoffPorAgente ?? undefined,
+    });
+    if (a) alertas.push(a);
+  } else {
+    avisos.push("handoff_mudo: nao julgado (radar_handoff_mudo indisponivel)");
+  }
+
   // =========================================================================
   // FASE 3 — GRAVAR
   // =========================================================================
@@ -576,6 +656,13 @@ export async function GET(req: Request) {
       // quer dizer "não julgado" — erro de leitura ou saturação —, nunca zero.
       quarentena_cartas_distintas_24h: quarDistintas,
       quarentena_eventos_24h: quarEventos,
+      // Mesmo par do FAROL: a contagem sozinha não distingue "nenhuma muda" de
+      // "não medi", porque as duas dariam null aqui. `julgado` diz qual foi.
+      handoff_mudo_conversas: handoffMudas,
+      handoff_mudo_julgado: handoffMudas !== null,
+      handoff_mudo_mais_antiga_horas:
+        handoffHoras === null ? null : Math.floor(handoffHoras),
+      handoff_mudo_minutos: MINUTOS_HANDOFF_MUDO,
     },
     alertas: alertas.map((a) => ({
       tipo: a.tipo,
