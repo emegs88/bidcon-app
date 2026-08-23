@@ -22,6 +22,7 @@ import {
   deveEscalarAntiLoop,
   comAberturaDeHandoff,
   NOTA_ABERTURA_HANDOFF,
+  terminaEmUser,
   type MensagemApi,
 } from "./cerebro";
 
@@ -198,4 +199,92 @@ test("HANDOFF (a) — a nota se ANUNCIA como nota e se manda calar sobre si mesm
   assert.ok(n.includes("não é uma mensagem do cliente"), "não se anuncia como nota");
   assert.ok(n.includes("não mencione esta nota"), "não se manda calar sobre si mesma");
   assert.ok(n.includes("primeira mensagem"), "não pede a abertura");
+});
+
+// ----------------------------------------------------------------------------
+// PREFILL — o histórico entregue à Anthropic tem que TERMINAR em `user`.
+//
+// Contexto medido: montarMensagensWa garante que a PRIMEIRA mensagem é `user`
+// (`while (msgs.length && msgs[0].role !== "user") msgs.shift()`), mas nada
+// nunca garantiu a ÚLTIMA. O modelo em uso (claude-fable-5) não aceita
+// prefill: um array terminando em `assistant` volta 400 "conversation must end
+// with a user message" — turno perdido, cliente sem resposta.
+//
+// A correção de 2026-07-21 (DESC + limit(30) + reverse) atacou a CAUSA mais
+// comum (truncamento), não a FORMA. Caminhos vivos que ainda terminam em
+// `assistant`: conversa onde a casa falou por último e ninguém respondeu (ex.:
+// 7109b701, `ultimo_papel='prosperito'`, 76h parada), toque do Sentinela
+// reprocessado, e retry de background depois da resposta já gravada.
+//
+// terminaEmUser é PURA de propósito: não corta, não loga, não decide. Só
+// responde. Cortar a última fala do agente faria o modelo RESPONDER DE NOVO
+// uma mensagem que ele já respondeu — o cliente receberia a mesma coisa duas
+// vezes. Recusar e logar é o comportamento correto.
+// ----------------------------------------------------------------------------
+test("PREFILL — histórico que termina em user é aceito", () => {
+  assert.equal(
+    terminaEmUser([
+      { role: "user", content: "oi" },
+      { role: "assistant", content: "olá" },
+      { role: "user", content: "quero uma carta" },
+    ]),
+    true
+  );
+});
+
+test("PREFILL — histórico que termina em assistant é RECUSADO (é o 400 da Anthropic)", () => {
+  assert.equal(
+    terminaEmUser([
+      { role: "user", content: "oi" },
+      { role: "assistant", content: "olá, posso ajudar?" },
+    ]),
+    false
+  );
+});
+
+test("PREFILL — lista vazia é falsa: nada a responder não é 'pode chamar'", () => {
+  // Regra 19: vazio e válido não podem colapsar no mesmo valor. Um array vazio
+  // não termina em `user`, então a resposta honesta é false.
+  assert.equal(terminaEmUser([]), false);
+});
+
+test("PREFILL — um único user basta (primeira mensagem da conversa)", () => {
+  assert.equal(terminaEmUser([{ role: "user", content: "oi" }]), true);
+});
+
+test("PREFILL — um único assistant é recusado (a casa abriu e ninguém respondeu)", () => {
+  assert.equal(terminaEmUser([{ role: "assistant", content: "oi, tudo bem?" }]), false);
+});
+
+test("PREFILL — só a ÚLTIMA posição decide, não quantas de cada papel existem", () => {
+  const muitosUsers: MensagemApi[] = [
+    { role: "user", content: "a" },
+    { role: "user", content: "b" },
+    { role: "user", content: "c" },
+    { role: "assistant", content: "resposta" },
+  ];
+  assert.equal(terminaEmUser(muitosUsers), false);
+});
+
+test("PREFILL — a nota de handoff FECHA o array em user (por isso a guarda vem depois dela)", () => {
+  // comAberturaDeHandoff acrescenta uma mensagem `user` ao fim. Se a guarda
+  // rodasse ANTES dela, este caso legítimo seria recusado e o handoff nunca
+  // abriria a boca.
+  const antesDoHandoff: MensagemApi[] = [
+    { role: "user", content: "oi" },
+    { role: "assistant", content: "olá" },
+  ];
+  assert.equal(terminaEmUser(antesDoHandoff), false);
+  assert.equal(terminaEmUser(comAberturaDeHandoff(antesDoHandoff)), true);
+});
+
+test("PREFILL — terminaEmUser NÃO altera o array que recebe", () => {
+  const original: MensagemApi[] = [
+    { role: "user", content: "oi" },
+    { role: "assistant", content: "olá" },
+  ];
+  const copia = JSON.stringify(original);
+  terminaEmUser(original);
+  assert.equal(JSON.stringify(original), copia);
+  assert.equal(original.length, 2);
 });

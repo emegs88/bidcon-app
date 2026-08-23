@@ -60,6 +60,7 @@ import {
 import { statusVenda, resultadoParaToolStatusVenda } from "@/lib/venda-nova/status-venda-tool";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { sanitizarUtm } from "@/lib/utm";
+import { desambiguarPorValores } from "@/lib/carta-identidade";
 
 export const dynamic = "force-dynamic";
 
@@ -275,6 +276,28 @@ function nomeAdministradora(
   return a.nome ?? null;
 }
 
+// Linha de `cartas` do jeito exato que o SELECT da reserva a pede. Fica
+// nomeada porque o caminho por `id` e o caminho por `numero_externo` devolvem
+// formas diferentes do PostgREST (um objeto vs. uma lista) e precisam
+// convergir para o MESMO tipo antes do passo 4b.
+type LinhaCartaReserva = {
+  id: string;
+  tipo: string;
+  valor_credito: number;
+  valor_entrada: number;
+  valor_parcela: number;
+  qtd_parcelas: number;
+  administradora_raw: string | null;
+  administradora: { nome: string | null } | { nome: string | null }[] | null;
+};
+
+// Teto de homônimas trazidas do banco quando a busca é por numero_externo.
+// MEDIDO no xtv em 23/08/2026, entre as cartas `status='disponivel'`: a maior
+// colisão sob um mesmo número é 2 (975 números repetidos, todos com exatamente
+// duas linhas). 10 é folga deliberada — se um dia a importação piorar, o
+// desempate ainda vê o grupo inteiro em vez de recortá-lo e escolher errado.
+const TETO_HOMONIMAS = 10;
+
 // RESERVA-01 — trava real de carta via chat (TTL 48h), acionada só pelo
 // marcador [[RESERVAR]] emitido pela Serena (ver _prompt.ts) após confirmação
 // explícita do cliente.
@@ -326,21 +349,67 @@ async function processarReservaCarta(
       )
       .eq("status", "disponivel")
       .gt("valor_credito", 0);
-    const { data: cartaDb, error: erroCarta } = await (porId
-      ? baseQuery.eq("id", cartaFoco.id as string)
-      : baseQuery.eq("numero_externo", refFoco)
-    ).maybeSingle();
-    if (erroCarta) {
-      console.error("[atende] reserva: erro ao buscar carta:", erroCarta);
-      return FRASE_RESERVA_ESCALONAR;
+
+    let cartaDb: LinhaCartaReserva | null = null;
+
+    if (porId) {
+      // Caminho estável: `id` é chave primária, nunca devolve duas linhas —
+      // maybeSingle() é seguro aqui e continua como estava.
+      const { data, error } = await baseQuery.eq("id", cartaFoco.id as string).maybeSingle();
+      if (error) {
+        console.error("[atende] reserva: erro ao buscar carta:", error);
+        return FRASE_RESERVA_ESCALONAR;
+      }
+      cartaDb = data as LinhaCartaReserva | null;
+    } else {
+      // CARTA-IDENTIDADE-01 (23/08). Aqui estava o defeito: este ramo fazia
+      // `.maybeSingle()` sobre `numero_externo`, que NÃO é único — medidos 956
+      // números ambíguos cobrindo 83% da vitrine viva. Com duas linhas casando,
+      // o PostgREST devolve PGRST116 e a reserva caía no `erro` acima, virando
+      // escalonamento silencioso. Agora as homônimas vêm todas e o empate é
+      // desfeito por crédito/entrada do próprio carta_foco.
+      const { data, error } = await baseQuery
+        .eq("numero_externo", refFoco)
+        .limit(TETO_HOMONIMAS);
+      if (error) {
+        console.error("[atende] reserva: erro ao buscar carta:", error);
+        return FRASE_RESERVA_ESCALONAR;
+      }
+      const linhas = (data ?? []) as unknown as LinhaCartaReserva[];
+      const escolha = desambiguarPorValores(linhas, {
+        credito: cartaFoco.credito,
+        entrada: cartaFoco.entrada,
+      });
+      if (escolha.motivo === "ainda_ambiguo") {
+        // Duas cartas com mesmo número, mesmo crédito e mesma entrada: nada do
+        // que o cliente viu na tela as separa. Travar a errada é pior que não
+        // travar — some humano.
+        console.error(
+          "[atende] reserva: ref ambíguo mesmo após crédito/entrada — escalando",
+          JSON.stringify({ ref: refFoco, homonimas: linhas.length })
+        );
+        return FRASE_RESERVA_ESCALONAR;
+      }
+      if (escolha.motivo === "nenhuma_bate") return FRASE_RESERVA_MISMATCH;
+      if (escolha.motivo === "desempatada") {
+        console.warn(
+          "[atende] reserva: ref com homônimas, desempatado por crédito/entrada",
+          JSON.stringify({ ref: refFoco, homonimas: linhas.length })
+        );
+      }
+      cartaDb = escolha.carta;
     }
     if (!cartaDb) return FRASE_RESERVA_INDISPONIVEL;
 
     // 4b) consistência: a linha atual do ref ainda é a MESMA carta da
     // conversa? (o sync realoca numero_externo entre rodadas; ver caso do
-    // ref 86 em 09/07). PERMANECE nos DOIS caminhos (D-4): no fallback por
-    // numero_externo ela é a única defesa contra a realocação; na busca por
-    // `id` ela ainda pega a carta cujos valores mudaram desde o clique.
+    // ref 86 em 09/07). PERMANECE nos DOIS caminhos (D-4), mas o peso mudou
+    // com CARTA-IDENTIDADE-01: no fallback por numero_externo esta checagem
+    // hoje é REDUNDANTE — a desambiguação acima já exigiu crédito e entrada
+    // iguais, então ela nunca reprova ali. Fica de pé mesmo assim, por dois
+    // motivos: na busca por `id` ela é a ÚNICA defesa (pega a carta cujos
+    // valores mudaram desde o clique), e no fallback ela é a rede se alguém
+    // um dia afrouxar o critério de desempate sem lembrar deste passo.
     // Parcela fica de fora da comparação (tolera reajuste
     // de centavos) — só credito/entrada, que são os campos mais estáveis e
     // discriminantes entre cartas diferentes.

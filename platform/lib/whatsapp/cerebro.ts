@@ -214,6 +214,46 @@ export function comAberturaDeHandoff(
   return saida;
 }
 
+// ----------------------------------------------------------------------------
+// A OUTRA PONTA — a guarda que faltava desde a CAUSA RAIZ de 2026-07-21.
+// ----------------------------------------------------------------------------
+// montarMensagensWa garante que a PRIMEIRA mensagem é `user` (o while que
+// dá shift no começo). Nada, em lugar nenhum, garantia que a ÚLTIMA fosse —
+// e é a última que a Anthropic exige: "conversation must end with a user
+// message" (prefill não suportado neste modelo). O conserto de 2026-07-21
+// (DESC + limit + reverse) atacou a CAUSA de então — o corte pelas 30 mais
+// antigas deixava a fala do cliente de fora. Mas atacou a causa, não a
+// forma: o array continuou podendo terminar em `assistant` por outros
+// caminhos, e aí a chamada saía daqui já condenada a um 400.
+//
+// Caminhos vivos que terminam em `assistant`, medidos nesta casa:
+//   - a conversa em que o agente falou por último e ninguém respondeu (a
+//     7109b701 da varredura de 22/08: `ultimo_papel='prosperito'`, parada
+//     há 76h com o bot armado);
+//   - o toque do Sentinela seguido de reprocessamento, sem fala nova do
+//     cliente no meio;
+//   - qualquer retentativa do processamento de fundo depois que a resposta
+//     já foi gravada.
+//
+// POR QUE NÃO CORTAR O `assistant` DO FIM. Seria o conserto óbvio e seria
+// errado: cortar a última fala do agente faz o modelo RESPONDER DE NOVO a
+// mensagem que ele já respondeu — o cliente recebe a mesma coisa duas
+// vezes. Se a conversa termina com a casa falando, não há pergunta nova
+// pendente; gerar resposta ali é o defeito, não a chamada que falha.
+//
+// Então esta função não conserta o array: ela RECUSA a chamada antes de
+// gastá-la, e o chamador loga o porquê. O resultado para o cliente é o
+// mesmo de hoje (null), mas deixa de ser um 400 mudo vindo da rede e passa
+// a ser uma linha de diagnóstico com o nome do defeito. Vale lembrar que
+// comAberturaDeHandoff roda ANTES desta guarda e é justamente quem resolve
+// o caso legítimo de terminar em `assistant`: ele anexa um turno `user`.
+//
+// PURA: não altera o array, não loga, não decide o que fazer. Só responde.
+export function terminaEmUser(msgs: ReadonlyArray<MensagemApi>): boolean {
+  if (!msgs.length) return false;
+  return msgs[msgs.length - 1].role === "user";
+}
+
 // cache simples em módulo (best-effort por instância serverless) — mesmo
 // padrão de /api/atende/route.ts, cache próprio (instância de módulo
 // separada).
@@ -564,6 +604,23 @@ export async function gerarRespostaWhatsApp(
   // HANDOFF-01, item (a) — o turno sintético entra AQUI, depois da guarda de
   // histórico vazio. Ver comAberturaDeHandoff logo acima de montarMensagensWa.
   const mensagens = opcoes?.aberturaDeHandoff ? comAberturaDeHandoff(base) : base;
+
+  // A OUTRA PONTA (ver terminaEmUser). Roda DEPOIS do turno de handoff de
+  // propósito: quando a abertura entra, é ela quem legitimamente fecha o
+  // array em `user`, e a guarda tem de ver o array já pronto. Sobrando um
+  // `assistant` no fim aqui, a chamada sairia condenada a um 400 — então
+  // não sai, e o motivo fica escrito com o nome do defeito.
+  if (!terminaEmUser(mensagens)) {
+    console.error(
+      "[cerebro][diag] retorno null: histórico termina em assistant — a Anthropic recusaria com 400 (prefill não suportado). A casa falou por último e ninguém respondeu: gerar resposta aqui repetiria a fala do agente.",
+      JSON.stringify({
+        conversaId,
+        turnos: mensagens.length,
+        aberturaDeHandoff: !!opcoes?.aberturaDeHandoff,
+      })
+    );
+    return null;
+  }
 
   let system = montarSystem(agenteAtivo, "whatsapp");
   const cartas = await blocoCartas(db);
