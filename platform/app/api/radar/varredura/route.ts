@@ -69,6 +69,18 @@ import {
   saudeSyncDe,
 } from "@/lib/radar/eventos";
 import { horasUteisEntre, percentil, radarLigado, ENV_KILL_SWITCH } from "@/lib/radar/limiar";
+/* As guardas de "medi e deu zero ≠ não consegui medir" moram em lib/, não aqui.
+ * Não é estética: o arnês (`scripts/testes.mjs`) não alcança uma rota, então
+ * uma guarda escrita em linha nesta função é uma guarda que nenhum teste de
+ * mutação consegue quebrar de propósito — que foi exatamente como o
+ * `publicadosHoje ?? 0` ficou meses no ar. Mesma razão que já tirou daqui a
+ * `quarentenaPorCarta`. */
+import {
+  contagemMedida,
+  listaMedida,
+  separarPorBaseline,
+  type AmostraDaFonte,
+} from "@/lib/radar/medida";
 import {
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
@@ -220,15 +232,22 @@ export async function GET(req: Request) {
 
   // Só o evento MAIS RECENTE de cada fonte. A lista vem em ordem decrescente,
   // então o primeiro que aparecer é o dele.
-  const ultimoRaw = new Map<
-    string,
-    { espera: number; lidas: number; recebidas: number }
-  >();
+  const ultimoRaw = new Map<string, AmostraDaFonte>();
   for (const ev of (raws ?? []) as EventoCru[]) {
     const a = amostraDe(ev.detalhe);
     if (!a.fonte || ultimoRaw.has(a.fonte)) continue;
     if (a.lidas === null || a.recebidas === null) continue;
-    ultimoRaw.set(a.fonte, { espera: a.espera ?? 0, lidas: a.lidas, recebidas: a.recebidas });
+    /* `espera` NÃO coalesce — e este caso é de NATUREZA DIFERENTE dos outros
+     * três desta fatia. Espera não é veredito: é BASELINE, o patamar que a
+     * fonte declara sustentar. `houveRegressao` sai em `baseline <= 0` com
+     * "nunca amostrou ⇒ não regrediu" (limiar.ts), o que é correto para uma
+     * fonte que de fato declara zero. Com `?? 0`, porém, a fonte cujo campo
+     * `espera` não veio no evento herdava esse mesmo caminho: o vigia da prova
+     * de amostra nascia MUDO para ela, para sempre, e a condição ainda era
+     * marcada como julgada — fechando qualquer alerta que estivesse aberto.
+     * Null aqui não vira zero: mais abaixo, a fonte fica FORA da comparação
+     * daquele ciclo, que é coisa distinta de "comparei e passou". */
+    ultimoRaw.set(a.fonte, { espera: a.espera, lidas: a.lidas, recebidas: a.recebidas });
   }
 
   // --- 1c. estoque -------------------------------------------------------
@@ -294,8 +313,7 @@ export async function GET(req: Request) {
    * vigia gritava, e o alerta nascia com um número plausível e falso. Uma
    * variável só, calculada uma vez, usada nos dois lugares (julgamento e
    * relatório), para que não exista caminho onde eles discordem. */
-  const farolContagem: number | null =
-    !errFarol && typeof publicadosHoje === "number" ? publicadosHoje : null;
+  const farolContagem = contagemMedida({ count: publicadosHoje, error: errFarol });
 
   // --- 1e. fila do Sentinela ---------------------------------------------
   const ESPERANDO = ["pendente", "aguardando_template", "enviado"];
@@ -419,7 +437,16 @@ export async function GET(req: Request) {
   }
 
   // 2. prova de amostra — baseline = o que a fonte DECLARA esperar.
-  for (const [fonte, m] of ultimoRaw) {
+  /* FORA DA COMPARAÇÃO, que não é o mesmo que "comparei e passou". Sem baseline
+   * declarado não existe patamar contra o qual medir regressão, e inventar zero
+   * faria o vigia calar para sempre nesta fonte. A fonte sai do ciclo: não é
+   * marcada, logo nada dela é fechado pela FASE 3, e o alerta que estiver
+   * aberto continua aberto até alguém medir de verdade. */
+  const { comparaveis, semBaseline } = separarPorBaseline(ultimoRaw);
+  for (const fonte of semBaseline) {
+    avisos.push(`sync_amostra ${fonte}: fora da comparacao (sem baseline declarado)`);
+  }
+  for (const [fonte, m] of comparaveis) {
     marcar(TIPO_AMOSTRA, fonte);
     const a = vigiaProvaAmostra({
       fonte,
@@ -449,8 +476,12 @@ export async function GET(req: Request) {
   }
 
   const ultimaNovaEm = (ultimaNova.data as { em: string } | null)?.em ?? null;
-  const ciclosNoPeriodo = ciclos24h.count ?? 0;
-  if (ultimaNovaEm) {
+  /* `vigiaEstoqueSemMovimento` sai em `ciclosNoPeriodo <= 0` — "o silêncio é do
+   * cron, não do estoque". Verdade quando o zero foi MEDIDO; com `?? 0`, a
+   * contagem que falhou entrava por essa mesma porta, o vigia calava, e a
+   * condição — marcada logo acima — era fechada pela FASE 3. */
+  const ciclosNoPeriodo = contagemMedida(ciclos24h);
+  if (ultimaNovaEm && ciclosNoPeriodo !== null) {
     marcar(TIPO_ESTOQUE, CHAVE_ESTOQUE_SEM_MOVIMENTO);
     const saude = saudeSyncDe((ultimoFim.data as { detalhe: string } | null)?.detalhe);
     const a = vigiaEstoqueSemMovimento({
@@ -464,8 +495,10 @@ export async function GET(req: Request) {
       fontesFalha: saude.fontesFalha ?? undefined,
     });
     if (a) alertas.push(a);
-  } else {
+  } else if (!ultimaNovaEm) {
     avisos.push("estoque_movimento: nao julgado (nenhum carta_nova registrado)");
+  } else {
+    avisos.push("estoque_movimento: nao julgado (contagem de ciclos indisponivel)");
   }
 
   // 4. FAROL
@@ -488,30 +521,45 @@ export async function GET(req: Request) {
   }
 
   // 5. fila do Sentinela
-  if (!fila.error && !maisAntiga.error) {
+  /* `vigiaFilaSentinela` sai em `quantasEsperando <= 0` — fila vazia não
+   * envelhece. Com `?? 0`, a contagem que falhou dizia "fila vazia" e a
+   * condição, já marcada, era fechada. A ausência de `error` não bastava:
+   * `count` volta null sem erro. */
+  const filaEsperando = contagemMedida(fila);
+  if (filaEsperando !== null && !maisAntiga.error) {
     marcar(TIPO_FILA_SENTINELA, CHAVE_FILA_ENVELHECENDO);
     const antiga = (maisAntiga.data as { criado_em: string } | null)?.criado_em ?? null;
     const a = vigiaFilaSentinela({
       maisAntigaEm: antiga ? new Date(antiga) : null,
-      quantasEsperando: fila.count ?? 0,
+      quantasEsperando: filaEsperando,
       agora,
     });
     if (a) alertas.push(a);
+  } else {
+    avisos.push("fila_sentinela: nao julgado (contagem indisponivel)");
   }
 
   // 6. quarentena — volume e reincidência. Duas condições, duas naturezas:
   //    volume alto = a fonte piorou AGORA; reincidência = uma carta específica é
   //    lixo permanente do lado do fornecedor, e nenhum ciclo nosso conserta.
-  const quarLidos = (quarentena ?? []) as {
-    numero_externo: number | null;
-    detalhe: string | null;
-  }[];
+  /* `?? []` era o mais traiçoeiro dos quatro: lista vazia não é um número
+   * suspeito, é o retrato de uma casa limpa. Sem erro e sem linhas, o código
+   * caía no ramo do julgamento, media volume zero E — pior — marcava toda
+   * chave `reincidente:*` aberta, fechando na FASE 3 alertas de cartas que
+   * continuam voltando. `errQuar` sozinho não cobria: `data` volta null sem
+   * erro. Null e lista vazia passam a ser coisas diferentes. */
+  const quarLidos = listaMedida<{ numero_externo: number | null; detalhe: string | null }>({
+    data: quarentena as { numero_externo: number | null; detalhe: string | null }[] | null,
+    error: errQuar,
+  });
   let quarDistintas: number | null = null;
   let quarEventos: number | null = null;
 
   if (errQuar) {
     // Já foi para `avisos` na fase 1. Sem medição não há julgamento, e não
     // julgar é diferente de julgar "está bom": nada é marcado, nada é fechado.
+  } else if (quarLidos === null) {
+    avisos.push("quarentena: nao julgado (leitura devolveu nulo sem erro)");
   } else if (quarLidos.length >= TETO_QUARENTENA) {
     avisos.push(
       `quarentena: nao julgado (leitura saturou em ${TETO_QUARENTENA} eventos)`
@@ -638,6 +686,10 @@ export async function GET(req: Request) {
     medido: {
       fontes_com_divergencia: porFonteDiv.size,
       fontes_com_prova_de_amostra: ultimoRaw.size,
+      // Vistas menos comparáveis. Sem esta linha, uma fonte que perdeu o campo
+      // `espera` sumia da comparação sem deixar rastro — e "nenhum alerta de
+      // amostra" ficava indistinguível de "ninguém olhou".
+      fontes_sem_baseline: semBaseline.length,
       cartas_disponiveis: disponiveis,
       cartas_novas_24h: novas,
       cartas_saidas_24h: saidas,
@@ -650,7 +702,8 @@ export async function GET(req: Request) {
       // runtime some e o alerta (ou a ausência dele) não conta essa história.
       farol_julgado: farolContagem !== null,
       hora_sp: horaSP(agora),
-      fila_sentinela_esperando: fila.count ?? null,
+      fila_sentinela_esperando: filaEsperando,
+      fila_sentinela_julgada: filaEsperando !== null,
       // Os dois lado a lado, sempre. Foi a distância entre eles que desfez o
       // relatório de "95 cartas barradas": são 95 EVENTOS e 4 CARTAS. Null aqui
       // quer dizer "não julgado" — erro de leitura ou saturação —, nunca zero.

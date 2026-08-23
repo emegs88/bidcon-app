@@ -24,6 +24,7 @@
 // ============================================================================
 import { createXtvClient } from "@/lib/supabase-xtv";
 import { gerarRespostaWhatsApp, agenteValido } from "@/lib/whatsapp/cerebro";
+import type { AgenteId } from "@/app/api/atende/_prompt";
 import { sendText } from "@/lib/whatsapp/graph";
 import { enviarInstagram } from "@/lib/instagram/graph";
 import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
@@ -165,6 +166,138 @@ async function enviarPorCanal(
     tokensIn: params.tokensIn,
     tokensOut: params.tokensOut,
   });
+}
+
+// ----------------------------------------------------------------------------
+// HANDOFF-01, item (a) — o handoff ATIVO.
+// ----------------------------------------------------------------------------
+// O DEFEITO QUE ISTO CORRIGE
+//
+// Até agora, quando o bastão passava (o `updates.agente_ativo` lá embaixo), o
+// job simplesmente ACABAVA. O agente novo só falaria no PRÓXIMO webhook do
+// cliente — quer dizer: nunca, se o cliente lesse a despedida do agente
+// anterior como fim de papo. É esse silêncio que prende negócio vivo.
+//
+// KILL-SWITCH QUE NASCE ARMADO — DESVIO DECLARADO
+//
+// A doutrina desta casa é kill-switch nascer DESARMADO (`=== "on"`, como
+// FAROL_SABER em lib/farol/saber.ts:74). Aqui eu inverto de propósito e
+// declaro: HANDOFF_ATIVO só se cala com a string literal "off".
+//
+// A razão é medida, não estética: PROSPERITO_SEM_ENTRADA nasceu desarmado e
+// segue na fila, até hoje, esperando alguém lembrar de armá-lo. Correção que
+// sobe desarmada não corrige nada até esse dia — e este item foi classificado
+// pela coordenação como "dinheiro vivo preso". O botão de desligar continua
+// existindo e ao alcance da mão, que é o que um kill-switch precisa garantir;
+// o que muda é só de que lado ele nasce.
+// Exportada só para o teste: um kill-switch que inverte a doutrina da casa
+// precisa de prova de que inverte exatamente onde eu disse — e não mais que
+// isso. "OFF", "0", "false" e vazio NÃO desligam; só a string literal "off".
+export function handoffAtivoLigado(): boolean {
+  return process.env.HANDOFF_ATIVO !== "off";
+}
+
+// Faz o agente que ACABOU de receber o bastão dizer a primeira palavra, sem
+// esperar o cliente voltar. Roda ainda DENTRO do lock do job (antes do
+// `finally` que limpa respondendo_desde), pra que nenhuma outra invocação
+// gere em paralelo na mesma conversa. Orçamento de relógio: debounce 8s +
+// geração 20s + envio + geração 20s + envio ≈ 50s, contra LOCK_TTL_MS = 120s.
+//
+// SETE DECISÕES QUE ESTÃO NO CORPO, E POR QUÊ:
+//
+// 1. NUNCA JOGA EXCEÇÃO. O corpo inteiro vive num try/catch que só loga. A
+//    resposta do agente ANTERIOR já saiu com sucesso neste ponto; uma falha
+//    na abertura não pode desfazer isso nem derrubar os jobs seguintes.
+// 2. NÃO ENCADEIA. O `proximoAgente` que voltar desta geração é ignorado de
+//    propósito. Sem isso, A passa pra B que passa pra C dentro do mesmo job, e
+//    o cliente recebe três mensagens seguidas sem ter escrito uma linha.
+// 3. MAS OBEDECE ao escalarHumano. Encadear agente é ruído; pedir humano é
+//    sinal de segurança, e sinal de segurança sempre passa.
+// 4. DUAS checagens de humano. A primeira ANTES de gerar, que economiza uma
+//    chamada de 20s e os tokens dela. A segunda imediatamente ANTES de
+//    enviar, que é a que de fato protege — é entre gerar e enviar que o
+//    operador clica "Assumir".
+// 5. O texto descartado é REGISTRADO, pela mesma razão do fluxo normal: o
+//    operador precisa ver o que o agente ia dizer.
+// 6. `agente_ativo` NÃO é reescrito. Ele já vale o valor certo — foi o update
+//    logo acima quem chamou esta função.
+// 7. A abertura sai com `agente: agenteNovo`, não com o agente que se
+//    despediu: quem fala é quem assume.
+async function abrirComAgenteNovo(
+  db: ReturnType<typeof createXtvClient>,
+  job: WaJob,
+  agenteNovo: AgenteId
+): Promise<void> {
+  const { conversaId, telefone } = job;
+  try {
+    if (!handoffAtivoLigado()) {
+      console.log(
+        "[whatsapp/background] handoff ativo DESLIGADO (HANDOFF_ATIVO=off) — agente novo não abre",
+        JSON.stringify({ conversaId, agenteNovo })
+      );
+      return;
+    }
+
+    // Decisão 4, primeira checagem — barata, antes de gastar 20s e tokens.
+    if (await assumidaPorHumano(db, conversaId)) {
+      console.log(
+        "[whatsapp/background] handoff ativo abortado antes de gerar — conversa assumida por humano",
+        JSON.stringify({ conversaId, agenteNovo })
+      );
+      return;
+    }
+
+    const abertura = await gerarRespostaWhatsApp(db, conversaId, agenteNovo, telefone, {
+      aberturaDeHandoff: true,
+    });
+    if (!abertura) {
+      // Não é exceção, é ausência — e ausência aqui precisa aparecer no log,
+      // senão o handoff ativo volta a ser exatamente o silêncio que ele veio
+      // consertar, só que agora com código no meio.
+      console.error(
+        "[whatsapp/background] handoff ativo: cérebro devolveu null na abertura",
+        JSON.stringify({ conversaId, agenteNovo })
+      );
+      return;
+    }
+
+    // Decisão 4, segunda checagem — a que de fato protege.
+    if (await assumidaPorHumano(db, conversaId)) {
+      console.log(
+        "[whatsapp/background] abertura de handoff NÃO enviada — conversa assumida durante a geração",
+        JSON.stringify({ conversaId, agenteNovo })
+      );
+      await registrarDescarte(db, conversaId, abertura.texto, "abertura de handoff");
+      return;
+    }
+
+    await enviarPorCanal(job, {
+      conversaId,
+      texto: abertura.texto,
+      agente: agenteNovo,
+      tokensIn: abertura.tokensIn,
+      tokensOut: abertura.tokensOut,
+    });
+
+    // Decisões 2 e 3: proximoAgente da abertura morre aqui; escalarHumano não.
+    if (abertura.escalarHumano) {
+      const { error } = await db
+        .from("wa_conversas")
+        .update({ status: "humano" })
+        .eq("id", conversaId);
+      if (error) {
+        console.error(
+          "[whatsapp/background] handoff ativo: falha ao escalar para humano:",
+          error.message
+        );
+      }
+    }
+  } catch (e) {
+    console.error(
+      "[whatsapp/background] handoff ativo falhou (não derruba o job):",
+      e instanceof Error ? e.message : e
+    );
+  }
 }
 
 /** Processa a lista de jobs de uma invocação do webhook — chamado via
@@ -369,17 +502,48 @@ async function processarUmJob(
         });
 
         const updates: Record<string, unknown> = {};
-        if (
+        // HANDOFF-01 (a): o bastão vira uma variável em vez de ser escrito
+        // direto no objeto, porque agora ele é lido duas vezes — aqui e no
+        // gancho da abertura, logo abaixo.
+        const bastaoPara =
           resultado.proximoAgente &&
           resultado.proximoAgente !== resultado.agenteQueRespondeu
-        ) {
-          updates.agente_ativo = resultado.proximoAgente;
+            ? resultado.proximoAgente
+            : null;
+        if (bastaoPara) {
+          updates.agente_ativo = bastaoPara;
         }
         if (resultado.escalarHumano) {
           updates.status = "humano";
         }
         if (Object.keys(updates).length > 0) {
-          await db.from("wa_conversas").update(updates).eq("id", conversaId);
+          // DEFEITO LATENTE CORRIGIDO DE PASSAGEM: este update descartava o
+          // próprio erro. supabase-js RETORNA erro, não joga — mesma lição já
+          // documentada duas vezes no cerebro.ts (logGuardrail e
+          // contarFallbacksRecentes). Antes isso era uma cegueira barata: no
+          // pior caso o bastão não passava e o cliente continuava com o agente
+          // velho. Agora não é mais: se a escrita falhou, `agente_ativo` NÃO
+          // mudou, e abrir a boca como o agente novo seria falar por um agente
+          // que a conversa não reconhece. Por isso a abertura fica DENTRO do
+          // ramo de sucesso.
+          const { error: erroUpdate } = await db
+            .from("wa_conversas")
+            .update(updates)
+            .eq("id", conversaId);
+
+          if (erroUpdate) {
+            console.error(
+              "[whatsapp/background] falha ao aplicar updates da conversa (bastão/escalada):",
+              erroUpdate.message,
+              JSON.stringify({ conversaId, updates })
+            );
+          } else if (bastaoPara && !resultado.escalarHumano) {
+            // A escalada para humano tem precedência sobre a abertura: se esta
+            // resposta pediu humano, quem fala em seguida é gente, não outro
+            // agente. Nos demais casos, o agente novo abre a boca agora — sem
+            // esperar o cliente voltar, que é o item (a) inteiro.
+            await abrirComAgenteNovo(db, job, bastaoPara);
+          }
         }
       }
     } finally {

@@ -179,6 +179,41 @@ function montarMensagensWa(
   return msgs;
 }
 
+export type MensagemApi = { role: "user" | "assistant"; content: string };
+
+// ----------------------------------------------------------------------------
+// HANDOFF-01, item (a) — acrescenta a nota de abertura ao fim das mensagens.
+// ----------------------------------------------------------------------------
+// Mora colada em montarMensagensWa de propósito: é dela que esta função herda
+// a REGRA DE COLAPSO. Se o último turno já é `user`, a nota é ANEXADA com "\n"
+// em vez de virar um segundo `user` consecutivo — que é exatamente o formato
+// que a Anthropic recusa. O caso comum é o outro (a última linha é a despedida
+// do agente que saiu, papel `assistant`), mas o bastão também pode passar numa
+// mensagem do cliente que o agente antigo leu e repassou sem responder.
+//
+// PURA E SEM EFEITO COLATERAL: devolve um array NOVO, com cópias rasas dos
+// turnos. O array que entrou não é tocado — quem chama continua podendo usá-lo
+// (o log de diagnóstico, por exemplo) sem ver a nota grudada nele.
+//
+// LISTA VAZIA CONTINUA VAZIA. Nunca inventa uma conversa a partir do nada: a
+// nota diz ao agente que ele "já leu o que foi conversado até aqui", e sem
+// nada conversado isso seria mentira. O chamador já barra esse caso antes de
+// chegar aqui; esta linha é a segunda tranca, para o dia em que alguém mover a
+// chamada para antes da guarda.
+export function comAberturaDeHandoff(
+  msgs: ReadonlyArray<MensagemApi>
+): MensagemApi[] {
+  if (!msgs.length) return [];
+  const saida: MensagemApi[] = msgs.map((m) => ({ ...m }));
+  const ultimo = saida[saida.length - 1];
+  if (ultimo.role === "user") {
+    ultimo.content += "\n" + NOTA_ABERTURA_HANDOFF;
+  } else {
+    saida.push({ role: "user", content: NOTA_ABERTURA_HANDOFF });
+  }
+  return saida;
+}
+
 // cache simples em módulo (best-effort por instância serverless) — mesmo
 // padrão de /api/atende/route.ts, cache próprio (instância de módulo
 // separada).
@@ -435,6 +470,42 @@ async function tentarRegenerarCompliance(
   }
 }
 
+// ----------------------------------------------------------------------------
+// HANDOFF-01, item (a) — a nota que faz o agente NOVO abrir a boca.
+// ----------------------------------------------------------------------------
+// POR QUE UM TURNO 'user' SINTÉTICO, E NÃO UMA CHAMADA DIRETA
+//
+// Quando o bastão passa, a última linha do histórico é a DESPEDIDA do agente
+// que saiu — papel 'prosperito', que montarMensagensWa mapeia para
+// `assistant`. Pedir uma geração nesse estado é exatamente o 400 já
+// documentado na causa raiz de 2026-07-21, trinta linhas abaixo:
+// "conversation must end with a user message" (prefill não suportado neste
+// modelo). Sem um turno `user` no fim, o handoff ativo não sai do papel.
+//
+// POR QUE ELA NÃO É PERSISTIDA
+//
+// Esta nota NUNCA entra em wa_mensagens. Se entrasse, apareceria na tela do
+// operador como se o cliente tivesse escrito isso — e, pior, voltaria no
+// histórico da PRÓXIMA geração, virando memória permanente de uma frase que
+// ninguém disse. Ela vive só dentro do array que vai à API, nesta chamada.
+//
+// POR QUE ELA SE ANUNCIA COMO NOTA
+//
+// A alternativa era disfarçar de mensagem do cliente ("oi?"). Isso faria o
+// modelo responder a um cliente que não falou, e o texto sairia com a cara de
+// quem foi perguntado. Dizer ao modelo o que de fato está acontecendo produz
+// abertura, não resposta — e é o que a conversa precisa.
+export const NOTA_ABERTURA_HANDOFF =
+  "[NOTA INTERNA DO SISTEMA — isto NÃO é uma mensagem do cliente e não deve " +
+  "ser respondido como se fosse.]\n" +
+  "O atendimento acabou de ser transferido para você e o cliente ainda não " +
+  "escreveu de novo. Escreva agora a PRIMEIRA mensagem sua nesta conversa: " +
+  "apresente-se em uma linha, deixe claro que já leu o que foi conversado até " +
+  "aqui e faça a próxima pergunta ou dê o próximo passo concreto. NÃO " +
+  "cumprimente como se fosse o primeiro contato, NÃO repita o que o colega " +
+  "anterior já disse, NÃO peça de novo um dado que o cliente já deu e NÃO " +
+  "mencione esta nota.";
+
 /** Gera a resposta do Time Prosperito pra uma conversa de WhatsApp: monta
  *  histórico + system prompt (persona ativa + estoque real), chama a
  *  Anthropic, processa bastão/reserva, converte marcadores pra texto puro e
@@ -442,12 +513,18 @@ async function tentarRegenerarCompliance(
  *  ausente, HTTP não-ok, histórico vazio) — o chamador decide o que fazer
  *  (nesta fatia: só loga, nunca derruba o 200 do webhook). NÃO envia nada
  *  via Graph API nem grava em wa_mensagens — isso é responsabilidade de
- *  quem chama (ver ./graph.ts sendText). */
+ *  quem chama (ver ./graph.ts sendText).
+ *
+ *  `opcoes.aberturaDeHandoff` (HANDOFF-01 item a): acrescenta um turno `user`
+ *  sintético e NÃO persistido no fim das mensagens enviadas à API, para que o
+ *  agente que acabou de receber o bastão consiga falar primeiro. Sem ele, este
+ *  arquivo devolve null com o 400 da Anthropic. Ver NOTA_ABERTURA_HANDOFF. */
 export async function gerarRespostaWhatsApp(
   db: ReturnType<typeof createXtvClient>,
   conversaId: string,
   agenteAtivo: AgenteId,
-  telefone: string
+  telefone: string,
+  opcoes?: { aberturaDeHandoff?: boolean }
 ): Promise<ResultadoCerebro | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -475,14 +552,18 @@ export async function gerarRespostaWhatsApp(
     .limit(30);
   const hist = histDesc ? [...histDesc].reverse() : histDesc;
 
-  const mensagens = montarMensagensWa((hist ?? []) as MensagemHist[]);
-  if (!mensagens.length) {
+  const base = montarMensagensWa((hist ?? []) as MensagemHist[]);
+  if (!base.length) {
     console.error(
       "[cerebro][diag] retorno null: histórico vazio após montarMensagensWa",
       JSON.stringify({ conversaId, histLen: hist?.length ?? 0 })
     );
     return null;
   }
+
+  // HANDOFF-01, item (a) — o turno sintético entra AQUI, depois da guarda de
+  // histórico vazio. Ver comAberturaDeHandoff logo acima de montarMensagensWa.
+  const mensagens = opcoes?.aberturaDeHandoff ? comAberturaDeHandoff(base) : base;
 
   let system = montarSystem(agenteAtivo, "whatsapp");
   const cartas = await blocoCartas(db);
