@@ -500,14 +500,39 @@ export function vigiaQuarentenaReincidente(entrada: {
 //
 // A doutrina da casa é tirar limiar de percentil do histórico — foi assim com
 // QUARENTENA_DISTINTAS_DIA (47) e HORAS_UTEIS_SEM_MOVIMENTO (20). Aqui não deu,
-// e o motivo é que a série medida é degenerada: `ciclos_com_envio 5 · min 15 ·
-// p50 15 · p90 15 · max 15 · ciclos_limpos 0`. TODO o histórico de envio deste
-// sistema é a própria pane. Não existe período saudável do qual extrair
-// normalidade, e fabricar um percentil de uma amostra sem variância seria
-// dar cara de estatística a um chute.
+// e o motivo era que a série medida EM 19/08 era degenerada: `ciclos_com_envio
+// 5 · min 15 · p50 15 · p90 15 · max 15 · ciclos_limpos 0`. Todo o histórico de
+// envio que existia naquele dia era a própria pane. Não havia período saudável
+// do qual extrair normalidade, e fabricar percentil de amostra sem variância
+// seria dar cara de estatística a um chute.
 //
-// Então o número é escolhido por PROPÓSITO, e isto fica escrito: ver
+// Então o número foi escolhido por PROPÓSITO, e isto fica escrito: ver
 // FALHAS_NO_CICLO abaixo.
+//
+// ---------------------------------------------------------------------------
+// CORREÇÃO MEDIDA EM 23/08/2026 — o parágrafo acima envelheceu
+//
+// Fica registrado que envelheceu, em vez de reescrito por cima, porque
+// comentário desatualizado é a dívida que esta casa paga mais caro: ele descreve
+// um mundo que não existe mais e ninguém desconfia, porque comentário não quebra
+// teste. A pane terminou em 19/08 entre 12:01 e 18:01. A série já tem variância,
+// e `ciclos_limpos` não é mais 0 — são 3:
+//
+//   ciclo (UTC)        falhas  entregues   veredito deste vigia
+//   2026-08-17 12:00       15          0   GRAVE
+//   2026-08-17 18:00       15          0   GRAVE
+//   2026-08-18 12:00       15          0   GRAVE
+//   2026-08-18 18:00       15          0   GRAVE
+//   2026-08-19 12:00       15          0   GRAVE
+//   2026-08-19 18:00        0         14   calado
+//   2026-08-20 12:00        0         14   calado
+//   2026-08-21 12:00        0          1   calado
+//
+// Isto é o CONTROLE que a Regra 9 exige, e ele veio de graça do dado real: cinco
+// ciclos em que o vigia acusa, três em que ele cala, e NENHUM ciclo na zona
+// cinzenta. O limiar 3 cai no vão entre 0 e 15 sem encostar em nenhum dos dois
+// lados. O número segue escolhido por propósito — mas agora existe amostra
+// saudável provando que ele não grita à toa, que é o que faltava em 19/08.
 
 export const TIPO_ENVIO_SENTINELA = "sentinela_envio";
 export const CHAVE_ENVIO_FALHANDO = "falhando";
@@ -581,6 +606,68 @@ export function vigiaEnvioSentinela(entrada: {
       limite,
     },
   };
+}
+
+/**
+ * A janela é JULGÁVEL? — a pergunta que a varredura tem de fazer ANTES de
+ * `marcar()`, e a razão de ela morar aqui e não em linha na rota.
+ *
+ * O PROBLEMA, MEDIDO EM 23/08/2026. Marcar uma condição como julgada autoriza a
+ * FASE 3 a FECHAR o alerta aberto dela. Este vigia cala quando `falhas` está
+ * abaixo do limite — e cala igualzinho quando ninguém tentou enviar coisa
+ * alguma. As duas coisas chegariam à FASE 3 como "condição passou".
+ *
+ * E o segundo caso é o NORMAL, não a exceção. A aritmética dos dois crons:
+ *
+ *   - Sentinela envia em `0 12,18 * * *` — duas vezes por dia.
+ *   - A varredura roda de 3 em 3 horas no minuto 20 — oito vezes por dia,
+ *     olhando 3h para trás. (O cron está em `vercel.json`; ele não cabe escrito
+ *     aqui porque a barra-asterisco do campo de hora FECHA este comentário.
+ *     Descobri isso derrubando o arquivo inteiro: o `tsc` acusou erro de sintaxe
+ *     240 linhas adiante, num trecho intocado, e o defeito estava aqui.)
+ *
+ * Só as passagens de 12:20 e 18:20 enxergam envio. Nas outras SEIS a janela
+ * está vazia por desenho. Sem esta guarda, seis vezes por dia a varredura
+ * declararia o envio saudável sem ter visto uma tentativa sequer — e fecharia
+ * um alerta legítimo de pane usando como prova o silêncio do relógio. Medido no
+ * instante em que isto foi escrito: último envio 21/08 12:01, `44,2h` atrás,
+ * `envios_na_janela_3h = 0`. A pane de 75 recusas seria apagada por uma janela
+ * em que ninguém tentou nada.
+ *
+ * A ORDEM DAS PORTAS não é arbitrária:
+ *
+ *   1. `falhas === null` ⇒ não julga. Não medi o que decide o alarme.
+ *   2. `falhas >= limite` ⇒ JULGA, mesmo sem `feitos`. Esta porta vem ANTES da
+ *      de `feitos` de propósito: o vigia alarma com as falhas que FORAM medidas,
+ *      e recusar-se a julgar aqui trocaria um alerta certo por silêncio cômodo.
+ *   3. `feitos === null` ⇒ não julga. Falhas abaixo do limite e entregues não
+ *      medidos: não dá para afirmar que o ciclo foi saudável, e só quem afirma
+ *      isso tem direito de fechar alerta.
+ *   4. `falhas + feitos === 0` ⇒ não julga. Ninguém tentou. Mesmo princípio do
+ *      `ciclosNoPeriodo <= 0` do vigia de movimento: o silêncio é do ciclo.
+ *
+ * Sobra um único caminho para o fechamento automático: os dois contadores
+ * medidos, pelo menos uma tentativa na janela, e as falhas abaixo do limite —
+ * que é a definição exata de "vi o envio funcionar".
+ */
+export function envioSentinelaJulgavel(entrada: {
+  falhas: number | null;
+  feitos: number | null;
+  limite?: number;
+}): { julgar: boolean; motivo: string | null } {
+  const { falhas, feitos, limite = FALHAS_NO_CICLO } = entrada;
+
+  if (falhas === null || !Number.isFinite(falhas)) {
+    return { julgar: false, motivo: "contagem de falhas indisponivel" };
+  }
+  if (falhas >= limite) return { julgar: true, motivo: null };
+  if (feitos === null || !Number.isFinite(feitos)) {
+    return { julgar: false, motivo: "entregues nao medidos e falhas abaixo do limite" };
+  }
+  if (falhas + feitos === 0) {
+    return { julgar: false, motivo: "nenhuma tentativa de envio na janela" };
+  }
+  return { julgar: true, motivo: null };
 }
 
 // ---------------------------------------------------------------------------

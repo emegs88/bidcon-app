@@ -61,6 +61,7 @@ import {
   MINUTOS_HANDOFF_MUDO,
   vigiaHandoffMudo,
   FALHAS_NO_CICLO,
+  envioSentinelaJulgavel,
   vigiaEnvioSentinela,
   vigiaDivergenciaSync,
   vigiaEstoqueNivel,
@@ -681,6 +682,92 @@ test("VIGIA 8 — REGRA 19: feitos nao medidos ainda ALARMAM, com o null visivel
   assert.equal(a.severidade, "aviso", "sem medir entregas nao se afirma pane");
   assert.equal(a.detalhe.feitos, null, "o null tem de viajar visivel ate quem le");
   assert.ok(a.titulo.includes("não medidos"));
+});
+
+// ---------------------------------------------------------------------------
+// A GUARDA DO VIGIA 8 — o silencio dele nao pode virar absolvicao
+// ---------------------------------------------------------------------------
+//
+// Os testes acima provam que o vigia CALA nos casos certos. Estes provam a
+// pergunta seguinte, que e outra: quando ele cala, a varredura tem direito de
+// FECHAR o alerta aberto?
+//
+// A distancia entre as duas e onde mora o defeito. `vigiaEnvioSentinela` cala
+// identico em "0 falhas de 15 entregues" (casa saudavel) e em "0 falhas de 0
+// tentativas" (ninguem tentou). Se as duas chegarem a FASE 3 como "condicao
+// julgada", a segunda fecha um alerta legitimo de pane usando como prova o
+// silencio do relogio.
+//
+// E o caso comum, nao a borda: o Sentinela envia em `0 12,18 * * *` (2x/dia) e
+// a varredura roda de 3 em 3h no minuto 20 (8x/dia, olhando 3h atras). Seis das oito
+// passagens veem janela vazia POR DESENHO.
+//
+// Por isso varios testes aqui casam as DUAS funcoes: nao basta a guarda
+// responder certo isolada, ela tem de responder certo sobre a entrada exata em
+// que o vigia ficou calado.
+
+test("GUARDA 8 — o caso de seis-em-oito: janela vazia NAO julga", () => {
+  /* A entrada medida em 23/08/2026 as 05h15 SP: ultimo envio 21/08 12:01,
+   * 44,2h atras, zero tentativas na janela de 3h. O vigia cala — e esta certo
+   * em calar. A guarda tem de impedir que esse silencio vire absolvicao. */
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 0 }), null, "o vigia cala");
+  const g = envioSentinelaJulgavel({ falhas: 0, feitos: 0 });
+  assert.equal(g.julgar, false, "calar por janela vazia NAO pode fechar alerta");
+  assert.ok(g.motivo, "nao julgar sem motivo escrito e nao julgar em silencio");
+});
+
+test("GUARDA 8 — o ciclo limpo de 19/08 JULGA, e e ele que fecha a pane", () => {
+  /* O outro lado, e o que da valor ao vigia: 19/08 18:00 UTC, 0 falhas e 14
+   * entregues. Se a guarda tambem calasse aqui, o alerta dos cinco ciclos
+   * graves ficaria aberto para sempre e alguem teria de fechar na mao — que e
+   * como um vigia perde a confianca da casa. */
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 14 }), null, "o vigia cala");
+  assert.equal(envioSentinelaJulgavel({ falhas: 0, feitos: 14 }).julgar, true);
+  assert.equal(envioSentinelaJulgavel({ falhas: 0, feitos: 1 }).julgar, true);
+});
+
+test("GUARDA 8 — porta 1: falhas nao medidas NAO julgam", () => {
+  /* Regra 19 do lado do fechamento. `?? 0` aqui faria a leitura falha do
+   * sentinela_log virar "zero falhas, ciclo limpo" — e fechar a pane. */
+  assert.equal(envioSentinelaJulgavel({ falhas: null, feitos: 14 }).julgar, false);
+  assert.equal(envioSentinelaJulgavel({ falhas: Number.NaN, feitos: 14 }).julgar, false);
+});
+
+test("GUARDA 8 — porta 2 vem ANTES da 3: falhas acima do limite julgam sem feitos", () => {
+  /* A ordem das portas nao e estilo. O vigia foi escrito para ALARMAR com
+   * `feitos: null` quando as falhas foram medidas (teste acima). Se a guarda
+   * testasse `feitos === null` primeiro, ela suprimiria esse alerta — a guarda
+   * contra fechamento indevido viraria mordaca de alarme legitimo, que e um
+   * defeito pior do que o que ela veio consertar. */
+  assert.ok(vigiaEnvioSentinela({ falhas: 15, feitos: null }), "o vigia alarma");
+  assert.equal(envioSentinelaJulgavel({ falhas: 15, feitos: null }).julgar, true);
+  assert.equal(envioSentinelaJulgavel({ falhas: 15, feitos: null }).motivo, null);
+  // e na fronteira exata do limiar, do lado de dentro
+  assert.equal(envioSentinelaJulgavel({ falhas: FALHAS_NO_CICLO, feitos: null }).julgar, true);
+});
+
+test("GUARDA 8 — porta 3: poucas falhas com entregues nao medidos NAO julgam", () => {
+  /* A fronteira do teste acima, um passo para fora. Duas falhas nao alarmam, e
+   * sem saber quantas entregas houve tambem nao se afirma que o ciclo foi
+   * saudavel. Quem nao pode afirmar isso nao tem direito de fechar. */
+  const g = envioSentinelaJulgavel({ falhas: FALHAS_NO_CICLO - 1, feitos: null });
+  assert.equal(g.julgar, false);
+  assert.ok(g.motivo);
+});
+
+test("GUARDA 8 — CONTROLE: existe caminho para o fechamento automatico", () => {
+  /* Regra 9 aplicada a propria guarda. Uma guarda que nunca deixa julgar e
+   * indistinguivel de uma condicao que ninguem mede — e o alerta ficaria aberto
+   * para sempre sem que nada acusasse. Este teste falha no dia em que alguem
+   * apertar a guarda a ponto de fechar a unica porta de saida. */
+  const casos = [
+    { falhas: 0, feitos: 14 },
+    { falhas: 1, feitos: 14 },
+    { falhas: 15, feitos: 0 },
+  ];
+  for (const c of casos) {
+    assert.equal(envioSentinelaJulgavel(c).julgar, true, JSON.stringify(c));
+  }
 });
 
 // ---------------------------------------------------------------------------

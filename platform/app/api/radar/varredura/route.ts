@@ -82,21 +82,25 @@ import {
   type AmostraDaFonte,
 } from "@/lib/radar/medida";
 import {
+  CHAVE_ENVIO_FALHANDO,
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
   CHAVE_FAROL_SEM_PUBLICAR,
   CHAVE_FILA_ENVELHECENDO,
   CHAVE_HANDOFF_MUDO,
   CHAVE_QUARENTENA_VOLUME,
+  envioSentinelaJulgavel,
   MINUTOS_HANDOFF_MUDO,
   TIPO_AMOSTRA,
   TIPO_DIVERGENCIA,
+  TIPO_ENVIO_SENTINELA,
   TIPO_ESTOQUE,
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
   TIPO_HANDOFF,
   TIPO_QUARENTENA,
   vigiaDivergenciaSync,
+  vigiaEnvioSentinela,
   vigiaEstoqueNivel,
   vigiaEstoqueSemMovimento,
   vigiaFarolSemPublicar,
@@ -330,7 +334,40 @@ export async function GET(req: Request) {
   if (fila.error) avisos.push(`sentinela_fila: ${fila.error.message}`);
   if (maisAntiga.error) avisos.push(`sentinela_fila_antiga: ${maisAntiga.error.message}`);
 
-  // --- 1f. quarentena ----------------------------------------------------
+  // --- 1f. envio do Sentinela (vigia 8) ----------------------------------
+  //
+  // VIGIAR A FILA NÃO É VIGIAR O ENVIO. A leitura 1e mede a IDADE da fila, e
+  // entre 17 e 19/08/2026 ela estava correta e inútil ao mesmo tempo: a fila não
+  // envelhecia, porque a varredura passava por ela de seis em seis horas — e 75
+  // envios eram recusados nesse meio-tempo. Fila que gira sem entregar é
+  // indistinguível de fila saudável para quem só mede idade.
+  //
+  // DUAS CONTAGENS, NÃO UMA. `envio_falha` sozinho não separa "recusou 15 de 15"
+  // de "recusou 15 de 200": a primeira é pane nossa, a segunda é ruído de
+  // destinatário. `envio_ok` é a outra metade da frase — mesma razão pela qual o
+  // vigia de movimento lê `fontes_ok` do último `sync_fim` em vez de se
+  // contentar com "nada entrou".
+  //
+  // A JANELA é JANELA_CICLO_MS, igual à dos outros vigias. Na maior parte das
+  // passagens ela NÃO contém envio nenhum — o Sentinela envia duas vezes por dia
+  // e a varredura roda oito. Isso não é defeito, é o motivo de
+  // `envioSentinelaJulgavel` existir; a aritmética está documentada lá.
+  const [envioFalhas, envioFeitos] = await Promise.all([
+    db
+      .from("sentinela_log")
+      .select("id", { count: "exact", head: true })
+      .eq("acao", "envio_falha")
+      .gte("criado_em", desdeJanela.toISOString()),
+    db
+      .from("sentinela_log")
+      .select("id", { count: "exact", head: true })
+      .eq("acao", "envio_ok")
+      .gte("criado_em", desdeJanela.toISOString()),
+  ]);
+  if (envioFalhas.error) avisos.push(`sentinela_log envio_falha: ${envioFalhas.error.message}`);
+  if (envioFeitos.error) avisos.push(`sentinela_log envio_ok: ${envioFeitos.error.message}`);
+
+  // --- 1g. quarentena ----------------------------------------------------
   //
   // A COLUNA, NÃO O TEXTO. `eventos_sync` tem `numero_externo` própria, e é ela
   // que vale. O `detalhe` também carrega um número — "PLAYCONTEMPLADAS credito
@@ -366,7 +403,7 @@ export async function GET(req: Request) {
     .is("resolvido_em", null);
   if (errQuarAbertos) avisos.push(`radar_alertas quarentena: ${errQuarAbertos.message}`);
 
-  // --- 1g. handoff mudo (HANDOFF-01 item c) ------------------------------
+  // --- 1h. handoff mudo (HANDOFF-01 item c) ------------------------------
   //
   // POR QUE RPC E NÃO CONSULTA AQUI: a condição é "o agente que está ativo
   // AGORA já falou alguma vez NESTA thread?" — subconsulta correlacionada por
@@ -539,7 +576,39 @@ export async function GET(req: Request) {
     avisos.push("fila_sentinela: nao julgado (contagem indisponivel)");
   }
 
-  // 6. quarentena — volume e reincidência. Duas condições, duas naturezas:
+  // 6. envio do Sentinela — a outra metade do que a fila não enxerga.
+  /* `marcar()` DEPOIS da guarda, e aqui a guarda é mais do que um teste de null.
+   * Este vigia cala com poucas falhas E cala com nenhuma tentativa, e as duas
+   * chegariam à FASE 3 como "condição passou" — fechando alerta de pane com base
+   * numa janela em que ninguém enviou nada. Como a varredura roda oito vezes por
+   * dia e o Sentinela envia duas, a janela vazia é o caso COMUM, não a borda.
+   * A decisão mora em `envioSentinelaJulgavel`, em lib/, onde o arnês alcança —
+   * escrita aqui em linha, seria exatamente o tipo de guarda que nenhum teste de
+   * mutação consegue quebrar de propósito. */
+  const envioFalhasN = contagemMedida(envioFalhas);
+  const envioFeitosN = contagemMedida(envioFeitos);
+  const julgamentoEnvio = envioSentinelaJulgavel({
+    falhas: envioFalhasN,
+    feitos: envioFeitosN,
+  });
+  if (julgamentoEnvio.julgar) {
+    marcar(TIPO_ENVIO_SENTINELA, CHAVE_ENVIO_FALHANDO);
+    const a = vigiaEnvioSentinela({ falhas: envioFalhasN, feitos: envioFeitosN });
+    if (a) alertas.push(a);
+  } else if (envioFalhasN === null || envioFeitosN === null) {
+    /* Aviso SÓ quando não julgar significa não ter medido.
+     *
+     * A tentação era `else { avisos.push(...) }`, simétrico com os blocos acima
+     * — e ali está certo, porque neles não julgar é sempre falha de leitura.
+     * Aqui não é: seis das oito passagens diárias veem janela vazia por
+     * desenho, e um aviso a cada uma encheria `avisos` de não-evento seis vezes
+     * por dia. Canal de aviso que vive cheio para de ser lido, e quando parar de
+     * ser lido vai levar junto o aviso que importa. O motivo do não-julgamento
+     * não se perde: está em `medido.sentinela_envio_motivo`, sempre. */
+    avisos.push(`envio_sentinela: nao julgado (${julgamentoEnvio.motivo})`);
+  }
+
+  // 7. quarentena — volume e reincidência. Duas condições, duas naturezas:
   //    volume alto = a fonte piorou AGORA; reincidência = uma carta específica é
   //    lixo permanente do lado do fornecedor, e nenhum ciclo nosso conserta.
   /* `?? []` era o mais traiçoeiro dos quatro: lista vazia não é um número
@@ -600,7 +669,7 @@ export async function GET(req: Request) {
     }
   }
 
-  // 7. handoff mudo — o bastão passou e o agente novo nunca abriu a boca.
+  // 8. handoff mudo — o bastão passou e o agente novo nunca abriu a boca.
   //
   // CHAVE ÚNICA DE VOLUME, e não uma por conversa. Medido em 21/08/2026 são 16
   // conversas neste estado; o painel corta em TETO_LINHAS = 12
@@ -704,6 +773,19 @@ export async function GET(req: Request) {
       hora_sp: horaSP(agora),
       fila_sentinela_esperando: filaEsperando,
       fila_sentinela_julgada: filaEsperando !== null,
+      // O envio, que a fila acima NAO enxerga: entre 17 e 19/08 a fila nao
+      // envelhecia e 75 envios eram recusados no mesmo periodo. Os dois
+      // contadores vao lado a lado porque `falhas` sozinho nao separa "recusou
+      // 15 de 15" de "recusou 15 de 200".
+      sentinela_envio_falhas: envioFalhasN,
+      sentinela_envio_feitos: envioFeitosN,
+      // Aqui o par `julgado`/`motivo` carrega mais informacao que nos outros,
+      // e de proposito. Nos demais, nao julgar e sempre falha de leitura. Neste,
+      // o caso COMUM e legitimo: a varredura roda oito vezes por dia e o
+      // Sentinela envia duas, entao seis passagens veem janela vazia por
+      // desenho. Sem o motivo escrito, "nao julgado" pareceria pane.
+      sentinela_envio_julgado: julgamentoEnvio.julgar,
+      sentinela_envio_motivo: julgamentoEnvio.motivo,
       // Os dois lado a lado, sempre. Foi a distância entre eles que desfez o
       // relatório de "95 cartas barradas": são 95 EVENTOS e 4 CARTAS. Null aqui
       // quer dizer "não julgado" — erro de leitura ou saturação —, nunca zero.
