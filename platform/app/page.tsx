@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/Badge";
 import { CartasNovasFeed } from "@/components/CartasNovasFeed";
 import { LABEL_STATUS, TONE_STATUS_PROCESSO, type StatusProcesso } from "@/lib/status";
 import { cartasNovas, type CartaFluxo } from "@/lib/cartas-fluxo";
+import { lerLinhasVitrine } from "@/lib/vitrine-fonte";
+import { paraFluxo } from "@/lib/vitrine";
 import styles from "./home.module.css";
 
 export const dynamic = "force-dynamic";
@@ -64,15 +66,22 @@ export default async function Home() {
   }
 
   // Feed NEUTRO de cartas novas (client-safe): só cartas disponíveis, recorte
-  // factual por janela de dias. RLS limita a leitura ao que o usuário pode ver.
-  // Sem ranking/score/custo — compliance (ver lib/cartas-fluxo.cartasNovas).
-  const { data: cartasDisp } = await supabase
-    .from("cartas")
-    .select("id, tipo, valor_credito, valor_entrada, valor_parcela, qtd_parcelas, status, criado_em")
-    .eq("status", "disponivel")
-    .order("criado_em", { ascending: false })
-    .limit(60);
-  const listaCartas = (cartasDisp ?? []) as (CartaFluxo & { tipo?: string })[];
+  // factual por janela de dias. Sem ranking/score/custo — compliance (ver
+  // lib/cartas-fluxo.cartasNovas).
+  //
+  // CATALOGO-UNIFICA-01 · FASE 2: a fonte deixou de ser `nnv.cartas` (medido em
+  // 19/08: 2 linhas, 0 disponíveis — este feed NUNCA teve o que mostrar) e passou
+  // a ser `xtv.vw_vitrine_viva`, a mesma do site público. O `limit` continua
+  // pequeno de propósito: a janela é de 7 dias e o corte é de 6 itens, então
+  // pedir o catálogo inteiro para jogar fora 99% dele seria desperdício.
+  //
+  // REGRA 19: `lerLinhasVitrine` separa falha de zero. O `?? []` de antes
+  // transformava fonte caída em "nenhuma carta nova" — e como o feed some
+  // quando é zero, a falha era literalmente invisível. `falhou` conserta isso.
+  const leituraFeed = await lerLinhasVitrine({ limite: 60, ordem: "novidade" });
+  const listaCartas: (CartaFluxo & { tipo?: string })[] = leituraFeed.ok
+    ? leituraFeed.dados.map((l) => ({ ...paraFluxo(l), tipo: l.tipo }))
+    : [];
   const novas = cartasNovas(listaCartas, { dias: 7, limite: 6 });
 
   const nome = profile?.nome ?? user.email ?? "visitante";
@@ -98,7 +107,7 @@ export default async function Home() {
         </div>
       )}
 
-      <CartasNovasFeed novas={novas} />
+      <CartasNovasFeed novas={novas} falhou={!leituraFeed.ok} />
 
       <div className={styles.grid}>
         <Card href="/meu-processo">

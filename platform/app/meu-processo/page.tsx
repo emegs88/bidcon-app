@@ -21,6 +21,7 @@ import {
   type StatusDocumento,
 } from "@/lib/status";
 import { brl, dataBR } from "@/lib/format";
+import { WA_PROSPERITO } from "@/lib/vitrine";
 import { resumoSinal } from "@/lib/sinal";
 import { cpfValido } from "@/lib/kyc";
 import {
@@ -37,7 +38,9 @@ import styles from "./processo.module.css";
 import fluxo from "./fluxo.module.css";
 
 // contatos oficiais do cliente (públicos). Instagram @bidcon.br.
-const WA = "5519997561909";
+// O WhatsApp vem de `lib/vitrine.ts` (linha da WABA viva) — esta tela é de
+// cliente com processo aberto, exatamente quem não pode cair em porta vazia.
+const WA = WA_PROSPERITO;
 const EMAIL = "contato@prospere.com.br";
 const INSTAGRAM = "bidcon.br";
 
