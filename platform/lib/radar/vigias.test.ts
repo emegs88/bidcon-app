@@ -54,7 +54,14 @@ import {
   TIPO_FAROL,
   TIPO_FILA_SENTINELA,
   TIPO_ENVIO_SENTINELA,
+  TIPO_HANDOFF,
+  CHAVE_HANDOFF_MUDO,
+  HANDOFF_MUDO_MINIMO,
+  HORAS_HANDOFF_GRAVE,
+  MINUTOS_HANDOFF_MUDO,
+  vigiaHandoffMudo,
   FALHAS_NO_CICLO,
+  envioSentinelaJulgavel,
   vigiaEnvioSentinela,
   vigiaDivergenciaSync,
   vigiaEstoqueNivel,
@@ -477,9 +484,14 @@ test("fila: vazia nao alarma, e 'sem data' tambem nao", () => {
 // falhou 7 !== 6 quando o tipo entrou, que e exatamente o que ele existe para
 // fazer — a trava funcionou e me obrigou a escrever esta linha em vez de
 // deixar um vigia novo aparecer no painel sem ninguem ter decidido.
-test("tipos: sete condicoes, sem repetidos — o painel agrupa por aqui", () => {
-  assert.equal(TIPOS_RADAR.length, 7);
-  assert.equal(new Set(TIPOS_RADAR).size, 7, "tipo repetido misturaria vigias na tela");
+//
+// OITAVO, DECLARADO: `handoff` (VIGIA 9), 21/08/2026 — HANDOFF-01 item (c).
+// A trava disparou de novo, 8 !== 7, e de novo fez o trabalho dela: o tipo
+// novo aparece no painel porque alguem escreveu esta linha, nao porque passou
+// despercebido.
+test("tipos: oito condicoes, sem repetidos — o painel agrupa por aqui", () => {
+  assert.equal(TIPOS_RADAR.length, 8);
+  assert.equal(new Set(TIPOS_RADAR).size, 8, "tipo repetido misturaria vigias na tela");
   for (const t of TIPOS_RADAR) {
     assert.ok(t.length > 0 && t === t.toLowerCase(), `tipo '${t}' fora do padrao snake_case`);
   }
@@ -499,6 +511,8 @@ test("alerta: todo alerta aberto tem titulo legivel e detalhe com numeros", () =
     }),
     // O ciclo real de 19/08/2026: 15 recusas, nenhuma entrega.
     vigiaEnvioSentinela({ falhas: 15, feitos: 0 }),
+    // A medicao real de 21/08/2026: 16 conversas, a mais antiga com 386h.
+    vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 }),
   ];
   for (const a of abertos) {
     assert.ok(a, "fixture montada para abrir alerta");
@@ -668,4 +682,235 @@ test("VIGIA 8 — REGRA 19: feitos nao medidos ainda ALARMAM, com o null visivel
   assert.equal(a.severidade, "aviso", "sem medir entregas nao se afirma pane");
   assert.equal(a.detalhe.feitos, null, "o null tem de viajar visivel ate quem le");
   assert.ok(a.titulo.includes("não medidos"));
+});
+
+// ---------------------------------------------------------------------------
+// A GUARDA DO VIGIA 8 — o silencio dele nao pode virar absolvicao
+// ---------------------------------------------------------------------------
+//
+// Os testes acima provam que o vigia CALA nos casos certos. Estes provam a
+// pergunta seguinte, que e outra: quando ele cala, a varredura tem direito de
+// FECHAR o alerta aberto?
+//
+// A distancia entre as duas e onde mora o defeito. `vigiaEnvioSentinela` cala
+// identico em "0 falhas de 15 entregues" (casa saudavel) e em "0 falhas de 0
+// tentativas" (ninguem tentou). Se as duas chegarem a FASE 3 como "condicao
+// julgada", a segunda fecha um alerta legitimo de pane usando como prova o
+// silencio do relogio.
+//
+// E o caso comum, nao a borda: o Sentinela envia em `0 12,18 * * *` (2x/dia) e
+// a varredura roda de 3 em 3h no minuto 20 (8x/dia, olhando 3h atras). Seis das oito
+// passagens veem janela vazia POR DESENHO.
+//
+// Por isso varios testes aqui casam as DUAS funcoes: nao basta a guarda
+// responder certo isolada, ela tem de responder certo sobre a entrada exata em
+// que o vigia ficou calado.
+
+test("GUARDA 8 — o caso de seis-em-oito: janela vazia NAO julga", () => {
+  /* A entrada medida em 23/08/2026 as 05h15 SP: ultimo envio 21/08 12:01,
+   * 44,2h atras, zero tentativas na janela de 3h. O vigia cala — e esta certo
+   * em calar. A guarda tem de impedir que esse silencio vire absolvicao. */
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 0 }), null, "o vigia cala");
+  const g = envioSentinelaJulgavel({ falhas: 0, feitos: 0 });
+  assert.equal(g.julgar, false, "calar por janela vazia NAO pode fechar alerta");
+  assert.ok(g.motivo, "nao julgar sem motivo escrito e nao julgar em silencio");
+});
+
+test("GUARDA 8 — o ciclo limpo de 19/08 JULGA, e e ele que fecha a pane", () => {
+  /* O outro lado, e o que da valor ao vigia: 19/08 18:00 UTC, 0 falhas e 14
+   * entregues. Se a guarda tambem calasse aqui, o alerta dos cinco ciclos
+   * graves ficaria aberto para sempre e alguem teria de fechar na mao — que e
+   * como um vigia perde a confianca da casa. */
+  assert.equal(vigiaEnvioSentinela({ falhas: 0, feitos: 14 }), null, "o vigia cala");
+  assert.equal(envioSentinelaJulgavel({ falhas: 0, feitos: 14 }).julgar, true);
+  assert.equal(envioSentinelaJulgavel({ falhas: 0, feitos: 1 }).julgar, true);
+});
+
+test("GUARDA 8 — porta 1: falhas nao medidas NAO julgam", () => {
+  /* Regra 19 do lado do fechamento. `?? 0` aqui faria a leitura falha do
+   * sentinela_log virar "zero falhas, ciclo limpo" — e fechar a pane. */
+  assert.equal(envioSentinelaJulgavel({ falhas: null, feitos: 14 }).julgar, false);
+  assert.equal(envioSentinelaJulgavel({ falhas: Number.NaN, feitos: 14 }).julgar, false);
+});
+
+test("GUARDA 8 — porta 2 vem ANTES da 3: falhas acima do limite julgam sem feitos", () => {
+  /* A ordem das portas nao e estilo. O vigia foi escrito para ALARMAR com
+   * `feitos: null` quando as falhas foram medidas (teste acima). Se a guarda
+   * testasse `feitos === null` primeiro, ela suprimiria esse alerta — a guarda
+   * contra fechamento indevido viraria mordaca de alarme legitimo, que e um
+   * defeito pior do que o que ela veio consertar. */
+  assert.ok(vigiaEnvioSentinela({ falhas: 15, feitos: null }), "o vigia alarma");
+  assert.equal(envioSentinelaJulgavel({ falhas: 15, feitos: null }).julgar, true);
+  assert.equal(envioSentinelaJulgavel({ falhas: 15, feitos: null }).motivo, null);
+  // e na fronteira exata do limiar, do lado de dentro
+  assert.equal(envioSentinelaJulgavel({ falhas: FALHAS_NO_CICLO, feitos: null }).julgar, true);
+});
+
+test("GUARDA 8 — porta 3: poucas falhas com entregues nao medidos NAO julgam", () => {
+  /* A fronteira do teste acima, um passo para fora. Duas falhas nao alarmam, e
+   * sem saber quantas entregas houve tambem nao se afirma que o ciclo foi
+   * saudavel. Quem nao pode afirmar isso nao tem direito de fechar. */
+  const g = envioSentinelaJulgavel({ falhas: FALHAS_NO_CICLO - 1, feitos: null });
+  assert.equal(g.julgar, false);
+  assert.ok(g.motivo);
+});
+
+test("GUARDA 8 — CONTROLE: existe caminho para o fechamento automatico", () => {
+  /* Regra 9 aplicada a propria guarda. Uma guarda que nunca deixa julgar e
+   * indistinguivel de uma condicao que ninguem mede — e o alerta ficaria aberto
+   * para sempre sem que nada acusasse. Este teste falha no dia em que alguem
+   * apertar a guarda a ponto de fechar a unica porta de saida. */
+  const casos = [
+    { falhas: 0, feitos: 14 },
+    { falhas: 1, feitos: 14 },
+    { falhas: 15, feitos: 0 },
+  ];
+  for (const c of casos) {
+    assert.equal(envioSentinelaJulgavel(c).julgar, true, JSON.stringify(c));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// VIGIA 9 — handoff mudo: o bastao passou e ninguem pegou
+// ---------------------------------------------------------------------------
+//
+// O CASO REAL, medido em producao em 21/08/2026: 16 conversas ativas cujo
+// `agente_ativo` nunca falou uma linha. Nao sao 40 — esse foi o meu numero
+// errado, e o erro esta preso num teste mais abaixo para nao voltar.
+
+test("VIGIA 9 — as 16 de 21/08: grave, chave unica, contagem no titulo", () => {
+  const a = vigiaHandoffMudo({
+    mudas: 16,
+    maisAntigaHoras: 386,
+    porAgente: { valentina: 10, caetano: 3, tobias: 2, bento: 1 },
+  });
+  assert.ok(a);
+  assert.equal(a.tipo, TIPO_HANDOFF);
+  assert.equal(a.chave, CHAVE_HANDOFF_MUDO);
+  assert.equal(a.severidade, "grave", "16 dias de espera nao e aviso");
+  assert.equal(a.detalhe.mudas, 16);
+  assert.equal(a.detalhe.mais_antiga_horas, 386);
+  assert.ok(a.titulo.includes("16"), "a contagem vive no titulo: e a chave que nao varia");
+  assert.deepEqual(a.detalhe.por_agente, { valentina: 10, caetano: 3, tobias: 2, bento: 1 });
+});
+
+test("VIGIA 9 — CHAVE ESTAVEL: 16 conversas dao UM alerta, nao 16", () => {
+  /* O painel corta em TETO_LINHAS = 12 (app/admin/RadarAlertas.tsx). Uma chave
+   * por conversa abriria 16 linhas e empurraria os outros oito vigias para
+   * fora da tela — divida historica apagando a vigilancia corrente. Se alguem
+   * um dia trocar a chave por `mudo:<conversa_id>`, este teste cai. */
+  const hoje = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 });
+  const amanha = vigiaHandoffMudo({ mudas: 3, maisAntigaHoras: 50 });
+  assert.ok(hoje && amanha);
+  assert.equal(hoje.chave, amanha.chave, "a condicao e uma so; o que muda e a contagem");
+  assert.ok(!hoje.chave.includes("16"), "numero na chave abriria alerta novo a cada varredura");
+});
+
+test("VIGIA 9 — REGRA 19: contagem nao medida NAO julga", () => {
+  /* `?? 0` na rota faria RPC ausente (0089 nao aplicada) ou falha de rede virar
+   * "nenhuma conversa muda". Pior: o chamador marcaria a condicao como julgada
+   * e a FASE 3 FECHARIA o alerta legitimo que estivesse aberto. A falha de
+   * leitura teria apagado o alerta que ela deveria ter aberto. */
+  assert.equal(vigiaHandoffMudo({ mudas: null, maisAntigaHoras: null }), null);
+  assert.equal(vigiaHandoffMudo({ mudas: Number.NaN, maisAntigaHoras: 386 }), null);
+});
+
+test("VIGIA 9 — idade nao medida ALARMA, mas nao promove a grave", () => {
+  /* A outra ponta da Regra 19, a mesma do VIGIA 8: as conversas FORAM contadas.
+   * Calar sobre 16 porque a idade nao veio seria trocar um alerta certo por um
+   * silencio comodo. O que cai e a severidade — severidade alta precisa de
+   * prova, e "ha quanto tempo" e justamente a prova que faltou. */
+  const a = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: null });
+  assert.ok(a, "16 conversas contadas nao podem ficar caladas");
+  assert.equal(a.severidade, "aviso");
+  assert.equal(a.detalhe.mais_antiga_horas, null, "o null viaja visivel ate quem le");
+  assert.ok(a.titulo.includes("não medida"));
+  // CONTROLE: a MESMA contagem, com idade medida acima do limiar, TEM de
+  // agravar. Sem esta linha, o aviso acima seria indistinguivel de um vigia
+  // que perdeu a capacidade de ficar grave.
+  const comIdade = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: HORAS_HANDOFF_GRAVE });
+  assert.ok(comIdade);
+  assert.equal(comIdade.severidade, "grave");
+});
+
+test("VIGIA 9 — a fronteira da severidade: 23,9h avisa, 24h agrava", () => {
+  const quase = vigiaHandoffMudo({ mudas: 2, maisAntigaHoras: HORAS_HANDOFF_GRAVE - 0.1 });
+  assert.ok(quase);
+  assert.equal(quase.severidade, "aviso");
+  const exato = vigiaHandoffMudo({ mudas: 2, maisAntigaHoras: HORAS_HANDOFF_GRAVE });
+  assert.ok(exato);
+  assert.equal(exato.severidade, "grave");
+});
+
+test("VIGIA 9 — SILENCIO na casa saudavel: zero conversas mudas", () => {
+  /* O estado que a abertura ativa do handoff (item (a)) deve produzir. Quando
+   * ele chegar, este vigia tem de CALAR — e ai o silencio dele sera a prova de
+   * que o conserto funcionou, nao ausencia de vigilancia. */
+  assert.equal(vigiaHandoffMudo({ mudas: 0, maisAntigaHoras: null }), null);
+  assert.equal(
+    vigiaHandoffMudo({ mudas: HANDOFF_MUDO_MINIMO - 1, maisAntigaHoras: null }),
+    null,
+    "a fronteira, colada no gatilho"
+  );
+  assert.ok(
+    vigiaHandoffMudo({ mudas: HANDOFF_MUDO_MINIMO, maisAntigaHoras: 1 }),
+    "uma conversa muda ja e uma pessoa esperando: o limiar e 1, e declarado"
+  );
+});
+
+test("VIGIA 9 — o titulo NAO precisa ser estavel, e isso e deliberado", () => {
+  /* O VIGIA 4 tem o teste oposto: la o titulo TEM de ser identico entre
+   * varreduras, porque `radar_registrar` reescreve `titulo` a cada ocorrencia
+   * enquanto o painel imprime "aberta ha X" vindo de `primeira_vez` — e um
+   * relogio de OBSERVACAO no titulo contradizia essa data.
+   *
+   * Aqui a contagem e a idade nao sao relogio de observacao: sao a medicao. Um
+   * alerta que diz "16 conversas" quando ja sao 3 estaria mentindo para manter
+   * uma estabilidade que ninguem pediu. E "a mais antiga ha 386h" nao contradiz
+   * "aberta ha 3h" — a conversa e mais velha que o alerta, o que e verdade e e
+   * justamente a informacao util. */
+  const antes = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 });
+  const depois = vigiaHandoffMudo({ mudas: 3, maisAntigaHoras: 50 });
+  assert.ok(antes && depois);
+  assert.notEqual(antes.titulo, depois.titulo, "o titulo acompanha a medicao");
+  assert.ok(depois.titulo.includes("3") && !depois.titulo.includes("16"));
+});
+
+test("VIGIA 9 — a regua do filtro viaja no detalhe, para o alerta nao mentir sobre ela", () => {
+  /* A janela de 30 minutos e aplicada na RPC (0089) e o vigia nunca a ve. Se um
+   * dia a consulta filtrar 60 e esta constante disser 30, o alerta descreveria
+   * uma regua que nao foi usada. Ter o numero no detalhe e o que torna essa
+   * divergencia visivel em vez de silenciosa. */
+  const a = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 });
+  assert.ok(a);
+  assert.equal(a.detalhe.minutos_minimos, MINUTOS_HANDOFF_MUDO);
+  assert.equal(a.detalhe.limite, HANDOFF_MUDO_MINIMO);
+  assert.equal(a.detalhe.horas_grave, HORAS_HANDOFF_GRAVE);
+});
+
+test("VIGIA 9 — sem quebra por agente, sem campo (nao um objeto vazio)", () => {
+  const sem = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 });
+  assert.ok(sem);
+  assert.ok(!("por_agente" in (sem.detalhe as object)), "campo vazio e ruido no painel");
+  const vazio = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386, porAgente: {} });
+  assert.ok(vazio);
+  assert.ok(!("por_agente" in (vazio.detalhe as object)));
+});
+
+test("VIGIA 9 — o erro que eu cometi: 40 nao era o numero, era 16", () => {
+  /* Preso aqui porque foi um erro de MEDICAO, nao de codigo, e erro de medicao
+   * volta calado. Eu contei como "handoff mudo" toda conversa em que algum
+   * remetente com papel='prosperito' ja havia falado. Mas `sentinela` (104
+   * mensagens), `sistema_extrato` (23) e `farol-comenta` (2) sao DISPARADORES,
+   * nao agentes de conversa: 25 conversas so tinham recebido disparo, e handoff
+   * nenhum havia acontecido nelas. 40 - 25 + 1 = 16.
+   *
+   * O vigia nao consegue se defender disso — quem separa agente de disparador e
+   * a RPC, derivando a lista de `wa_conversas.agente_ativo` em vez de digitar
+   * oito nomes a mao. Este teste e o marco da diferenca entre os dois numeros. */
+  const errado = vigiaHandoffMudo({ mudas: 40, maisAntigaHoras: 386 });
+  const certo = vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 });
+  assert.ok(errado && certo);
+  assert.ok(errado.titulo.includes("40") && certo.titulo.includes("16"));
+  assert.equal(errado.chave, certo.chave, "os dois descrevem a MESMA condicao");
 });
