@@ -1,15 +1,37 @@
 // ============================================================================
 // CARTA-IDENTIDADE-01 — desambiguar carta quando só existe o número.
 // ----------------------------------------------------------------------------
-// O QUE FOI MEDIDO (xtv, 23/08/2026), e que motiva este arquivo:
+// O QUE FOI MEDIDO (xtv, vw_carousel_cartas). Duas colunas porque a segunda
+// medição desmentiu a primeira — e para pior. Ficam as duas: uma linha só diria
+// "é assim", e duas dizem "está PIORANDO", que é outra informação.
 //
-//   cartas na vitrine viva (vw_carousel_cartas) .............. 2.306
-//   refs distintos ........................................... 1.345
-//   refs AMBÍGUOS (mais de uma carta sob o mesmo número) ....... 956
-//   cartas envolvidas nesses refs ........................... 1.912  (83%)
-//   refs ambíguos que misturam IMÓVEL e VEÍCULO ................ 545
-//   maior diferença de crédito sob um mesmo ref ..... R$ 1.864.310
-//   diferença média ................................... R$ 161.063
+//                                                    23/08        28/08
+//   cartas na vitrine viva ....................      2.306        2.295
+//   refs distintos ............................      1.345        1.232
+//   refs AMBÍGUOS (>1 carta sob o mesmo ref) ..        956        1.061
+//   cartas envolvidas nesses refs .............      1.912        2.124
+//        ... como fatia da vitrine ............        83%        92,5%
+//   refs ambíguos que misturam IMÓVEL e VEÍCULO        545          641
+//   maior diferença de crédito sob um ref ..... R$ 1.864.310  R$ 1.389.251
+//   diferença média ........................... R$   161.063  R$   167.468
+//
+// O CONTROLE que a Regra 9 exige, e que faltava na primeira medição: quantos
+// refs continuariam ambíguos DEPOIS de desempatar por (crédito, entrada)?
+//
+//   refs ambíguos que o par (crédito, entrada) NÃO resolve ......... 0
+//
+// Zero em 1.061. Isso não é promessa de que `ainda_ambiguo` nunca acontece — o
+// caminho existe e é testado, porque duas cartas com mesmo ref, mesmo crédito e
+// mesma entrada são indistinguíveis com o que o cliente viu na tela. É a prova
+// de que, no acervo de hoje, o desempate escolhido resolve o problema inteiro em
+// vez de metade dele. Se esse zero virar diferente de zero, o caminho de
+// escalonamento é que passa a carregar o peso — e aí vale re-medir antes de
+// culpar a rota.
+//
+// NOTA DE COLUNA: a view expõe `ref` / `credito` / `entrada`; a TABELA `cartas`,
+// que /api/atende consulta, usa `numero_externo` / `valor_credito` /
+// `valor_entrada`. Os nomes deste arquivo seguem a TABELA, que é o que chega
+// aqui. Medir na view e escrever para a tabela é fácil de confundir.
 //
 // O caso concreto que abriu a investigação: `numero_externo = 1`, mesma
 // `fonte` ('360prospere'), duas cartas disponíveis —
