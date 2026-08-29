@@ -7,10 +7,19 @@
 // `excluido`. E `sum(tentativas) = 0` na tabela inteira: ninguém foi tocado
 // nunca. O resumo tem de conseguir dizer isso.
 //
-// O teste que mais importa é o do status desconhecido. `erro` existe no enum e
-// não aparecia em lista nenhuma do código. Uma partição por `!encerrado`
-// classificaria um status novo como "esperando" e inflaria a fila; a partição
-// inversa o esconderia. As duas mentem. Aqui ele aparece com o nome dele.
+// O teste que mais importa é o do status desconhecido. Uma partição por
+// `!encerrado` classificaria um status novo como "esperando" e inflaria a
+// fila; a partição inversa o esconderia. As duas mentem. Aqui ele aparece com
+// o nome dele.
+//
+// ----------------------------------------------------------------------------
+// A SEGUNDA FIXTURE, DE 29/08/2026 — E POR QUE ELA EXISTE
+//
+// A fila de 16/08 continua aqui porque um número medido não se joga fora. Mas
+// em 29/08 a fila tinha OUTRA cara: 52 linhas, e 26 delas (metade) caíam em
+// `desconhecidas` porque cinco status haviam nascido no enum sem que este
+// código soubesse. `FILA_29_08` trava esse dia. Se alguém encolher as listas
+// de novo, é ela que quebra — com o número exato na mensagem.
 // ============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -52,11 +61,32 @@ const FILA_REAL: LinhaFila[] = [
   ...Array.from({ length: 4 }, () => linha({ status: "excluido", criado_em: EM_04_08 })),
 ];
 
+/**
+ * A fila real de 29/08/2026, contada no banco: 25 `encerrado_por_silencio`,
+ * 16 `enviado`, 7 `excluido`, 3 `respondeu`, 1 `duplicado_telefone`.
+ */
+const FILA_29_08: LinhaFila[] = [
+  ...Array.from({ length: 25 }, () => linha({ status: "encerrado_por_silencio" })),
+  ...Array.from({ length: 16 }, () =>
+    linha({ status: "enviado", criado_em: "2026-08-25T12:00:43.000000+00:00", tentativas: 1 })
+  ),
+  ...Array.from({ length: 7 }, () => linha({ status: "excluido" })),
+  ...Array.from({ length: 3 }, () => linha({ status: "respondeu" })),
+  linha({ status: "duplicado_telefone" }),
+];
+
 // ---------------------------------------------------------------------------
 // A PARTIÇÃO
 // ---------------------------------------------------------------------------
 
-test("as duas listas cobrem os sete status do enum, sem sobra e sem repetir", () => {
+test("as duas listas cobrem os doze status do enum, sem sobra e sem repetir", () => {
+  // Os doze valores de `sentinela_status`, lidos do banco em 29/08/2026. Eram
+  // sete quando este teste nasceu. Esta lista é escrita à MÃO e não tem como
+  // se atualizar sozinha: teste offline não alcança um enum de Postgres. Então
+  // ela envelhece igual ao cabeçalho do módulo — e envelheceu, treze dias.
+  // Quem crescer o enum: cresça aqui junto. E entenda que este teste NÃO é a
+  // defesa contra o esquecimento; a defesa é o contador `desconhecidas`, que
+  // acende sozinho quando uma linha chega com nome que ninguém previu.
   const enumMedido = [
     "pendente",
     "aguardando_template",
@@ -65,6 +95,11 @@ test("as duas listas cobrem os sete status do enum, sem sobra e sem repetir", ()
     "esgotado",
     "excluido",
     "erro",
+    "encerrado_por_silencio",
+    "encerrada_cordialmente",
+    "handoff_humano",
+    "duplicado_telefone",
+    "erro_permanente",
   ];
   // `string[]` de propósito: as duas constantes são de literais, e um
   // `includes` sobre elas recusaria `string` no tsc — o teste passaria no tsx,
@@ -84,14 +119,48 @@ test("'respondeu' e o rotulo do banco — 'respondido' nao existe", () => {
 });
 
 test("status novo nao vira espera nem some — aparece como desconhecido", () => {
-  const r = resumirFila([linha({ status: "encerrado_por_silencio" })], AGORA);
+  // O exemplo aqui era `encerrado_por_silencio` até 29/08/2026, quando medi o
+  // enum e descobri que ele tinha VIRADO STATUS REAL — com 25 linhas vivas. Ao
+  // colocá-lo em STATUS_ENCERRADOS este teste continuaria VERDE testando nada:
+  // `desconhecidas` daria 0 e o assert de 1 quebraria... e se eu tivesse
+  // escrito `>= 0` por descuido, passaria mudo para sempre. Por isso o exemplo
+  // agora é um nome que NÃO PODE virar real: não é candidato a status nenhum.
+  const NUNCA_SERA_STATUS = "status_que_nao_existe_no_enum_zzz";
+  const r = resumirFila([linha({ status: NUNCA_SERA_STATUS })], AGORA);
   assert.equal(r.total, 1);
   assert.equal(r.esperando, 0, "status novo nao infla a fila");
   assert.equal(r.encerradas, 0);
   assert.equal(r.desconhecidas, 1);
-  const g = r.porStatus.find((x) => x.status === "encerrado_por_silencio");
+  const g = r.porStatus.find((x) => x.status === NUNCA_SERA_STATUS);
   assert.ok(g);
   assert.equal(g.conhecido, false, "o painel precisa poder gritar sobre ele");
+});
+
+test("os cinco status que faltavam nao caem mais em desconhecidas", () => {
+  // A regressão que esta fatia existe para impedir. Em 29/08 estes cinco
+  // estavam no enum e fora do código: 26 das 52 linhas da fila — METADE —
+  // eram classificadas como "não sei".
+  const r = resumirFila(
+    [
+      linha({ status: "encerrado_por_silencio" }),
+      linha({ status: "encerrada_cordialmente" }),
+      linha({ status: "duplicado_telefone" }),
+      linha({ status: "erro_permanente" }),
+      linha({ status: "handoff_humano" }),
+    ],
+    AGORA
+  );
+  assert.equal(r.desconhecidas, 0, "os cinco sao conhecidos agora");
+  assert.equal(r.encerradas, 4, "quatro sairam da fila");
+  assert.equal(r.esperando, 1, "handoff_humano ainda espera — de gente, mas espera");
+});
+
+test("handoff_humano e ESPERA: o robo parou, o atendimento nao", () => {
+  // Julgamento, não leitura — e por isso está travado aqui em vez de morar só
+  // num comentário. Se a casa decidir o contrário, é este assert que cai
+  // primeiro, e a decisão fica visível no diff em vez de silenciosa.
+  assert.equal(estaEsperando("handoff_humano"), true);
+  assert.equal(estaEncerrada("handoff_humano"), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -104,6 +173,19 @@ test("a fila real de 16/08: 30 linhas, 26 esperando, 4 encerradas", () => {
   assert.equal(r.esperando, 26, "21 aguardando_template + 5 pendente");
   assert.equal(r.encerradas, 4);
   assert.equal(r.desconhecidas, 0);
+});
+
+test("a fila de 29/08: 52 linhas, e NENHUMA desconhecida", () => {
+  const r = resumirFila(FILA_29_08, new Date("2026-08-29T12:00:00.000Z"));
+  assert.equal(r.total, 52);
+  assert.equal(
+    r.desconhecidas,
+    0,
+    "antes desta fatia eram 26 — metade da fila classificada como 'nao sei'"
+  );
+  assert.equal(r.esperando, 16, "so os 16 enviado ainda esperam");
+  assert.equal(r.encerradas, 36, "25 silencio + 7 excluido + 3 respondeu + 1 duplicado");
+  assert.equal(r.total, r.esperando + r.encerradas + r.desconhecidas, "a conta fecha");
 });
 
 test("a mais antiga que ESPERA e a de 04/08 — onze dias", () => {
