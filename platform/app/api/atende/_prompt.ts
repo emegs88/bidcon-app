@@ -90,6 +90,17 @@
  *  route.ts (site) chama montarSystem(agente, 'site').
  * ========================================================================== */
 
+// OUVIDO-01 v2 (d) — PRIMEIRO import deste arquivo, e ele é de propósito.
+// A marca "[áudio transcrito]" é ESCRITA por lib/whatsapp/transcricao.ts e LIDA
+// pelo modelo através do texto abaixo. Se as duas pontas fossem duas strings
+// literais, o dia em que alguém reescrevesse a marca no código deixaria este
+// prompt falando de uma marca que não chega mais — e o aviso viraria enfeite
+// sem nenhum portão acusando. Importando a constante, as duas pontas não têm
+// como divergir: ou mudam juntas, ou o `tsc` reclama.
+// `tipos.ts` é módulo puro (constantes e funções sem rede, sem Supabase), então
+// entra aqui sem arrastar dependência nenhuma para o caminho do prompt.
+import { PREFIXO_TRANSCRICAO } from '@/lib/whatsapp/tipos';
+
 export type AgenteId =
   | 'prosperito' | 'valentina' | 'caetano'
   | 'serena' | 'tobias' | 'aurora' | 'bento'
@@ -314,11 +325,36 @@ ORDEM OBRIGATÓRIA DENTRO DA RESPOSTA
 }
 
 /* ----------------------------------------------------------------------------
+ *  OUVIDO-01 v2 (d) — ÁUDIO TRANSCRITO. Só no canal whatsapp, e isso é medido,
+ *  não suposto: a transcrição grava em `wa_mensagens.conteudo` (tabela do
+ *  WhatsApp); o canal 'site' lê `conversas`, outra tabela, que áudio nenhum
+ *  alcança. Avisar a persona do site sobre uma marca que não pode chegar até
+ *  ela seria ensinar o modelo a desconfiar de um texto que sempre foi digitado
+ *  — barulho, no melhor caso, e hesitação inventada no pior.
+ *
+ *  POR QUE O AVISO EXISTE: até esta fatia, áudio virava turno vazio e o cliente
+ *  não era respondido. Agora ele é — mas por um texto que uma MÁQUINA ouviu.
+ *  Whisper erra justamente onde dói nesta casa: dígito de valor, número de
+ *  grupo/cota e nome próprio. "cento e setenta mil" e "cento e setenta e sete
+ *  mil" são um fonema de distância, e a segunda reserva a carta errada.
+ * -------------------------------------------------------------------------- */
+const AVISO_TRANSCRICAO = `
+ÁUDIO TRANSCRITO (mensagens que começam com ${PREFIXO_TRANSCRICAO})
+- Quando a mensagem do cliente vier marcada com ${PREFIXO_TRANSCRICAO}, ela é a fala dele
+  convertida em texto por transcrição automática — trate como fala normal e responda como
+  responderia a qualquer mensagem escrita.
+- Mensagens ${PREFIXO_TRANSCRICAO} podem conter erros de transcrição — na dúvida sobre número
+  ou nome, confirme com o cliente antes de agir.
+`.trim();
+
+/* ----------------------------------------------------------------------------
  *  montarPromptBase — monta a base completa (comum + apresentação de carta
- *  do canal + busca de estoque/ordem + compliance).
+ *  do canal + busca de estoque/ordem + aviso de transcrição (whatsapp) +
+ *  compliance).
  * -------------------------------------------------------------------------- */
 function montarPromptBase(canal: Canal): string {
   const apresentacao = canal === 'site' ? APRESENTACAO_SITE : APRESENTACAO_WHATSAPP;
+  const avisoAudio = canal === 'site' ? '' : `${AVISO_TRANSCRICAO}\n\n`;
   return `
 ${PROMPT_BASE_COMUM}
 
@@ -326,7 +362,7 @@ ${apresentacao}
 
 ${buscaEstoqueEOrdem(canal)}
 
-${COMPLIANCE}
+${avisoAudio}${COMPLIANCE}
 `.trim();
 }
 

@@ -29,6 +29,13 @@ import { sendText } from "@/lib/whatsapp/graph";
 import { enviarInstagram } from "@/lib/instagram/graph";
 import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
 import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
+import { transcreverAudio } from "@/lib/whatsapp/transcricao";
+import {
+  cerebroConsegueLer,
+  textoFallback,
+  PREFIXO_TRANSCRICAO,
+  type TipoMensagem,
+} from "@/lib/whatsapp/tipos";
 
 // EXTRATO-01-FIX + DEBOUNCE (ver nota original em route.ts, preservada
 // aqui porque é aqui que o debounce de fato roda agora): DEBOUNCE_MS é
@@ -125,6 +132,37 @@ export type WaJob = {
    *  campo (seu diff é vazio, por exigência da OS) — então todo job vindo de
    *  lá cai no default e segue por sendText exatamente como antes. */
   canal?: "whatsapp" | "instagram";
+
+  // --------------------------------------------------------------------------
+  // OUVIDO-01 v2 (b) — os quatro campos do áudio e da rede.
+  // --------------------------------------------------------------------------
+  // TODOS OPCIONAIS, e isso não é frouxidão: o webhook do Instagram também
+  // monta WaJob (ver INSTA-01) e não conhece nenhum destes dados. Torná-los
+  // obrigatórios quebraria o outro canal para guardar um campo.
+  //
+  // A consequência disso está no portão lá embaixo e é o ponto da Regra 19:
+  // `conteudo === undefined` significa "não sei o que foi gravado", NÃO
+  // significa "gravou vazio". Um job do Instagram tem de atravessar o portão
+  // sem disparar rede nenhuma.
+
+  /** `media_id` do áudio, quando a mensagem foi uma nota de voz. Campo SEPARADO
+   *  de `anexoId` de propósito: `anexoId` é o caminho do EXTRATO (baixa, sobe
+   *  pro bucket, chama visão, grava em extratos_cotas). Áudio não passa por
+   *  nada disso. Reaproveitar o campo faria uma nota de voz virar tentativa de
+   *  leitura de extrato. */
+  audioId?: string | null;
+  /** O `mime_type` que a META DECLAROU. A Graph também devolve um mime no
+   *  download; quando os dois existirem o observado ganha do declarado, mas o
+   *  declarado viaja porque é o que a gente já tem em mãos sem pagar rede. */
+  audioMime?: string | null;
+  /** `m.type` já normalizado por `normalizarTipo` — o mesmo valor gravado na
+   *  coluna. Serve só para o fallback saber dizer "teu áudio" em vez de
+   *  "tua mensagem". `null` é resposta legítima: a Meta não declarou tipo. */
+  tipo?: TipoMensagem | null;
+  /** O que o webhook DE FATO gravou em `wa_mensagens.conteudo`. É sobre isto
+   *  que o portão pergunta — não sobre o tipo. Ver o cabeçalho de tipos.ts:
+   *  rede por conteúdo não tem furo de vocabulário. */
+  conteudo?: string;
 };
 
 // ----------------------------------------------------------------------------
@@ -195,6 +233,43 @@ async function enviarPorCanal(
 // isso. "OFF", "0", "false" e vazio NÃO desligam; só a string literal "off".
 export function handoffAtivoLigado(): boolean {
   return process.env.HANDOFF_ATIVO !== "off";
+}
+
+// ============================================================================
+// OUVIDO-01 v2 (c)/(e) — a decisão "este turno merece a rede", isolada.
+// ----------------------------------------------------------------------------
+// POR QUE ESTA FUNÇÃO EXISTE SEPARADA DO PORTÃO QUE A USA
+//
+// A ordem do item (e) pede controle dos dois lados, com `sticker→fallback`
+// nomeado. Enquanto esta decisão vivia como um `if` dentro de `processarUmJob`,
+// ela era INALCANÇÁVEL por teste: aquela função precisa de Supabase, Anthropic
+// e Graph API para ser chamada. Prometer "figurinha cai na rede" sem poder
+// provar seria exatamente o tipo de afirmação que esta casa não aceita.
+//
+// Extraída, a decisão vira fato verificável. O `if` lá embaixo passa a ler a
+// pergunta em vez de reconstruí-la, que é como uma regra deixa de ter duas
+// versões que podem divergir com o tempo.
+//
+// OS TRÊS FATOS, E POR QUE NENHUM PODE SER ACHATADO NOS OUTROS (Regra 19):
+//
+// · `conteudo === undefined` — NÃO SEI o que foi gravado. O webhook do
+//   Instagram monta WaJob sem este campo. "Não sei" virando "veio vazio"
+//   mandaria a rede para toda mensagem do Instagram, inclusive as de texto
+//   perfeitamente legível. O portão só dispara sobre fato MEDIDO.
+// · `jaRespondeu === true` — o cliente JÁ recebeu resposta neste job (o aviso
+//   do extrato). Somar a rede em cima disso seria falar duas vezes.
+// · `cerebroConsegueLer(conteudo)` — a pergunta é sobre o que está ESCRITO na
+//   linha, nunca sobre o tipo declarado. É o que faz áudio-que-não-transcreveu,
+//   figurinha, vídeo, localização e o tipo que a Meta ainda vai inventar caírem
+//   todos neste mesmo galho, sem ninguém ter precisado enumerá-los.
+// ============================================================================
+export function mereceRede(
+  conteudo: string | undefined,
+  jaRespondeu: boolean
+): boolean {
+  if (conteudo === undefined) return false;
+  if (jaRespondeu) return false;
+  return !cerebroConsegueLer(conteudo);
 }
 
 // Faz o agente que ACABOU de receber o bastão dizer a primeira palavra, sem
@@ -334,6 +409,24 @@ async function processarUmJob(
 ): Promise<void> {
   const { conversaId, telefone, msgInseridaId, anexoId } = job;
 
+  // OUVIDO-01 v2 — o que o cérebro vai encontrar quando ler a thread.
+  //
+  // Começa valendo o que o webhook gravou e só avança quando a transcrição
+  // ENTROU NO BANCO. Se o update falhar, o banco segue com '[áudio recebido]'
+  // e esta variável tem de dizer a mesma coisa: o cérebro lê do banco, não
+  // desta função. Uma variável local otimista aqui faria o portão achar que o
+  // turno é legível enquanto a thread real continua muda.
+  let conteudoFinal: string | undefined = job.conteudo;
+
+  // Se o caminho do extrato já falou nesta passada, a rede não fala de novo.
+  //
+  // Medido: hoje isto NÃO pode acontecer — quando o objeto de anexo existe, o
+  // webhook grava '[anexo sem nome/legenda]' no pior caso (route.ts:371), que
+  // `cerebroConsegueLer` aceita, então o portão nem abre. São duas linhas para
+  // não deixar a garantia morando num arquivo diferente do que a usa: no dia
+  // em que aquela cascata mudar, quem mudar não vai lembrar deste portão.
+  let jaRespondeu = false;
+
   // WHATSAPP-EXTRATO-01 — extrato de cota anexado (document/image): baixa
   // da Graph Media API, sobe pro bucket privado wa-extratos, extrai os
   // campos via IA e grava 'pendente_revisao' em extratos_cotas. NUNCA
@@ -403,11 +496,93 @@ async function processarUmJob(
             texto: resumo,
             agente: "sistema_extrato",
           });
+          jaRespondeu = true;
         }
       }
     } catch (e) {
       console.error(
         "[whatsapp/background] falha ao processar extrato (anexo):",
+        e instanceof Error ? e.message : e
+      );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // OUVIDO-01 v2 (b) — a nota de voz vira texto ANTES do cérebro ler a thread.
+  // --------------------------------------------------------------------------
+  // POR QUE AQUI, E NÃO NO WEBHOOK
+  //
+  // O webhook da Meta tem de devolver 200 depressa. Baixar mídia (até 20s) e
+  // transcrever (até 8s) dentro do ciclo request/response é exatamente o
+  // padrão que produziu as três perdas de 2026-07-21 documentadas no topo
+  // deste arquivo: inbound gravado, zero resposta, zero log. Transcrever no
+  // webhook reabriria a ferida do F4a com um nome novo.
+  //
+  // POR QUE ANTES DO DEBOUNCE
+  //
+  // Depois do debounce o job já está decidindo se fala. A thread precisa estar
+  // legível ANTES disso, senão o cérebro é chamado para ler '[áudio recebido]'
+  // e a fatia não terá servido para nada.
+  //
+  // POR QUE ANTES DO `podeResponder`
+  //
+  // Transcrição não serve só ao cérebro: serve ao operador que abre a conversa
+  // no painel. Quem decide se um job de áudio existe é o webhook — em UM lugar
+  // só. Duplicar a decisão aqui faria as duas divergirem um dia.
+  //
+  // ORÇAMENTO DE RELÓGIO (item c), somado:
+  //   download 20s (teto de media.ts) + transcrição 8s + debounce 8s +
+  //   geração ~20s ≈ 56s, contra LOCK_TTL_MS = 120s. E nada disto segura lock:
+  //   o lock só é tomado depois do debounce.
+  //
+  // NÃO JOGA. Como o bloco do anexo, qualquer falha vira log. O cliente não
+  // fica sem resposta por causa de um Whisper fora do ar: ele cai na rede.
+  if (job.audioId) {
+    try {
+      const midia = await baixarMidia(job.audioId);
+
+      // O mime OBSERVADO (bytes na mão) ganha do DECLARADO pela Meta — mesma
+      // regra que o bloco do anexo já aplica logo acima.
+      const r = await transcreverAudio(midia.bytes, midia.mimeType ?? job.audioMime);
+
+      if (r.ok) {
+        const texto = `${PREFIXO_TRANSCRICAO} ${r.texto}`;
+        const { error } = await db
+          .from("wa_mensagens")
+          .update({ conteudo: texto })
+          .eq("id", msgInseridaId);
+
+        if (error) {
+          // supabase-js DEVOLVE erro, não joga — lição já documentada três
+          // vezes nesta base. Aqui ela custa caro: `conteudoFinal` NÃO avança,
+          // porque o banco continua com '[áudio recebido]' e é o banco que o
+          // cérebro lê. O cliente cai na rede, que é o certo — respondemos
+          // sobre o que a thread REALMENTE diz.
+          console.error(
+            "[whatsapp/background] transcrição obtida mas NÃO gravada:",
+            error.message,
+            JSON.stringify({ conversaId, msgInseridaId })
+          );
+        } else {
+          conteudoFinal = texto;
+          console.log(
+            "[whatsapp/background] áudio transcrito",
+            JSON.stringify({ conversaId, msgInseridaId, chars: r.texto.length })
+          );
+        }
+      } else {
+        // `motivo` é enumerado de propósito (Regra 19): 'longo_demais',
+        // 'whisper_fora' e 'silencio' são fatos diferentes e o log tem de
+        // conseguir distingui-los. O TEXTO do cliente nunca entra no log.
+        console.log(
+          "[whatsapp/background] áudio NÃO transcrito — cai na rede",
+          JSON.stringify({ conversaId, msgInseridaId, motivo: r.motivo })
+        );
+      }
+    } catch (e) {
+      // Só `baixarMidia` chega aqui: `transcreverAudio` não joga, por contrato.
+      console.error(
+        "[whatsapp/background] falha ao baixar áudio para transcrição:",
         e instanceof Error ? e.message : e
       );
     }
@@ -442,6 +617,74 @@ async function processarUmJob(
       JSON.stringify({ conversaId, msgInseridaId, ultimaMsgClienteId: ultimaMsgCliente?.id ?? null, souAUltima })
     );
     if (!souAUltima) return;
+
+    // ------------------------------------------------------------------------
+    // OUVIDO-01 v2 (c) — A REDE. Nunca o caminho.
+    // ------------------------------------------------------------------------
+    // O PORTÃO É POR CONTEÚDO, NÃO POR TIPO — e essa é a fatia inteira.
+    //
+    // A tentação era listar os tipos ruins (sticker, vídeo, location) e barrar
+    // por tipo. O modo de falhar é conhecido: a Meta inventa um tipo novo, ele
+    // não está na lista, e o turno vazio volta a entrar em silêncio. Aqui a
+    // pergunta é sobre o que está ESCRITO na linha — então áudio que não
+    // transcreveu, figurinha, vídeo, localização e o tipo que a Meta ainda não
+    // inventou caem todos neste mesmo galho, sem ninguém ter previsto cada um.
+    //
+    // POR QUE DEPOIS DO `souAUltima`
+    //
+    // Se o cliente já mandou algo mais novo, este job saiu de cena. Mandar a
+    // rede aqui seria responder a uma mensagem que já foi superada — e o
+    // cliente veria "Recebi teu áudio!" depois de já ter escrito em texto.
+    //
+    // POR QUE ANTES DO LOCK
+    //
+    // O lock existe para serializar geração cara. Isto é uma string fixa: não
+    // chama modelo, não gasta token. Tomar o lock aqui obrigaria a liberá-lo,
+    // e o `finally` que libera vive dentro do bloco da geração.
+    //
+    // QUAIS FATOS ABREM O PORTÃO: está em `mereceRede`, no topo deste arquivo,
+    // junto com o porquê de cada um (Regra 19). Não repito aqui de propósito —
+    // regra escrita em dois lugares é regra que um dia diverge, e a cópia que
+    // ninguém lê é a que continua valendo no ar.
+    if (mereceRede(conteudoFinal, jaRespondeu)) {
+      // Mesma releitura fresca do resto do arquivo: entre a foto do status no
+      // webhook e este ponto passaram o download, a transcrição e 8s de
+      // debounce — tempo de sobra para o operador clicar "Assumir".
+      if (await assumidaPorHumano(db, conversaId)) {
+        console.log(
+          "[whatsapp/background] fallback NÃO enviado — conversa assumida por humano",
+          JSON.stringify({ conversaId, tipo: job.tipo ?? null })
+        );
+        await registrarDescarte(
+          db,
+          conversaId,
+          textoFallback(job.tipo ?? null),
+          "fallback de conteúdo ilegível"
+        );
+        return;
+      }
+
+      // Texto FIXO, escrito e revisado em tipos.ts — não sai de modelo. Por
+      // isso não passa por `avaliarComplianceGradual`: não há o que sanitizar
+      // numa frase que nós mesmos escrevemos.
+      //
+      // `agente` é 'sistema_fallback' e não um agente de conversa. Medido: o
+      // vigia 9 (radar_handoff_mudo, migration 0089) deriva a lista de agentes
+      // de `wa_conversas.agente_ativo`, NUNCA de `wa_mensagens.agente` — então
+      // este remetente entra ao lado de 'sistema_extrato' e 'sentinela' sem
+      // poluir a medição do handoff mudo.
+      await enviarPorCanal(job, {
+        conversaId,
+        texto: textoFallback(job.tipo ?? null),
+        agente: "sistema_fallback",
+      });
+      console.log(
+        "[whatsapp/background] fallback honesto enviado — conteúdo ilegível para o cérebro",
+        JSON.stringify({ conversaId, msgInseridaId, tipo: job.tipo ?? null })
+      );
+      // O cérebro NÃO é chamado: era exatamente ele que recebia turno vazio.
+      return;
+    }
 
     // Lock: impede duas gerações simultâneas na mesma conversa (ex.: dois
     // jobs cujo debounce vence quase junto). UPDATE...WHERE é atômico por

@@ -24,7 +24,12 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { handoffAtivoLigado } from "./processar-background";
+import { handoffAtivoLigado, mereceRede } from "./processar-background";
+import {
+  MARCA_AUDIO_RECEBIDO,
+  PREFIXO_TRANSCRICAO,
+  placeholderDoTipo,
+} from "./tipos";
 
 const ORIGINAL = process.env.HANDOFF_ATIVO;
 
@@ -80,4 +85,92 @@ test("KILL-SWITCH — CONTROLE: o teste consegue mesmo mexer no valor lido", () 
   delete process.env.HANDOFF_ATIVO;
   const ligado = handoffAtivoLigado();
   assert.notEqual(desligado, ligado, "a função não está lendo a env de verdade");
+});
+
+// ============================================================================
+// OUVIDO-01 v2 (e) — A REDE: quem cai nela e, principalmente, quem NÃO cai.
+// ----------------------------------------------------------------------------
+// A ordem pede controle dos dois lados. Um teste que só mostra figurinha caindo
+// na rede não prova rede nenhuma: prova que existe um galho. O que precisa
+// doer aqui é o lado oposto — texto normal do cliente NÃO pode cair, ou o bot
+// passa a responder "Consegues me escrever em texto?" a quem escreveu texto.
+// Esse defeito seria muito pior que o que esta fatia conserta, porque atinge
+// TODO cliente em vez dos poucos que mandam áudio.
+// ============================================================================
+
+test("REDE — figurinha cai (é o caso nomeado na ordem)", () => {
+  // Uso `placeholderDoTipo` em vez da string literal de propósito: se alguém
+  // trocar o texto da marca lá e esquecer daqui, o teste continua medindo a
+  // marca DE VERDADE em vez de uma cópia que envelheceu em silêncio.
+  const marca = placeholderDoTipo("sticker");
+  assert.ok(marca, "a figurinha precisa ter marca, senão o teste não mede nada");
+  assert.equal(mereceRede(marca, false), true);
+});
+
+test("REDE — vídeo, localização e áudio-que-não-transcreveu caem também", () => {
+  for (const tipo of ["video", "location"] as const) {
+    const marca = placeholderDoTipo(tipo);
+    assert.ok(marca, `${tipo} precisa ter marca`);
+    assert.equal(mereceRede(marca, false), true, `${tipo} tinha de cair na rede`);
+  }
+  // O áudio que chegou e não virou texto: a linha ficou com a marca do webhook
+  // porque o Whisper não respondeu, ou estourou o teto, ou veio silêncio.
+  assert.equal(mereceRede(MARCA_AUDIO_RECEBIDO, false), true);
+});
+
+test("REDE — conteúdo vazio e só-espaço caem (o turno mudo que abriu a fatia)", () => {
+  for (const vazio of ["", "   ", "\n\t "]) {
+    assert.equal(mereceRede(vazio, false), true, `"${vazio}" tinha de cair na rede`);
+  }
+});
+
+test("CONTROLE — texto normal do cliente NÃO cai na rede", () => {
+  // Este é o lado que dói. Sem ele, um `mereceRede` que devolvesse `true` fixo
+  // passaria em todos os testes acima e mandaria o fallback para todo mundo.
+  for (const texto of [
+    "quero vender minha cota",
+    "oi",
+    "170500",
+    "[anexo sem nome/legenda]", // marca NOSSA, mas legível — decisão da fatia
+  ]) {
+    assert.equal(mereceRede(texto, false), false, `"${texto}" NÃO podia cair na rede`);
+  }
+});
+
+test("CONTROLE — áudio TRANSCRITO segue o fluxo normal, não a rede", () => {
+  // O caso feliz inteiro da fatia: transcreveu, logo é fala do cliente, logo o
+  // agente responde como responderia a texto. Se isto caísse na rede, a
+  // transcrição teria sido paga e jogada fora no passo seguinte.
+  const transcrito = `${PREFIXO_TRANSCRICAO} quero vender minha cota da Servopa`;
+  assert.equal(mereceRede(transcrito, false), false);
+});
+
+test("REGRA 19 — `undefined` é 'não sei', e 'não sei' NÃO manda rede", () => {
+  // O webhook do Instagram monta WaJob sem `conteudo`. Se "não sei" virasse
+  // "veio vazio", TODA mensagem do Instagram — inclusive texto perfeito —
+  // receberia "Consegues me escrever em texto?".
+  assert.equal(mereceRede(undefined, false), false);
+  // E o controle do outro lado: string vazia É fato medido, e essa cai.
+  assert.notEqual(
+    mereceRede(undefined, false),
+    mereceRede("", false),
+    "'não sei' e 'veio vazio' viraram o mesmo registro — é o achatamento que a Regra 19 proíbe"
+  );
+});
+
+test("quem JÁ recebeu resposta neste job não recebe a rede em cima", () => {
+  // O aviso do extrato já saiu. Somar o fallback seria o bot falando duas vezes
+  // sobre a mesma mensagem, sendo que a primeira fala deu certo.
+  assert.equal(mereceRede(MARCA_AUDIO_RECEBIDO, true), false);
+  assert.equal(mereceRede("", true), false);
+});
+
+test("CONTROLE — `jaRespondeu` muda mesmo a resposta (a flag não é enfeite)", () => {
+  // Regra 9: sem isto, um `mereceRede` que ignorasse o segundo argumento
+  // passaria no teste acima por acidente, já que ambos esperam `false`.
+  assert.notEqual(
+    mereceRede(MARCA_AUDIO_RECEBIDO, false),
+    mereceRede(MARCA_AUDIO_RECEBIDO, true),
+    "o argumento `jaRespondeu` não está sendo lido"
+  );
 });

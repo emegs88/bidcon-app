@@ -789,6 +789,142 @@ export function vigiaHandoffMudo(entrada: {
 }
 
 // ---------------------------------------------------------------------------
+// VIGIA 10 — CONTEÚDO VAZIO: a mensagem do cliente entrou sem nada para ler
+// AUTORIZADO: coordenação, 28/08/2026 — OUVIDO-01 v2 item (e).
+// ---------------------------------------------------------------------------
+//
+// A CONDIÇÃO
+//
+// Uma linha de `wa_mensagens` com `papel = 'cliente'` cujo `conteudo` está nulo
+// ou só com espaço. O cérebro não tem o que ler, o turno entra vazio, e o
+// cliente não é respondido. Não é higiene de dados: é uma pessoa que falou e
+// não foi ouvida.
+//
+// ESTE VIGIA NASCE DEPOIS DO CONSERTO, E É ISSO QUE ELE MEDE
+//
+// Os itens (b) e (c) desta mesma fatia fecharam o buraco por dois lados — a
+// transcrição no caminho, e a rede honesta (`mereceRede`) quando a transcrição
+// falha ou o tipo não é transcrevível. Depois deles, conteúdo vazio de cliente
+// deixou de ser possível POR DESENHO.
+//
+// "Impossível por desenho" é uma afirmação sobre o código que eu escrevi, não
+// sobre o mundo. Este vigia é o que torna essa afirmação verificável todo dia:
+// se ele fica mudo, a rede segurou; se ele grita, alguma coisa furou a rede e
+// nós ficamos sabendo no mesmo dia, em vez de descobrir por um cliente que
+// sumiu. A ordem escreveu "o vigia FICA"; a medição corrigiu para NASCE — ele
+// nunca existiu.
+//
+// O LIMIAR É 1, DECLARADO — E A JANELA É O QUE DEIXA ELE CALAR
+//
+// Medido em 28/08/2026 no xtv, 431 mensagens de cliente: 6 vazias, TODAS de
+// espaço em branco, NENHUMA nula. Por dia, em 30 dias: 23 dias com movimento,
+// e só 3 deles com vazias (23/08: 1 · 20/08: 2 · 06/08: 2). Vinte dias em zero.
+//
+// O valor saudável é zero, e percentil de série cujo valor saudável é zero não
+// é estatística, é enfeite — mesma razão de HANDOFF_MUDO_MINIMO e de
+// FALHAS_NO_CICLO. Declarado em 1.
+//
+// A JANELA não é detalhe: as seis vazias são históricas e anteriores ao
+// conserto. Sem janela, este vigia nasceria aberto sobre uma ferida já costurada
+// e NUNCA fecharia, porque a história não muda. Alerta permanentemente aceso é
+// ruído, e ruído treina a pessoa a fechar o painel sem ler — exatamente o
+// defeito que a correção de 16/08 tirou do vigia de movimento. Com janela, a
+// condição se resolve sozinha quando para de acontecer, como `reincidente:*`.
+//
+// POR QUE O GRAVE É 3, E POR QUE NÃO É PROPORÇÃO
+//
+// 3 fica um acima do PIOR dia já medido (2) na era em que o defeito estava
+// solto. Uma vazia depois do conserto já é furo e merece aviso; três num dia é
+// mais do que o sistema quebrado produzia, e isso é outra categoria de notícia.
+//
+// Considerei promover a grave por proporção (`vazias === total` seria surdez
+// completa na janela) e RECUSEI: não tenho um único episódio medido desse
+// formato, e limiar sem medição por trás é decoração. `total` viaja no detalhe
+// justamente para que a pessoa faça esse juízo com o número na frente — 2 em 42
+// e 2 em 2 são situações diferentes, e a contagem sozinha não separa as duas.
+//
+// `por_tipo` É A PERÍCIA QUE OS SEIS CASOS HISTÓRICOS NÃO TÊM
+//
+// Medido: as seis vazias têm `tipo`, `media_id` e `mime_type` TODOS nulos — são
+// anteriores à 0091, que criou a coluna `tipo`. Não há como saber o que eram.
+// Por isso eu NÃO afirmo que a rede de (b)+(c) cobre esses seis casos: não
+// tenho o dado para afirmar. `por_tipo` garante que o PRÓXIMO furo chegue com a
+// perícia junto — o operador vê QUAL tipo passou, não só que passou.
+
+export const TIPO_CONTEUDO_VAZIO = "conteudo_vazio";
+export const CHAVE_CONTEUDO_VAZIO = "cliente";
+
+/**
+ * Janela de contagem, em horas.
+ *
+ * Vive aqui, e não solta na chamada da RPC, pelo mesmo motivo de
+ * MINUTOS_HANDOFF_MUDO: quem MEDE (a rota de varredura) e quem JULGA (esta
+ * função) têm de concordar no mesmo número. Se a RPC contar 24h e o título
+ * disser 48h, o alerta mente sobre a própria régua.
+ */
+export const HORAS_CONTEUDO_VAZIO = 24;
+
+/** Vazias a partir das quais o vigia abre. Ver o bloco acima: declarado. */
+export const CONTEUDO_VAZIO_MINIMO = 1;
+
+/** Vazias a partir das quais deixa de ser aviso e vira grave. */
+export const CONTEUDO_VAZIO_GRAVE = 3;
+
+export function vigiaConteudoVazio(entrada: {
+  /**
+   * Mensagens de cliente que entraram sem conteúdo na janela. `null` = NÃO
+   * CONSEGUI MEDIR (Regra 19): a RPC falhou. Um `?? 0` aqui transformaria banco
+   * mudo em "nenhuma mensagem perdida" — a pior mentira possível para este
+   * vigia em particular, porque ele existe justamente para provar um zero.
+   */
+  vazias: number | null;
+  /**
+   * Total de mensagens de cliente na MESMA janela. Não entra no julgamento;
+   * viaja no detalhe para dar escala à contagem. `null` quando não medido.
+   */
+  total: number | null;
+  /** Quebra por tipo das vazias. Só perícia; não entra no julgamento. */
+  porTipo?: Readonly<Record<string, number>>;
+  horas?: number;
+  limite?: number;
+  limiteGrave?: number;
+}): Alerta | null {
+  const {
+    vazias,
+    total,
+    porTipo,
+    horas = HORAS_CONTEUDO_VAZIO,
+    limite = CONTEUDO_VAZIO_MINIMO,
+    limiteGrave = CONTEUDO_VAZIO_GRAVE,
+  } = entrada;
+  if (vazias === null || !Number.isFinite(vazias)) return null;
+  if (vazias < limite) return null;
+
+  const severidade: Severidade = vazias >= limiteGrave ? "grave" : "aviso";
+
+  // O total só entra no título quando foi medido. "de 0" seria pior que omitir.
+  const escala =
+    total === null || !Number.isFinite(total) ? "" : ` de ${total}`;
+
+  return {
+    tipo: TIPO_CONTEUDO_VAZIO,
+    chave: CHAVE_CONTEUDO_VAZIO,
+    severidade,
+    titulo: `${vazias}${escala} mensagem(ns) de cliente entraram sem conteúdo nas últimas ${horas}h`,
+    detalhe: {
+      vazias,
+      // null viaja visível: "zero mensagens na janela" e "não sei quantas
+      // mensagens houve" são coisas diferentes para quem lê o alerta.
+      total: total === null || !Number.isFinite(total) ? null : total,
+      horas,
+      limite,
+      limite_grave: limiteGrave,
+      ...(porTipo && Object.keys(porTipo).length > 0 ? { por_tipo: porTipo } : {}),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Todos os tipos que o RADAR pode abrir. O painel usa para agrupar. */
 export const TIPOS_RADAR = [
@@ -800,6 +936,7 @@ export const TIPOS_RADAR = [
   TIPO_ENVIO_SENTINELA,
   TIPO_QUARENTENA,
   TIPO_HANDOFF,
+  TIPO_CONTEUDO_VAZIO,
 ] as const;
 
 export type { Limiar };

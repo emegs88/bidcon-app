@@ -1,6 +1,9 @@
 // ============================================================================
 // GET /api/radar/varredura — FATIA SENTINELA-RADAR-01, Parte 2
-// A varredura que mede as cinco condições e escreve em radar_alertas.
+// A varredura que mede as condições de TIPOS_RADAR e escreve em radar_alertas.
+// (Eram cinco na estreia; são NOVE em 28/08/2026. O número saiu daqui de
+//  propósito: comentário com contagem envelhece calado, e a lista de verdade
+//  mora em `TIPOS_RADAR`, onde um teste cobra a declaração a cada vigia novo.)
 // AUTORIZADO: Emerson, 15/08/2026.
 // ----------------------------------------------------------------------------
 // TRÊS FASES, e a separação entre elas é o ponto da fatia:
@@ -9,7 +12,8 @@
 //   3) GRAVAR  — abre o que alarmou, FECHA o que foi medido e não alarmou.
 //
 // A fase 2 estar separada é o que permite provar "o RADAR alarma quando deve e
-// cala quando não deve" com 44 testes que rodam em 20ms, sem levantar Postgres.
+// cala quando não deve" em lib/radar/vigias.test.ts, que roda em milissegundos
+// sem levantar Postgres.
 //
 // ----------------------------------------------------------------------------
 // KILL-SWITCH DESARMADO NÃO SIGNIFICA ROTA MORTA
@@ -82,6 +86,7 @@ import {
   type AmostraDaFonte,
 } from "@/lib/radar/medida";
 import {
+  CHAVE_CONTEUDO_VAZIO,
   CHAVE_ENVIO_FALHANDO,
   CHAVE_ESTOQUE_NIVEL,
   CHAVE_ESTOQUE_SEM_MOVIMENTO,
@@ -90,8 +95,10 @@ import {
   CHAVE_HANDOFF_MUDO,
   CHAVE_QUARENTENA_VOLUME,
   envioSentinelaJulgavel,
+  HORAS_CONTEUDO_VAZIO,
   MINUTOS_HANDOFF_MUDO,
   TIPO_AMOSTRA,
+  TIPO_CONTEUDO_VAZIO,
   TIPO_DIVERGENCIA,
   TIPO_ENVIO_SENTINELA,
   TIPO_ESTOQUE,
@@ -99,6 +106,7 @@ import {
   TIPO_FILA_SENTINELA,
   TIPO_HANDOFF,
   TIPO_QUARENTENA,
+  vigiaConteudoVazio,
   vigiaDivergenciaSync,
   vigiaEnvioSentinela,
   vigiaEstoqueNivel,
@@ -458,6 +466,58 @@ export async function GET(req: Request) {
       ? handoffLinha.por_agente
       : null;
 
+  // --- 1i. conteúdo vazio (OUVIDO-01 v2 item e) --------------------------
+  //
+  // POR QUE RPC, E NÃO UMA CONSULTA AQUI: a condição é `btrim(conteudo) = ''`,
+  // e o PostgREST não expressa isso. Ele faz `is.null` e `eq.''`, nenhum dos
+  // dois serve — medido em 28/08/2026 no xtv: das 6 mensagens de cliente que
+  // entraram sem conteúdo, ZERO são NULL e SEIS são espaço em branco. Uma
+  // consulta escrita aqui seria cega justamente à única forma do defeito que
+  // já apareceu de verdade neste banco. Ver 0092_radar_conteudo_vazio.sql.
+  //
+  // JANELA DE 24h, e ela é o ponto. Este vigia mede se a rede do (b)+(c) está
+  // furando AGORA. As 6 vazias conhecidas são da era anterior à correção e
+  // caem fora da janela — por isso o esperado, hoje, é silêncio. Um vigia de
+  // histórico inteiro nunca poderia fechar, e alerta que não fecha vira
+  // paisagem. O ensaio da migration mediu os dois lados: 24h → 0 de 10;
+  // 1200h → 6 de 431. É esse contraste que prova que ele não nasceu cego.
+  //
+  // Se a 0092 não estiver aplicada, cai em `avisos`, a condição NÃO é marcada
+  // e a fase 3 não fecha nada — mesmo princípio do handoff logo acima.
+  const { data: vazio, error: errVazio } = await db.rpc("radar_conteudo_vazio", {
+    p_horas: HORAS_CONTEUDO_VAZIO,
+  });
+  if (errVazio) avisos.push(`radar_conteudo_vazio: ${errVazio.message}`);
+
+  // `returns table` chega como array de uma linha.
+  const vazioLinha =
+    (
+      vazio as
+        | {
+            vazias: number | null;
+            total: number | null;
+            por_tipo: Record<string, number> | null;
+          }[]
+        | null
+    )?.[0] ?? null;
+
+  /* Regra 19: `vazias` só vale se veio número de leitura sem erro. Sem esta
+   * guarda, RPC ausente viraria `0` — o veredito "a rede não furou" —, a
+   * condição seria marcada e a fase 3 fecharia o alerta legítimo. Este vigia é
+   * especialmente sensível a isso porque o resultado NORMAL dele é zero: o
+   * falso zero se parece com o dia bom. */
+  const vaziasN: number | null =
+    !errVazio && typeof vazioLinha?.vazias === "number" ? vazioLinha.vazias : null;
+  /* `total` é escala, não veredito. Ele viaja separado e pode ser null sem
+   * derrubar o julgamento — o vigia sabe omitir "de N" do título quando não
+   * mediu, em vez de escrever "de 0" e mentir sobre o tamanho da amostra. */
+  const totalN: number | null =
+    !errVazio && typeof vazioLinha?.total === "number" ? vazioLinha.total : null;
+  const vazioPorTipo =
+    vazioLinha?.por_tipo && typeof vazioLinha.por_tipo === "object"
+      ? vazioLinha.por_tipo
+      : null;
+
   // =========================================================================
   // FASE 2 — JULGAR. Daqui para baixo, nenhuma linha toca o banco.
   // =========================================================================
@@ -690,6 +750,28 @@ export async function GET(req: Request) {
     avisos.push("handoff_mudo: nao julgado (radar_handoff_mudo indisponivel)");
   }
 
+  // 9. conteúdo vazio — a assinatura do surdo, do outro lado da rede.
+  //
+  // Este é o único vigia da varredura cujo resultado ESPERADO é silêncio
+  // permanente. Os outros medem coisas que oscilam; este mede se uma rede
+  // furou, e rede que não fura devolve zero todo dia. É por isso que ele vem
+  // com controle de Regra 9 no arnês: um vigia que cala por estar quebrado é
+  // idêntico, de fora, a um vigia que cala por estar tudo bem.
+  //
+  // `marcar()` DEPOIS da guarda, pelo mesmo motivo do FAROL e do handoff.
+  if (vaziasN !== null) {
+    marcar(TIPO_CONTEUDO_VAZIO, CHAVE_CONTEUDO_VAZIO);
+    const a = vigiaConteudoVazio({
+      vazias: vaziasN,
+      total: totalN,
+      porTipo: vazioPorTipo ?? undefined,
+      horas: HORAS_CONTEUDO_VAZIO,
+    });
+    if (a) alertas.push(a);
+  } else {
+    avisos.push("conteudo_vazio: nao julgado (radar_conteudo_vazio indisponivel)");
+  }
+
   // =========================================================================
   // FASE 3 — GRAVAR
   // =========================================================================
@@ -798,6 +880,16 @@ export async function GET(req: Request) {
       handoff_mudo_mais_antiga_horas:
         handoffHoras === null ? null : Math.floor(handoffHoras),
       handoff_mudo_minutos: MINUTOS_HANDOFF_MUDO,
+      // Mesmo par dos outros, e aqui ele é mais necessário que em qualquer
+      // um: o valor SAUDÁVEL deste vigia é zero. Sem `_julgado` ao lado, o
+      // zero de "a rede segurou" e o null de "a 0092 sumiu" contariam a mesma
+      // história boa. `total` vai junto porque zero vazias de 3 mensagens não
+      // é a mesma notícia que zero vazias de 400.
+      conteudo_vazio_vazias_24h: vaziasN,
+      conteudo_vazio_total_24h: totalN,
+      conteudo_vazio_julgado: vaziasN !== null,
+      conteudo_vazio_por_tipo: vazioPorTipo,
+      conteudo_vazio_horas: HORAS_CONTEUDO_VAZIO,
     },
     alertas: alertas.map((a) => ({
       tipo: a.tipo,

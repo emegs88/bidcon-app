@@ -60,6 +60,12 @@ import {
   HORAS_HANDOFF_GRAVE,
   MINUTOS_HANDOFF_MUDO,
   vigiaHandoffMudo,
+  TIPO_CONTEUDO_VAZIO,
+  CHAVE_CONTEUDO_VAZIO,
+  CONTEUDO_VAZIO_MINIMO,
+  CONTEUDO_VAZIO_GRAVE,
+  HORAS_CONTEUDO_VAZIO,
+  vigiaConteudoVazio,
   FALHAS_NO_CICLO,
   envioSentinelaJulgavel,
   vigiaEnvioSentinela,
@@ -489,9 +495,16 @@ test("fila: vazia nao alarma, e 'sem data' tambem nao", () => {
 // A trava disparou de novo, 8 !== 7, e de novo fez o trabalho dela: o tipo
 // novo aparece no painel porque alguem escreveu esta linha, nao porque passou
 // despercebido.
-test("tipos: oito condicoes, sem repetidos — o painel agrupa por aqui", () => {
-  assert.equal(TIPOS_RADAR.length, 8);
-  assert.equal(new Set(TIPOS_RADAR).size, 8, "tipo repetido misturaria vigias na tela");
+//
+// NONO, DECLARADO: `conteudo_vazio` (VIGIA 10), 28/08/2026 — OUVIDO-01 v2 (e).
+// Disparou 9 !== 8, terceira vez seguida que esta trava cobra a declaracao.
+// Registro o que ela cobrou: este vigia mede mensagem de cliente que entrou sem
+// nada para ler. Ele nasce DEPOIS do conserto de (b)+(c) e o esperado dele e
+// silencio — ele existe para provar todo dia que a rede segurou, e para gritar
+// no mesmo dia se algo furar.
+test("tipos: nove condicoes, sem repetidos — o painel agrupa por aqui", () => {
+  assert.equal(TIPOS_RADAR.length, 9);
+  assert.equal(new Set(TIPOS_RADAR).size, 9, "tipo repetido misturaria vigias na tela");
   for (const t of TIPOS_RADAR) {
     assert.ok(t.length > 0 && t === t.toLowerCase(), `tipo '${t}' fora do padrao snake_case`);
   }
@@ -513,6 +526,9 @@ test("alerta: todo alerta aberto tem titulo legivel e detalhe com numeros", () =
     vigiaEnvioSentinela({ falhas: 15, feitos: 0 }),
     // A medicao real de 21/08/2026: 16 conversas, a mais antiga com 386h.
     vigiaHandoffMudo({ mudas: 16, maisAntigaHoras: 386 }),
+    // O pior dia real da era em que o defeito estava solto (20/08 e 06/08):
+    // 2 vazias. Depois do conserto de (b)+(c), duas ja sao furo na rede.
+    vigiaConteudoVazio({ vazias: 2, total: 42 }),
   ];
   for (const a of abertos) {
     assert.ok(a, "fixture montada para abrir alerta");
@@ -913,4 +929,128 @@ test("VIGIA 9 — o erro que eu cometi: 40 nao era o numero, era 16", () => {
   assert.ok(errado && certo);
   assert.ok(errado.titulo.includes("40") && certo.titulo.includes("16"));
   assert.equal(errado.chave, certo.chave, "os dois descrevem a MESMA condicao");
+});
+
+// ===========================================================================
+// VIGIA 10 — CONTEÚDO VAZIO (OUVIDO-01 v2, item e)
+// ---------------------------------------------------------------------------
+// Este vigia é diferente dos outros nove: o resultado ESPERADO dele é silêncio.
+// Ele nasce depois do conserto de (b)+(c), para provar todo dia que a rede
+// segurou. Um vigia cujo trabalho normal é calar precisa de teste de RUÍDO com
+// força dobrada — se ele estiver quebrado, ele fica quieto e parece saudável.
+//
+// Por isso o controle da Regra 9 aqui é explícito: existe um caso, com números
+// medidos em produção, em que este vigia TEM de gritar. Se esse caso parar de
+// disparar, o silêncio dos outros testes não vale nada.
+// ===========================================================================
+
+test("VIGIA 10 — CONTROLE (Regra 9): a medicao real de 28/08 faz ele gritar", () => {
+  /* Medido no xtv em 28/08/2026, janela de 1200h: 6 vazias em 431 mensagens de
+   * cliente, todas com tipo nulo (anteriores a 0091). Se esta linha parar de
+   * abrir alerta, o vigia ficou cego e o silencio das outras deixa de provar
+   * qualquer coisa. */
+  const a = vigiaConteudoVazio({
+    vazias: 6,
+    total: 431,
+    porTipo: { "(sem tipo)": 6 },
+    horas: 1200,
+  });
+  assert.ok(a, "6 vazias medidas em producao TEM de abrir alerta");
+  assert.equal(a.tipo, TIPO_CONTEUDO_VAZIO);
+  assert.equal(a.chave, CHAVE_CONTEUDO_VAZIO);
+  assert.equal(a.severidade, "grave", "6 esta acima do limite grave");
+  assert.equal(a.detalhe.vazias, 6);
+  assert.equal(a.detalhe.total, 431);
+  assert.deepEqual(a.detalhe.por_tipo, { "(sem tipo)": 6 });
+});
+
+test("VIGIA 10 — SILENCIO: a janela de 24h medida hoje esta limpa", () => {
+  /* A outra metade da mesma medicao: janela de 24h deu vazias 0 em 10. Este e
+   * o estado saudavel de HOJE, e o vigia tem de ficar mudo nele. */
+  assert.equal(vigiaConteudoVazio({ vazias: 0, total: 10 }), null);
+});
+
+test("VIGIA 10 — abre na FRONTEIRA: uma vazia ja e furo na rede", () => {
+  /* O silencio e testado no caso mais proximo do gatilho, nao no confortavel.
+   * Depois de (b)+(c), UMA mensagem de cliente sem conteudo ja e defeito. */
+  assert.equal(CONTEUDO_VAZIO_MINIMO, 1);
+  const zero = vigiaConteudoVazio({ vazias: 0, total: 40 });
+  const uma = vigiaConteudoVazio({ vazias: 1, total: 40 });
+  assert.equal(zero, null, "zero e o estado esperado, nao alerta");
+  assert.ok(uma, "uma vazia ja abre");
+  assert.equal(uma.severidade, "aviso");
+});
+
+test("VIGIA 10 — Regra 19: 'nao consegui medir' NAO e 'esta tudo limpo'", () => {
+  /* O teste mais importante deste arquivo para este vigia. Um `?? 0` na rota
+   * transformaria RPC quebrada em "nenhuma mensagem perdida" — e o chamador
+   * ainda marcaria a condicao como julgada, fechando alerta legitimo. Silencio
+   * por saude e silencio por cegueira tem de ser distinguiveis, e aqui os dois
+   * devolvem null de proposito: quem separa e o guard da rota, que so chama
+   * esta funcao depois de confirmar que o numero veio.
+   *
+   * NAO APAGUE AS LINHAS DE NaN/Infinity ACHANDO QUE SAO REDUNDANTES.
+   * Medido por sonda em 28/08/2026, removendo o guard `=== null ||
+   * !Number.isFinite(...)` do vigia: este teste falhou — mas NAO por causa da
+   * linha do `null`. Em JS `null < 1` e `true`, entao com limiar 1 o caso nulo
+   * cai no `vazias < limite` e devolve null de qualquer jeito, guard ou nao.
+   * A linha do `null` passa pelo motivo errado. Quem realmente exercita o
+   * guard e o NaN (`NaN < 1` e false) e o Infinity — sem elas, a remocao do
+   * guard passaria despercebida e um `?? 0` na rota entraria sem resistencia.
+   * A mesma armadilha vale para o VIGIA 9, que tem limiar 1 e a mesma forma. */
+  assert.equal(vigiaConteudoVazio({ vazias: null, total: 431 }), null);
+  assert.equal(vigiaConteudoVazio({ vazias: Number.NaN, total: 431 }), null);
+  assert.equal(
+    vigiaConteudoVazio({ vazias: Number.POSITIVE_INFINITY, total: 431 }),
+    null
+  );
+});
+
+test("VIGIA 10 — o grave fica UM acima do pior dia da era quebrada", () => {
+  /* Medido por dia em 30 dias: so 3 dias tiveram vazias, e o pior deu 2
+   * (20/08 e 06/08). Duas sao furo e merecem aviso; tres e mais do que o
+   * sistema QUEBRADO produzia num dia, e isso e outra categoria de noticia. */
+  assert.equal(CONTEUDO_VAZIO_GRAVE, 3);
+  const duas = vigiaConteudoVazio({ vazias: 2, total: 42 });
+  const tres = vigiaConteudoVazio({ vazias: 3, total: 42 });
+  assert.ok(duas && tres);
+  assert.equal(duas.severidade, "aviso", "o pior dia medido ainda e aviso");
+  assert.equal(tres.severidade, "grave");
+});
+
+test("VIGIA 10 — total nao medido viaja como null, e some do titulo", () => {
+  /* "2 de 0 mensagens" seria pior do que nao dizer nada: inventaria uma escala
+   * que ninguem mediu. O null aparece no detalhe, onde pode ser lido. */
+  const a = vigiaConteudoVazio({ vazias: 2, total: null });
+  assert.ok(a);
+  assert.equal(a.detalhe.total, null);
+  assert.ok(!a.titulo.includes("de 0"), "escala inventada");
+  assert.ok(!a.titulo.includes("null") && !a.titulo.includes("NaN"));
+  const com = vigiaConteudoVazio({ vazias: 2, total: 42 });
+  assert.ok(com);
+  assert.ok(com.titulo.includes("42"), "medido, aparece");
+});
+
+test("VIGIA 10 — sem quebra por tipo, sem campo (nao um objeto vazio)", () => {
+  const sem = vigiaConteudoVazio({ vazias: 2, total: 42 });
+  assert.ok(sem);
+  assert.ok(!("por_tipo" in (sem.detalhe as object)), "campo vazio e ruido no painel");
+  const vazio = vigiaConteudoVazio({ vazias: 2, total: 42, porTipo: {} });
+  assert.ok(vazio);
+  assert.ok(!("por_tipo" in (vazio.detalhe as object)));
+});
+
+test("VIGIA 10 — o titulo nao pode mentir sobre a propria regua", () => {
+  /* Se a RPC contar 24h e o titulo disser outra coisa, o alerta mente. O
+   * numero do titulo e o do detalhe saem da MESMA variavel — este teste prende
+   * isso, inclusive quando a janela e passada por parametro. */
+  const padrao = vigiaConteudoVazio({ vazias: 1, total: 10 });
+  assert.ok(padrao);
+  assert.equal(padrao.detalhe.horas, HORAS_CONTEUDO_VAZIO);
+  assert.ok(padrao.titulo.includes(`${HORAS_CONTEUDO_VAZIO}h`));
+
+  const larga = vigiaConteudoVazio({ vazias: 1, total: 10, horas: 1200 });
+  assert.ok(larga);
+  assert.equal(larga.detalhe.horas, 1200);
+  assert.ok(larga.titulo.includes("1200h"), "titulo tem de seguir a janela usada");
 });
