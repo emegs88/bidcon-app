@@ -15,11 +15,36 @@ export function CartasNovasFeed({
   novas,
   hrefBase = "/cartas",
   verTodasHref = "/cartas",
+  falhou = false,
 }: {
   novas: CartasNovas;
   hrefBase?: string;
   verTodasHref?: string;
+  /**
+   * REGRA 19 no feed. Sem este parâmetro, "a leitura da vitrine caiu" e "não
+   * entrou carta nova nos últimos 7 dias" produziam EXATAMENTE o mesmo pixel:
+   * `return null`, seção some, ninguém sabe de nada. Silêncio por escolha e
+   * silêncio por defeito ficavam indistinguíveis na home.
+   *
+   * Quando é falha, a seção aparece dizendo que a leitura não voltou — nunca
+   * afirmando que não há carta. Note que a falha VENCE a lista: se a fonte caiu,
+   * o que sobrou em `novas` não é resposta, é resto.
+   */
+  falhou?: boolean;
 }) {
+  if (falhou) {
+    return (
+      <section className={styles.novas} role="alert" aria-label="Cartas novas">
+        <div className={styles.novasHead}>
+          <h2 className={styles.novasTitulo}>Não consegui carregar as cartas agora</h2>
+          <a className={styles.novasLink} href={verTodasHref}>
+            Tentar de novo
+          </a>
+        </div>
+      </section>
+    );
+  }
+
   if (novas.quantidade <= 0) return null;
 
   return (

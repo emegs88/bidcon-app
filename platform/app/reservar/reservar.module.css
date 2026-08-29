@@ -167,6 +167,17 @@
   margin: 0 auto 14px;
 }
 
+/* ----- nota da ponte (F2.1) -----
+   Linha única acima da grade, dizendo ANTES do clique que a reserva segue por
+   conversa. Classe nova: o resto deste arquivo pertence ao ReservarWizard, que
+   continua no disco esperando a FASE 3 — nada aqui foi reescrito. */
+.notaPonte {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
 /* ----- gate de KYC ----- */
 .kycHead {
   display: flex;

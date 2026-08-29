@@ -500,14 +500,39 @@ export function vigiaQuarentenaReincidente(entrada: {
 //
 // A doutrina da casa é tirar limiar de percentil do histórico — foi assim com
 // QUARENTENA_DISTINTAS_DIA (47) e HORAS_UTEIS_SEM_MOVIMENTO (20). Aqui não deu,
-// e o motivo é que a série medida é degenerada: `ciclos_com_envio 5 · min 15 ·
-// p50 15 · p90 15 · max 15 · ciclos_limpos 0`. TODO o histórico de envio deste
-// sistema é a própria pane. Não existe período saudável do qual extrair
-// normalidade, e fabricar um percentil de uma amostra sem variância seria
-// dar cara de estatística a um chute.
+// e o motivo era que a série medida EM 19/08 era degenerada: `ciclos_com_envio
+// 5 · min 15 · p50 15 · p90 15 · max 15 · ciclos_limpos 0`. Todo o histórico de
+// envio que existia naquele dia era a própria pane. Não havia período saudável
+// do qual extrair normalidade, e fabricar percentil de amostra sem variância
+// seria dar cara de estatística a um chute.
 //
-// Então o número é escolhido por PROPÓSITO, e isto fica escrito: ver
+// Então o número foi escolhido por PROPÓSITO, e isto fica escrito: ver
 // FALHAS_NO_CICLO abaixo.
+//
+// ---------------------------------------------------------------------------
+// CORREÇÃO MEDIDA EM 23/08/2026 — o parágrafo acima envelheceu
+//
+// Fica registrado que envelheceu, em vez de reescrito por cima, porque
+// comentário desatualizado é a dívida que esta casa paga mais caro: ele descreve
+// um mundo que não existe mais e ninguém desconfia, porque comentário não quebra
+// teste. A pane terminou em 19/08 entre 12:01 e 18:01. A série já tem variância,
+// e `ciclos_limpos` não é mais 0 — são 3:
+//
+//   ciclo (UTC)        falhas  entregues   veredito deste vigia
+//   2026-08-17 12:00       15          0   GRAVE
+//   2026-08-17 18:00       15          0   GRAVE
+//   2026-08-18 12:00       15          0   GRAVE
+//   2026-08-18 18:00       15          0   GRAVE
+//   2026-08-19 12:00       15          0   GRAVE
+//   2026-08-19 18:00        0         14   calado
+//   2026-08-20 12:00        0         14   calado
+//   2026-08-21 12:00        0          1   calado
+//
+// Isto é o CONTROLE que a Regra 9 exige, e ele veio de graça do dado real: cinco
+// ciclos em que o vigia acusa, três em que ele cala, e NENHUM ciclo na zona
+// cinzenta. O limiar 3 cai no vão entre 0 e 15 sem encostar em nenhum dos dois
+// lados. O número segue escolhido por propósito — mas agora existe amostra
+// saudável provando que ele não grita à toa, que é o que faltava em 19/08.
 
 export const TIPO_ENVIO_SENTINELA = "sentinela_envio";
 export const CHAVE_ENVIO_FALHANDO = "falhando";
@@ -583,6 +608,186 @@ export function vigiaEnvioSentinela(entrada: {
   };
 }
 
+/**
+ * A janela é JULGÁVEL? — a pergunta que a varredura tem de fazer ANTES de
+ * `marcar()`, e a razão de ela morar aqui e não em linha na rota.
+ *
+ * O PROBLEMA, MEDIDO EM 23/08/2026. Marcar uma condição como julgada autoriza a
+ * FASE 3 a FECHAR o alerta aberto dela. Este vigia cala quando `falhas` está
+ * abaixo do limite — e cala igualzinho quando ninguém tentou enviar coisa
+ * alguma. As duas coisas chegariam à FASE 3 como "condição passou".
+ *
+ * E o segundo caso é o NORMAL, não a exceção. A aritmética dos dois crons:
+ *
+ *   - Sentinela envia em `0 12,18 * * *` — duas vezes por dia.
+ *   - A varredura roda de 3 em 3 horas no minuto 20 — oito vezes por dia,
+ *     olhando 3h para trás. (O cron está em `vercel.json`; ele não cabe escrito
+ *     aqui porque a barra-asterisco do campo de hora FECHA este comentário.
+ *     Descobri isso derrubando o arquivo inteiro: o `tsc` acusou erro de sintaxe
+ *     240 linhas adiante, num trecho intocado, e o defeito estava aqui.)
+ *
+ * Só as passagens de 12:20 e 18:20 enxergam envio. Nas outras SEIS a janela
+ * está vazia por desenho. Sem esta guarda, seis vezes por dia a varredura
+ * declararia o envio saudável sem ter visto uma tentativa sequer — e fecharia
+ * um alerta legítimo de pane usando como prova o silêncio do relógio. Medido no
+ * instante em que isto foi escrito: último envio 21/08 12:01, `44,2h` atrás,
+ * `envios_na_janela_3h = 0`. A pane de 75 recusas seria apagada por uma janela
+ * em que ninguém tentou nada.
+ *
+ * A ORDEM DAS PORTAS não é arbitrária:
+ *
+ *   1. `falhas === null` ⇒ não julga. Não medi o que decide o alarme.
+ *   2. `falhas >= limite` ⇒ JULGA, mesmo sem `feitos`. Esta porta vem ANTES da
+ *      de `feitos` de propósito: o vigia alarma com as falhas que FORAM medidas,
+ *      e recusar-se a julgar aqui trocaria um alerta certo por silêncio cômodo.
+ *   3. `feitos === null` ⇒ não julga. Falhas abaixo do limite e entregues não
+ *      medidos: não dá para afirmar que o ciclo foi saudável, e só quem afirma
+ *      isso tem direito de fechar alerta.
+ *   4. `falhas + feitos === 0` ⇒ não julga. Ninguém tentou. Mesmo princípio do
+ *      `ciclosNoPeriodo <= 0` do vigia de movimento: o silêncio é do ciclo.
+ *
+ * Sobra um único caminho para o fechamento automático: os dois contadores
+ * medidos, pelo menos uma tentativa na janela, e as falhas abaixo do limite —
+ * que é a definição exata de "vi o envio funcionar".
+ */
+export function envioSentinelaJulgavel(entrada: {
+  falhas: number | null;
+  feitos: number | null;
+  limite?: number;
+}): { julgar: boolean; motivo: string | null } {
+  const { falhas, feitos, limite = FALHAS_NO_CICLO } = entrada;
+
+  if (falhas === null || !Number.isFinite(falhas)) {
+    return { julgar: false, motivo: "contagem de falhas indisponivel" };
+  }
+  if (falhas >= limite) return { julgar: true, motivo: null };
+  if (feitos === null || !Number.isFinite(feitos)) {
+    return { julgar: false, motivo: "entregues nao medidos e falhas abaixo do limite" };
+  }
+  if (falhas + feitos === 0) {
+    return { julgar: false, motivo: "nenhuma tentativa de envio na janela" };
+  }
+  return { julgar: true, motivo: null };
+}
+
+// ---------------------------------------------------------------------------
+// VIGIA 9 — HANDOFF MUDO: o bastão passou e ninguém pegou
+// AUTORIZADO: coordenação, 21/08/2026 — HANDOFF-01 item (c).
+// ---------------------------------------------------------------------------
+//
+// A CONDIÇÃO
+//
+// `wa_conversas.agente_ativo` foi trocado, algum agente de conversa já havia
+// falado, e o agente que está ativo AGORA nunca falou uma linha. O cliente ficou
+// olhando para a última fala de quem se despediu. Ninguém do outro lado.
+//
+// Isto é dinheiro parado, não higiene: cada linha aqui é uma pessoa que pediu
+// alguma coisa e foi transferida para o silêncio.
+//
+// POR QUE CHAVE ÚNICA DE VOLUME, E NÃO UMA POR CONVERSA
+//
+// Medido em 21/08 em produção: 16 conversas neste estado. O painel corta em 12
+// linhas (`TETO_LINHAS` em RadarAlertas.tsx). Uma chave por conversa abriria 16
+// alertas de uma vez e empurraria os outros oito vigias para fora da tela —
+// dívida histórica apagando a vigilância corrente. Um alerta, contagem no
+// título, quebra por agente no detalhe. Mesmo padrão de CHAVE_QUARENTENA_VOLUME.
+//
+// O LIMIAR É 1, E ISSO NÃO É PREGUIÇA DE MEDIR
+//
+// Em quarentena e em estoque o limiar sai de percentil porque existe um volume
+// NORMAL: quarentenar cartas é o sistema funcionando. Aqui não existe volume
+// normal. A abertura ativa do handoff leva segundos; qualquer conversa parada
+// neste estado por mais de meia hora é defeito, não ritmo. O valor saudável é
+// zero, e um percentil de uma série cujo valor saudável é zero não é
+// estatística, é enfeite. Declarado, como em FALHAS_NO_CICLO.
+//
+// O QUE A MEDIÇÃO DE HOJE DIZ SOBRE O CORTE DE 30 MINUTOS
+//
+// Nenhuma das 16 é recente: a mais nova tem 49,7h e a mais velha 384,3h
+// (valentina 10 · caetano 3 · tobias 2 · bento 1). Ou seja, hoje o corte de
+// meia hora não separa nada — todas passam. Ele fica assim mesmo, porque é a
+// definição certa da condição e porque, depois que a abertura ativa entrar no
+// ar, é justamente ele que vai distinguir "acabou de passar o bastão" de
+// "passou e morreu".
+
+export const TIPO_HANDOFF = "handoff";
+export const CHAVE_HANDOFF_MUDO = "mudo";
+
+/**
+ * Minutos que uma conversa pode ficar com agente novo calado antes de contar.
+ *
+ * Vive aqui, e não solto na consulta, porque quem MEDE (a rota de varredura) e
+ * quem JULGA (esta função) precisam concordar no mesmo número. Se a consulta
+ * filtrar 30 e o título disser 60, o alerta mente sobre a própria régua.
+ */
+export const MINUTOS_HANDOFF_MUDO = 30;
+
+/** Conversas mudas a partir das quais o vigia abre. Ver o bloco acima. */
+export const HANDOFF_MUDO_MINIMO = 1;
+
+/** Horas de espera a partir das quais deixa de ser aviso e vira grave. */
+export const HORAS_HANDOFF_GRAVE = 24;
+
+export function vigiaHandoffMudo(entrada: {
+  /**
+   * Conversas com agente ativo que nunca falou, já filtradas por
+   * MINUTOS_HANDOFF_MUDO. `null` = NÃO CONSEGUI MEDIR (Regra 19): a leitura
+   * falhou. Um `?? 0` aqui transformaria banco mudo em "nenhuma conversa
+   * parada" — e o chamador ainda fecharia o alerta legítimo que estivesse
+   * aberto, porque teria marcado a condição como julgada.
+   */
+  mudas: number | null;
+  /** Idade da mais antiga, em horas. `null` quando não medida. */
+  maisAntigaHoras: number | null;
+  /** Quebra por agente que ficou parado. Só detalhe; não entra no julgamento. */
+  porAgente?: Readonly<Record<string, number>>;
+  limite?: number;
+  horasGrave?: number;
+}): Alerta | null {
+  const {
+    mudas,
+    maisAntigaHoras,
+    porAgente,
+    limite = HANDOFF_MUDO_MINIMO,
+    horasGrave = HORAS_HANDOFF_GRAVE,
+  } = entrada;
+  if (mudas === null || !Number.isFinite(mudas)) return null;
+  if (mudas < limite) return null;
+
+  // Idade não medida NÃO promove a grave: severidade alta precisa de prova.
+  const velha =
+    maisAntigaHoras !== null &&
+    Number.isFinite(maisAntigaHoras) &&
+    maisAntigaHoras >= horasGrave;
+
+  const sufixo =
+    maisAntigaHoras === null || !Number.isFinite(maisAntigaHoras)
+      ? " (idade da mais antiga não medida)"
+      : ` — a mais antiga há ${Math.floor(maisAntigaHoras)}h`;
+
+  return {
+    tipo: TIPO_HANDOFF,
+    chave: CHAVE_HANDOFF_MUDO,
+    severidade: velha ? "grave" : "aviso",
+    titulo: `${mudas} conversa(s) com agente novo que nunca falou${sufixo}`,
+    detalhe: {
+      mudas,
+      // null viaja visível: "zero horas" e "não sei há quanto tempo" são coisas
+      // diferentes, e quem lê o alerta precisa poder distinguir.
+      mais_antiga_horas:
+        maisAntigaHoras === null || !Number.isFinite(maisAntigaHoras)
+          ? null
+          : Math.floor(maisAntigaHoras),
+      minutos_minimos: MINUTOS_HANDOFF_MUDO,
+      limite,
+      horas_grave: horasGrave,
+      ...(porAgente && Object.keys(porAgente).length > 0
+        ? { por_agente: porAgente }
+        : {}),
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 
 /** Todos os tipos que o RADAR pode abrir. O painel usa para agrupar. */
@@ -594,6 +799,7 @@ export const TIPOS_RADAR = [
   TIPO_FILA_SENTINELA,
   TIPO_ENVIO_SENTINELA,
   TIPO_QUARENTENA,
+  TIPO_HANDOFF,
 ] as const;
 
 export type { Limiar };

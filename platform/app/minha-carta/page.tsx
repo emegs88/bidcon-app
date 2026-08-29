@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { LABEL_TIPO_BEM } from "@/lib/status";
 import { brl, linkWhatsApp } from "@/lib/format";
+import { WA_PROSPERITO } from "@/lib/vitrine";
 import styles from "./minha-carta.module.css";
 
 // Fontes de marca (identidade visual da vitrine pública) escopadas só a esta
@@ -33,7 +34,9 @@ import styles from "./minha-carta.module.css";
 const titulo = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-title" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-mono" });
 
-const WA = "5519997561909";
+// Linha da WABA viva — fonte única em `lib/vitrine.ts`, onde está escrito por
+// que é este número e não o 5519 (a porta sem agente atrás).
+const WA = WA_PROSPERITO;
 
 type CartaXtv = {
   id: string;

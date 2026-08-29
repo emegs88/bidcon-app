@@ -7,9 +7,22 @@
 //   4) chama a RPC buscar_cartas_semantica (filtros duros em SQL + ranking vetor);
 //   5) gera uma frase de encaixe por carta (compliance-locked) e devolve.
 // Mutação? Não — é leitura. Mas mantemos Route Handler + force-dynamic porque
-// usa a sessão e chama serviço externo. Client COM RLS (createClient).
+// usa a sessão e chama serviço externo.
+//
+// CATALOGO-UNIFICA-01 · FASE 2 (portão g) — DOIS CLIENTES, DE PROPÓSITO:
+//   AUTENTICAÇÃO fica no nnv, com RLS (`createClient`). Quem é a pessoa, se ela
+//   está logada e qual o rate-limit dela — nada disso mudou de lugar.
+//   A BUSCA passa a rodar no xtv (`createXtvClient`), porque é lá que o estoque
+//   vive. Medido em 20/08/2026: nnv.cartas = 2 linhas, 0 disponíveis, 2 com
+//   vetor; xtv.cartas = 104.965 linhas, 2.308 disponíveis. A busca semântica no
+//   nnv era, na prática, uma busca sobre estoque vazio.
+//
+// As duas RPCs `buscar_cartas_semantica` são IDÊNTICAS em assinatura e em
+// colunas de retorno (conferido por `pg_get_functiondef` nos dois projetos em
+// 20/08), então o de-para aqui é a troca do cliente e nada mais.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { createXtvClient } from "@/lib/supabase-xtv";
 import {
   extrairIntencao,
   gerarEmbedding,
@@ -91,8 +104,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // 4) RPC: filtros duros em SQL + ranking por vetor (só estoque disponível)
-  const { data: cartas, error } = await supabase.rpc("buscar_cartas_semantica", {
+  // 4) RPC no xtv: filtros duros em SQL + ranking por vetor (só estoque
+  //    disponível E com vetor — o `embedding is not null` está dentro da função).
+  const xtv = createXtvClient();
+  const { data: cartas, error } = await xtv.rpc("buscar_cartas_semantica", {
     p_embedding: embeddingParaSQL(embedding),
     p_tipo: intencao.tipo_bem,
     p_valor_max: intencao.valor_max,
@@ -114,6 +129,47 @@ export async function POST(req: Request) {
     score: number;
   };
   const lista = (cartas ?? []) as Linha[];
+
+  // ── REGRA 19 NA BUSCA: zero por falta de VETOR não é zero por falta de CARTA.
+  //
+  // A função filtra por `embedding is not null`. Medido em 20/08/2026, ANTES do
+  // backfill re-apontado: xtv tinha 2.308 cartas disponíveis e ZERO vetores.
+  // Nesse estado a RPC devolve lista vazia, sem erro nenhum — e a tela diria
+  // "Nada encontrado para esse pedido", como se a casa não tivesse a carta que
+  // a pessoa pediu. Mentira por omissão: a carta está lá, quem não está pronto
+  // é o índice.
+  //
+  // O controle custa uma contagem, e SÓ no caminho do zero — busca com resultado
+  // não paga nada. E é um controle que pode disparar de verdade (Regra 9): hoje
+  // ele dispara; conforme o backfill anda, ele para de disparar sozinho.
+  if (lista.length === 0) {
+    const { count, error: erroControle } = await xtv
+      .from("cartas")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "disponivel")
+      .not("embedding", "is", null);
+
+    // Se nem o controle respondeu, também não dá para afirmar "nada encontrado".
+    if (erroControle) {
+      console.error("[busca] controle de índice falhou —", erroControle.message);
+      return NextResponse.json(
+        { erro: "Não foi possível buscar as cartas agora. Tente de novo." },
+        { status: 503 }
+      );
+    }
+
+    if ((count ?? 0) === 0) {
+      console.warn("[busca] índice semântico VAZIO — nenhuma carta disponível tem vetor");
+      return NextResponse.json(
+        {
+          erro:
+            "A busca por descrição ainda está sendo preparada. " +
+            "Enquanto isso, veja as cartas disponíveis na vitrine.",
+        },
+        { status: 503 }
+      );
+    }
+  }
 
   // 5) frase de encaixe por carta (paralelo; cada uma já cai em fallback seguro)
   const comFrase = await Promise.all(

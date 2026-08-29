@@ -25,9 +25,18 @@ import { Button } from "@/components/ui/Button";
 import { LABEL_TIPO_BEM } from "@/lib/status";
 import { custoEfetivoCarta, fmtCustoEfetivo } from "@/lib/custo-efetivo";
 import { brl, linkWhatsApp } from "@/lib/format";
+import {
+  linkReservaPonte,
+  ordenarExclusivaPrimeiro,
+  NOTA_RESERVA_PONTE,
+  WA_PROSPERITO,
+} from "@/lib/vitrine";
 import styles from "./detalhe.module.css";
 
-const WA = "5519997561909";
+// Mesmo número que este arquivo já usava literalmente; agora vem de um lugar só,
+// junto com os outros quatro arquivos do app logado. (O site público usa OUTRO
+// número — divergência medida e reportada, resolvida fora desta fatia.)
+const WA = WA_PROSPERITO;
 
 type CartaDetalhe = {
   id: string;
@@ -41,7 +50,13 @@ type CartaDetalhe = {
   qtd_parcelas: number | null;
   status: string;
   // marca pública do bem (join administradoras, RLS p/ logado). NUNCA fornecedor.
-  administradora: { nome: string; aceita_assuncao: boolean } | null;
+  //
+  // `aceita_assuncao` é `boolean | null` e não `boolean`: medido em 20/08/2026,
+  // `xtv.administradoras` tem 37 linhas (35 true, 2 false, 0 null) — mas o join
+  // pode não casar, e nesse caso o valor é NÃO SEI, não "não aceita". O `null`
+  // é falsy, então a linha "Aceita assunção de cota" continua sumindo; a
+  // diferença é que a casa não afirma o que não mediu.
+  administradora: { nome: string; aceita_assuncao: boolean | null } | null;
 };
 
 export default async function CartaDetalhePage({
@@ -150,6 +165,34 @@ export default async function CartaDetalhePage({
     `Olá! Tenho interesse na carta de ${tipoLabel.toLowerCase()} (${ref}), ` +
     `crédito de ${brl(c.valor_credito)}. Pode me passar mais informações?`;
 
+  // CATALOGO-UNIFICA-01 · FASE 2 (decisão 2 do Emerson) — A RESERVA VIRA PONTE.
+  //
+  // Esta carta veio do xtv. O fluxo `/reservar` grava em `nnv.reservas`, cuja FK
+  // aponta para `nnv.cartas` — 2 linhas, nenhuma delas esta. Ou seja: o botão
+  // "Reservar esta carta" levava, por construção, a um caminho que não podia
+  // completar. A decisão foi ponte, não bloqueio: mandar para o canal que JÁ
+  // funciona hoje, com os números da carta já escritos na mensagem.
+  //
+  // `ref` numérico para a mensagem: no xtv `numero_externo` é `integer` (o tipo
+  // aceita string por herança do nnv, onde era texto). Quando não for número,
+  // vai `null` e `refCarta` cai no prefixo do uuid — nunca "nº NaN".
+  const refNumero =
+    typeof c.numero_externo === "number"
+      ? c.numero_externo
+      : c.numero_externo != null && Number.isFinite(Number(c.numero_externo))
+        ? Number(c.numero_externo)
+        : null;
+
+  const hrefReserva = linkReservaPonte({
+    id: c.id,
+    ref: refNumero,
+    tipo: c.tipo,
+    valor_credito: c.valor_credito,
+    valor_entrada: c.valor_entrada,
+    valor_parcela: c.valor_parcela,
+    qtd_parcelas: c.qtd_parcelas,
+  });
+
   return (
     <AppShell nome={nome}>
       <PageHeader
@@ -224,17 +267,17 @@ export default async function CartaDetalhePage({
         <Card>
           <h2 className={styles.h2}>Tem interesse nesta carta?</h2>
           <p className={styles.texto}>
-            Inicie a reserva pela plataforma ou fale com o atendimento pelo
-            WhatsApp para tirar dúvidas sobre a transferência da cota junto à
-            administradora do consórcio. Nenhuma contemplação é prometida:
-            trata-se de uma cota já contemplada sendo transferida.
+            {NOTA_RESERVA_PONTE}: o atendimento confere os valores com você e
+            conduz a transferência da cota junto à administradora do consórcio.
+            Nenhuma contemplação é prometida: trata-se de uma cota já
+            contemplada sendo transferida.
           </p>
-          <Button href={`/reservar?carta=${c.id}`} block>
+          <Button href={hrefReserva} block>
             Reservar esta carta
           </Button>
           <div className={styles.ctaSecundario}>
             <Button href={linkWhatsApp(WA, mensagem)} variant="ghost" block>
-              Falar no WhatsApp
+              Tirar dúvidas no WhatsApp
             </Button>
           </div>
         </Card>
@@ -290,7 +333,7 @@ async function buscarSimilares(
   const base = () =>
     db
       .from("cartas")
-      .select(`${CAMPOS_CARD}, administradora_origem`)
+      .select(`${CAMPOS_CARD}, fonte`)
       .eq("status", "disponivel")
       .neq("id", morta.id)
       // Mesma ordenação da vitrine (/cartas), copiada sem alteração.
@@ -310,12 +353,25 @@ async function buscarSimilares(
     brutas = [...brutas, ...(topo ?? []).filter((c) => !vistos.has(c.id as string))];
   }
 
-  // Regra da casa: BIDCON_DIRETO primeiro. Partição ESTÁVEL — dentro de cada
-  // bloco a ordem do banco (ágio, depois crédito) é preservada.
-  const direto = brutas.filter((c) => c.administradora_origem === "BIDCON_DIRETO");
-  const resto = brutas.filter((c) => c.administradora_origem !== "BIDCON_DIRETO");
-
-  return [...direto, ...resto].slice(0, 4).map((c) => {
+  // CATALOGO-UNIFICA-01 · FASE 2 (decisão 3 do Emerson) — O EIXO OFICIAL.
+  //
+  // Esta partição comparava a STRING `administradora_origem === "BIDCON_DIRETO"`.
+  // O problema não é que estivesse errada — é que ela mora no campo errado:
+  // `administradora_origem` guarda o FORNECEDOR do feed (medido hoje, entre as
+  // 2.308 disponíveis: PLAYCONTEMPLADAS 921 · CBC 576 · PIFFER 469 · CARTAS 183
+  // · LANCE 156 · BIDCON_DIRETO 3). Proveniência é identidade, e um rótulo
+  // morando no namespace do fornecedor é o homônimo esperando acontecer.
+  //
+  // O eixo passa a ser `fonte = 'cliente_direto'`. CONTROLE da troca, medido
+  // antes de trocar: so_fonte 0 · so_rotulo 0 · ambos 3 — os dois eixos
+  // concordam hoje linha a linha, então esta mudança não move nenhum pixel; ela
+  // só tira o código de cima de uma coincidência não amarrada por constraint.
+  //
+  // A ordenação vem de `ordenarExclusivaPrimeiro` (lib/vitrine, com teste): dois
+  // baldes, ESTÁVEL — dentro de cada bloco a ordem do banco (ágio, depois
+  // crédito) é preservada. E a partição acontece ANTES do corte em 4, como
+  // antes: cortar primeiro poderia descartar uma exclusiva que tinha vaga.
+  const cartas: CartaVitrine[] = brutas.map((c) => {
     const adm = (c as { administradora?: unknown }).administradora;
     const administradora = Array.isArray(adm) ? (adm[0] ?? null) : (adm ?? null);
     return {
@@ -329,6 +385,9 @@ async function buscarSimilares(
       bidcon_agio_120: c.bidcon_agio_120,
       bidcon_custo_am: c.bidcon_custo_am,
       administradora: administradora as CartaVitrine["administradora"],
+      exclusiva: c.fonte === "cliente_direto",
     };
   });
+
+  return ordenarExclusivaPrimeiro(cartas).slice(0, 4);
 }
