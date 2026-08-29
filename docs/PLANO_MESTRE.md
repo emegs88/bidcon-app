@@ -6,7 +6,13 @@
 > um doc mais antigo, **este documento vence** — e o doc antigo deve ser marcado
 > como desatualizado, não seguido.
 >
-> **Última atualização:** 2026-07-03.
+> **Última atualização:** 2026-08-29.
+>
+> **Aviso de defasagem (medido em 2026-08-29):** entre 2026-07-17 e 2026-08-29 este
+> documento ficou parado enquanto o projeto andou (dezenas de fatias, PRs #52–#58,
+> migrations até 0092 no xtv). §2, §4, §5 e §9 descrevem um estado antigo. A regra de
+> entrada continua valendo, mas **§2 tem correção registrada logo abaixo da tabela** —
+> leia-a antes de usar o mapa de bancos.
 
 ---
 
@@ -66,6 +72,37 @@ Quatro projetos distintos. **Confundir banco é o erro mais caro do projeto.**
 
 > A plataforma logada (`platform/`, 2º projeto Vercel `bidcon-plataforma`, Root=`platform/`,
 > DNS `app.bidcon.com.br`) usa banco **próprio** — nunca o do site (#1).
+
+> ### ⚠️ CORREÇÃO DE §2 (2026-08-29) — a tabela acima está DESATUALIZADA
+>
+> A tabela é de 03/07 e foi contrariada pela medição da própria §4 (WHATSAPP-01, 12/07)
+> e por toda a operação desde então. **Não siga a tabela; siga este bloco.** Os quatro
+> bancos de julho viraram dois em uso real:
+>
+> | Ref | Papel real hoje | Nome curto |
+> |---|---|---|
+> | `xtvjpnyadcdeadhmzyff` | Atendimento, vitrine, cartas, WhatsApp, sync, RADAR/Sentinela | **xtv** |
+> | `nnvjeijsrwpzsggwqpcu` | Auth/portal, reservas financeiras, KYC, vendas novas | **nnv** |
+>
+> Os dois erros da tabela antiga, nomeados para não voltarem:
+> 1. **`nnv` NÃO é "Site PROD institucional INTOCÁVEL".** O rótulo era errado já em
+>    12/07 e está corrigido em §4 (WHATSAPP-01): `nnv` estava praticamente vazio, e o
+>    banco que todas as rotas ativas usam via `createXtvClient()` é o **xtv**. Hoje
+>    `nnv` é o banco do app logado (auth, `reservas` financeiras, KYC, `vendas_novas`),
+>    e é gravado por código — não é intocável, é o outro lado da casa.
+>
+> **A divisão não é intuitiva e não se adivinha — mede-se.** Exemplo medido em 29/08:
+> `captacoes` (lado do cedente, migration 0088) está no **xtv**, não no nnv, apesar de
+> ser cadastro de pessoa. `select to_regclass('public.captacoes')` devolve a tabela no
+> xtv e `null` no nnv. Antes de escrever qualquer rota, rode o `to_regclass` nos dois.
+> 2. **Os bancos #2 (`fpgimirtiryivnrjdyxb`, DEV) e #4 (`szsqdpwwxtmrtrhaikuh`, ensaio)
+>    não participam da operação.** O item #3 (`bidcon-plataforma-prod`, "a criar")
+>    nunca foi criado — o papel dele é do xtv.
+>
+> **Existem DUAS tabelas `reservas`, uma em cada banco, e elas não se conhecem**
+> (medido em 29/08, ver `platform/docs/CATALOGO-F3-copy-on-reserve.md`): a do xtv é
+> etiqueta de vitrine (48h, fingerprint, sem dinheiro); a do nnv é a operação
+> financeira. Confundir as duas é a versão 2026 do "erro mais caro do projeto".
 
 ---
 
@@ -270,6 +307,31 @@ aguarda **AUTORIZO**; push aguarda **PUBLICA PLAYCONTEMPLADAS-01**.
 - **Aplicar SQL em PROD / `git push` / Vercel / DNS pelo agente:** proibido (§1.2).
 - **Re-aplicar o ensaio (§7):** proibido — está concluído.
 
+### DESCONGELADO em 2026-08-29 — mini-simulador da página de venda (CAPTACAO-OFERTA-01 F2)
+
+**Palavra do Emerson (29/08/2026):** *"O mini-simulador ENTRA. O despacho de 28/08
+prevalece; o cancelamento anterior registrado no caderno está REVERTIDO por esta
+palavra."*
+
+**Registro honesto de uma medição incômoda:** ao abrir a fatia, procurei o cancelamento
+para riscá-lo e **não o encontrei**. Nenhum arquivo do repositório contém a string
+"mini-simulador"; `CLAUDE.md` não menciona "simulador"; esta §6 não tinha o item. Ou o
+cancelamento foi combinado só em conversa, ou foi anotado fora do repositório. **Não
+risquei uma linha que não existe** — esta entrada é o registro novo, com data, para que
+a mesma contradição não trave a fatia de novo. Se o cancelamento aparecer em algum lugar
+depois, **esta entrada vence** (regra de entrada deste documento).
+
+**As cinco pedras que valem dentro do simulador, sem exceção** (palavra do Emerson,
+29/08 — qualquer implementação futura que as viole é regressão, não escolha):
+
+1. Valores **sempre sobre o crédito líquido ao cessionário** — regra do extrato; lance
+   embutido não é desembolso do cliente.
+2. **Custo da Conta Notarial incluído** em qualquer conta exibida.
+3. **TIR canônica** se aparecer taxa; **nunca** percentual nominal.
+4. **Léxico:** proibido investimento/investidor/rendimento/CDI/lucro; nunca prometer
+   contemplação nem prazo.
+5. **Pagamento: só Conta Notarial.** Nunca Pix/TED direto ao vendedor.
+
 ---
 
 ## 7. Ensaio de hash-chain — CONCLUÍDO E VALIDADO em 03/07
@@ -325,4 +387,6 @@ por aqui. Emparelhado com `checklist-deploy-amanha.md` (deploy autoritativo),
 2026-07-12 · WhatsApp oficial de volta a 5511973202967 (bloqueio resolvido, número aprovado pelo WhatsApp Business) — reversão nos mesmos 16 arquivos; linhas de log anteriores (07-11 e a de hoje acima) mantidas como registro histórico, não alteradas
 2026-07-12 · Novo bloqueio no 5511973202967 — WhatsApp oficial trocado de volta pra 5519997561909, mesmos 16 arquivos (site + plataforma); linhas de log anteriores mantidas como registro histórico, não alteradas
 2026-07-12 · WHATSAPP-01 fix: 401 na validação de X-Hub-Signature-256 — comparação HMAC refeita byte-a-byte (hex sem prefixo sha256=) + log temporário do motivo da rejeição (sem segredo/corpo) pra diagnosticar em produção; Fatia 4 (LGPD) junto: quick reply "Não quero receber" do carrossel marca wa_conversas.opt_out=true — ver platform/app/api/whatsapp/route.ts. PUBLICA condicionado a confirmação do Emerson
+2026-08-29 · CAPTACAO-OFERTA-01 F2 — mini-simulador DESCONGELADO por palavra do Emerson; o cancelamento anterior NÃO foi encontrado no caderno (grep vazio em todo o repo), então esta é entrada nova, não risco de linha existente — ver §6 "DESCONGELADO", com as 5 pedras (crédito líquido ao cessionário · Conta Notarial dentro da conta · TIR canônica · léxico · só Conta Notarial)
+2026-08-29 · §2 marcada como DESATUALIZADA com bloco de correção — o mapa de 4 bancos de 03/07 contraria a própria §4 (WHATSAPP-01, 12/07): nnv não é "Site PROD intocável", xtv é o banco da operação, e existem DUAS tabelas `reservas` que não se conhecem (ver platform/docs/CATALOGO-F3-copy-on-reserve.md). Tabela antiga preservada como histórico, não seguida
 2026-07-17 · PLAYCONTEMPLADAS-01 (migration 0053, aguarda AUTORIZO) — novo fornecedor/vitrine playcontempladas.com.br entra na rotação automática de sync: leitor dedicado lib/playcontempladas-source.ts (HTML, sem JSON do parceiro), 981 cotas / 29 administradoras (27 batem direto, 6 aliases novos), RPCs sync_aplicar_cotas/sync_varrer_ausentes ampliadas pra aceitar a origem, entrada = cru do parceiro + 7% do crédito (compliance §1.3, calculado aqui dentro por não haver camada intermediária) — ver §4
