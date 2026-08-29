@@ -81,6 +81,12 @@ import { etiquetasDaMensagem } from "@/lib/farol/cedente";
 import { etiquetasSemEntrada } from "@/lib/farol/sem-entrada";
 import { semEntradaLigado } from "@/lib/farol/pivo-sem-entrada";
 import { ehOptOut as regraOptOut } from "@/lib/opt-out";
+// OUVIDO-01 v2 (a)+(b) — `normalizarTipo` é o espelho em TypeScript do CHECK
+// que a migration 0091 pôs na coluna `tipo`. Gravar aqui um valor que o CHECK
+// recusa derrubaria o INSERT inteiro e o turno do cliente sumiria de novo —
+// que é exatamente o defeito que esta fatia fecha. `placeholderDoTipo` dá a
+// marca legível ao que a Meta manda sem texto.
+import { normalizarTipo, placeholderDoTipo } from "@/lib/whatsapp/tipos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -232,9 +238,18 @@ function assinaturaValidaMeta(
 type MensagemMeta = {
   id?: string;
   from?: string;
-  // "text" | "button" | "interactive" | "document" | "image" | ... — só os
-  // tipos que este webhook trata de fato são desestruturados abaixo; os
-  // demais (audio, video, sticker, location, ...) caem no fallback vazio.
+  // "text" | "button" | "interactive" | "document" | "image" | "audio" | ...
+  //
+  // OUVIDO-01 v2 — este comentário dizia, até esta fatia, que "os demais
+  // (audio, video, sticker, location, ...) caem no fallback vazio". Era
+  // verdade e era o defeito: turno vazio entrando no cérebro. Agora `type` é
+  // NORMALIZADO e PERSISTIDO (coluna `tipo`, migration 0091), o áudio tem
+  // ramo próprio e os tipos sem texto ganham marca legível em vez de "".
+  //
+  // O que NÃO mudou, de propósito: os tipos continuam não sendo todos
+  // desestruturados aqui. A rede lá no background pergunta pelo CONTEÚDO
+  // gravado, não pelo tipo — então tipo que a Meta inventar amanhã e que
+  // ninguém desestruturou cai no mesmo galho, sem ninguém ter previsto.
   type?: string;
   text?: { body?: string };
   interactive?: {
@@ -251,6 +266,13 @@ type MensagemMeta = {
   // API, baixado depois via lib/whatsapp/media.ts.
   document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   image?: { id?: string; caption?: string; mime_type?: string };
+  // OUVIDO-01 v2 (b) — a nota de voz. Este é o payload REAL da Meta, medido:
+  // `{ id, mime_type, sha256, voice }` e mais nada — não há campo de duração,
+  // que é por que o teto de `transcricao.ts` é por bytes e se declara proxy.
+  // `voice` distingue nota de voz gravada na hora (true) de arquivo de áudio
+  // anexado (false); não usamos a distinção hoje, mas ela viaja porque
+  // descartá-la aqui apagaria o fato antes de alguém poder medi-lo.
+  audio?: { id?: string; mime_type?: string; voice?: boolean };
   // FATIA 1 (venda nova) — presente só quando a conversa nasce de um anúncio
   // Click-to-WhatsApp (CTWA); a Meta manda esse objeto na PRIMEIRA mensagem
   // do clique. Persistido first-touch-only em wa_conversas.referral (ver
@@ -361,7 +383,23 @@ export async function POST(req: Request) {
     const anexo: { id?: string; filename?: string; caption?: string; mime_type?: string } | undefined =
       m.type === "document" ? m.document : m.type === "image" ? m.image : undefined;
 
-    const conteudo =
+    // OUVIDO-01 v2 (b) — a nota de voz tem ramo PRÓPRIO, e isso é decisão, não
+    // simetria perdida. `anexo` é o caminho do EXTRATO: baixa, sobe pro bucket
+    // privado, chama visão e grava em extratos_cotas. Áudio não faz nada disso.
+    // Enfiar áudio em `anexo` faria toda nota de voz virar uma tentativa de ler
+    // extrato de cota — custo de visão gasto para não encontrar nada.
+    const audio = m.type === "audio" ? m.audio : undefined;
+
+    // OUVIDO-01 v2 (a) — o tipo que a Meta JÁ manda, agora persistido.
+    // `normalizarTipo` devolve `null` quando a Meta não declarou tipo e
+    // 'desconhecido' quando declarou algo fora da lista dela: são fatos
+    // diferentes e não podem virar o mesmo registro (Regra 19).
+    const tipo = normalizarTipo(m.type);
+
+    // A cascata ORIGINAL, byte por byte, agora entre parênteses. Ela continua
+    // mandando: se a mensagem trouxe texto, legenda ou nome de arquivo, é isso
+    // que se grava, e esta fatia não encosta nesse caminho.
+    const conteudoDeclarado =
       m.text?.body ??
       m.button?.text ??
       m.interactive?.button_reply?.title ??
@@ -369,6 +407,25 @@ export async function POST(req: Request) {
       anexo?.filename ??
       anexo?.caption ??
       (anexo ? "[anexo sem nome/legenda]" : "");
+
+    // O SEGUNDO passo usa `||`, e a diferença entre `||` e `??` É a fatia.
+    //
+    // A cascata acima é toda de `??`, que só anda quando o valor é
+    // null/undefined. O último ramo dela devolve STRING VAZIA quando não há
+    // anexo — e `""` é uma resposta que `??` aceita como boa. Era exatamente
+    // ali que o turno vazio nascia: a cascata "achava" a resposta "" e parava.
+    //
+    // `||` trata `""` como "ainda não achei nada" e deixa a marca do tipo
+    // entrar. Estender a cascata com mais um `??` teria mantido o defeito com
+    // código novo por cima — parece conserto e não conserta.
+    //
+    // O `|| ""` final continua podendo devolver vazio, e continua PODENDO de
+    // propósito: marca só existe para os tipos que esta fatia decidiu tratar.
+    // Um tipo que a Meta mandar e nós nunca mapeamos grava conteúdo vazio e
+    // FICA no banco como marca do nosso ponto cego, para o vigia do
+    // conteúdo-vazio achar. Dar marca a todo tipo mataria esse vigia no mesmo
+    // commit que o cria — contador que é zero por construção não vigia nada.
+    const conteudo = conteudoDeclarado || placeholderDoTipo(tipo) || "";
 
     // CONVERSAS-02 — o nome entra AQUI, no mesmo upsert, e não numa segunda
     // consulta: é a diferença entre uma ida ao banco e duas por mensagem. A
@@ -400,7 +457,19 @@ export async function POST(req: Request) {
         papel: "cliente",
         conteudo,
         wa_message_id: waMessageId,
-        media_id: anexo?.id ?? null,
+        // OUVIDO-01 v2 (a). `media_id` e `mime_type` JÁ EXISTIAM na tabela —
+        // medido antes de escrever a migration: a ordem pediu três colunas e o
+        // terreno precisava de uma. Aqui elas só passam a receber também o que
+        // vem do áudio, e não apenas do anexo.
+        media_id: anexo?.id ?? audio?.id ?? null,
+        // O mime DECLARADO pela Meta. Para o anexo, o bloco do extrato lá no
+        // background sobrescreve depois com o mime OBSERVADO nos bytes — o
+        // observado ganha do declarado, e é por isso que este valor pode mudar
+        // no meio do caminho. Para o áudio, este é o único que temos aqui.
+        mime_type: anexo?.mime_type ?? audio?.mime_type ?? null,
+        // `null` quando a Meta não declarou tipo — e `null` NÃO é
+        // 'desconhecido'. Ver o cabeçalho de lib/whatsapp/tipos.ts.
+        tipo,
       })
       .select("id")
       .single();
@@ -519,6 +588,16 @@ export async function POST(req: Request) {
         // `caption` NÃO entra: legenda de foto não é nome de arquivo (foi
         // exatamente essa confusão que sujou as 15 linhas antigas).
         anexoNome: anexo?.filename ?? null,
+        // OUVIDO-01 v2 (b) — o áudio viaja SEPARADO do anexo. Reusar `anexoId`
+        // mandaria a nota de voz pelo caminho do EXTRATO (bucket + visão +
+        // extratos_cotas), que é trabalho que áudio nenhum quer.
+        audioId: audio?.id ?? null,
+        audioMime: audio?.mime_type ?? null,
+        // `tipo` e `conteudo` são o que o background precisa para decidir se o
+        // cérebro consegue LER o turno. Sem eles, a rede do (c) teria de
+        // reconsultar o banco só para saber o que ela mesma acabou de gravar.
+        tipo,
+        conteudo,
         conversaOptOut: conversa.opt_out === true,
         conversaStatus: conversa.status ?? null,
         agenteAtivo: conversa.agente_ativo ?? null,
