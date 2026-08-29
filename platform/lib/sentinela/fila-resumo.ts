@@ -9,13 +9,32 @@
 // contagem sem teste é exatamente o que deixou 21 pessoas onze dias esperando.
 //
 // ----------------------------------------------------------------------------
-// OS SETE STATUS, MEDIDOS NO ENUM EM 16/08/2026
+// OS DOZE STATUS, REMEDIDOS NO ENUM EM 29/08/2026
 //
-//   pendente · aguardando_template · enviado · respondeu · esgotado ·
-//   excluido · erro
+//   1 pendente               5 esgotado                 9 encerrada_cordialmente
+//   2 aguardando_template    6 excluido                10 handoff_humano
+//   3 enviado                7 erro                    11 duplicado_telefone
+//   4 respondeu              8 encerrado_por_silencio  12 erro_permanente
 //
-// Repare em `respondeu` (não "respondido") e em `erro`, que existe no enum e
-// não aparecia em lista nenhuma do código. Um status que ninguém conta é um
+// ----------------------------------------------------------------------------
+// ESTE CABEÇALHO JÁ MENTIU, E É POR ISSO QUE A DATA ESTÁ NELE
+//
+// Até 29/08/2026 estas linhas diziam "OS SETE STATUS, MEDIDOS EM 16/08". O enum
+// tinha crescido para doze e ninguém veio aqui. Cinco status passaram a existir
+// sem que este arquivo soubesse — e nesse dia a fila real tinha 52 linhas, das
+// quais 26 (`encerrado_por_silencio` 25 + `duplicado_telefone` 1) caíam em
+// `desconhecidas`. METADE DA FILA classificada como "não sei".
+//
+// O mecanismo funcionou: nenhuma linha foi contada errado, e o painel gritava.
+// O que falhou foi a lista, que é escrita à mão e não tem como se atualizar
+// sozinha — teste offline não alcança o enum do banco. Então a defesa real não
+// é este comentário: é o contador `desconhecidas` e o alarme que ele acende.
+// Quem mexer aqui: a lista envelhece, o alarme não. Não troque um pelo outro.
+//
+// ----------------------------------------------------------------------------
+// POR QUE LISTA FECHADA
+//
+// Repare em `respondeu` (não "respondido"). Um status que ninguém conta é um
 // status onde linhas somem: se três linhas caírem em `erro`, um resumo escrito
 // de cabeça as ignoraria e a fila pareceria menor do que é.
 //
@@ -32,15 +51,50 @@ export type LinhaFila = {
   criado_em: string;
 };
 
-/** Quem ainda espera alguma coisa da casa. */
-export const STATUS_ESPERANDO = ["pendente", "aguardando_template", "enviado"] as const;
+/**
+ * Quem ainda espera alguma coisa da casa.
+ *
+ * `handoff_humano` entrou aqui em 29/08/2026, e é a única das cinco entradas
+ * novas que exigiu julgamento em vez de leitura. As outras quatro dizem no
+ * próprio nome que acabaram; esta não. A régua usada foi a definição desta
+ * lista, escrita acima: quem ainda espera ALGUMA COISA DA CASA. Uma pessoa
+ * passada para uma pessoa continua devendo resposta — o robô parou, o
+ * atendimento não. Chamar isso de encerrado esconderia exatamente a espera que
+ * mais dói, porque é a que alguém prometeu atender.
+ *
+ * Decidi agora porque hoje `handoff_humano` tem ZERO linhas: a escolha não
+ * mexe em nenhum número da tela, e é por isso que ela é barata hoje e cara
+ * depois. Se a leitura da casa for outra, é uma linha para mover — e o teste
+ * `as duas listas cobrem os doze status` acusa a mudança na hora.
+ */
+export const STATUS_ESPERANDO = [
+  "pendente",
+  "aguardando_template",
+  "enviado",
+  "handoff_humano",
+] as const;
 
 /**
  * Quem saiu da fila, por qualquer porta. `erro` está aqui de propósito: a linha
  * parou de andar, então não é espera — mas é um encerramento que ninguém
- * escolheu, e por isso o painel o mostra separado dos outros.
+ * escolheu, e por isso o painel o mostra separado dos outros. `erro_permanente`
+ * entra pela mesma porta, e é o mesmo caso levado ao fim: não adianta tentar.
+ *
+ * `encerrado_por_silencio`, `encerrada_cordialmente` e `duplicado_telefone`
+ * são encerramentos limpos — a linha cumpriu o caminho dela e saiu. Os três
+ * estavam no enum e fora daqui; `encerrado_por_silencio` sozinho respondia por
+ * 25 das 52 linhas da fila em 29/08.
  */
-export const STATUS_ENCERRADOS = ["respondeu", "esgotado", "excluido", "erro"] as const;
+export const STATUS_ENCERRADOS = [
+  "respondeu",
+  "esgotado",
+  "excluido",
+  "erro",
+  "encerrado_por_silencio",
+  "encerrada_cordialmente",
+  "duplicado_telefone",
+  "erro_permanente",
+] as const;
 
 export function estaEsperando(status: string): boolean {
   return (STATUS_ESPERANDO as readonly string[]).includes(status);

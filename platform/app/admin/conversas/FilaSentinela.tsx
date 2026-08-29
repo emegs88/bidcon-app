@@ -8,22 +8,38 @@
 // equipe antes de montar isto.
 //
 // ----------------------------------------------------------------------------
-// AS COLUNAS SÃO AS MEDIDAS HOJE, E `max_toques` NÃO ESTÁ ENTRE ELAS
+// ESTE CABEÇALHO MENTIU POR TREZE DIAS — LEIA ISTO ANTES DE CONFIAR NELE
 //
-// Medi as colunas de `sentinela_fila` em 16/08/2026: id, conversa_site_id,
-// wa_conversa_id, interesse_id, nome, telefone, motivo, status, tentativas,
-// ultimo_envio_em, proximo_toque_em, criado_em, atualizado_em. Não há
-// `max_toques` — a migração 0081 existe em arquivo e NÃO foi aplicada. Pedir
-// essa coluna aqui derrubaria o bloco inteiro com 42703 no dia em que alguém
-// abrisse a tela, e a tela é justamente o que deveria avisar.
+// Até 29/08/2026 estas linhas afirmavam, em caixa alta, que `sentinela_fila`
+// tinha treze colunas, que `max_toques` NÃO estava entre elas e que "a migração
+// 0081 existe em arquivo e NÃO foi aplicada".
+//
+// Medi a tabela em 29/08: são DEZESSETE colunas, e `max_toques` é uma delas
+// (`smallint NOT NULL default 2`). A 0081 foi aplicada. As outras três que o
+// cabeçalho não conhecia: `falhas_consecutivas`, `max_falhas`, `ultimo_erro`.
+//
+// Nada quebrou por causa disso, e é justamente esse o ponto: um comentário
+// errado passa no `tsc` e passa na suíte inteira sem fazer barulho. O `select`
+// abaixo pede quatro colunas nominais e sobreviveria a qualquer uma dessas
+// mudanças — a defesa nunca foi o texto, foi o `select` estreito. Quem escrever
+// aqui: comentário que afirma o estado do banco é comentário com data de
+// validade. Datar não o torna verdadeiro; torna a mentira DATÁVEL.
 //
 // ----------------------------------------------------------------------------
 // O QUE ESTE BLOCO EXISTE PARA DIZER
 //
-// Em 16/08 a fila tem 30 linhas: 21 em `aguardando_template` desde 04/08 com
+// Em 16/08 a fila tinha 30 linhas: 21 em `aguardando_template` desde 04/08 com
 // `criado_em` idêntico (foi um lote só), 5 `pendente` entre 06/08 e 14/08, e 4
-// `excluido`. E `sum(tentativas) = 0` na tabela inteira: ninguém foi tocado
-// nunca. Onze dias. Nenhuma tela dizia isso — por isso esta existe.
+// `excluido` — e `sum(tentativas) = 0` na tabela inteira. Ninguém tocado nunca,
+// onze dias. Nenhuma tela dizia isso; por isso esta existe.
+//
+// Em 29/08 a fila é outra: 52 linhas, 25 `encerrado_por_silencio`, 16 `enviado`,
+// 7 `excluido`, 3 `respondeu`, 1 `duplicado_telefone`, e 54 toques dados. A fila
+// ANDOU. Deixo os dois retratos porque a comparação é a informação: o valor
+// desta tela não é o número de hoje, é o número de hoje ao lado do de ontem.
+//
+// Os números acima envelhecem sozinhos. O que NÃO envelhece é o alarme de
+// `desconhecidas` mais abaixo — ele é lido do banco a cada visita.
 //
 // Os três silêncios de `RadarAlertas` valem igual aqui: fila vazia, tabela
 // ausente e erro de leitura produziriam a MESMA tela num componente descuidado,
