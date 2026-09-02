@@ -2066,3 +2066,182 @@ Elas não passaram por typecheck, não passaram por build e o caminho de erro n�
 vivo. Enquanto isso não acontecer, o correto é dizer que o ACESSO-01 está **escrito**, não
 consertado. Cinco fatias entraram na fila enquanto essa auditoria não aconteceu; registro isso
 aqui para que a dívida tenha nome e data.
+
+## 23 — FUNIL-01, F2: a 0093 em produção pela ordem certa, e a porta da casa medida antes de usada (02/09/2026)
+
+Primeira migration desta corrida a entrar no banco **depois** de estar em `main`. O que segue
+vale menos pelo que a 0093 faz e mais pelo que a fatia descobriu sobre os instrumentos com que
+esta casa mede.
+
+### 23.1 — A ordem que passa a valer: portões → PR → merge → `apply_migration`
+
+O motivo tem nome e número: a **0090** está aplicada nos dois bancos e o arquivo dela nunca
+chegou à `main` — vive numa branch aberta. Migration que entra no banco antes de estar em `main`
+é migration cujo texto ninguém consegue auditar depois.
+
+A F2 fez o inverso, e é a primeira vez: portões locais verdes → `push` → PR #61 → merge
+(`main = 2963b46`) → e só então o banco, por `apply_migration` com `name = 0093_funil_01`.
+
+**Nunca `execute_sql` para aplicar migration.** Ele escreve no banco e não registra no ledger: o
+resultado é uma migration fantasma, que é exatamente a doença que a 0090 tem.
+
+### 23.2 — A porta da casa para o Postgres, medida antes de carregada
+
+Nada disto era sabido. Tudo foi medido com isca e controle positivo, em probes de raio de dano
+mínimo, antes de qualquer DDL de verdade:
+
+| propriedade | como ficou provada |
+|---|---|
+| `begin`/`rollback` é honrado — não é auto-commit | `create table` dentro de `begin…rollback` → `to_regclass` nulo, com `to_regclass('public.interesses')` devolvendo nome na **mesma expressão** |
+| multi-statement passa, mas **só o resultado do último volta** | os `select` do meio sumiram; o desenho do ensaio inteiro mudou por causa disso |
+| `raise exception` dentro de `begin` **devolve a mensagem e garante o desfazimento** | mais forte que `rollback;`: nenhum caminho commita, nem por erro no meio do arquivo |
+| `\n` sobrevive na mensagem de erro | por isso o relatório do ensaio pôde vir em linhas |
+| o papel é `postgres`, superusuário | `current_user` |
+| a conexão é **limpa** depois do erro | zero `idle in transaction (aborted)`, zero `AccessExclusiveLock` no alvo, com `sessoes_totais` como positivo |
+| `apply_migration` guarda o corpo **verbatim, um statement só, sem aparar** | `md5(statements)` = md5 do arquivo, e `n_statements = 1` |
+
+A última linha é a que fecha a auditoria da fatia: o que está no banco é byte por byte o que está
+em `main`, por md5 — não por argumento.
+
+### 23.3 — Como se prova um arquivo inteiro sem aplicá-lo
+
+O ensaio da 0093: `begin` → `set local lock_timeout = '5s'` e `statement_timeout = '60s'` → uma
+**temp table** de relatório → âncoras do "antes" → **o arquivo verbatim, como statements de
+topo** (nunca retranscrito para dentro de `execute`) → âncoras do "depois", isca e controle
+positivo → `raise exception` carregando o relatório inteiro.
+
+A temp table foi descartada cedo demais na primeira versão do desenho, por eu pensar nela como
+sobrevivente do rollback. Ela não precisa sobreviver: precisa estar viva **até o `raise`**, e ali
+está.
+
+Duas emendas da coordenação que ficam como padrão:
+
+1. **Sentinela.** O relatório termina em `--FIM-DO-RELATORIO--`. Se a sentinela não aparece, a
+   mensagem foi cortada e o ensaio conta como **não lido** — não como aprovado.
+2. **Relatório denso.** Contagens, nomes e `sqlstate`; nunca despejos.
+
+E uma técnica que vale guardar: as **sete impressões digitais**. Os `comment on` são prosa longa;
+erro de transcrição neles **não** produz erro de sintaxe. Medi o comprimento dos sete literais no
+arquivo (101, 118, 153, 169, 243, 250, 372) e conferi contra `length(d.description)` no banco. É
+a única prova disponível para a região que a sintaxe não cobre.
+
+### 23.4 — `length()` conta caracteres; byte é `octet_length()`
+
+O arquivo tem **22348 bytes** e **22017 caracteres** — 331 de diferença, que são os acentos (`ã`,
+`é`, `—`, `·` e companhia). Comparar `length()` com `wc -c` é comparar réguas, não corpos, e por
+um momento essa diferença passou por "331 bytes que a porta descartou".
+
+Regra: **`length()` = caracteres, `octet_length()` = bytes.** Nunca comparar um com o outro.
+
+### 23.5 — As 25 combinações que falharam, e por isso provaram
+
+Para descobrir se a porta fatiava o corpo, fatiei o arquivo localmente — separador que respeita
+comentário de linha e literal com `''`, 33 statements de topo — e testei **cinco formas de
+recortar × cinco juntas = 25 combinações**. Nenhuma bateu com o md5 do banco. A única coisa que
+casa é o arquivo **intacto**.
+
+Prova por fracasso: se a porta tivesse fatiado, uma das 25 teria batido.
+
+O separador foi obrigado a mostrar que sabe errar antes de valer: `select 1 -- sem ponto e
+virgula` → 0 · `select 1; select 2;` → 2 · `select 'tem ; dentro do literal';` → 1 · `select 1
+-- ; em comentario` + `;` → 1.
+
+### 23.6 — Controle positivo não é formalidade
+
+No ensaio, a isca — `insert` de um `interesses` `convertido` sem fechamento — foi recusada com
+`23514 · interesses_convertido_tem_fechamento`. Sozinha, ela não prova nada: constraint que
+recusa tudo é a mesma coisa que eixo que reprova tudo.
+
+O controle positivo — a mesma linha **com** `fechado_em` e `fechado_valor` — foi aceito. E rendeu
+mais do que a formalidade: foi a **única linha viva** que exercitou o braço `convertido →
+fechado_venda` do mapa e a regra do `parado_horas` nulo.
+
+Depois da aplicação, com dado real, `vw_funil` tem 60 linhas e **uma única etapa distinta:
+`entrada`**; `parado_horas` nulo em zero. Dez dos doze braços do mapa seguem provados por
+leitura, não por dado. A F5 fecha isso com um `insert` por status.
+
+Regra: **controle positivo é o único dado que testa o caminho feliz de uma trava nova.**
+
+### 23.7 — A regra do cano, e as quatro reincidências desta fatia
+
+A §22.11 escreveu *contagem antes do pipe, nunca exit code depois dele*. Nesta fatia a mesma
+família apareceu quatro vezes:
+
+- `EXIT=$?` depois de `echo "$(binario | head -1)"` mediu o `echo` → **0** para um binário
+  inexistente. Conserto: `binario >/dev/null 2>&1; echo $?` → **127**, com `node -v` → 0 como
+  positivo.
+- `${PIPESTATUS[0]}` **não existe aqui**: o shell da casa é `zsh`, não `bash`. O bloco inteiro
+  quebrou com `tail: echo: No such file or directory`.
+- `grep -E '^. (tests|pass|fail) '` não casou nada porque a linha começa com `ℹ`, que é
+  multi-byte. Lido como "zero testes", teria virado relatório fictício sem mentira.
+- `git ls-remote --heads origin <ramo-inventado>` sai com **0** e zero linhas. Quem lê o exit
+  conclui que o ramo existe. **Quem julga é a contagem.**
+
+Autodiagnóstico que fica escrito: *construo a régua com pressa quando o resultado que espero é
+óbvio.*
+
+### 23.8 — `Portoes: testes N/N` é retrato de ramo, não série que sobe
+
+Um commit trazia `testes 1236/1236` e o portão desta fatia deu `1240/1240`. A diferença não é
+regressão nem inflação: os números de portão de commits diferentes são retratos de **ramos**
+diferentes.
+
+Reconciliado por medição, não por inferência: `1196` (base) `+ 3` (funil) `+ 40` (captação) `+ 1`
+= **1240**. Os dois arquivos foram rodados isolados para a inferência virar medição:
+`ℹ tests 40 / pass 40 / fail 0` e `ℹ tests 1 / pass 1 / fail 0`.
+
+### 23.9 — Os dois órfãos, e a candidata `LEDGER-REPO-01`
+
+Conferindo os comentários da 0093 por diferença, apareceram **14** no banco contra **13** nos
+arquivos:
+
+- 7 da `0093_funil_01.sql`;
+- 6 da `0088_captacoes.sql` (122, 157, 171, 193, 196, 345);
+- **1 órfão**: `interesses.alerta_enviado`, 70 caracteres, presente no xtv e ausente dos 72
+  arquivos de `platform/supabase/migrations/`. O ledger aponta a origem:
+  `20260712205801 · 0047_whatsapp_envio`.
+
+E há **dois `0047`** no ledger: `0047_whatsapp_envio` (12/07) e `0047_sync_identidade_estavel`
+(16/07). Colisão de número, quatro dias de distância.
+
+Hipótese, marcada como hipótese: em julho, migrations entraram pela porta direto do chat, sem
+arquivo, e o número foi reusado por quem não viu a primeira porque ela nunca esteve no
+repositório.
+
+**`LEDGER-REPO-01`, parada, para a mesa do Emerson:** reconciliar ledger × repositório — para
+cada uma das 101 entradas, existe arquivo? para cada um dos 72 arquivos, existe entrada? quais
+números colidem (0023, 0024, 0047, 0089)? — e escrever a regra que faltava, que é justamente a
+da §23.1. As duas provas de que ela é necessária são a `0090` e o `alerta_enviado`.
+
+O `0089_radar_handoff_mudo` também segue **em dobro** no ledger, confirmado de novo hoje.
+
+### 23.10 — O que a F2 entregou, um item por linha
+
+Três colunas de operação nas duas mesas · uma conversa, uma captação viva, por índice único
+parcial que não matou o índice de busca · a vista do funil com allowlist positiva de 19 colunas e
+nenhum texto livre do cliente · a escada do comprador com os dois degraus novos, por palavra do
+Emerson · a lista de operadores no banco, uma pessoa por linha, para poder suspender uma sem
+suspender o grupo · fechamento só com valor e data, nos dois lados · a porta pública de
+`interesses` fechada em `novo` · o quinto interruptor da casa, nascido desarmado.
+
+Ledger: `101 · 20260902220912 · 0093_funil_01`. Colunas: `captacoes` 18 → 23, `interesses`
+14 → 19. Dado tocado: **nenhum** — 2 captações, 58 interesses, 60 linhas na vista, antes e
+depois. Sem backfill.
+
+### 23.11 — O que a F2 **não** muda
+
+`FUNIL` não está na Vercel e nenhuma rota lê as colunas novas. O deploy de produção que levou a
+fatia não mudou comportamento nenhum. A mesa continua sendo o quadro publicado até a F4, e o
+interruptor só é armado na F6, por palavra do Emerson.
+
+### 23.12 — O que fica sem prova
+
+- **Dez dos doze braços do mapa de etapas**, e o `else fora_do_mapa` — provados por leitura do
+  arquivo, não por dado. F5, trava 4.
+- **A allowlist de 19 colunas prova que as 19 estão, não que são só elas.** Também F5.
+- **8 vulnerabilidades** (3 moderate, 5 high) reportadas pelo `npm ci`. Candidata
+  `SEGURANCA-DEPS-01`.
+- **41 `;` no arquivo contra 33 de topo.** Os 8 restantes vivem dentro de literal ou de prosa;
+  não os conferi um a um. É inferência, não medição.
+- **O resíduo dos pacotes**: o `npm ci` de hoje diz "added 154, audited 155"; réguas antigas
+  deram 150 e 160, e ninguém explicou.
