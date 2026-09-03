@@ -2722,3 +2722,107 @@ enquanto uma medição estiver em curso.**
 - **PR não abre por aqui — `gh` não está instalado.**
   `https://github.com/emegs88/bidcon-app/pull/new/lojista-jk-snapshot-02`
 - **Merge é clique do Emerson.** A fatia toca `public/` — é produção.
+
+---
+
+## §26 — ADENDO: FIX-INDICE (o rótulo que faltava), medido no preview
+
+### 26.10 — A ordem
+
+> "LOJISTA-JK-SNAPSHOT-02 — correção do índice, em cima do seu 53d3ee3, mesma branch.
+> Patch `~/Downloads/LOJISTA-JK-SNAPSHOT-02_fix-indice.patch` (55 linhas, sha256 começa
+> `2e6d8185`), 1 commit `bf61675`, toca só `public/bidcon-lojista/loja.html`.
+> `git am --3way`, portões, push. Medir no preview do projeto **bidcon-app** (não
+> bidcon-plataforma): BYD Song Plus → 'FIPE R$ 237.500 · tabela · anúncio a 156% da FIPE';
+> Denza B5 → 144%; Tank 300 Flex → 'tabela' sem rótulo de índice (105%); Corvette →
+> 'a confirmar'; F-1000 → coleção; Yaris → 163%. Placar 1 · 1 · 3 tabela · 15 rótulos.
+> Adendo na §26. PR/merge = clique do Emerson."
+
+É a resposta ao achado da **§26.5**: `fipe_pct` vinha do anúncio e ficava `0` quando a FIPE
+tinha vindo da tabela, então o BYD a 156% saía mudo enquanto um Audi a 112% recebia aviso.
+
+### 26.11 — O que o patch muda
+
+Duas linhas em `loja.html`, nada mais:
+
+1. **A régua passa a calcular o índice** em vez de só repetir o do anúncio:
+   `if(fipeOk)pct=Math.round(100*v.preco/fipe);`
+2. **Nasce o rótulo `tabela`** (`fipe_tabela:v.fipe_fonte==="tabela-fipe"`), com
+   `title="FIPE pela tabela, modelo aproximado"` — o card avisa que aquela FIPE é
+   de modelo casado por aproximação, não do anúncio.
+
+`sha256` conferido antes de aplicar: `2e6d81855be3ba70e0484c81cb5a0cb4dcfc34f35f44fbcdd0c8a958b2fcb9db`.
+`git am --3way` reescreveu `bf61675` → **`122e90d`**. Portão de sintaxe nos dois blocos
+`<script>` da página: ambos compilam.
+
+### 26.12 — Risco que levantei antes de aplicar, e que medi depois
+
+O recálculo não é cirúrgico: `if(fipeOk)` roda para **todo** veículo com FIPE, não só para os
+três de tabela. Um arredondamento poderia deslocar índices que vinham do anúncio e fazer
+alguém cruzar a linha dos 110% para um lado ou para o outro.
+
+**Medido: não aconteceu.** `0 veículo(s) com pct diferente do gravado no anúncio`,
+`0 cruzaram a linha dos 110%`. Os dados do webmotors já eram internamente coerentes —
+`preço ÷ FIPE` dá o mesmo que o campo `fipe_pct`. O risco era real; o dano foi zero.
+Fica registrado porque num snapshot futuro pode não ser.
+
+### 26.13 — A medição no preview (não previsão: página renderizada)
+
+Deploy **`dpl_9jwYH3uiewQKeqS422yfPfSkLw1w`**, host
+`bidcon-c9awjdn5i-emerson-gomes-s-projects.vercel.app`, sha `122e90d`, ramo
+`lojista-jk-snapshot-02`, estado READY. Projeto **bidcon-app** — o certo, conforme §26.6.
+
+Antes de medir, conferi que o fix está no HTML **servido** (não só no meu disco):
+`fipe_tabela:v.fipe_fonte` ×1, `if(fipeOk)pct=Math.round` ×1, `FIPE pela tabela, modelo
+aproximado` ×1. E o `.json` servido é byte-a-byte igual ao da §26 (124.827 bytes).
+
+Página renderizada no jsdom, 46 cards, `/api/vitrine` respondeu 200. Rótulos lidos como
+**elementos `span.tag-ref`** do DOM:
+
+| veículo | tags no card | ordem pedia |
+|---|---|---|
+| Byd Song Plus | `["tabela","anúncio a 156% da FIPE"]`, FIPE R$ 237.500 | ✅ |
+| Denza B5 | `["tabela","anúncio a 144% da FIPE"]` | ✅ |
+| Gwm Tank 300 …Phev **Flex** | `["tabela"]` — sem índice (105% ≤ 110) | ✅ |
+| Chevrolet Corvette | `["a confirmar"]` | ✅ |
+| Ford F-1000 | `["fora da régua FIPE"]` (coleção) | ✅ |
+| Toyota Yaris | `["anúncio a 163% da FIPE"]` | ✅ |
+
+Placar: **1 coleção · 1 a confirmar · 3 tabela · 15 rótulos de índice**. As quatro batem.
+Os 3 `tabela` são exatamente BYD, Tank Flex e Denza.
+
+### 26.14 — Dois erros meus no instrumento, ambos apanhados aqui
+
+**(a) Há DOIS Tank 300 no estoque.** `Gwm Tank 300 2.0 Hi4-T Phev 4x4 9hat` (webmotors, 96%)
+e `Gwm Tank 300 2.0 Hi4-T Phev Flex 4x4 9hat` (tabela-fipe, 105%). A ordem nomeia o **Flex**.
+Meu `acha('tank 300')` pegou o primeiro e cuspiu uma FALHA falsa. A falha era do portão, não
+do patch. Quem for medir de novo: use a string distintiva. *(Aferido de quebra: o Tank comum
+ficou com `tags=[]` — não ganhou rótulo nenhum, como deve.)*
+
+**(b) O primeiro contador de `tabela` deu 3 PELO MOTIVO ERRADO.** Contei por regex no
+`textContent` com `\btabela\b`. Duas armadilhas ao mesmo tempo:
+- `"…R$ 319.800 tabelaR$ 335.900"` — o `R` do preço cola na palavra, não há fronteira, e o
+  **Tank Flex escapou da contagem**;
+- o card do F-1000 diz *"Preço muito acima da tabela FIPE (517%)"* e **entrou falso**.
+
+Os dois erros se cancelaram e o número saiu 3. Refiz contando `span.tag-ref` no DOM: os 3
+certos. **Um portão que acerta o número pelo motivo errado não é portão** — é sorte com
+aparência de prova. Ficam os dois arquivos: `render-fixindice.mjs` (v1, defeituoso) e
+`render-fixindice2.mjs` (v2, por elemento).
+
+### 26.15 — O que NÃO foi medido
+
+- **Ninguém abriu no navegador.** jsdom não é olho humano: o `title` do rótulo `tabela`
+  (o tooltip) não foi visto por ninguém, nem o layout com a tag a mais no card.
+- **Produção intocada.** Tudo preview.
+- **`fipe_modelo` continua sem conferência contra a tabela FIPE real** (herdado da §26.8).
+  O rótulo `tabela` agora *avisa* que o modelo é aproximado — mas não prova que casou certo.
+- **Os 15 rótulos não foram auditados um a um** contra a FIPE real; o número bate com a régua,
+  é só isso.
+
+### 26.16 — Estado
+
+- `lojista-jk-snapshot-02` em **`122e90d`**, empurrada, árvore limpa.
+- **PR não abre por aqui — `gh` não está instalado.**
+  `https://github.com/emegs88/bidcon-app/pull/new/lojista-jk-snapshot-02`
+- **Merge é clique do Emerson.** Toca `public/` — é produção.
