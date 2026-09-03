@@ -1,0 +1,15 @@
+{
+ "_": "LOJISTA-MULTI-01 — registro de lojas parceiras. Para adicionar uma loja: cole o link dela no scripts/lojista-snapshot.js (console do navegador, na página da loja) — ele gera o <slug>.json e imprime a entrada abaixo. Loja WooCommerce não precisa de snapshot: o motor lê ao vivo.",
+ "lojas": [
+  {
+   "slug": "jk-alphaville",
+   "nome": "JK Premium Cars",
+   "titulo": "JK Premium Cars — Alphaville",
+   "cidade": "Barueri",
+   "uf": "SP",
+   "url": "https://www.webmotors.com.br/carros/estoque?tipoveiculo=carros&idrevendedor=3963018",
+   "fonte": "webmotors",
+   "snapshot": "/bidcon-lojista/jk-alphaville.json"
+  }
+ ]
+}

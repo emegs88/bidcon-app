@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JK Premium Cars Alphaville × cartas contempladas | bidcon Lojista</title>
-<meta name="description" content="Estoque da JK Premium Cars (Alphaville, Barueri) cruzado com cartas de consórcio contempladas: valor do carro, FIPE, entrada final e parcelas — cotas da mesma administradora, saldo devedor dentro da FIPE.">
+<title>Lojas parceiras × cartas contempladas | bidcon Lojista</title>
+<meta name="description" content="Estoque de lojas parceiras cruzado com cartas de consórcio contempladas: valor do carro, FIPE, entrada final e parcelas — cotas da mesma administradora, saldo devedor dentro da FIPE.">
 <meta name="author" content="EGS Capital Participações Ltda">
-<link rel="canonical" href="https://www.bidcon.com.br/bidcon-lojista/jk-alphaville">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta property="og:title" content="JK Alphaville × cartas contempladas | bidcon">
-<meta property="og:description" content="Cada carro do estoque com o melhor encaixe de carta de crédito contemplada: entrada final, parcelas e custo financeiro (TIR).">
 <meta property="og:image" content="https://www.bidcon.com.br/og.png">
-<meta property="og:url" content="https://www.bidcon.com.br/bidcon-lojista/jk-alphaville">
 <script>window.BIDCON_API="https://360prospere.vercel.app";window.BIDCON_APP="https://app.bidcon.com.br";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"bidcon","item":"https://www.bidcon.com.br/"},{"@type":"ListItem","position":2,"name":"Lojista","item":"https://www.bidcon.com.br/bidcon-lojista"},{"@type":"ListItem","position":3,"name":"JK Alphaville","item":"https://www.bidcon.com.br/bidcon-lojista/jk-alphaville"}]},{"@type":"WebPage","name":"JK Premium Cars Alphaville × cartas contempladas","url":"https://www.bidcon.com.br/bidcon-lojista/jk-alphaville","isPartOf":{"@id":"https://www.bidcon.com.br/#org"},"about":{"@type":"AutoDealer","name":"JK Premium Cars","address":{"@type":"PostalAddress","addressLocality":"Barueri","addressRegion":"SP","addressCountry":"BR"}}}]}</script>
 <style>
+/* LOJISTA-MULTI-01 — página genérica por loja (/bidcon-lojista/<slug>) e
+   índice de lojas (/bidcon-lojista/lojas). Identidade bidcon: navy #0A0E1A,
+   gradiente #8FB7FF→#36C5F0→#1E6FE6, Space Grotesk (títulos), IBM Plex Mono
+   (números). A loja vem do registro lojas.json; o estoque, do snapshot da loja
+   ou do motor (360prospere /api/estoque); as cartas, da vitrine viva. */
 /* LOJISTA-JK-01 — página por loja dentro de /bidcon-lojista.
    Identidade bidcon: navy #0A0E1A, gradiente #8FB7FF→#36C5F0→#1E6FE6,
    Space Grotesk (títulos), IBM Plex Mono (números). */
@@ -95,44 +95,57 @@ footer{border-top:1px solid var(--line);padding:24px 0 40px;font-size:12px;color
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 .cta a.zap{color:var(--ok)}
+.lojas{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:8px 0 48px}
+.lojas a{display:block;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px;text-decoration:none;color:var(--text)}
+.lojas a:hover{border-color:var(--accent)}
+.lojas h3{font-size:18px;margin-bottom:4px}
+.lojas .sub{font-size:13px;color:var(--muted)}
+.tag-ref{font-size:11px;color:var(--warn);font-weight:600}
 </style>
 </head>
 <body>
-<div class="topbar"><div class="wrap"><a class="brand" href="/" style="text-decoration:none;color:var(--text)">bidc<span>o</span>n <span style="font-weight:500;font-size:13px;color:var(--muted);-webkit-text-fill-color:var(--muted)">Lojista</span></a><div class="crumb"><a href="/bidcon-lojista">Lojista</a> › JK Alphaville</div></div></div>
+<div class="topbar"><div class="wrap"><a class="brand" href="/" style="text-decoration:none;color:var(--text)">bidc<span>o</span>n <span style="font-weight:500;font-size:13px;color:var(--muted);-webkit-text-fill-color:var(--muted)">Lojista</span></a><div class="crumb"><a href="/bidcon-lojista">Lojista</a> › <span id="crumb">Lojas</span></div></div></div>
 <div class="wrap">
 <header class="loja">
-<div class="eyebrow">Loja parceira · Barueri (SP)</div>
-<h1>JK Premium Cars — Alphaville</h1>
-<p>Cada carro do estoque com o melhor encaixe de carta de crédito contemplada: menor custo financeiro (TIR ao mês), cotas sempre da mesma administradora e saldo devedor dentro da FIPE. A entrada já inclui a intermediação bidcon. Pagamento protegido por Conta Notarial.</p>
-<div class="meta"><span id="m-total">Carregando estoque…</span><span><a id="m-fonte" href="https://www.webmotors.com.br/carros/estoque?tipoveiculo=carros&amp;idrevendedor=3963018" target="_blank" rel="noopener">Ver estoque na Webmotors ↗</a></span><span id="m-atual"></span></div>
+<div class="eyebrow" id="eyebrow">Lojas parceiras</div>
+<h1 id="h1">Estoque das lojas parceiras, carro a carro</h1>
+<p id="lead">Cada carro do estoque com o melhor encaixe de carta de crédito contemplada: menor custo financeiro (TIR ao mês), cotas sempre da mesma administradora e saldo devedor dentro da FIPE. A entrada já inclui a intermediação bidcon. Pagamento protegido por Conta Notarial.</p>
+<div class="meta" id="meta"></div>
 </header>
+<div class="lojas" id="lojas" hidden></div>
 <div class="kpis" id="kpis"></div>
-<div class="controls"><input type="search" id="q" placeholder="Buscar modelo…" aria-label="Buscar modelo"><span class="hint" id="hint"></span></div>
-<div id="aviso" class="aviso"><span class="spin"></span>Lendo o estoque da loja e as cartas disponíveis…</div>
+<div class="controls" id="controls" hidden><input type="search" id="q" placeholder="Buscar modelo…" aria-label="Buscar modelo"><span class="hint" id="hint"></span></div>
+<div id="aviso" class="aviso"><span class="spin"></span>Carregando…</div>
 <div class="grid" id="grid"></div>
-<footer>Consórcio é compra programada: a carta contemplada dá poder de compra imediato, sem promessa de data de contemplação para cotas não contempladas. Junção de cotas só entre cotas da mesma administradora, com saldo devedor somado dentro da FIPE do veículo. Custo financeiro em TIR ao mês; na junção, ponderado pelo crédito de cada cota. FIPE derivada do índice preço/FIPE publicado no anúncio (quando ausente ou fora de faixa, o preço serve de referência e o card marca "ref."). Fotos e preços: anúncios da loja na Webmotors. Valores sujeitos a confirmação na reserva.</footer>
+<footer>Consórcio é compra programada: a carta contemplada dá poder de compra imediato, sem promessa de data de contemplação para cotas não contempladas. Junção de cotas só entre cotas da mesma administradora, com saldo devedor somado dentro da FIPE do veículo. Custo financeiro em TIR ao mês; na junção, ponderado pelo crédito de cada cota. FIPE: índice preço/FIPE do anúncio ou tabela FIPE consultada na captura; sem FIPE confiável o card marca "FIPE a confirmar" e usa o preço como referência; veículo de coleção (preço muito acima da FIPE) fica fora da régua e sem encaixe automático. Fotos e preços: anúncios da própria loja. Valores sujeitos a confirmação na reserva.</footer>
 </div>
 <script>
 (function(){
 "use strict";
-// LOJISTA-JK-01 — cruzamento ao vivo: estoque pelo motor (360prospere
-// /api/estoque, adaptador Webmotors) × cartas da vitrine viva
-// (app.bidcon.com.br/api/vitrine — valores FINAIS, exclusivas primeiro).
-var LOJA_URL="https://www.webmotors.com.br/carros/estoque?tipoveiculo=carros&idrevendedor=3963018";
 var WA="5511973202967";
 var API=window.BIDCON_API,APP=window.BIDCON_APP;
 var brl=function(n){return "R$ "+Math.round(n).toLocaleString("pt-BR")};
 var pc=function(n){return n.toFixed(2).replace(".",",")+"%"};
-var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})};
-var grid=document.getElementById("grid"),q=document.getElementById("q"),hint=document.getElementById("hint"),aviso=document.getElementById("aviso");
-var DATA=[];
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})};
+var $=function(id){return document.getElementById(id)};
+var grid=$("grid"),q=$("q"),hint=$("hint"),aviso=$("aviso");
+var DATA=[],LOJA=null;
 
-// --- regra de encaixe --------------------------------------------------------
+// slug: /bidcon-lojista/<slug> (rewrite do vercel.json) ou ?loja=<slug>
+function slugAtual(){
+  var qs=new URLSearchParams(location.search).get("loja");if(qs)return qs;
+  var m=location.pathname.match(/\/bidcon-lojista\/([a-z0-9-]+)\/?$/i);
+  var s=m?m[1]:"";return (s==="loja"||s==="lojas"||s==="index")?"":s;
+}
+
+// --- regra de encaixe (palavra do Emerson, 02/09/2026) -----------------------
 // 1 cota: crédito ≥ preço e saldo devedor ≤ FIPE.
-// Junção: só cotas da MESMA administradora, quantas precisar (teto prático 4),
+// Junção: só cotas da MESMA administradora, quantas precisar (teto 4),
 // crédito somado ≥ preço, saldo devedor somado ≤ FIPE.
 // Score = TIR ponderada + 0,10 p.p. por cota extra + 0,05 p.p. por 1% de sobra.
-var MAX_COTAS=4, POR_ADM=24;
+// FIPE-01: sem FIPE confiável, a régua é o preço e o card marca "FIPE a
+// confirmar"; veículo de coleção (preço > 150% da FIPE) não recebe encaixe.
+var MAX_COTAS=4, POR_ADM=24, COLECAO_PCT=150;
 function stats(cs){var cred=0,ent=0,sd=0,w=0;for(var i=0;i<cs.length;i++){var c=cs[i];cred+=c.c;ent+=c.e;sd+=c.p*c.x;w+=(c.custo||0)*c.c}return {cred:cred,ent:ent,sd:sd,tir:cred?w/cred:0}}
 function melhor(preco,fipe,porAdm){
   var best=null;
@@ -154,19 +167,21 @@ function melhor(preco,fipe,porAdm){
   return best;
 }
 
+function zapMsg(t){return "https://wa.me/"+WA+"?text="+encodeURIComponent(t)}
 function card(d){
   var foto=d.img?'<img src="'+esc(d.img)+'" alt="'+esc(d.nome)+'" loading="lazy">':'<div class="ph"></div>';
-  var fipeTxt="FIPE "+brl(d.fipe)+(d.fipe_oficial?"":" (ref.)");
-  if(!d.enc) return '<article class="card nao"><div class="foto">'+foto+'<span class="adm">sem encaixe</span></div><div class="body"><div class="valor"><div><h3>'+esc(d.nome)+'</h3><div class="ano">'+esc(d.anoTxt)+' · '+fipeTxt+'</div></div><div class="p num">'+brl(d.preco)+'</div></div><p class="hint">Nenhuma cota da mesma administradora fecha com saldo devedor dentro da FIPE. <a href="https://wa.me/'+WA+'?text='+encodeURIComponent("Olá! Quero uma carta contemplada pra fechar o "+d.nome+" ("+brl(d.preco)+") da JK Alphaville.")+'" target="_blank" rel="noopener">Falar com a bidcon</a></p></div></article>';
+  var fipeTxt=d.colecao?'<span class="tag-ref">fora da régua FIPE</span>':("FIPE "+brl(d.fipe)+(d.fipe_ok?"":' <span class="tag-ref">a confirmar</span>'));
+  var cab='<div class="valor"><div><h3>'+esc(d.nome)+'</h3><div class="ano">'+esc(d.anoTxt)+' · '+fipeTxt+'</div></div><div class="p num">'+brl(d.preco)+'</div></div>';
+  if(d.colecao) return '<article class="card nao"><div class="foto">'+foto+'<span class="adm">veículo de coleção</span></div><div class="body">'+cab+'<p class="hint">Preço muito acima da tabela FIPE ('+d.fipe_pct+'%): a administradora avalia o bem pela FIPE, então o encaixe automático não se aplica. <a href="'+zapMsg("Olá! Quero avaliar uma carta contemplada pra fechar o "+d.nome+" ("+brl(d.preco)+") da "+LOJA.nome+".")+'" target="_blank" rel="noopener">Falar com a bidcon</a></p></div></article>';
+  if(!d.enc) return '<article class="card nao"><div class="foto">'+foto+'<span class="adm">sem encaixe</span></div><div class="body">'+cab+'<p class="hint">Nenhuma cota da mesma administradora fecha com saldo devedor dentro da FIPE. <a href="'+zapMsg("Olá! Quero uma carta contemplada pra fechar o "+d.nome+" ("+brl(d.preco)+") da "+LOJA.nome+".")+'" target="_blank" rel="noopener">Falar com a bidcon</a></p></div></article>';
   var e=d.enc,sobra=e.cred-d.preco,adm=e.cotas[0].adm;
   var refs=e.cotas.map(function(c){return "#"+c.n}).join(" + ");
   var parcelaMes=e.cotas.reduce(function(s,c){return s+c.p},0);
   var nMax=Math.max.apply(null,e.cotas.map(function(c){return c.x}));
-  var zap="https://wa.me/"+WA+"?text="+encodeURIComponent("Olá! Tenho interesse na"+(e.cotas.length>1?"s cartas "+refs:" carta "+refs)+" ("+adm+") pra fechar o "+d.nome+" ("+brl(d.preco)+") da JK Alphaville. Entrada "+brl(e.ent)+" + parcelas "+brl(parcelaMes)+"/mês. Como funciona?");
+  var zap=zapMsg("Olá! Tenho interesse na"+(e.cotas.length>1?"s cartas "+refs:" carta "+refs)+" ("+adm+") pra fechar o "+d.nome+" ("+brl(d.preco)+") da "+LOJA.nome+". Entrada "+brl(e.ent)+" + parcelas "+brl(parcelaMes)+"/mês. Como funciona?");
   return '<article class="card">'
   +'<div class="foto">'+foto+'<span class="adm">'+esc(adm)+(e.cotas.length>1?" · junção "+e.cotas.length+" cotas":"")+'</span></div>'
-  +'<div class="body">'
-  +'<div class="valor"><div><h3>'+esc(d.nome)+'</h3><div class="ano">'+esc(d.anoTxt)+' · '+fipeTxt+'</div></div><div class="p num">'+brl(d.preco)+'</div></div>'
+  +'<div class="body">'+cab
   +'<div class="big">'
   +'<div><div class="l">Entrada final</div><div class="v num">'+brl(e.ent)+'</div></div>'
   +'<div><div class="l">Parcelas</div><div class="v num">'+brl(parcelaMes)+'<small>/mês'+(e.cotas.length>1?" (soma)":"")+' · até '+nMax+'×</small></div></div>'
@@ -178,44 +193,61 @@ function card(d){
   +'</div></article>';
 }
 function kpis(){
-  var ok=DATA.filter(function(d){return d.enc});if(!ok.length){document.getElementById("kpis").innerHTML="";return}
+  var ok=DATA.filter(function(d){return d.enc});if(!ok.length){$("kpis").innerHTML="";return}
   var tirs=ok.map(function(d){return d.enc.tir}),min=Math.min.apply(null,tirs),med=tirs.reduce(function(a,b){return a+b},0)/tirs.length;
   var junc=ok.filter(function(d){return d.enc.cotas.length>1}).length;
-  document.getElementById("kpis").innerHTML=[["grad",ok.length+"/"+DATA.length,"veículos com encaixe (mesma administradora, saldo ≤ FIPE)"],["",pc(min)+" a.m.","menor custo financeiro (TIR)"],["",pc(med)+" a.m.","custo médio (TIR)"],["",String(junc),"veículos por junção de cotas"]].map(function(k){return '<div class="kpi"><div class="v num '+k[0]+'">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>'}).join("");
+  $("kpis").innerHTML=[["grad",ok.length+"/"+DATA.length,"veículos com encaixe (mesma administradora, saldo ≤ FIPE)"],["",pc(min)+" a.m.","menor custo financeiro (TIR)"],["",pc(med)+" a.m.","custo médio (TIR)"],["",String(junc),"veículos por junção de cotas"]].map(function(k){return '<div class="kpi"><div class="v num '+k[0]+'">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>'}).join("");
 }
 function render(){var t=q.value.trim().toLowerCase();var list=DATA.filter(function(d){return d.nome.toLowerCase().indexOf(t)>=0});grid.innerHTML=list.map(card).join("");hint.textContent=list.length+" de "+DATA.length+" veículos";kpis()}
 q.addEventListener("input",render);
+function falha(msg){aviso.hidden=false;aviso.className="aviso err";aviso.textContent=msg}
+function json(u,opt){return fetch(u,opt).then(function(r){if(!r.ok)throw new Error("http_"+r.status);return r.json()})}
 
-function falha(msg){aviso.className="aviso err";aviso.textContent=msg}
-// Estoque: 1º o snapshot desta loja publicado junto com a página
-// (jk-alphaville.json — a API da Webmotors só responde a sessão de navegador,
-// medido em 02/09/2026, então o snapshot é capturado via navegador e
-// commitado, no padrão "snapshot automático do estoque" da casa). 2º, se o
-// snapshot faltar, o motor (360prospere /api/estoque) — que hoje devolve 422
-// honesto para Webmotors e passa a valer no dia em que uma fonte de servidor
-// existir (feed da loja).
-function estoque(){
-  return fetch("/bidcon-lojista/jk-alphaville.json",{cache:"no-cache"})
-    .then(function(r){if(!r.ok)throw 0;return r.json()})
-    .catch(function(){return fetch(API+"/api/estoque?url="+encodeURIComponent(LOJA_URL)).then(function(r){return r.json()})});
+// Estoque: snapshot da loja (capturado via navegador — Webmotors só responde a
+// sessão de navegador) → senão o motor com o link da loja (WooCommerce ao vivo).
+function estoque(loja){
+  var motor=function(){return json(API+"/api/estoque?url="+encodeURIComponent(loja.url))};
+  if(!loja.snapshot)return motor();
+  return json(loja.snapshot,{cache:"no-cache"}).catch(motor);
 }
-Promise.all([
-  estoque(),
-  fetch(APP+"/api/vitrine").then(function(r){return r.json()})
-]).then(function(res){
-  var est=res[0],vit=res[1];
-  if(!est||!est.ok){return falha((est&&est.error)||"Não consegui ler o estoque da loja agora.")}
-  if(!vit||!vit.ok){return falha("Não consegui carregar as cartas disponíveis agora.")}
-  var porAdm={};
-  (vit.cotas||[]).forEach(function(c){if(c.t!=="veiculo"||c.r||!c.adm||!c.c||!c.p||!c.x)return;(porAdm[c.adm]=porAdm[c.adm]||[]).push(c)});
-  DATA=(est.veiculos||[]).map(function(v){
-    var fipeOk=!!v.fipe,fipe=v.fipe||v.preco;
-    return {nome:v.nome,anoTxt:(v.ano_fab&&v.ano?v.ano_fab+"/"+v.ano:String(v.ano||"")),preco:v.preco,fipe:fipe,fipe_oficial:fipeOk,img:v.img,link:v.link,enc:melhor(v.preco,fipe,porAdm)};
-  });
-  document.getElementById("m-total").textContent=DATA.length+" veículos no estoque";
-  document.getElementById("m-atual").innerHTML='Estoque de <span class="num">'+new Date(est.atualizado).toLocaleDateString("pt-BR")+'</span> · cartas de <span class="num">'+new Date(vit.atualizado).toLocaleDateString("pt-BR")+'</span>';
-  aviso.hidden=true;render();
-}).catch(function(){falha("Não consegui montar o cruzamento agora. Tente de novo em instantes.")});
+
+function indice(reg){
+  document.title="Lojas parceiras × cartas contempladas | bidcon Lojista";
+  aviso.hidden=true;$("lojas").hidden=false;
+  $("meta").innerHTML='<span>'+reg.lojas.length+' loja'+(reg.lojas.length===1?"":"s")+' parceira'+(reg.lojas.length===1?"":"s")+'</span><span><a href="/bidcon-lojista#cruzar">Cruzar o estoque da sua loja ↗</a></span>';
+  $("lojas").innerHTML=reg.lojas.map(function(l){return '<a href="/bidcon-lojista/'+esc(l.slug)+'"><h3>'+esc(l.titulo||l.nome)+'</h3><div class="sub">'+esc(l.cidade)+(l.uf?" ("+esc(l.uf)+")":"")+' · fonte: '+esc(l.fonte)+'</div></a>'}).join("");
+}
+
+function pagina(loja){
+  LOJA=loja;
+  document.title=(loja.titulo||loja.nome)+" × cartas contempladas | bidcon Lojista";
+  $("crumb").textContent=loja.nome;$("eyebrow").textContent="Loja parceira · "+loja.cidade+(loja.uf?" ("+loja.uf+")":"");$("h1").textContent=loja.titulo||loja.nome;
+  var can=document.createElement("link");can.rel="canonical";can.href="https://www.bidcon.com.br/bidcon-lojista/"+loja.slug;document.head.appendChild(can);
+  $("controls").hidden=false;aviso.innerHTML='<span class="spin"></span>Lendo o estoque da loja e as cartas disponíveis…';
+  Promise.all([estoque(loja),json(APP+"/api/vitrine")]).then(function(res){
+    var est=res[0],vit=res[1];
+    if(!est||!est.ok){return falha((est&&est.error)||"Não consegui ler o estoque da loja agora.")}
+    if(!vit||!vit.ok){return falha("Não consegui carregar as cartas disponíveis agora.")}
+    var porAdm={};
+    (vit.cotas||[]).forEach(function(c){if(c.t!=="veiculo"||c.r||!c.adm||!c.c||!c.p||!c.x)return;(porAdm[c.adm]=porAdm[c.adm]||[]).push(c)});
+    DATA=(est.veiculos||[]).map(function(v){
+      var pct=Number(v.fipe_pct||0),fipeOk=!!v.fipe,fipe=v.fipe||v.preco;
+      var colecao=pct>COLECAO_PCT;
+      return {nome:v.nome,anoTxt:(v.ano_fab&&v.ano?v.ano_fab+"/"+v.ano:String(v.ano||"")),preco:v.preco,fipe:fipe,fipe_ok:fipeOk,fipe_pct:pct,colecao:colecao,img:v.img,link:v.link,enc:colecao?null:melhor(v.preco,fipe,porAdm)};
+    });
+    var fonte=loja.url?'<span><a href="'+esc(loja.url)+'" target="_blank" rel="noopener">Ver estoque na loja ↗</a></span>':"";
+    $("meta").innerHTML='<span>'+DATA.length+' veículos no estoque</span>'+fonte+'<span>Estoque de <span class="num">'+new Date(est.atualizado).toLocaleDateString("pt-BR")+'</span> · cartas de <span class="num">'+new Date(vit.atualizado).toLocaleDateString("pt-BR")+'</span></span>';
+    aviso.hidden=true;render();
+  }).catch(function(){falha("Não consegui montar o cruzamento agora. Tente de novo em instantes.")});
+}
+
+json("/bidcon-lojista/lojas.json",{cache:"no-cache"}).then(function(reg){
+  var slug=slugAtual();
+  if(!slug)return indice(reg);
+  var loja=(reg.lojas||[]).filter(function(l){return l.slug===slug})[0];
+  if(!loja){$("h1").textContent="Loja não encontrada";return falha("Não achei a loja \""+slug+"\" no registro. Veja a lista em /bidcon-lojista/lojas.")}
+  pagina(loja);
+}).catch(function(){falha("Não consegui carregar o registro de lojas.")});
 })();
 </script>
 </body>
