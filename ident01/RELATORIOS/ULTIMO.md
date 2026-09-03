@@ -2245,3 +2245,143 @@ interruptor só é armado na F6, por palavra do Emerson.
   não os conferi um a um. É inferência, não medição.
 - **O resíduo dos pacotes**: o `npm ci` de hoje diz "added 154, audited 155"; réguas antigas
   deram 150 e 160, e ninguém explicou.
+
+---
+
+## 24 — LOJISTA-JK-01: a Webmotors fechou a porta, e a página foi pelo snapshot (02–03/09/2026)
+
+**Estado: preview medido e verde, aguardando o clique do Emerson.** Duas frentes. A F1
+(`prospere-360`) bateu numa parada dura e **fica parada, PR aberto, sem merge, por ordem
+expressa**. A F2 (`bidcon-app`) foi refeita em cima de snapshot, aplicada limpa e medida no
+preview: **47 de 47 veículos com encaixe**.
+
+### 24.1 — A F1 morreu medida, não suposta
+
+Branch `estoque-webmotors-01`, commit `f4b8d01`, só `app/api/estoque/route.js` (+157). Portões
+verdes (`npm ci`, build, rota presente). A medição no preview:
+
+```json
+{"ok":false,"custom":true,"parceiro":"webmotors.com.br",
+ "error":"A Webmotors não respondeu ao motor (webmotors_http_403)…","veiculos":[]}
+```
+
+`http=422`, **três tentativas, três vezes o mesmo**. O adaptador se comportou como projetado:
+devolveu erro honesto em vez de lista vazia fingindo sucesso.
+
+**O diagnóstico que mudou a conclusão da OS.** A OS supunha bloqueio de IP de datacenter. Chamei
+a mesma API **da máquina local, IP residencial, mesmos cabeçalhos** — **403 também**. Não é IP:
+o endpoint exige a sessão anti-bot do navegador. Logo **proxy, troca de UA ou outro IP não
+resolveriam**, e tentar teria sido queimar rodada. O próprio comentário do patch já avisava que
+a API "foi medida só via navegador".
+
+Regressão conferida antes de encostar em qualquer coisa: o caminho WooCommerce padrão continua
+`ok:true`, **359 veículos** (Unimais Veículos). Nada quebrou.
+
+Parada dura acatada. **`estoque-webmotors-01` não foi tocada e não deve ser mesclada.**
+
+### 24.2 — A F2 v2: snapshot-primeiro, motor como reserva
+
+Patch `LOJISTA-JK-01_bidcon-app_lojista-jk-01_v2.patch`, conferido **antes** do `git am`:
+
+| medida | valor |
+|---|---|
+| linhas | 1293 ✓ |
+| bytes | 57436 |
+| sha256 | `5497017e0311b969a5722fc8dbc8f2ee757297c1d58439886993c4df32bf8374` ✓ |
+
+Branch `lojista-jk-01` tirada de `origin/main` (`c8334c5`), `git am --3way`, dois commits limpos:
+`73f77fe` (página + sitemap) e **`d1b7797`** (snapshot + leitura snapshot-primeiro). Autoria
+`Emerson Santos <eme.santos123@gmail.com>` preservada nos dois. Escopo real:
+
+```
+public/bidcon-lojista/jk-alphaville.html | 222 +
+public/bidcon-lojista/jk-alphaville.json | 952 +
+public/sitemap.xml                       |   5 +
+3 arquivos, 1179 inserções
+```
+
+O coração da mudança — a página tenta o snapshot commitado e **só cai no motor se ele faltar**:
+
+```js
+function estoque(){
+  return fetch("/bidcon-lojista/jk-alphaville.json",{cache:"no-cache"})
+    .then(function(r){if(!r.ok)throw 0;return r.json()})
+    .catch(function(){return fetch(API+"/api/estoque?url="+encodeURIComponent(LOJA_URL))…});
+}
+```
+
+### 24.3 — O portão que teria quebrado a página em silêncio
+
+Antes do push conferi a CSP do `vercel.json`, porque é o portão que derruba página estática sem
+erro visível: `img-src 'self' data: https:` cobre o CDN da Webmotors; `connect-src` lista
+**nominalmente** `app.bidcon.com.br` e `360prospere.vercel.app`, que são exatamente os dois
+endpoints da página; `script-src` tem `'unsafe-inline'`, então o script embutido roda. **Verde,
+sem precisar mexer na CSP.**
+
+### 24.4 — Medição no preview (`dpl_E7jhXnkc…`, sha `d1b7797`, READY)
+
+| checagem | resultado |
+|---|---|
+| `/bidcon-lojista/jk-alphaville` | **200** `text/html`, 19251 bytes |
+| `/bidcon-lojista/jk-alphaville.json` | **200** `application/json`, 31569 bytes |
+| `/bidcon-lojista` (a página antiga) | **200**, 122605 bytes — **intacta** |
+| `app.bidcon.com.br/api/vitrine`, Origin `bidcon.com.br` | **200**, `access-control-allow-origin: https://www.bidcon.com.br`, 2277 cotas |
+| 5 fotos do CDN `image.webmotors.com.br` | **206 `image/webp`** — imagem real |
+| cabeçalho | "47 veículos no estoque" · "Estoque de **02/09/2026** · cartas de 03/09/2026" |
+
+**Risco que levantei por conta própria e medi:** o patch cria a pasta
+`public/bidcon-lojista/` ao lado do arquivo `public/bidcon-lojista.html` que já existia. Com
+`cleanUrls: true`, `/bidcon-lojista` poderia ficar ambíguo e a página antiga sumir. Não sumiu —
+responde 200 com os mesmos 122605 bytes.
+
+### 24.5 — O encaixe, reproduzido contra a vitrine ao vivo
+
+Reproduzi em Python a regra exata da página (mesma cota-única, mesma junção até 4 cotas da
+**mesma administradora**, mesmo score `TIR + 0,10 p.p. por cota extra + 0,05 p.p. por 1% de
+sobra`), rodando contra as 2277 cotas reais:
+
+| medida | valor |
+|---|---|
+| **com encaixe** | **47 / 47** |
+| por junção de cotas | 37 |
+| menor custo financeiro | **1,05% a.m. (TIR)** |
+| custo médio | 1,35% a.m. (TIR) |
+| administradoras elegíveis | 25 (HS 215, Itaú 126, Porto 124, Bradesco 92, Mycon 80…) |
+
+Emerson esperava ~45/47. **Deu 47/47** — melhor que o previsto, e a razão é medível: a vitrine
+tem 2277 cotas elegíveis em 25 administradoras, e a junção de até 4 cotas é generosa.
+
+Léxico conferido no HTML servido: **zero** ocorrências de investimento, investidor, rendimento,
+retorno, lucro ou CDI. Administradora exposta no card (`<span class="adm">`) **e** dentro da
+mensagem do WhatsApp. "A entrada já inclui a intermediação bidcon" e "Pagamento protegido por
+Conta Notarial" no texto de topo. Nenhuma promessa de contemplação.
+
+### 24.6 — O que fica sem prova (e o achado que Emerson precisa ver)
+
+- **Seis dos 47 veículos têm `fipe: 0`** — Corvette Stingray Conversível (R$ 1.069.900),
+  BYD Song Plus DM-i, Ford F-1000 4.9, GWM Tank 300, Toyota Yaris Cross Hybrid XRE e Denza B5.
+  A página cai em `fipe = preco` e marca **"(ref.)"** no card, o que é honesto. Mas a promessa
+  "saldo devedor dentro da FIPE" fica **mais frouxa** nesses seis, porque a régua vira o próprio
+  preço pedido. O caso gritante é a **Ford F-1000**: o snapshot carrega `fipe_pct: 517`, ou seja,
+  a FIPE real ronda R$ 40 mil e o anúncio pede R$ 210 mil (picape antiga restaurada). Os seis
+  fecham encaixe, mas contra uma régua que não é a FIPE. **Decisão de negócio, não minha.**
+- **`fipe_pct` residual com `fipe: 0`** em dois veículos (517 e 163). A página **não lê**
+  `fipe_pct`, então hoje é inerte — mas é sujeira no contrato do snapshot.
+- **Não abri a página em navegador de verdade.** O encaixe foi reproduzido em Python a partir das
+  mesmas duas fontes; renderização, `loading="lazy"` e layout **não** foram vistos com o olho.
+- **47/47 é a foto de 03/09/2026 00:25 UTC.** A vitrine muda quando carta é vendida; o número
+  cai sozinho.
+- **O snapshot é de 02/09/2026 e não se atualiza sozinho.** Enquanto a Webmotors não abrir uma
+  fonte de servidor (feed da loja), o estoque envelhece por conta própria e precisa de recaptura
+  via navegador. A data está no cabeçalho, o que é honesto, mas não resolve.
+- **A causa-raiz do 403 é inferida, não confirmada pela Webmotors.** Medi o sintoma dos dois
+  lados; ninguém de lá disse o porquê.
+
+### 24.7 — Estado e o que depende do Emerson
+
+- `lojista-jk-01` empurrada em `d1b7797`. **PR não abre por aqui — `gh` não está instalado.**
+  Link: `https://github.com/emegs88/bidcon-app/pull/new/lojista-jk-01`
+- **Merge é clique do Emerson.** Nada foi a produção.
+- `estoque-webmotors-01` (`prospere-360`): **aberta, intocada, sem merge**, por ordem.
+- F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville` e
+  conferir encaixes, fotos e WhatsApp com o olho.
