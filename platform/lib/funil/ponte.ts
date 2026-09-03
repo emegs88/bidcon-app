@@ -119,13 +119,31 @@
 
 import { chaveTelefone, ehTelefoneDaCasa, normalizarTelefoneBR } from "../telefone";
 import { chaveOrigem, textoCurto } from "../captacao";
+import { TAG_CEDENTE } from "../farol/cedente";
 
 // ----------------------------------------------------------------------------
 // AS CONSTANTES DA RÉGUA. Todas espelham literais que hoje existem no SQL.
 // ----------------------------------------------------------------------------
 
-/** Tag que quem atendeu coloca na conversa para dizer "esta pessoa vende". */
-export const TAG_CEDENTE = "cedente";
+// A TAG NÃO NASCE AQUI, E ISSO É UM CONSERTO.
+// ----------------------------------------------------------------------------
+// A primeira versão deste arquivo declarava `export const TAG_CEDENTE =
+// "cedente"` de novo. Era a SEGUNDA cópia da mesma palavra na casa, e o
+// comentário da primeira (`lib/farol/cedente.ts:40`, de 09/08) diz exatamente
+// o que essa cópia quebrava: "Uma constante para não haver 'cedente' digitado
+// em dois lugares".
+//
+// O estrago não seria hoje, seria no dia em que a etiqueta mudar de nome. Quem
+// mudasse iria a `lib/farol/cedente.ts`, trocaria lá, veria o detector e o
+// painel passarem a usar o nome novo — e a ponte continuaria procurando o
+// nome velho, calada, deixando de inserir captação de gente marcada. Um erro
+// que não acende luz nenhuma: só um funil que emagrece sem motivo.
+//
+// Por isso a ponte IMPORTA a constante de quem a escreve — o detector — e
+// apenas a REEXPORTA, para que `ponte.test.ts` e os chamadores continuem
+// dizendo `from "./ponte"` sem saber de onde ela veio. Uma dona, vários
+// leitores.
+export { TAG_CEDENTE };
 
 /** Agentes cuja presença já torna a conversa CANDIDATA a ser lida.
  *  `caetano` capta; `tobias` atende os dois lados — por isso ele entra na
