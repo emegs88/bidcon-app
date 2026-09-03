@@ -50,11 +50,15 @@
   if (!anuncios.length) { alert('Nenhum anúncio veio da API — a página está logada/carregada?'); return; }
 
   // 2) tabela FIPE (só para quem não tem índice)
-  let marcas = null;
+  let marcas = null, ultimoModeloFipe = '';
   async function fipeTabela(marca, modelo, versao, anoModelo) {
     try {
       marcas = marcas || await (await fetch(FIPE)).json();
-      const m = marcas.find((x) => norm(x.nome) === norm(marca)) || marcas.find((x) => norm(x.nome).startsWith(norm(marca).split(' ')[0]));
+      // A tabela grafa algumas marcas do seu jeito ("GM - Chevrolet", "VW - VolksWagen",
+      // "Kia Motors"); sem o alias o Corvette ficou sem FIPE na captura de 03/09/2026.
+      const ALIAS = { chevrolet: 'gm chevrolet', volkswagen: 'vw volkswagen', kia: 'kia motors', 'mercedes benz': 'mercedes benz', 'land rover': 'land rover', byd: 'byd' };
+      const alvoMarca = ALIAS[norm(marca)] || norm(marca);
+      const m = marcas.find((x) => norm(x.nome) === alvoMarca) || marcas.find((x) => norm(x.nome) === norm(marca)) || marcas.find((x) => norm(x.nome).includes(norm(marca).split(' ')[0]));
       if (!m) return 0;
       const mods = (await (await fetch(`${FIPE}/${m.codigo}/modelos`)).json()).modelos || [];
       const alvo = norm(modelo + ' ' + versao).split(' ');
@@ -70,6 +74,8 @@
       if (!a) return 0;
       const v = await (await fetch(`${FIPE}/${m.codigo}/modelos/${best.codigo}/anos/${a.codigo}`)).json();
       const n = Number(String(v.Valor || '').replace(/[^\d,]/g, '').replace(',', '.'));
+      // registra QUAL modelo da tabela casou — sem isso a FIPE aproximada não é auditável
+      ultimoModeloFipe = `${v.Marca} ${v.Modelo} ${v.AnoModelo}`;
       return Number.isFinite(n) && n > 0 ? Math.round(n / 100) * 100 : 0;
     } catch { return 0; }
   }
@@ -83,10 +89,10 @@
     const pct = Number(a.FipePercent || 0);
     const marca = tc(val(spec.Make)), modelo = tc(val(spec.Model)), versao = tc(val(spec.Version));
     const anoFab = Number(spec.YearFabrication) || 0, anoMod = Number(spec.YearModel) || anoFab;
-    let fipe = 0, fipe_fonte = '';
+    let fipe = 0, fipe_fonte = '', fipe_modelo = '';
     if (pct > 0) { fipe = Math.round((preco * 100) / pct / 100) * 100; fipe_fonte = 'webmotors'; }
-    else if (!pct) { fipe = await fipeTabela(marca, modelo, versao, anoMod); if (fipe) fipe_fonte = 'tabela-fipe'; }
-    veiculos.push({ id: String(a.UniqueId), nome: `${marca} ${modelo} ${versao}`.replace(/\s+/g, ' ').trim(), preco, ano: anoMod, ano_fab: anoFab, km: Number(val(spec.Odometer)) || 0, sku: '', link: `https://www.webmotors.com.br/comprar/${a.UniqueId}`, img: fotos[0] || '', fotos, fipe, fipe_pct: pct, fipe_fonte, categorias: [marca], estoque: true });
+    else if (!pct) { ultimoModeloFipe = ''; fipe = await fipeTabela(marca, modelo, versao, anoMod); if (fipe) { fipe_fonte = 'tabela-fipe'; fipe_modelo = ultimoModeloFipe; } }
+    veiculos.push({ id: String(a.UniqueId), nome: `${marca} ${modelo} ${versao}`.replace(/\s+/g, ' ').trim(), preco, ano: anoMod, ano_fab: anoFab, km: Number(val(spec.Odometer)) || 0, sku: '', link: `https://www.webmotors.com.br/comprar/${a.UniqueId}`, img: fotos[0] || '', fotos, fipe, fipe_pct: pct, fipe_fonte, fipe_modelo, categorias: [marca], estoque: true });
   }
 
   const snap = { ok: true, custom: true, parceiro: 'webmotors.com.br', fonte: url, revendedor: rev, atualizado: new Date().toISOString(), origem: 'snapshot via navegador (scripts/lojista-snapshot.js)', total: veiculos.length, veiculos };

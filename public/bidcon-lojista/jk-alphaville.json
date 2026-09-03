@@ -4,996 +4,1563 @@
  "parceiro": "webmotors.com.br",
  "fonte": "https://www.webmotors.com.br/carros/estoque?tipoveiculo=carros&idrevendedor=3963018",
  "revendedor": "3963018",
- "atualizado": "2026-09-02T22:30:00-03:00",
- "origem": "snapshot via navegador (Cowork/Chrome) — a API da Webmotors não responde a servidor",
- "total": 47,
+ "atualizado": "2026-09-03T01:53:47.248Z",
+ "origem": "snapshot via navegador (scripts/lojista-snapshot.js)",
+ "total": 46,
  "veiculos": [
   {
    "id": "77310594",
-   "nome": "Audi A5 2.0 TFSI Sportback S Line",
+   "nome": "Audi A5 2.0 Tfsi Mhev Sportback S Line S Tronic",
    "preco": 259900,
    "ano": 2023,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 15000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77310594",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230440530.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230440530.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230440530.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230453028.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230461336.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230474310.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230484166.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230493819.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230507823.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230515326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230524129.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230531630.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230541913.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230556217.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230563947.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260812/audi-a5-2-0-tfsi-mhev-sportback-s-line-s-tronic-wmimagem01230576820.webp"
    ],
    "fipe": 232100,
    "fipe_pct": 112,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Audi"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78313591",
-   "nome": "Chevrolet Corvette Stingray Conversível",
+   "nome": "Chevrolet Corvette 6.2 V8 Lt1 Gasolina Stingray Conversivel Automático",
    "preco": 1069900,
    "ano": 2025,
    "ano_fab": 2024,
-   "km": 0,
+   "km": 8400,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78313591",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223420734.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223420734.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223420734.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223448414.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223467026.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223484428.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223495930.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223510513.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223532412.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223543367.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223563533.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223574225.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223589518.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223603518.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223615037.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223630329.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223649533.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223662832.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/chevrolet-corvette-6-2-v8-lt1-gasolina-stingray-conversivel-automatico-wmimagem23223677924.webp"
    ],
    "fipe": 0,
    "fipe_pct": 0,
+   "fipe_fonte": "",
    "categorias": [
     "Chevrolet"
    ],
    "estoque": true,
-   "fipe_fonte": ""
-  },
-  {
-   "id": "75501348",
-   "nome": "Chevrolet Silverado High Country 4x4",
-   "preco": 389900,
-   "ano": 2024,
-   "ano_fab": 2024,
-   "km": 0,
-   "sku": "",
-   "link": "https://www.webmotors.com.br/comprar/75501348",
-   "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/chevrolet-silverado-5-3-v8-gasolina-1500-high-country-4x4-automatico-wmimagem14153871210.webp",
-   "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/chevrolet-silverado-5-3-v8-gasolina-1500-high-country-4x4-automatico-wmimagem14153871210.webp"
-   ],
-   "fipe": 386000,
-   "fipe_pct": 101,
-   "categorias": [
-    "Chevrolet"
-   ],
-   "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78423024",
-   "nome": "Volvo XC60 T8 PHEV Ultra Dark",
+   "nome": "Volvo Xc60 2.0 T8 Phev Ultra Dark Awd Geartronic",
    "preco": 559900,
    "ano": 2026,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 4000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78423024",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004408230.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004408230.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004408230.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004419418.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004426357.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004436597.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004446935.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004457342.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004470649.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004480213.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004488221.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004496210.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004505236.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004517530.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004526415.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004545025.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004555842.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volvo-xc60-2-0-t8-phev-ultra-dark-awd-geartronic-wmimagem00004564472.webp"
    ],
    "fipe": 447900,
    "fipe_pct": 125,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Volvo"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78700468",
-   "nome": "BMW X2 M35i",
+   "nome": "Bmw X2 2.0 Turbo Gasolina Xdrive M35i Steptronic",
    "preco": 485900,
    "ano": 2026,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 3200,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78700468",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262894811.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262894811.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262894811.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262908531.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262921357.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262935610.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262942435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262954024.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262975537.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262983342.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00262995427.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem00263006017.webp"
    ],
    "fipe": 471700,
    "fipe_pct": 103,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78339214",
-   "nome": "GWM Tank 300 Hi4-T PHEV",
+   "nome": "Gwm Tank 300 2.0 Hi4-T Phev 4x4 9hat",
    "preco": 284900,
    "ano": 2026,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 21000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78339214",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083056235.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083056235.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083056235.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083082719.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083102115.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083121121.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083135134.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083149015.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083160932.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083175231.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083188915.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083203610.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083223072.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260830/gwm-tank-300-2-0-hi4t-phev-4x4-9hat-wmimagem14083234237.webp"
    ],
    "fipe": 296800,
    "fipe_pct": 96,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "GWM"
+    "Gwm"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78283486",
-   "nome": "Porsche 718 Boxster S",
+   "nome": "Porsche 718 2.5 16v H4 Gasolina Boxster S Pdk",
    "preco": 459900,
    "ano": 2018,
    "ano_fab": 2017,
-   "km": 0,
+   "km": 11800,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78283486",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103412936.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103412936.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103412936.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103439976.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103464729.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103488410.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103505340.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103519323.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103532819.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103553018.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103568533.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103588133.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103603236.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103623632.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103638824.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103651221.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103667614.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103683016.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103700681.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/porsche-718-2-5-16v-h4-gasolina-boxster-s-pdk-wmimagem13103716910.webp"
    ],
    "fipe": 469300,
    "fipe_pct": 98,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "76950396",
-   "nome": "BMW X2 xDrive20i M Sport",
+   "nome": "Bmw X2 2.0 Turbo Gasolina Xdrive20i M Sport Steptronic",
    "preco": 469900,
    "ano": 2025,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 15500,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/76950396",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562698022.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562698022.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562698022.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562720536.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562734669.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562747537.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562761932.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562778334.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562793053.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562803961.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562810328.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562819726.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x2-2-0-turbo-gasolina-xdrive20i-m-sport-steptronic-wmimagem09562828149.webp"
    ],
    "fipe": 348100,
    "fipe_pct": 135,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "76434354",
-   "nome": "Porsche Cayenne E-Hybrid Coupé",
+   "nome": "Porsche Cayenne 3.0 V6 E-Hybrid Coupé Awd Tiptronic S",
    "preco": 669900,
    "ano": 2023,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 27000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/76434354",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104592168.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104592168.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104592168.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104620237.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104650117.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104673830.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104690933.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104710936.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104724336.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104738228.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104755530.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104774024.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104789435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104805234.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104815926.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/porsche-cayenne-3-0-v6-ehybrid-coupe-awd-tiptronic-s-wmimagem02104831212.webp"
    ],
    "fipe": 609000,
    "fipe_pct": 110,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78283531",
-   "nome": "BYD Song Plus DM-i",
+   "nome": "Byd Song Plus 1.5 Dm-I Turbo Híbrido Automático",
    "preco": 369900,
    "ano": 2027,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 100,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78283531",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392366542.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392366542.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392366542.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392395857.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392407622.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392421713.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392428112.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392435426.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392458332.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392469225.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392476326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392486827.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392494431.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392501322.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392513511.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392524110.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392539815.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/byd-song-plus-1-5-dmi-turbo-hibrido-automatico-wmimagem02392548313.webp"
    ],
-   "fipe": 0,
+   "fipe": 237500,
    "fipe_pct": 0,
+   "fipe_fonte": "tabela-fipe",
    "categorias": [
-    "BYD"
+    "Byd"
    ],
    "estoque": true,
-   "fipe_fonte": ""
+   "fipe_modelo": "BYD Song Plus 1.5 16V Aut. (Híbrido) 2027"
   },
   {
    "id": "78019362",
-   "nome": "BMW X4 xDrive30i M Sport",
+   "nome": "Bmw X4 2.0 16v Gasolina Xdrive30i M Sport Steptronic",
    "preco": 279900,
    "ano": 2020,
    "ano_fab": 2019,
-   "km": 0,
+   "km": 61000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78019362",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080896710.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080896710.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080896710.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080916432.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080946327.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080969720.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17080990240.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081015595.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081026134.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081039667.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081056440.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081075020.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081090521.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081109634.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081129054.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x4-2-0-16v-gasolina-xdrive30i-m-sport-steptronic-wmimagem17081143715.webp"
    ],
    "fipe": 235200,
    "fipe_pct": 119,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77667171",
-   "nome": "BMW X1 sDrive20i M Sport",
+   "nome": "Bmw X1 2.0 16v Turbo Gasolina Sdrive20i M Sport Steptronic",
    "preco": 345900,
    "ano": 2023,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 30375,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77667171",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464683339.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464683339.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464683339.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464712639.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464735715.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464758127.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464779127.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464799737.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464818099.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464828838.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464847331.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464864735.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464884023.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464899537.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260827/bmw-x1-2-0-16v-turbo-gasolina-sdrive20i-m-sport-steptronic-wmimagem20464921382.webp"
    ],
    "fipe": 266100,
    "fipe_pct": 130,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "76268417",
-   "nome": "Jeep Commander T270 Limited",
+   "nome": "Jeep Commander 1.3 T270 Turbo Flex Limited At6",
    "preco": 289900,
    "ano": 2026,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 12500,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/76268417",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370375729.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370375729.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370375729.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370390824.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370409333.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370432619.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370446712.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370464214.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370486752.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370501638.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370521833.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370539725.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370556620.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/jeep-commander-1-3-t270-turbo-flex-limited-at6-wmimagem12370573416.webp"
    ],
    "fipe": 201300,
    "fipe_pct": 144,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Jeep"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "75537931",
-   "nome": "Porsche 911 Carrera Cabriolet",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera Cabriolet Pdk",
    "preco": 639900,
    "ano": 2019,
    "ano_fab": 2018,
-   "km": 0,
+   "km": 49000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/75537931",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564212019.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564212019.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564212019.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564220636.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564231336.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564238420.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564247535.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564255452.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564267433.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564279359.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564289435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564296922.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564304582.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564311419.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260723/porsche-911-3-0-24v-h6-gasolina-carrera-cabriolet-pdk-wmimagem21564320110.webp"
    ],
    "fipe": 666600,
    "fipe_pct": 96,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "69384064",
-   "nome": "Porsche Macan GTS",
+   "nome": "Porsche Macan 2.9 V6 Biturbo Gasolina Gts Pdk",
    "preco": 609900,
    "ano": 2024,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 18500,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/69384064",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012720728.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012720728.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012720728.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012736173.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012746931.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012757213.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012764119.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012773814.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012782340.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012790729.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012797524.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012807839.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012817028.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012826724.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/porsche-macan-2-9-v6-biturbo-gasolina-gts-pdk-wmimagem23012839684.webp"
    ],
    "fipe": 677700,
    "fipe_pct": 90,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "74923672",
-   "nome": "BMW X2 M35i",
+   "nome": "Bmw X2 2.0 Turbo Gasolina Xdrive M35i Steptronic",
    "preco": 479900,
    "ano": 2026,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 3100,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/74923672",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344321426.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344321426.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344321426.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344341768.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344358815.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344378010.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344392426.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344417223.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344429519.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344443219.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344462123.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344478738.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344493129.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344511339.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344531341.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/bmw-x2-2-0-turbo-gasolina-xdrive-m35i-steptronic-wmimagem23344542018.webp"
    ],
    "fipe": 470500,
    "fipe_pct": 102,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78700671",
-   "nome": "Porsche 718 Cayman GT4",
+   "nome": "Porsche 718 4.0 H6 Gasolina Cayman Gt4 Pdk",
    "preco": 859900,
    "ano": 2023,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 18000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78700671",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414585630.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414585630.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414585630.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414595340.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414606867.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414619937.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414631310.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414638935.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414649610.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414657919.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414672110.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414684435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414693634.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/porsche-718-4-0-h6-gasolina-cayman-gt4-pdk-wmimagem00414705313.webp"
    ],
    "fipe": 955400,
    "fipe_pct": 90,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78629043",
-   "nome": "Land Rover Discovery D300 R-Dynamic HSE",
+   "nome": "Land Rover Discovery 3.0 D300 Turbo Diesel Mhev R-Dynamic Hse Automático",
    "preco": 365900,
    "ano": 2023,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 48200,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78629043",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305019014.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305019014.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305019014.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305041222.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305066318.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305085119.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305100264.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305114941.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305138322.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305151632.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305167212.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305183263.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260831/land-rover-discovery-3-0-d300-turbo-diesel-mhev-rdynamic-hse-automatico-wmimagem12305207919.webp"
    ],
    "fipe": 469100,
    "fipe_pct": 78,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Land"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77673166",
-   "nome": "Range Rover Sport D300 HSE",
+   "nome": "Land Rover Range Rover Sport 3.0 D300 Turbo Diesel Mhev Hse Automático",
    "preco": 399900,
    "ano": 2022,
    "ano_fab": 2021,
-   "km": 0,
+   "km": 83000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77673166",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231175229.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231175229.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231175229.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231203876.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231220433.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231238918.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231257733.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231270211.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231283612.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231290916.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231305415.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231318314.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231330826.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231346320.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231354232.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/land-rover-range-rover-sport-3-0-d300-turbo-diesel-mhev-hse-automatico-wmimagem01231368218.webp"
    ],
    "fipe": 420900,
    "fipe_pct": 95,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Range"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "70896186",
-   "nome": "Mercedes CLS 63 AMG",
+   "nome": "Mercedes-Benz Cls 63 Amg 5.5 V8 Turbo Gasolina 4p Automático",
    "preco": 335900,
    "ano": 2014,
    "ano_fab": 2013,
-   "km": 0,
+   "km": 69000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/70896186",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285696672.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285696672.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285696672.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285716416.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285736530.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285747615.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285767563.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285780476.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285797132.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285807914.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285822326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285838138.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260616/mercedesbenz-cls-63-amg-5-5-v8-turbo-gasolina-4p-automatico-wmimagem23285851261.webp"
    ],
    "fipe": 342800,
    "fipe_pct": 98,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Mercedes"
+    "Mercedes-Benz"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "75293192",
-   "nome": "BMW M2 Coupé",
+   "nome": "Bmw M2 3.0 I6 Twinturbo Gasolina Coupé M Steptronic",
    "preco": 619900,
    "ano": 2026,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 750,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/75293192",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513899549.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513899549.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513899549.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513921423.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513933527.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513953630.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513965411.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513974124.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15513991741.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514000236.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514012342.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514026515.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514037129.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514046835.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514055125.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514063635.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514078250.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260819/bmw-m2-3-0-i6-twinturbo-gasolina-coupe-m-steptronic-wmimagem15514085929.webp"
    ],
    "fipe": 626200,
    "fipe_pct": 99,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77802387",
-   "nome": "VW Amarok V6 Extreme",
+   "nome": "Volkswagen Amarok 3.0 V6 Tdi Diesel Extreme Cd 4motion Automático",
    "preco": 265900,
    "ano": 2025,
    "ano_fab": 2024,
-   "km": 0,
+   "km": 65000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77802387",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334804868.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334804868.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334804868.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334823910.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334844820.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334859424.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334868342.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334885615.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334902978.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/volkswagen-amarok-3-0-v6-tdi-diesel-extreme-cd-4motion-automatico-wmimagem00334909733.webp"
    ],
    "fipe": 295400,
    "fipe_pct": 90,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "VW"
+    "Volkswagen"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77802274",
-   "nome": "Mitsubishi Pajero Sport HPE-S",
+   "nome": "Mitsubishi Pajero Sport 2.4 16v Mivec Turbo Diesel Hpe-S Awd Automático",
    "preco": 259900,
    "ano": 2023,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 58000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77802274",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391094927.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391094927.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391094927.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391117916.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391135310.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391144128.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391151920.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391158213.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391164824.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391173124.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391183920.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391192128.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260816/mitsubishi-pajero-sport-2-4-16v-mivec-turbo-diesel-hpes-awd-automatico-wmimagem14391203638.webp"
    ],
    "fipe": 273600,
    "fipe_pct": 95,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Mitsubishi"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77913059",
-   "nome": "Porsche 911 Carrera GTS",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera Gts Pdk",
    "preco": 959900,
    "ano": 2024,
    "ano_fab": 2024,
-   "km": 0,
+   "km": 7600,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77913059",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015310612.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015310612.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015310612.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015331611.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015350224.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015365036.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015385928.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015401040.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015414412.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015429530.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015442719.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015462037.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015475611.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015489565.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015504824.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015525129.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260826/porsche-911-3-0-24v-h6-gasolina-carrera-gts-pdk-wmimagem18015548926.webp"
    ],
    "fipe": 999900,
    "fipe_pct": 96,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "67181199",
-   "nome": "Ford F-1000 4.9",
+   "nome": "Ford F-1000 4.9 I Cs Gasolina 2p Manual",
    "preco": 210000,
    "ano": 1998,
    "ano_fab": 1997,
-   "km": 0,
+   "km": 69000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/67181199",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080360921.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080360921.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080360921.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080392026.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080406318.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080420498.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080432532.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080448326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080461792.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080477920.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080490110.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080507241.webp"
    ],
    "fipe": 40600,
    "fipe_pct": 517,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Ford"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "74373422",
-   "nome": "Range Rover Sport HSE Híbrido",
+   "nome": "Land Rover Range Rover Sport 2.0 Hse Híbrido 4p Automático",
    "preco": 329900,
    "ano": 2021,
    "ano_fab": 2020,
-   "km": 0,
+   "km": 77000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/74373422",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123058237.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123058237.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123058237.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123074884.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123092211.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123103528.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123112727.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123122818.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123137338.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123158710.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123173519.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260806/land-rover-range-rover-sport-2-0-hse-hibrido-4p-automatico-wmimagem02123189622.webp"
    ],
    "fipe": 343600,
    "fipe_pct": 96,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Range"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77667483",
-   "nome": "Porsche 911 Turbo S Cabriolet",
+   "nome": "Porsche 911 3.8 24v H6 Gasolina Turbo S Cabriolet Pdk",
    "preco": 1399900,
    "ano": 2022,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 9200,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77667483",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180607840.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180607840.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180607840.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180632940.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180656538.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180676864.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180695234.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180709121.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180722425.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180732832.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180741412.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180752211.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180762120.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180777823.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180792542.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180799253.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180813321.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180820312.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/porsche-911-3-8-24v-h6-gasolina-turbo-s-cabriolet-pdk-wmimagem00180828522.webp"
    ],
    "fipe": 1414000,
    "fipe_pct": 99,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78648960",
-   "nome": "Porsche Macan 3.6 V6 Turbo",
+   "nome": "Porsche Macan 3.6 24v V6 Turbo Gasolina 4p Automático",
    "preco": 319900,
    "ano": 2018,
    "ano_fab": 2017,
-   "km": 0,
+   "km": 63000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78648960",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510426074.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510426074.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510426074.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510464726.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510558139.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510639823.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510693627.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510750831.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510786814.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510817423.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510853673.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510877011.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510921516.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510958953.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08510994740.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08511020240.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260901/porsche-macan-3-6-24v-v6-turbo-gasolina-4p-automatico-wmimagem08511066714.webp"
    ],
    "fipe": 319900,
    "fipe_pct": 100,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "73573347",
-   "nome": "GWM Tank 300 Hi4-T Flex",
+   "nome": "Gwm Tank 300 2.0 Hi4-T Phev Flex 4x4 9hat",
    "preco": 335900,
    "ano": 2027,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 100,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/73573347",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073421137.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073421137.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073421137.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073445613.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073459421.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073480529.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073497533.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073511460.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073523211.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073538737.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073557837.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073580534.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260813/gwm-tank-300-2-0-hi4t-phev-flex-4x4-9hat-wmimagem01073600442.webp"
    ],
-   "fipe": 0,
+   "fipe": 319800,
    "fipe_pct": 0,
+   "fipe_fonte": "tabela-fipe",
    "categorias": [
-    "GWM"
+    "Gwm"
    ],
    "estoque": true,
-   "fipe_fonte": ""
+   "fipe_modelo": "GWM Tank 300 2.0 16V AWD Aut. (Híbrido) 2027"
   },
   {
    "id": "67748914",
-   "nome": "Porsche Panamera 4S E-Hybrid",
+   "nome": "Porsche Panamera 2.9 V6 E-Hybrid 4s Pdk",
    "preco": 1089900,
    "ano": 2025,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 5200,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/67748914",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531702174.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531702174.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531702174.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531735836.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531760012.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531780935.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531808799.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531826922.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531841728.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531860082.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531879933.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260618/porsche-panamera-2-9-v6-ehybrid-4s-pdk-wmimagem08531901228.webp"
    ],
    "fipe": 999900,
    "fipe_pct": 109,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "75426098",
-   "nome": "Toyota Yaris Cross Hybrid XRE",
+   "nome": "Toyota Yaris Cross 1.5 Vvt-I Hybrid Flex Xre Cvt",
    "preco": 265900,
    "ano": 2026,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 100,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/75426098",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303738762.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303738762.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303738762.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303765393.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303779124.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303791425.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303803815.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303814240.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303825596.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303842427.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303866439.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303878494.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303890132.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303902423.webp"
    ],
    "fipe": 163100,
    "fipe_pct": 163,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Toyota"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78534230",
-   "nome": "Porsche 911 Turbo S",
+   "nome": "Porsche 911 3.8 24v H6 Gasolina Turbo S Pdk",
    "preco": 1599900,
    "ano": 2024,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 6500,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78534230",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155839718.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155839718.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155839718.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155869521.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155885910.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155906528.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155929411.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155964734.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16155981370.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160002435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160024126.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160042141.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160064822.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160085098.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160122813.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160139223.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160157710.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260828/porsche-911-3-8-24v-h6-gasolina-turbo-s-pdk-wmimagem16160186769.webp"
    ],
    "fipe": 1649400,
    "fipe_pct": 97,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78578968",
-   "nome": "Audi Q3 Performance Black",
+   "nome": "Audi Q3 2.0 40 Tfsi Gasolina Performance Black Quattro Tiptronic",
    "preco": 259900,
    "ano": 2022,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 42300,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78578968",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593126319.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593126319.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593126319.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593136638.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593143326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593150733.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593157312.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593165435.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593172751.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593181825.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593191423.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260829/audi-q3-2-0-40-tfsi-gasolina-performance-black-quattro-tiptronic-wmimagem18593198714.webp"
    ],
    "fipe": 216600,
    "fipe_pct": 120,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Audi"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78422987",
-   "nome": "Porsche 911 Carrera T",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera T Pdk",
    "preco": 839900,
    "ano": 2023,
    "ano_fab": 2023,
-   "km": 0,
+   "km": 2900,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78422987",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535159322.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535159322.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535159322.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535184425.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535193681.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535206742.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535213440.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535225993.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535232611.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535241827.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535251416.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535260617.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535267415.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-911-3-0-24v-h6-gasolina-carrera-t-pdk-wmimagem23535276584.webp"
    ],
    "fipe": 839900,
    "fipe_pct": 100,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77538027",
-   "nome": "Porsche 911 Carrera",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera Pdk",
    "preco": 799990,
    "ano": 2021,
    "ano_fab": 2021,
-   "km": 0,
+   "km": 14000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77538027",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055289326.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055289326.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055289326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055317621.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055338184.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055361035.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055380323.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055395219.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055410242.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055422213.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055450018.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055463917.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055472521.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260822/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem02055481034.webp"
    ],
    "fipe": 708000,
    "fipe_pct": 113,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78498062",
-   "nome": "Denza B5 PHEV GS AWD",
+   "nome": "Denza B5 1.5 Turbo Phev Gs Awd Automático",
    "preco": 589900,
    "ano": 2027,
    "ano_fab": 2026,
-   "km": 0,
+   "km": 100,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78498062",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125481446.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125481446.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125481446.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125504022.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125518761.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125534219.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125561816.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125581333.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125602120.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125620737.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125638314.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125660028.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125675837.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125701542.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125715990.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125743326.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/denza-b5-1-5-turbo-phev-gs-awd-automatico-wmimagem00125778021.webp"
    ],
-   "fipe": 0,
+   "fipe": 410200,
    "fipe_pct": 0,
+   "fipe_fonte": "tabela-fipe",
    "categorias": [
     "Denza"
    ],
    "estoque": true,
-   "fipe_fonte": ""
+   "fipe_modelo": "Denza B5 GS 4WD 2027"
   },
   {
    "id": "77430199",
-   "nome": "BMW X5 xDrive45e M Sport",
+   "nome": "Bmw X5 3.0 I6 Turbo Híbrido Xdrive45e M Sport Automático",
    "preco": 409900,
    "ano": 2022,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 58000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77430199",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054106339.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054106339.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054106339.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054124138.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054143216.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054163842.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054184324.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054211029.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054222334.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054243265.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054259256.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054274916.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054289512.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054300754.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054314314.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x5-3-0-i6-turbo-hibrido-xdrive45e-m-sport-automatico-wmimagem15054337225.webp"
    ],
    "fipe": 362700,
    "fipe_pct": 113,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "77673240",
-   "nome": "VW T-Cross Highline",
+   "nome": "Volkswagen T-Cross 1.4 250 Tsi Total Flex Highline Automático",
    "preco": 159900,
    "ano": 2022,
    "ano_fab": 2022,
-   "km": 0,
+   "km": 71000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/77673240",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250849711.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250849711.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250849711.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250883232.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250894922.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250907810.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250931032.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250943211.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250964737.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260815/volkswagen-tcross-1-4-250-tsi-total-flex-highline-automatico-wmimagem01250983824.webp"
    ],
    "fipe": 115000,
    "fipe_pct": 139,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "VW"
+    "Volkswagen"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "78720118",
-   "nome": "Land Rover Discovery Sport P250 R-Dynamic SE",
+   "nome": "Land Rover Discovery Sport 2.0 P250 Turbo Flex R-Dynamic Se Automático",
    "preco": 359900,
    "ano": 2025,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 23000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/78720118",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203093727.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203093727.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203093727.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203117834.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203140231.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203155420.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203176422.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203192711.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203207215.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203229410.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203244589.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202609/20260902/land-rover-discovery-sport-2-0-p250-turbo-flex-rdynamic-se-automatico-wmimagem13203263228.webp"
    ],
    "fipe": 346100,
    "fipe_pct": 104,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Land"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "70945152",
-   "nome": "VW Fusca 2.0 TSI",
+   "nome": "Volkswagen Fusca 2.0 Tsi 16v Gasolina 2p Automático",
    "preco": 89900,
    "ano": 2013,
    "ano_fab": 2012,
-   "km": 0,
+   "km": 122000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/70945152",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210337313.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210337313.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210337313.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210350811.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210377819.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210399424.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210418115.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210452912.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210468324.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210488316.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202606/20260630/volkswagen-fusca-2-0-tsi-16v-gasolina-2p-automatico-wmimagem14210514022.webp"
    ],
    "fipe": 104500,
    "fipe_pct": 86,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "VW"
+    "Volkswagen"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "66561906",
-   "nome": "Range Rover Sport 3.0 HSE Diesel",
+   "nome": "Land Rover Range Rover Sport 3.0 Hse 4x4 V6 24v Turbo Diesel 4p Automático",
    "preco": 319900,
    "ano": 2020,
    "ano_fab": 2019,
-   "km": 0,
+   "km": 62000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/66561906",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22333967513.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22333967513.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22333967513.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22333987329.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334009237.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334027348.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334059418.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334075828.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334087342.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334096141.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334111633.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334130023.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334145232.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334167899.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334180321.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260518/land-rover-range-rover-sport-3-0-hse-4x4-v6-24v-turbo-diesel-4p-automatico-wmimagem22334198830.webp"
    ],
    "fipe": 304700,
    "fipe_pct": 105,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Range"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "71809788",
-   "nome": "Land Rover Defender 110 P400e",
+   "nome": "Land Rover Defender 2.0 P400e Phev 110 X-Dynamic Hse Awd Automático",
    "preco": 619900,
    "ano": 2024,
    "ano_fab": 2024,
-   "km": 0,
+   "km": 13964,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/71809788",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584688520.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584688520.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584688520.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584707317.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584720220.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584727818.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584735821.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584747475.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584757438.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260808/land-rover-defender-2-0-p400e-phev-110-xdynamic-hse-awd-automatico-wmimagem22584768274.webp"
    ],
    "fipe": 607700,
    "fipe_pct": 102,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "Land"
+    "Land Rover"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "74008541",
-   "nome": "Volvo S90 T8 Inscription",
+   "nome": "Volvo S90 2.0 T8 Hybrid Inscription Awd Geartronic",
    "preco": 244900,
    "ano": 2020,
    "ano_fab": 2019,
-   "km": 0,
+   "km": 35000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/74008541",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332158432.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332158432.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332158432.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332175310.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332188632.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332209035.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332226636.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332244513.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332257444.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332265711.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332272822.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332281132.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332290510.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332300628.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332311123.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332322856.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332334322.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332345540.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332363227.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332372236.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332382411.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260824/volvo-s90-2-0-t8-hybrid-inscription-awd-geartronic-wmimagem15332392942.webp"
    ],
    "fipe": 194400,
    "fipe_pct": 126,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Volvo"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "63901435",
-   "nome": "Porsche 911 Carrera S Cabriolet",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera S Cabriolet Pdk",
    "preco": 839900,
    "ano": 2020,
    "ano_fab": 2019,
-   "km": 0,
+   "km": 30700,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/63901435",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341055840.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341055840.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341055840.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341078756.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341089623.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341096516.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341111340.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341118561.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341134826.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341147937.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341167535.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341177749.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260801/porsche-911-3-0-24v-h6-gasolina-carrera-s-cabriolet-pdk-wmimagem20341189424.webp"
    ],
    "fipe": 848400,
    "fipe_pct": 99,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "76268246",
-   "nome": "BMW X3 M40i",
+   "nome": "Bmw X3 3.0 Twinpower Gasolina M40i Steptronic",
    "preco": 509900,
    "ano": 2024,
    "ano_fab": 2024,
-   "km": 0,
+   "km": 21300,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/76268246",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294841162.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294841162.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294841162.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294868842.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294879837.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294900710.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294917541.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294933738.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294946129.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294971636.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20294993538.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20295015822.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/bmw-x3-3-0-twinpower-gasolina-m40i-steptronic-wmimagem20295033812.webp"
    ],
    "fipe": 418000,
    "fipe_pct": 122,
+   "fipe_fonte": "webmotors",
    "categorias": [
-    "BMW"
+    "Bmw"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "65309466",
-   "nome": "Porsche 911 Carrera",
+   "nome": "Porsche 911 3.0 24v H6 Gasolina Carrera Pdk",
    "preco": 899900,
    "ano": 2025,
    "ano_fab": 2025,
-   "km": 0,
+   "km": 2600,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/65309466",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044572037.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044572037.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044572037.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044602818.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044627499.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044645623.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044670273.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044695420.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044715330.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044728340.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044746638.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044767918.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044783525.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044799114.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044812063.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202607/20260717/porsche-911-3-0-24v-h6-gasolina-carrera-pdk-wmimagem00044827965.webp"
    ],
    "fipe": 957300,
    "fipe_pct": 94,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   },
   {
    "id": "69630522",
-   "nome": "Porsche Cayenne Coupé 3.0 V6",
+   "nome": "Porsche Cayenne 3.0 V6 Gasolina Coupé Awd Tiptronic S",
    "preco": 450000,
    "ano": 2020,
    "ano_fab": 2019,
-   "km": 0,
+   "km": 54000,
    "sku": "",
    "link": "https://www.webmotors.com.br/comprar/69630522",
    "img": "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484766734.webp",
    "fotos": [
-    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484766734.webp"
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484766734.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484787728.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484800639.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484819339.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484840614.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484861814.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484877832.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484890615.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484898462.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484919028.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484931613.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484938711.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484947310.webp",
+    "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260825/porsche-cayenne-3-0-v6-gasolina-coupe-awd-tiptronic-s-wmimagem00484955130.webp"
    ],
    "fipe": 445500,
    "fipe_pct": 101,
+   "fipe_fonte": "webmotors",
    "categorias": [
     "Porsche"
    ],
    "estoque": true,
-   "fipe_fonte": "webmotors"
+   "fipe_modelo": ""
   }
  ]
 }
