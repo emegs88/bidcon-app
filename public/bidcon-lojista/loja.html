@@ -170,7 +170,7 @@ function melhor(preco,fipe,porAdm){
 function zapMsg(t){return "https://wa.me/"+WA+"?text="+encodeURIComponent(t)}
 function card(d){
   var foto=d.img?'<img src="'+esc(d.img)+'" alt="'+esc(d.nome)+'" loading="lazy">':'<div class="ph"></div>';
-  var fipeTxt=d.colecao?'<span class="tag-ref">fora da régua FIPE</span>':("FIPE "+brl(d.fipe)+(d.fipe_ok?(d.fipe_pct>110?' <span class="tag-ref">anúncio a '+d.fipe_pct+'% da FIPE</span>':""):' <span class="tag-ref">a confirmar</span>'));
+  var fipeTxt=d.colecao?'<span class="tag-ref">fora da régua FIPE</span>':("FIPE "+brl(d.fipe)+(d.fipe_ok?((d.fipe_tabela?' <span class="tag-ref" title="FIPE pela tabela, modelo aproximado">tabela</span>':"")+(d.fipe_pct>110?' <span class="tag-ref">anúncio a '+d.fipe_pct+'% da FIPE</span>':"")):' <span class="tag-ref">a confirmar</span>'));
   var cab='<div class="valor"><div><h3>'+esc(d.nome)+'</h3><div class="ano">'+esc(d.anoTxt)+' · '+fipeTxt+'</div></div><div class="p num">'+brl(d.preco)+'</div></div>';
   if(d.colecao) return '<article class="card nao"><div class="foto">'+foto+'<span class="adm">veículo de coleção</span></div><div class="body">'+cab+'<p class="hint">Preço muito acima da tabela FIPE ('+d.fipe_pct+'%): a administradora avalia o bem pela FIPE, então o encaixe automático não se aplica. <a href="'+zapMsg("Olá! Quero avaliar uma carta contemplada pra fechar o "+d.nome+" ("+brl(d.preco)+") da "+LOJA.nome+".")+'" target="_blank" rel="noopener">Falar com a bidcon</a></p></div></article>';
   if(!d.enc) return '<article class="card nao"><div class="foto">'+foto+'<span class="adm">sem encaixe</span></div><div class="body">'+cab+'<p class="hint">Nenhuma cota da mesma administradora fecha com saldo devedor dentro da FIPE. <a href="'+zapMsg("Olá! Quero uma carta contemplada pra fechar o "+d.nome+" ("+brl(d.preco)+") da "+LOJA.nome+".")+'" target="_blank" rel="noopener">Falar com a bidcon</a></p></div></article>';
@@ -237,11 +237,14 @@ function pagina(loja){
       var pct=Number(v.fipe_pct||0),fipe=v.fipe||0,fipeOk=!!fipe;
       if(!fipe&&pct>0){fipe=Math.round(v.preco*100/pct/100)*100;fipeOk=true}
       if(!fipe)fipe=v.preco;
+      // Índice preço/FIPE que a página usa: calculado do que ela sabe. O campo do
+      // anúncio fica 0 quando a FIPE veio da tabela (§26: BYD a 156% sem rótulo).
+      if(fipeOk)pct=Math.round(100*v.preco/fipe);
       // Coleção = preço muito acima da FIPE E veículo com 20+ anos. Só o índice
       // não basta (mediu-se um Yaris Cross 0 km a 163%).
       var anoRef=Number(v.ano_fab||v.ano||0),idade=anoRef?new Date().getFullYear()-anoRef:0;
       var colecao=pct>COLECAO_PCT&&idade>=COLECAO_ANOS;
-      return {nome:v.nome,anoTxt:(v.ano_fab&&v.ano?v.ano_fab+"/"+v.ano:String(v.ano||"")),preco:v.preco,fipe:fipe,fipe_ok:fipeOk,fipe_pct:pct,colecao:colecao,img:v.img,link:v.link,enc:colecao?null:melhor(v.preco,fipe,porAdm)};
+      return {nome:v.nome,anoTxt:(v.ano_fab&&v.ano?v.ano_fab+"/"+v.ano:String(v.ano||"")),preco:v.preco,fipe:fipe,fipe_ok:fipeOk,fipe_pct:pct,fipe_tabela:v.fipe_fonte==="tabela-fipe",colecao:colecao,img:v.img,link:v.link,enc:colecao?null:melhor(v.preco,fipe,porAdm)};
     });
     var fonte=loja.url?'<span><a href="'+esc(loja.url)+'" target="_blank" rel="noopener">Ver estoque na loja ↗</a></span>':"";
     $("meta").innerHTML='<span>'+DATA.length+' veículos no estoque</span>'+fonte+'<span>Estoque de <span class="num">'+new Date(est.atualizado).toLocaleDateString("pt-BR")+'</span> · cartas de <span class="num">'+new Date(vit.atualizado).toLocaleDateString("pt-BR")+'</span></span>';
