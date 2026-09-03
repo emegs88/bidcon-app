@@ -2385,3 +2385,217 @@ Conta Notarial" no texto de topo. Nenhuma promessa de contemplação.
 - `estoque-webmotors-01` (`prospere-360`): **aberta, intocada, sem merge**, por ordem.
 - F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville` e
   conferir encaixes, fotos e WhatsApp com o olho.
+
+## 25 — LOJISTA-MULTI-01: o rewrite que não servia, e a régua que pegou um Toyota novo
+
+Fatia aplicada sobre `main` `043ca31`. Patch conferido (`sha256` `d017baef…`, 469 linhas),
+`git am --3way` limpo em `12a0a20`, autoria do Emerson preservada. Branch `lojista-multi-01`.
+
+### 25.1 — O defeito que teria derrubado uma URL viva
+
+O patch remove `public/bidcon-lojista/jk-alphaville.html` e passa a servir
+`/bidcon-lojista/<slug>` por rewrite para `/bidcon-lojista/loja.html`. **Medido no preview
+`dpl_9pkYF78`, os três caminhos reescritos deram `404 NOT_FOUND`:**
+
+```
+/bidcon-lojista/jk-alphaville   404   /bidcon-lojista/lojas   404   /bidcon-lojista/nao-existe  404
+```
+
+Causa, medida e não deduzida: `vercel.json` tem `cleanUrls: true`, e com ele o `.html`
+**não é destino servível** — é um redirecionamento:
+
+```
+/bidcon-lojista/loja.html  ->  308  ->  /bidcon-lojista/loja
+/bidcon-lojista/loja       ->  200  (20909 bytes)
+```
+
+O arquivo estava lá o tempo todo. O rewrite é que apontava para um endereço que só redireciona.
+
+**O tamanho do estrago, se tivesse ido assim:** `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville`
+responde **200 hoje em produção** (19251 bytes) e **está no sitemap**. Como o patch apaga o
+`.html` e entrega a rota inteira ao rewrite quebrado, o merge transformaria uma página pública
+viva e indexada em 404. Não é regressão de recurso novo: é queda de URL existente.
+
+Correção mínima, um commit (`c442426`): tirar o `.html` dos dois destinos.
+
+### 25.2 — As seis medições da OS, depois da correção (`dpl_BBMkqBgB…`, `c442426`)
+
+| caminho | status | tamanho | tipo |
+|---|---|---|---|
+| `/bidcon-lojista/jk-alphaville` | 200 | 20909 b | `text/html` (pela `loja.html`) |
+| `/bidcon-lojista/lojas` | 200 | 20909 b | `text/html` |
+| `/bidcon-lojista/nao-existe` | 200 | 20909 b | `text/html` |
+| `/bidcon-lojista` (antiga) | 200 | **122605 b** | `text/html` |
+| `/bidcon-lojista/jk-alphaville.json` | 200 | 31569 b | `application/json` |
+| `/bidcon-lojista/lojas.json` | 200 | 639 b | `application/json` |
+
+Os 122605 bytes batem no número que a OS pediu — a página antiga saiu intacta. E o
+`:slug([a-z0-9-]+)` **não engoliu os `.json`**: o `.` não está na classe de caracteres, e o
+filesystem responde antes. As duas promessas da mensagem de commit ficaram medidas, não supostas.
+
+Cabeçalho: sai de `titulo` no `lojas.json`, vale `"JK Premium Cars — Alphaville"`, idêntico ao
+pedido. O HTML servido não tem `"JK Premium"` em lugar nenhum — a página é genérica de verdade.
+
+**`/bidcon-lojista/nao-existe` devolve 200, não 404.** O "Loja não encontrada" é escrito por
+JavaScript no `<h1>`; o status HTTP continua 200. Para o cliente está certo; para buscador é um
+soft 404, e qualquer slug inventado vira página indexável. Fica registrado, não corrigido — não
+tenho palavra para mexer nisso.
+
+### 25.3 — A divergência: 2 + 4, não 1 + 5
+
+A OS previa "F-1000 como veículo de coleção; os 5 zero-km com FIPE a confirmar". Medido contra o
+snapshot servido pelo preview, com `COLECAO_PCT = 150` lido do próprio HTML:
+
+```
+veículo de coleção (pct > 150): 2      <- a OS previa 1
+   Ford F-1000 4.9                     R$   210.000   pct=517
+   Toyota Yaris Cross Hybrid XRE       R$   265.900   pct=163
+FIPE a confirmar (sem fipe, pct = 0): 4   <- a OS previa 5
+   Chevrolet Corvette Stingray Conversível  R$ 1.069.900
+   BYD Song Plus DM-i                       R$   369.900
+   GWM Tank 300 Hi4-T Flex                  R$   335.900
+   Denza B5 PHEV GS AWD                     R$   589.900
+com FIPE e encaixe normal: 41
+```
+
+Somam os mesmos 6 da §24 — a divisão é que mudou de lugar. O Yaris Cross tem `fipe_pct = 163`,
+e 163 > 150.
+
+**O que isso publica:** um **Toyota Yaris Cross Hybrid XRE zero-km** aparece para o cliente e para
+o lojista como *"veículo de coleção — preço muito acima da tabela FIPE (163%)"*. É uma afirmação
+falsa sobre um Toyota novo de linha, escrita na página pública da loja parceira.
+
+**Causa-raiz, medida:** o campo `fipe_fonte` — criado pelo `scripts/lojista-snapshot.js` nesta
+mesma fatia — aparece em **0 de 47** veículos do `jk-alphaville.json`. O snapshot commitado é o
+antigo, anterior ao FIPE-01, nunca regerado pelo script novo. A expectativa "5 zero-km com FIPE a
+confirmar" pressupõe um snapshot regerado, onde o Yaris teria FIPE de tabela e `pct` recalculado.
+
+Não mexi na régua nem regerei o snapshot: as duas coisas são decisão de negócio e não tenho
+palavra do Emerson para nenhuma. Aplico como veio, meço, e entrego o número.
+
+### 25.4 — Portões locais
+
+`vercel.json` JSON válido, `cleanUrls` e `outputDirectory` intactos, CSP intacta.
+`sitemap.xml` válido, 16 URLs, `+/bidcon-lojista/lojas` como anunciado.
+`lojas.json` válido, 1 loja. `loja.html` com léxico limpo, `WA` inalterado (`5511973202967`).
+
+### 25.5 — O que fica sem prova
+
+- **O encaixe renderizado não foi visto com o olho.** A extensão do Chrome está desconectada;
+  repliquei a lógica da página em Python contra os arquivos servidos pelo preview. Os 41 com FIPE
+  seguem a mesma régua já medida 47/47 na §24, mas ninguém abriu a página.
+- **Fotos, WhatsApp e `/api/vitrine` no preview novo não foram reconferidos** — a §24 os mediu na
+  fatia anterior; aqui presumo que continuam, e presunção não é medição.
+- **O snapshot continua de 02/09/2026.** Envelhece sozinho.
+
+### 25.6 — Estado e o que depende do Emerson
+
+- `lojista-multi-01` empurrada em `c442426` (2 commits: `12a0a20` do patch + a correção do rewrite).
+  **PR não abre por aqui — `gh` não está instalado.**
+  Link: `https://github.com/emegs88/bidcon-app/pull/new/lojista-multi-01`
+- **Merge é clique do Emerson.** A fatia toca `public/` e `vercel.json` — é produção.
+- **Três decisões dele, nenhuma minha:** (a) regerar o `jk-alphaville.json` com o script novo, para
+  o Yaris cair em "FIPE a confirmar"; (b) ou subir o `COLECAO_PCT` acima de 163; (c) ou aceitar o
+  Yaris rotulado como coleção. Enquanto nenhuma vier, a página publica o rótulo errado.
+- F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville`.
+
+---
+
+## 25-A — ADENDO: a correção da régua (LOJISTA-MULTI-01, fix-régua)
+
+Emerson acatou os dois achados da §25 e mandou o patch de correção. O commit dele credita a
+medição: *"Medição do Code na §25: Yaris Cross 0 km a 163% da FIPE saía como 'veículo de coleção'.
+A régua só por índice estava errada"*. Este adendo mede o que o patch fez.
+
+### 25-A.1 — Aplicação
+
+`sha256` conferido antes do `am`: `7341e120e603c3bf…`, 586 linhas — bate com a ordem.
+Li o patch antes de aplicar, mirando na dúvida que a própria §25 deixou registrada: **onde o
+`noindex` seria injetado.** Fica dentro do ramo `if(!loja)` e em lugar nenhum mais — loja válida
+não é desindexada.
+
+`git am --3way` limpo. **O hash saiu `cb3830c`, não `feff3b0`** — o `--3way` reassenta sobre
+`3b465f3`. Conteúdo idêntico; o número é que muda.
+
+### 25-A.2 — O que a régua virou
+
+```js
+var MAX_COTAS=4, POR_ADM=24, COLECAO_PCT=150, COLECAO_ANOS=20;
+if(!fipe&&pct>0){fipe=Math.round(v.preco*100/pct/100)*100;fipeOk=true}   // FIPE derivada do índice
+var idade=anoRef?new Date().getFullYear()-anoRef:0;
+var colecao=pct>COLECAO_PCT&&idade>=COLECAO_ANOS;                        // duas condições, não uma
+```
+
+Duas condições em vez de uma. Um índice alto sozinho não faz um carro ser de coleção — a F-1000 é
+de 1997; o Yaris é zero-km. E um carro caro em relação à tabela **continua tendo FIPE**: só quem
+não tem índice nenhum é que sai "a confirmar".
+
+### 25-A.3 — Medições no preview
+
+Deploy `dpl_FBJwwzuXFuzgEvMpxphFM7f63CPa` (`cb3830c`), bypass novo — o cookie morre a cada deploy.
+As 6 rotas reconferidas, todas 200; `/bidcon-lojista` antiga em **122605 bytes exatos**.
+A página cresceu 20909 → 21728 bytes; o snapshot 31569 → 32952 (`fipe_fonte` agora em 43/47, era 0/47).
+
+**Desta vez a página foi renderizada, não simulada.** A extensão do Chrome segue desconectada, então
+montei um renderizador em jsdom fora do repo. Placar contado nos cards do DOM:
+
+| alvo da ordem | medido no DOM |
+|---|---|
+| F-1000 = coleção (517%, 29 anos) | ✅ único card `.nao`, "1997/1998 · fora da régua FIPE" |
+| Yaris = encaixe normal, FIPE 163.100, "anúncio a 163% da FIPE" | ✅ "FIPE R$ 163.100 anúncio a 163% da FIPE", Bradesco, junção 2 cotas |
+| Corvette/BYD/Tank/Denza = "FIPE a confirmar" | ✅ exatamente esses 4 |
+| **1 coleção · 4 a confirmar · 42 normais** | ✅ **bate** (47 cards, 46 com encaixe) |
+| `noindex` em `/bidcon-lojista/nao-existe` | ✅ `meta[name=robots]="noindex"` presente |
+| `noindex` **ausente** na loja válida | ✅ nenhuma meta robots em `/jk-alphaville` |
+
+O rótulo novo (`pct > 110`) aparece em 13 dos 42 normais. O "Tank 300" da ordem é o **Hi4-T Flex**;
+há um segundo Tank 300 no estoque, o **Hi4-T PHEV**, que tem FIPE (296.800) e não entra nos 4.
+
+**A FIPE corrigida muda o encaixe, não só o rótulo.** O Yaris fecha com parcelas de R$ 2.115 até
+76× ≈ R$ 160.740 de saldo, dentro da FIPE de R$ 163.100. Antes da correção o `fipe` caía para o
+preço (R$ 265.900) e a régua "saldo ≤ FIPE" ficava frouxa demais.
+
+### 25-A.4 — Achado novo: a vitrine não responde no preview
+
+Medido em quatro origens contra `https://app.bidcon.com.br/api/vitrine`:
+
+```
+200  Origin: https://www.bidcon.com.br
+200  Origin: https://bidcon.com.br
+403  Origin: https://bidcon-app-git-lojista-multi-01-….vercel.app   {"ok":false,"erro":"origem não permitida"}
+403  sem Origin
+```
+
+**Em navegador real, no preview, a página não mostra encaixe nenhum** — a vitrine recusa a origem
+`vercel.app`. Não é defeito da fatia: é o CORS da API fazendo o trabalho dele, e em produção a
+origem é `bidcon.com.br`. Mas desfaz uma expectativa que vinha desde a §24 ("`/api/vitrine`
+respondendo no preview"): ela só responde se alguém **simular** a origem de produção, que foi o que
+meu renderizador fez para conseguir medir os cards. Isso está declarado aqui de propósito: os
+números de encaixe acima são de uma origem simulada, não de uma visita comum ao preview.
+
+### 25-A.5 — Dois defeitos meus, no instrumento
+
+A primeira tentativa de renderizar devolveu `<h1>: Log in to Vercel` e 0 cards. Não era achado
+sobre o produto — era o meu medidor quebrado, em dois pontos:
+
+1. o `curl` grava a linha do `_vercel_jwt` com prefixo `#HttpOnly_`, e meu filtro `!startsWith('#')`
+   jogava fora justamente ela: eu estava medindo a tela de login da Vercel;
+2. o jsdom não implementa `window.matchMedia`, que a página chama — estourava antes de trabalhar.
+
+Registro porque quase virou relatório: um instrumento quebrado produz números com cara de medição.
+Pus um portão no renderizador — se o HTML contiver "Log in to Vercel", ele recusa medir.
+
+### 25-A.6 — O que fica sem prova
+
+- **Fotos e WhatsApp não foram reconferidos neste deploy.** A §24 os mediu; aqui presumo.
+- **Ninguém abriu a página com o olho** — jsdom não é Chrome; fontes, layout e imagem ficam por ver.
+- **O snapshot continua de 02/09/2026.** Envelhece sozinho.
+- **Produção não foi tocada.** Tudo acima é preview.
+
+### 25-A.7 — Estado
+
+- `lojista-multi-01` em `cb3830c`, 4 commits à frente de `origin/main` (`043ca31`).
+- **PR não abre por aqui — `gh` não está instalado.**
+  `https://github.com/emegs88/bidcon-app/pull/new/lojista-multi-01`
+- **Merge é clique do Emerson.** A fatia toca `public/` e `vercel.json` — é produção.
+- F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville`.
