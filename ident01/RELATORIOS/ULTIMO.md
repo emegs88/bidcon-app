@@ -2599,3 +2599,126 @@ Pus um portão no renderizador — se o HTML contiver "Log in to Vercel", ele re
   `https://github.com/emegs88/bidcon-app/pull/new/lojista-multi-01`
 - **Merge é clique do Emerson.** A fatia toca `public/` e `vercel.json` — é produção.
 - F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville`.
+
+---
+
+## §26 — LOJISTA-JK-SNAPSHOT-02: medida, e o preço de confiar no `.vercel/project.json` (append, 03/09)
+
+### 26.1 — A ordem
+
+Patch v2 `LOJISTA-JK-SNAPSHOT-02.patch`, 1878 linhas, sha256 `d8f0c710…` — conferido **antes**
+do `git am`, como manda a casa. O de 1869 linhas foi descartado sem ser lido. Um commit
+(`a776f2a`) sobre `main` `db140b0`. Toca dois arquivos e nada mais:
+`public/bidcon-lojista/jk-alphaville.json` e `scripts/lojista-snapshot.js`.
+
+`git am --3way` reescreveu o hash: `a776f2a` → **`677d886`**. Normal, e vale anotar para quem
+comparar hashes depois.
+
+### 26.2 — O que o patch muda no script
+
+Duas coisas, ambas sobre a FIPE aproximada:
+
+- **`ALIAS` de marca.** A tabela FIPE grafa `GM - Chevrolet`, `VW - VolksWagen`, `Kia Motors`.
+  Sem o alias, marca nenhuma casava e a consulta voltava vazia.
+- **`fipe_modelo`.** Quando a FIPE vem da tabela (e não do anúncio), o script agora grava
+  qual marca/modelo/ano casou. Antes a FIPE aproximada era um número sem procedência;
+  agora dá para auditar o casamento. **A página não exibe esse campo** — é rastro, não conteúdo.
+
+### 26.3 — As quatro aferições da ordem, no preview
+
+Contra o arquivo **servido** (não o do disco), host `bidcon-6lgkkf2mw-…vercel.app`,
+deploy `dpl_A4b9D8LH1SHZP1bbhHPamMKsnLv9`, sha `677d886`:
+
+| aferição | esperado | medido | |
+|---|---|---|---|
+| `.json` responde | 200 | **200**, 124.827 bytes, `application/json` | OK |
+| `total` | 46 | **46** (e `veiculos.length` = 46) | OK |
+| `fipe_fonte` | webmotors 42 · tabela-fipe 3 · vazio 1 | **42 · 3 · 1** | OK |
+| os 3 `tabela-fipe` com `fipe_modelo` | preenchido | **os 3 preenchidos** | OK |
+
+Os três modelos casados: `BYD Song Plus 1.5 16V Aut. (Híbrido) 2027`,
+`GWM Tank 300 2.0 16V AWD Aut. (Híbrido) 2027`, `Denza B5 GS 4WD 2027`.
+
+As seis rotas da OS no mesmo host, todas **200**: `.json` (124.827), `lojas.json` (639),
+`/jk-alphaville` (21.728), `/lojas` (21.728), `/bidcon-lojista` antiga (122.605),
+`/nao-existe` (21.728 — a casca que decide "Loja não encontrada" no cliente).
+
+### 26.4 — O placar, pela régua da própria página
+
+Não chutei nomes de campo: li `loja.html` (linhas 237–244) e apliquei
+`fipeOk = !!fipe`, `colecao = pct > 150 && idade >= 20`.
+
+- **1 coleção** — Ford F-1000 1998, 28 anos, 517%.
+- **1 a confirmar** — Chevrolet Corvette Stingray, único com `fipe = 0`.
+- **44 demais.**
+
+Bate com o que a ordem antecipou. E confirma o efeito colateral que ela já previa ao escrever
+"encaixe normal **ou sem cota**": as três FIPEs que antes não existiam agora entram na régua
+"saldo ≤ FIPE" e apertam o encaixe desses três.
+
+### 26.5 — ACHADO: as linhas `tabela-fipe` nunca recebem o rótulo
+
+`loja.html` linha 173 só emite `anúncio a N% da FIPE` quando `d.fipe_pct > 110`. Mas `fipe_pct`
+vem do **anúncio**; quando a FIPE é da tabela, o campo fica **`0`**. Resultado medido:
+
+| veículo | preço | FIPE exibida | razão real | `fipe_pct` | rótulo |
+|---|---|---|---|---|---|
+| BYD Song Plus | 369.900 | 237.500 | **156%** | 0 | **não sai** |
+| Denza B5 | 589.900 | 410.200 | **144%** | 0 | **não sai** |
+| GWM Tank 300 | 335.900 | 319.800 | 105% | 0 | não sai (correto) |
+
+O desconforto é a comparação: **13 veículos recebem o rótulo, e 12 deles têm razão MENOR que
+os 156% do BYD** — Audi A5 a 112%, Volvo XC60 a 125%, BMW X4 a 119%. A página avisa sobre o
+carro a 112% e cala sobre o carro a 156%. Não é erro do patch: o patch fez o que a ordem pediu.
+É uma lacuna que o patch **expôs** ao fazer a FIPE de tabela existir pela primeira vez.
+
+**Não corrigi.** Fora do escopo da ordem, e `loja.html` é produção. Fica como decisão do Emerson:
+gravar `fipe_pct` também quando a fonte é tabela, ou dar às linhas de tabela um rótulo próprio
+que diga que a FIPE é aproximada.
+
+### 26.6 — O erro da fatia: medi o projeto Vercel errado
+
+Vale mais registrado que escondido, porque o próximo vai cair no mesmo buraco.
+
+Gastei a fatia inteira perseguindo um 404 que não existia. **O repositório tem dois projetos
+Vercel sobre o mesmo GitHub `emegs88/bidcon-app`:**
+
+- **`bidcon-plataforma`** (`prj_PKcIYNTDmQN2CLKmQvivzHMVesRC`) — raiz `platform/`, serve
+  `app.bidcon.com.br`. É o app logado.
+- **`bidcon-app`** (`prj_JZrRv4S0eSQYK9wgjkAfiiRH6WhG`) — raiz do repositório, serve
+  `bidcon.com.br`. **É quem publica `public/bidcon-lojista/*`.**
+
+**O `.vercel/project.json` do working tree aponta para o primeiro.** Confiei nele e medi o app
+durante horas. O 404 era honesto: aquelas rotas não existem lá.
+
+O que fechou o caso foi o controle positivo: no deploy errado o CSS respondia **200** e
+`/favicon.ico` respondia **404** — um arquivo de `public/` faltando enquanto o build dizia
+"Collected static files (public/, static/, .next/static)" e "Build Completed [45s]". Estático
+servido e `public/` ausente ao mesmo tempo só fecha de um jeito: `public/` era outro.
+
+**Precedente:** para a linha lojista, o alvo é `bidcon-app`. Não herde o alvo do
+`.vercel/project.json`; confirme por `list_projects` qual projeto tem o domínio que você quer.
+
+### 26.7 — Segundo erro, menor: eu matei meu próprio bypass
+
+Chamei `web_fetch_vercel_url` no meio da apuração. Ele **regenera** o share token — e o
+`_vercel_jwt` que eu já tinha no jar virou pó. Os 404 viraram 302 apontando para
+`vercel.com/login`, e por um tempo achei que o deploy tinha caído. **Não emitir bypass novo
+enquanto uma medição estiver em curso.**
+
+### 26.8 — O que NÃO foi medido
+
+- **Ninguém abriu a página no navegador.** O placar acima é a régua da página aplicada ao JSON
+  servido, não pixels. Cards, fotos e layout ficam por ver.
+- **Produção não foi tocada.** Tudo acima é preview.
+- **`fipe_modelo` não foi conferido contra a tabela FIPE real** — confiei no que o script gravou.
+  Se o alias casou o modelo errado, a medição não pega.
+- **O snapshot é de 03/09/2026.** Envelhece sozinho.
+
+### 26.9 — Estado
+
+- `lojista-jk-snapshot-02` em **`677d886`**, 1 commit à frente de `origin/main` (`db140b0`),
+  árvore limpa, empurrada.
+- **PR não abre por aqui — `gh` não está instalado.**
+  `https://github.com/emegs88/bidcon-app/pull/new/lojista-jk-snapshot-02`
+- **Merge é clique do Emerson.** A fatia toca `public/` — é produção.
