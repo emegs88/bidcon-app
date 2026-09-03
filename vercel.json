@@ -14,8 +14,8 @@
     { "source": "/gpt", "destination": "https://chatgpt.com/g/g-6a52c1782c788191aa2a36b15aee763d-bidcon-cartas-contempladas", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/bidcon-lojista/lojas", "destination": "/bidcon-lojista/loja.html" },
-    { "source": "/bidcon-lojista/:slug([a-z0-9-]+)", "destination": "/bidcon-lojista/loja.html" }
+    { "source": "/bidcon-lojista/lojas", "destination": "/bidcon-lojista/loja" },
+    { "source": "/bidcon-lojista/:slug([a-z0-9-]+)", "destination": "/bidcon-lojista/loja" }
   ],
   "headers": [
     {
