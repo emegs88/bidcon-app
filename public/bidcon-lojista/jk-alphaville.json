@@ -26,7 +26,8 @@
    "categorias": [
     "Audi"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78313591",
@@ -46,7 +47,8 @@
    "categorias": [
     "Chevrolet"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": ""
   },
   {
    "id": "75501348",
@@ -66,7 +68,8 @@
    "categorias": [
     "Chevrolet"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78423024",
@@ -86,7 +89,8 @@
    "categorias": [
     "Volvo"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78700468",
@@ -106,7 +110,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78339214",
@@ -126,7 +131,8 @@
    "categorias": [
     "GWM"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78283486",
@@ -146,7 +152,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "76950396",
@@ -166,7 +173,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "76434354",
@@ -186,7 +194,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78283531",
@@ -206,7 +215,8 @@
    "categorias": [
     "BYD"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": ""
   },
   {
    "id": "78019362",
@@ -226,7 +236,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77667171",
@@ -246,7 +257,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "76268417",
@@ -266,7 +278,8 @@
    "categorias": [
     "Jeep"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "75537931",
@@ -286,7 +299,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "69384064",
@@ -306,7 +320,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "74923672",
@@ -326,7 +341,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78700671",
@@ -346,7 +362,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78629043",
@@ -366,7 +383,8 @@
    "categorias": [
     "Land"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77673166",
@@ -386,7 +404,8 @@
    "categorias": [
     "Range"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "70896186",
@@ -406,7 +425,8 @@
    "categorias": [
     "Mercedes"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "75293192",
@@ -426,7 +446,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77802387",
@@ -446,7 +467,8 @@
    "categorias": [
     "VW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77802274",
@@ -466,7 +488,8 @@
    "categorias": [
     "Mitsubishi"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77913059",
@@ -486,7 +509,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "67181199",
@@ -501,12 +525,13 @@
    "fotos": [
     "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202605/20260531/ford-f1000-4-9-i-cs-gasolina-2p-manual-wmimagem17080360921.webp"
    ],
-   "fipe": 0,
+   "fipe": 40600,
    "fipe_pct": 517,
    "categorias": [
     "Ford"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "74373422",
@@ -526,7 +551,8 @@
    "categorias": [
     "Range"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77667483",
@@ -546,7 +572,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78648960",
@@ -566,7 +593,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "73573347",
@@ -586,7 +614,8 @@
    "categorias": [
     "GWM"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": ""
   },
   {
    "id": "67748914",
@@ -606,7 +635,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "75426098",
@@ -621,12 +651,13 @@
    "fotos": [
     "https://image.webmotors.com.br/_fotos/anunciousados/gigante/2026/202608/20260802/toyota-yaris-cross-1-5-vvti-hybrid-flex-xre-cvt-wmimagem23303738762.webp"
    ],
-   "fipe": 0,
+   "fipe": 163100,
    "fipe_pct": 163,
    "categorias": [
     "Toyota"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78534230",
@@ -646,7 +677,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78578968",
@@ -666,7 +698,8 @@
    "categorias": [
     "Audi"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78422987",
@@ -686,7 +719,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77538027",
@@ -706,7 +740,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78498062",
@@ -726,7 +761,8 @@
    "categorias": [
     "Denza"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": ""
   },
   {
    "id": "77430199",
@@ -746,7 +782,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "77673240",
@@ -766,7 +803,8 @@
    "categorias": [
     "VW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "78720118",
@@ -786,7 +824,8 @@
    "categorias": [
     "Land"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "70945152",
@@ -806,7 +845,8 @@
    "categorias": [
     "VW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "66561906",
@@ -826,7 +866,8 @@
    "categorias": [
     "Range"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "71809788",
@@ -846,7 +887,8 @@
    "categorias": [
     "Land"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "74008541",
@@ -866,7 +908,8 @@
    "categorias": [
     "Volvo"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "63901435",
@@ -886,7 +929,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "76268246",
@@ -906,7 +950,8 @@
    "categorias": [
     "BMW"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "65309466",
@@ -926,7 +971,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   },
   {
    "id": "69630522",
@@ -946,7 +992,8 @@
    "categorias": [
     "Porsche"
    ],
-   "estoque": true
+   "estoque": true,
+   "fipe_fonte": "webmotors"
   }
  ]
 }

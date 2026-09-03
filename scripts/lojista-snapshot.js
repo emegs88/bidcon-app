@@ -84,7 +84,7 @@
     const marca = tc(val(spec.Make)), modelo = tc(val(spec.Model)), versao = tc(val(spec.Version));
     const anoFab = Number(spec.YearFabrication) || 0, anoMod = Number(spec.YearModel) || anoFab;
     let fipe = 0, fipe_fonte = '';
-    if (pct >= 60 && pct <= 150) { fipe = Math.round((preco * 100) / pct / 100) * 100; fipe_fonte = 'webmotors'; }
+    if (pct > 0) { fipe = Math.round((preco * 100) / pct / 100) * 100; fipe_fonte = 'webmotors'; }
     else if (!pct) { fipe = await fipeTabela(marca, modelo, versao, anoMod); if (fipe) fipe_fonte = 'tabela-fipe'; }
     veiculos.push({ id: String(a.UniqueId), nome: `${marca} ${modelo} ${versao}`.replace(/\s+/g, ' ').trim(), preco, ano: anoMod, ano_fab: anoFab, km: Number(val(spec.Odometer)) || 0, sku: '', link: `https://www.webmotors.com.br/comprar/${a.UniqueId}`, img: fotos[0] || '', fotos, fipe, fipe_pct: pct, fipe_fonte, categorias: [marca], estoque: true });
   }
