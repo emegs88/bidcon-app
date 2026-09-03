@@ -187,8 +187,20 @@ function render(){var t=q.value.trim().toLowerCase();var list=DATA.filter(functi
 q.addEventListener("input",render);
 
 function falha(msg){aviso.className="aviso err";aviso.textContent=msg}
+// Estoque: 1º o snapshot desta loja publicado junto com a página
+// (jk-alphaville.json — a API da Webmotors só responde a sessão de navegador,
+// medido em 02/09/2026, então o snapshot é capturado via navegador e
+// commitado, no padrão "snapshot automático do estoque" da casa). 2º, se o
+// snapshot faltar, o motor (360prospere /api/estoque) — que hoje devolve 422
+// honesto para Webmotors e passa a valer no dia em que uma fonte de servidor
+// existir (feed da loja).
+function estoque(){
+  return fetch("/bidcon-lojista/jk-alphaville.json",{cache:"no-cache"})
+    .then(function(r){if(!r.ok)throw 0;return r.json()})
+    .catch(function(){return fetch(API+"/api/estoque?url="+encodeURIComponent(LOJA_URL)).then(function(r){return r.json()})});
+}
 Promise.all([
-  fetch(API+"/api/estoque?url="+encodeURIComponent(LOJA_URL)).then(function(r){return r.json()}),
+  estoque(),
   fetch(APP+"/api/vitrine").then(function(r){return r.json()})
 ]).then(function(res){
   var est=res[0],vit=res[1];
@@ -201,7 +213,7 @@ Promise.all([
     return {nome:v.nome,anoTxt:(v.ano_fab&&v.ano?v.ano_fab+"/"+v.ano:String(v.ano||"")),preco:v.preco,fipe:fipe,fipe_oficial:fipeOk,img:v.img,link:v.link,enc:melhor(v.preco,fipe,porAdm)};
   });
   document.getElementById("m-total").textContent=DATA.length+" veículos no estoque";
-  document.getElementById("m-atual").innerHTML='Cruzamento ao vivo · cartas de <span class="num">'+new Date(vit.atualizado).toLocaleDateString("pt-BR")+'</span>';
+  document.getElementById("m-atual").innerHTML='Estoque de <span class="num">'+new Date(est.atualizado).toLocaleDateString("pt-BR")+'</span> · cartas de <span class="num">'+new Date(vit.atualizado).toLocaleDateString("pt-BR")+'</span>';
   aviso.hidden=true;render();
 }).catch(function(){falha("Não consegui montar o cruzamento agora. Tente de novo em instantes.")});
 })();
