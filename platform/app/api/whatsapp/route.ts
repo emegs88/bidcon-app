@@ -80,6 +80,7 @@ import { processarJobsWhatsapp, type WaJob } from "@/lib/whatsapp/processar-back
 import { etiquetasDaMensagem } from "@/lib/farol/cedente";
 import { etiquetasSemEntrada } from "@/lib/farol/sem-entrada";
 import { semEntradaLigado } from "@/lib/farol/pivo-sem-entrada";
+import { rodarPonteNaConversa } from "@/lib/funil/gatilho";
 import { ehOptOut as regraOptOut } from "@/lib/opt-out";
 // OUVIDO-01 v2 (a)+(b) — `normalizarTipo` é o espelho em TypeScript do CHECK
 // que a migration 0091 pôs na coluna `tipo`. Gravar aqui um valor que o CHECK
@@ -361,6 +362,16 @@ export async function POST(req: Request) {
 
   const db = createXtvClient();
   const jobs: WaJob[] = [];
+  // FUNIL-01 — as conversas que este POST tocou. É um Set porque a Meta manda
+  // várias mensagens da MESMA conversa num único payload, e o funil não ganha
+  // nada rodando três vezes sobre o mesmo estado.
+  //
+  // NÃO reuso `jobs` para isto, e o motivo é medido: o job só é empilhado
+  // quando `anexo?.id || podeResponder`. Conversa com atendente humano no
+  // comando e sem anexo NÃO gera job — e é exatamente uma conversa dessas que
+  // pode acabar de ganhar a etiqueta `cedente`. Pendurar o funil no `jobs`
+  // deixaria esse caso sem gatilho, em silêncio.
+  const conversasTocadas = new Set<string>();
 
   for (const m of msgs) {
     const waMessageId = m.id;
@@ -507,6 +518,11 @@ export async function POST(req: Request) {
       }
     }
 
+    // FUNIL-01 — ponto 1 dos dois: a etiqueta acabou de nascer, então a casa
+    // sabe algo novo sobre esta conversa. Aqui só ANOTA; quem roda é o bloco
+    // depois do ack, lá embaixo. Ver o comentário do `conversasTocadas`.
+    conversasTocadas.add(conversa.id);
+
     // PAINEL-WA-01 item 5 — reabertura. 'encerrado' é arquivo, não bloqueio:
     // cliente que volta a escrever traz a conversa de volta pra fila do bot.
     // Sem isto, o selo "Encerrada" mentiria assim que chegasse mensagem nova,
@@ -649,6 +665,41 @@ export async function POST(req: Request) {
         "[whatsapp] contexto @vercel/request-context ausente (Fluid Compute indisponível?) — processando em fallback síncrono antes do ack."
       );
       await processarJobsWhatsapp(db, jobs);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // FUNIL-01 — o gatilho, DEPOIS DO ACK e nunca antes.
+  //
+  // A ordem original dizia "no ponto da tag", dentro do laço. NÃO é onde ele
+  // ficou, e o motivo é precedente escrito com motivo, no cabeçalho deste
+  // arquivo: a F4a (2026-07-21) nasceu de TRÊS reproduções ao vivo com inbound
+  // persistido, ZERO resposta e ZERO log de erro — a cadeia pesada rodava
+  // síncrona dentro do ciclo HTTP da Meta e um timeout DELA matava a invocação
+  // no meio, sem exceção capturável. A regra que ficou: F1 (persistência)
+  // continua síncrono e rápido; o resto vai por `waitUntil` depois do ack.
+  //
+  // O gatilho faz até cinco idas ao banco por conversa. Dentro do laço ele
+  // recriaria exatamente aquele defeito — e o sintoma seria o pior possível:
+  // cliente sem resposta, para ganhar um card num painel. A anotação fica no
+  // ponto da tag (é lá que a casa aprende); a execução fica aqui.
+  //
+  // EM SÉRIE, não em `Promise.all`: duas conversas da MESMA chave rodando
+  // juntas disputariam a mesma captação. A trava `wa_conversa_id is null` do
+  // update já recusa a segunda, mas fabricar a corrida de propósito para
+  // depender da trava é confiar na rede em vez de não cair.
+  //
+  // `rodarPonteNaConversa` já lê `funilLigado()` na primeira linha e nunca
+  // lança. Não repito o interruptor aqui: duas leituras da mesma chave são
+  // duas cópias, e é assim que uma delas envelhece sozinha.
+  if (conversasTocadas.size > 0) {
+    const rodarFunil = async () => {
+      for (const id of conversasTocadas) await rodarPonteNaConversa(db, id);
+    };
+    if (contextoVercelSuportaWaitUntil()) {
+      waitUntil(rodarFunil());
+    } else {
+      await rodarFunil();
     }
   }
 

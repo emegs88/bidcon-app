@@ -30,6 +30,7 @@ import { enviarInstagram } from "@/lib/instagram/graph";
 import { baixarMidia, subirParaStorage } from "@/lib/whatsapp/media";
 import { extrairExtrato, resumoExtratoWa } from "@/lib/whatsapp/extrato";
 import { transcreverAudio } from "@/lib/whatsapp/transcricao";
+import { rodarPonteNaConversa } from "@/lib/funil/gatilho";
 import {
   cerebroConsegueLer,
   textoFallback,
@@ -474,6 +475,21 @@ async function processarUmJob(
         contemplada: extrato.contemplada,
         confianca: extrato.confianca,
       });
+
+      // FUNIL-01 — ponto 2 dos dois: o extrato acabou de nascer, e extrato é o
+      // sinal mais forte que esta casa tem de que alguém quer vender uma cota.
+      //
+      // Aqui é `await` sem cerimônia, ao contrário do ponto da etiqueta: este
+      // arquivo INTEIRO já roda depois do ack, dentro do `waitUntil` que a F4a
+      // criou. Não há ciclo HTTP da Meta esperando; o que se paga aqui é tempo
+      // de função, não risco de o cliente ficar sem resposta.
+      //
+      // DEPOIS do insert, nunca antes: o gatilho relê o extrato do banco em vez
+      // de recebê-lo pronto. É de propósito — assim ele enxerga exatamente o que
+      // ficou GRAVADO, com os tipos que o banco devolve, e não o objeto em
+      // memória que a visão montou. Se a travessia estragar um número, o defeito
+      // aparece aqui e vira "crédito não lido" na mesa, em vez de entrar calado.
+      await rodarPonteNaConversa(db, conversaId);
 
       if (
         process.env.WHATSAPP_AGENT_ATIVO === "true" &&
