@@ -83,6 +83,14 @@
 //    COROLÁRIO: o índice é parcial sobre os status VIVOS. `perdida` e
 //    `recusada` liberam a chave — a Tamires pode ser recaptada amanhã sem
 //    ninguém mexer em índice.
+//    E O COROLÁRIO TEM UM LIMITE, escrito em 03/09/2026 quando o gatilho ao
+//    vivo obrigou a pensar nisso: liberar a chave é PERMISSÃO DO BANCO PARA O
+//    ATO HUMANO de reabrir na mesa (F4). Não é licença para a PONTE reabrir
+//    sozinha. As duas frases convivem porque falam de sujeitos diferentes — o
+//    banco deixa, a ponte se recusa. Quem faz a recusa é o braço 8b, e o motivo
+//    dele é a única memória que a exclusão tem: `inserir` deixa linha, `ligar`
+//    deixa `wa_conversa_id`, e `excluir` não deixa nada. Sem o 8b, o gatilho
+//    refaria a conta a cada mensagem nova e desfaria a palavra de quem decidiu.
 //
 // 4. `telefone` GRAVADO COMO VEIO, SEM O 55 E SEM GANHAR O NONO DÍGITO.
 //    Medido nas duas linhas reais: `captacoes.telefone` guarda sem o DDI
@@ -178,6 +186,43 @@ export const ORIGEM_DA_PONTE = "whatsapp" as const;
 export const STATUS_DE_NASCIMENTO = "novo" as const;
 
 // ----------------------------------------------------------------------------
+// O QUE É UMA CAPTAÇÃO VIVA — E POR QUE A LISTA É DE VIVAS, NÃO DE MORTAS
+//
+// Não é opinião: é o `WHERE` dos dois índices parciais de `captacoes`, lido do
+// banco em 03/09/2026 (`pg_indexes`):
+//
+//   captacoes_origem_chave_key      WHERE origem_chave IS NOT NULL
+//                                     AND status = ANY (ARRAY['novo',
+//                                     'em_analise','proposta_enviada','aceita'])
+//   captacoes_wa_conversa_viva_key  mesma lista de status
+//
+// Os seis status sãos são `novo`, `em_analise`, `proposta_enviada`, `aceita`,
+// `recusada`, `perdida` (CHECK `captacoes_status_sano`). Os quatro de cima
+// OCUPAM a chave; `recusada` e `perdida` a LIBERAM. `aceita` conta como VIVA —
+// isso surpreende, porque negócio fechado parece terminal, mas para o banco a
+// chave segue ocupada, e quem manda aqui é o banco.
+//
+// A LISTA É DE VIVAS DE PROPÓSITO. Escrever a lista das mortas faria um status
+// novo nascer VIVO por omissão, e o gatilho escreveria em cima de uma captação
+// cujo significado ninguém ensinou a ele. Assim, ao contrário: status novo cai
+// como encerrado, o gatilho NÃO escreve, e alguém vem consertar. O erro por
+// omissão fica do lado de não gravar.
+// ----------------------------------------------------------------------------
+export const STATUS_VIVOS_DA_CAPTACAO: readonly string[] = [
+  "novo",
+  "em_analise",
+  "proposta_enviada",
+  "aceita",
+];
+
+/** Uma captação encerrada (`recusada`/`perdida`) LIBEROU a chave no banco — mas
+ *  isso é permissão para o ATO HUMANO de reabrir na mesa, nunca licença para a
+ *  ponte escrever sozinha. Ver o braço 8b. */
+export function captacaoViva(status: string): boolean {
+  return STATUS_VIVOS_DA_CAPTACAO.includes(status);
+}
+
+// ----------------------------------------------------------------------------
 // OS FATOS QUE A PONTE RECEBE
 // ----------------------------------------------------------------------------
 
@@ -202,7 +247,13 @@ export type ExtratoEscolhido = {
 /** A captação que já existe para esta chave de telefone, se existir. */
 export type CaptacaoExistente = {
   readonly id: string;
+  /** Um dos seis de `captacoes_status_sano`. `captacaoViva()` diz se ocupa a
+   *  chave; ver o bloco "O QUE É UMA CAPTAÇÃO VIVA". */
   readonly status: string;
+  /** Quando a linha mudou pela última vez. Entra no MOTIVO quando a captação
+   *  está encerrada, para quem lê a mesa saber de quando é a decisão que está
+   *  segurando a conversa. */
+  readonly atualizado_em: string | null;
   /** Nulo = ainda não tem conversa dona. Preenchido com OUTRA conversa =
    *  a chave já está viva em outro lugar. */
   readonly wa_conversa_id: string | null;
@@ -607,6 +658,37 @@ export function decidir(c: ConversaMedida): Decisao {
       return {
         classe: "nada",
         motivo: `a captacao ${cap.id} ja esta ligada a esta conversa: nada a fazer. A ponte pode rodar de novo sem mudar linha`,
+      };
+    }
+
+    // BRAÇO 8b: A CAPTAÇÃO ESTÁ ENCERRADA — E ISSO É A MEMÓRIA DA EXCLUSÃO.
+    //
+    // O problema que este braço resolve: `inserir` deixa linha, `ligar` deixa
+    // `wa_conversa_id`, mas `excluir` NÃO DEIXA NADA. Depois do backfill, nada
+    // no banco distingue "foi avaliada e a resposta foi não" de "nunca foi
+    // olhada" — e o gatilho ao vivo, que reclassifica a cada mensagem, refaria
+    // a conta do zero e desfaria a palavra de quem decidiu.
+    //
+    // A MEMÓRIA NÃO É UMA LISTA DE PESSOAS, É A PRÓPRIA CAPTAÇÃO ENCERRADA.
+    // Decisão da coordenação, 03/09/2026: as palavras do Emerson descrevem um
+    // ESTADO ("não teve negócio", "cota cancelada"), não uma pessoa banida. Uma
+    // lista de excluídos erraria exatamente no dia em que a pessoa voltasse
+    // querendo vender de verdade. Então não há lista, não há tabela nova, não
+    // há exceção: há este braço, que é régua.
+    //
+    // E ELE NÃO CONTRADIZ A F3.2. Lá ficou escrito que `perdida` LIBERA a
+    // chave, e continua verdade — é permissão do BANCO para o ATO HUMANO de
+    // reabrir na mesa (F4). Não é licença para a ponte reabrir sozinha. As duas
+    // frases convivem porque falam de sujeitos diferentes.
+    //
+    // INERTE NO BACKFILL, e isso foi medido antes de escrever: as duas
+    // captações de 03/09 estão ambas em `novo`, nenhuma encerrada. A contagem
+    // aprovada 15/1/2/10 não muda por causa deste braço.
+    if (!captacaoViva(cap.status)) {
+      const quando = cap.atualizado_em ?? "(sem data)";
+      return {
+        classe: "nada",
+        motivo: `a chave ja teve captacao (${cap.id}) e ela esta ENCERRADA em "${cap.status}" desde ${quando}: reabrir e decisao da mesa, nao da ponte. A exclusao tem memoria justamente para o gatilho nao desfazer a palavra de quem decidiu`,
       };
     }
 

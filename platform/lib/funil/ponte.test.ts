@@ -40,6 +40,7 @@ import {
   reaisDoExtrato,
   TAG_CEDENTE,
   telefoneParaCaptacoes,
+  type CaptacaoExistente,
   type ConversaMedida,
   type Decisao,
 } from "./ponte";
@@ -94,6 +95,29 @@ function extrato(over: Partial<{
     valor_credito: null as number | null,
     saldo_devedor: null as number | null,
     parcelas_pagas: null as number | null,
+    ...over,
+  };
+}
+
+/** A captação que JÁ EXISTE na chave. O padrão é `novo` porque é o status das
+ *  duas captações reais medidas em 03/09/2026 (Tamires `6d4f46ea`, Leandro
+ *  `fa8f1ffd`) — as duas VIVAS, nenhuma encerrada.
+ *
+ *  `atualizado_em` nasceu aqui em 03/09 junto com o braço 8b: quando a captação
+ *  está ENCERRADA, essa data entra no motivo devolvido, porque é ela que diz
+ *  desde quando a mesa decidiu. O padrão é `null` de propósito — quem testa o
+ *  braço encerrado tem de dizer a data, e quem não testa não finge ter uma. */
+function captacao(over: Partial<CaptacaoExistente> = {}): CaptacaoExistente {
+  return {
+    id: "fa8f1ffd-0000-4000-8000-00000000000a",
+    status: "novo",
+    atualizado_em: null,
+    wa_conversa_id: null,
+    nome: null,
+    administradora: null,
+    credito: null,
+    saldo_devedor: null,
+    parcelas_pagas: null,
     ...over,
   };
 }
@@ -185,18 +209,12 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
         telefone: TEL_10,
         tags: [TAG_CEDENTE],
         extrato: extrato({ ...DADOS_CHEIOS }),
-        captacao: {
-          id: "fa8f1ffd-0000-4000-8000-00000000000a",
-          status: "novo",
-          wa_conversa_id: null,
+        captacao: captacao({
           nome: "Leandro Bittencourt Miranda",
-          administradora: null,
           // O site já gravou 131.000; o extrato lê 131.163,29. O humano
           // escreveu primeiro, e o OCR não passa por cima dele.
           credito: 131000,
-          saldo_devedor: null,
-          parcelas_pagas: null,
-        },
+        }),
       })
     );
     const lig = comoLigar(d);
@@ -382,16 +400,7 @@ describe("FUNIL-01 ponte — N conversas para 1 captação", () => {
   test("captação já ligada a ESTA conversa -> nada (idempotente)", () => {
     const c = conversa({
       tags: [TAG_CEDENTE],
-      captacao: {
-        id: "fa8f1ffd-0000-4000-8000-00000000000a",
-        status: "novo",
-        wa_conversa_id: ID_CONVERSA,
-        nome: null,
-        administradora: null,
-        credito: null,
-        saldo_devedor: null,
-        parcelas_pagas: null,
-      },
+      captacao: captacao({ wa_conversa_id: ID_CONVERSA }),
     });
     const primeira = decidir(c);
     const segunda = decidir(c);
@@ -404,21 +413,120 @@ describe("FUNIL-01 ponte — N conversas para 1 captação", () => {
     const d = decidir(
       conversa({
         tags: [TAG_CEDENTE],
-        captacao: {
-          id: "fa8f1ffd-0000-4000-8000-00000000000a",
-          status: "novo",
-          wa_conversa_id: ID_OUTRA_CONVERSA,
-          nome: null,
-          administradora: null,
-          credito: null,
-          saldo_devedor: null,
-          parcelas_pagas: null,
-        },
+        captacao: captacao({ wa_conversa_id: ID_OUTRA_CONVERSA }),
       })
     );
     assert.equal(d.classe, "nada");
     assert.match(d.motivo, /captacoes_wa_conversa_viva_key/);
     assert.match(d.motivo, /Recuso antes do banco recusar/);
+  });
+
+  // --------------------------------------------------------------------------
+  // O MUNDO DEPOIS DO BACKFILL
+  //
+  // As três fixtures abaixo não descrevem o banco de hoje: descrevem o banco de
+  // DEPOIS que a F3.4 rodar. Elas existem porque o gatilho ao vivo vai reencontrar
+  // as mesmas conversas todo dia, e a pergunta que importa é se ele REFAZ a conta
+  // ou se ele RESPEITA o que já foi decidido.
+  //
+  // `inserir` deixa linha, `ligar` deixa `wa_conversa_id`, e `excluir` NÃO DEIXA
+  // NADA. Por isso a memória da exclusão é a própria captação encerrada, e não uma
+  // lista de pessoas — decisão da coordenação em 03/09/2026: estado, não pessoa.
+  // Uma lista de excluídos erraria exatamente no dia em que a pessoa voltasse
+  // querendo vender de verdade.
+  // --------------------------------------------------------------------------
+
+  test("DEPOIS DO BACKFILL — Tamires: captação PERDIDA na chave -> nada, e o motivo manda reabrir na mesa", () => {
+    const d = decidir(
+      conversa({
+        tags: [TAG_CEDENTE],
+        extrato: extrato({ ...DADOS_CHEIOS }),
+        captacao: captacao({
+          id: "6d4f46ea-0000-4000-8000-00000000000b",
+          status: "perdida",
+          atualizado_em: "2026-09-03T12:00:00Z",
+          wa_conversa_id: null,
+        }),
+      })
+    );
+
+    assert.equal(d.classe, "nada", "captacao encerrada NAO se reabre sozinha");
+    assert.match(d.motivo, /ENCERRADA/);
+    assert.match(d.motivo, /perdida/);
+    assert.match(d.motivo, /2026-09-03T12:00:00Z/, "a data entra no motivo: desde quando");
+    assert.match(d.motivo, /decisao da mesa/, "reabrir e ato humano, na F4");
+
+    // CONTROLE NEGATIVO — a mesma conversa, a mesma captação, mudando SÓ o status.
+    // Sem isto, o teste acima passaria com um `decidir()` que devolve `nada` por
+    // qualquer outro motivo, e eu não saberia que foi o braço 8b que recusou.
+    const viva = decidir(
+      conversa({
+        tags: [TAG_CEDENTE],
+        extrato: extrato({ ...DADOS_CHEIOS }),
+        captacao: captacao({
+          id: "6d4f46ea-0000-4000-8000-00000000000b",
+          status: "novo",
+          atualizado_em: "2026-09-03T12:00:00Z",
+          wa_conversa_id: null,
+        }),
+      })
+    );
+    assert.equal(viva.classe, "ligar", "ISCA: viva, a MESMA conversa liga");
+  });
+
+  test("DEPOIS DO BACKFILL — Leandro: captação VIVA já ligada a esta conversa -> nada (segunda rodada é inerte)", () => {
+    // Este é o par exato que a F3.4 vai escrever: a captação `fa8f1ffd` passa a
+    // apontar para a conversa `b506938f`. Quando o script rodar a SEGUNDA vez —
+    // e ele vai, logo depois de FUNIL=on, para varrer a fresta — tem de encontrar
+    // este estado e não fazer nada. É o mesmo braço que o teste genérico de
+    // idempotência exercita; o valor desta fixture é ser a âncora NOMINAL disso.
+    const c = conversa({
+      id: ID_CONVERSA,
+      telefone: TEL_10,
+      tags: [TAG_CEDENTE],
+      extrato: extrato({ ...DADOS_CHEIOS }),
+      captacao: captacao({
+        status: "novo",
+        wa_conversa_id: ID_CONVERSA,
+        nome: "Leandro Bittencourt Miranda",
+        credito: 131000,
+      }),
+    });
+
+    assert.equal(decidir(c).classe, "nada");
+    assert.match(decidir(c).motivo, /ja esta ligada a esta conversa/);
+    assert.deepEqual(decidir(c), decidir(c), "rodar de novo da exatamente o mesmo");
+  });
+
+  test("DEPOIS DO BACKFILL — chave SEM captação nenhuma + extrato na borda (0,7) -> inserir", () => {
+    const d = decidir(
+      conversa({
+        captacao: null,
+        extrato: extrato({ ...DADOS_CHEIOS, confianca: 0.7 }),
+      })
+    );
+    const linha = comoInserir(d);
+    assert.equal(linha.credito, 131163.29);
+
+    // A BORDA É INCLUSIVA e isso é `>=`, não `>`. O controle negativo mora um
+    // centésimo abaixo: se alguém trocar o operador, este par acusa.
+    //
+    // E a resposta abaixo da borda foi MEDIDA, não suposta — eu tinha escrito
+    // `revisar` aqui e o teste me reprovou. Com 0,69 e mais nada, a conversa não
+    // é sequer CANDIDATA: cai no braço 1, `(mesma chave)`. Isso é mais afiado do
+    // que eu esperava e diz o que a régua realmente faz: a confiança do extrato
+    // não decide entre inserir e revisar, ela decide se a conversa ENTRA.
+    const abaixo = decidir(
+      conversa({
+        captacao: null,
+        extrato: extrato({ ...DADOS_CHEIOS, confianca: 0.69 }),
+      })
+    );
+    assert.equal(
+      abaixo.classe,
+      "(mesma chave)",
+      "ISCA: 0,69 sozinho nao torna a conversa candidata"
+    );
   });
 });
 
@@ -519,16 +627,7 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
         conversa({
           tags: [TAG_CEDENTE],
           extrato: extrato({ ...DADOS_CHEIOS }),
-          captacao: {
-            id: "fa8f1ffd-0000-4000-8000-00000000000a",
-            status: "novo",
-            wa_conversa_id: null,
-            nome: null,
-            administradora: null,
-            credito: null,
-            saldo_devedor: null,
-            parcelas_pagas: null,
-          },
+          captacao: captacao(),
         })
       )
     );
