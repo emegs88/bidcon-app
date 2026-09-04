@@ -37,6 +37,7 @@ import {
   ehCandidata,
   inteiroDoExtrato,
   numeroDoExtrato,
+  reaisDoExtrato,
   TAG_CEDENTE,
   telefoneParaCaptacoes,
   type ConversaMedida,
@@ -75,25 +76,38 @@ function conversa(over: Partial<ConversaMedida> = {}): ConversaMedida {
   };
 }
 
+/** O extrato como a ponte passou a lê-lo em 03/09: as COLUNAS TIPADAS de
+ *  `extratos_cotas`, não o `dados` jsonb. Medido: as duas cópias concordam em
+ *  34/34, e a coluna é melhor porque o banco já garantiu o tipo na escrita. */
 function extrato(over: Partial<{
   confianca: number;
   contemplada: boolean | null;
-  dados: Record<string, unknown>;
+  administradora: string | null;
+  valor_credito: number | null;
+  saldo_devedor: number | null;
+  parcelas_pagas: number | null;
 }> = {}) {
   return {
     confianca: 0.9,
     contemplada: true as boolean | null,
-    dados: {} as Record<string, unknown>,
+    administradora: null as string | null,
+    valor_credito: null as number | null,
+    saldo_devedor: null as number | null,
+    parcelas_pagas: null as number | null,
     ...over,
   };
 }
 
-/** O FORMATO MEDIDO, não o imaginado. Em 03/09/2026, `jsonb_typeof` sobre os
- *  34 extratos deu `number` para os três numéricos em 100% dos casos em que a
- *  chave existe, e `string` só para `administradora`. Estes valores são de
- *  linhas reais do banco (Porto Seguro, conf 0.7). Se você trocar por string
- *  aqui, está testando um mundo que não existe — foi o que eu fiz, e custou
- *  dois vermelhos que revelaram um risco de erro de cem vezes. */
+/** O FORMATO MEDIDO, não o imaginado. Estes valores são de linhas reais do
+ *  banco (Porto Seguro, conf 0.7). Os tipos das colunas foram medidos em
+ *  `information_schema` (numeric, numeric, integer, text) e a travessia JSON
+ *  em `to_jsonb` (number, number, number, string — com a isca do `text`
+ *  discordando, que é o que prova a régua).
+ *
+ *  Se você trocar por string aqui, está testando um mundo que não existe —
+ *  foi o que eu fiz, e custou dois vermelhos que revelaram um risco de erro
+ *  de cem vezes. O nome ficou `DADOS_CHEIOS` por continuidade, mas isto já
+ *  não é o `dados` jsonb: são as quatro colunas. */
 const DADOS_CHEIOS = {
   valor_credito: 131163.29,
   saldo_devedor: 80000,
@@ -140,7 +154,7 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
     const d = decidir(
       conversa({
         tags: [TAG_CEDENTE],
-        extrato: extrato({ confianca: CONFIANCA_MINIMA_EXTRATO, dados: DADOS_CHEIOS }),
+        extrato: extrato({ confianca: CONFIANCA_MINIMA_EXTRATO, ...DADOS_CHEIOS }),
       })
     );
     const linha = comoInserir(d);
@@ -157,7 +171,7 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
     // candidata, então cai em "(mesma chave)". Se o `>=` virasse `>` no
     // limiar, o teste de cima quebraria; se o limiar sumisse, este quebraria.
     const d = decidir(
-      conversa({ extrato: extrato({ confianca: 0.69, dados: DADOS_CHEIOS }) })
+      conversa({ extrato: extrato({ confianca: 0.69, ...DADOS_CHEIOS }) })
     );
     assert.equal(d.classe, "(mesma chave)");
     assert.equal(ehCandidata(conversa({ extrato: extrato({ confianca: 0.69 }) })), false);
@@ -170,7 +184,7 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
       conversa({
         telefone: TEL_10,
         tags: [TAG_CEDENTE],
-        extrato: extrato({ dados: DADOS_CHEIOS }),
+        extrato: extrato({ ...DADOS_CHEIOS }),
         captacao: {
           id: "fa8f1ffd-0000-4000-8000-00000000000a",
           status: "novo",
@@ -247,7 +261,7 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
     const d = decidir(
       conversa({
         tags: [TAG_CEDENTE],
-        extrato: extrato({ dados: DADOS_CHEIOS }),
+        extrato: extrato({ ...DADOS_CHEIOS }),
         nominal: { classe: "excluir", motivo, quem: "Emerson" },
       })
     );
@@ -414,7 +428,7 @@ describe("FUNIL-01 ponte — as três decisões de negócio de 03/09", () => {
     const casos = [
       conversa({ tags: [TAG_CEDENTE] }),
       conversa({ agente_ativo: AGENTE_DE_CAPTACAO }),
-      conversa({ tags: [TAG_CEDENTE], extrato: extrato({ dados: DADOS_CHEIOS }) }),
+      conversa({ tags: [TAG_CEDENTE], extrato: extrato({ ...DADOS_CHEIOS }) }),
       conversa({ telefone: TEL_10, tags: [TAG_CEDENTE] }),
     ];
     for (const c of casos) {
@@ -428,20 +442,31 @@ describe("FUNIL-01 ponte — as três decisões de negócio de 03/09", () => {
   });
 
   test("tipo_bem é SEMPRE null nesta fatia, mesmo com extrato cheio", () => {
+    // A GARANTIA FICOU MAIS FORTE EM 03/09, e vale registrar por quê.
+    //
+    // Antes, a ponte lia o `dados` jsonb, e este teste passava um
+    // `tipo_bem: "imovel"` LÁ DENTRO para provar em runtime que a fatia
+    // ignorava o campo. Agora a ponte lê as colunas tipadas de
+    // `extratos_cotas` — e `tipo_bem` NÃO É UMA COLUNA dessa tabela. Medido:
+    // 0 de 34 extratos tinham a chave no jsonb, e a tabela nunca teve a
+    // coluna.
+    //
+    // Resultado: não existe mais como escrever o caso ruim. Se você
+    // acrescentar `tipo_bem` ao objeto abaixo, o TypeScript recusa antes de
+    // o teste rodar. Saímos de "provado em runtime" para "impossível de
+    // representar", que é a trava mais barata que existe.
     const linha = comoInserir(
       decidir(
         conversa({
           tags: [TAG_CEDENTE],
-          extrato: extrato({
-            dados: { ...DADOS_CHEIOS, tipo_bem: "imovel" },
-          }),
+          extrato: extrato({ ...DADOS_CHEIOS }),
         })
       )
     );
     assert.equal(
       linha.tipo_bem,
       null,
-      "TIPO-BEM-MENSAGEM-01: mesmo se o jsonb trouxer, esta fatia nao le"
+      "TIPO-BEM-MENSAGEM-01: extrato cheio e ainda assim tipo_bem nulo"
     );
   });
 
@@ -480,20 +505,20 @@ describe("FUNIL-01 ponte — as três decisões de negócio de 03/09", () => {
 describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
   test("a linha tem exatamente doze colunas, e são estas", () => {
     const linha = comoInserir(
-      decidir(conversa({ tags: [TAG_CEDENTE], extrato: extrato({ dados: DADOS_CHEIOS }) }))
+      decidir(conversa({ tags: [TAG_CEDENTE], extrato: extrato({ ...DADOS_CHEIOS }) }))
     );
     assert.deepEqual(Object.keys(linha).sort(), [...COLUNAS_DA_LINHA].sort());
   });
 
   test("nenhuma coluna proibida aparece em linha nova nem em escrita existente", () => {
     const nova = comoInserir(
-      decidir(conversa({ tags: [TAG_CEDENTE], extrato: extrato({ dados: DADOS_CHEIOS }) }))
+      decidir(conversa({ tags: [TAG_CEDENTE], extrato: extrato({ ...DADOS_CHEIOS }) }))
     );
     const lig = comoLigar(
       decidir(
         conversa({
           tags: [TAG_CEDENTE],
-          extrato: extrato({ dados: DADOS_CHEIOS }),
+          extrato: extrato({ ...DADOS_CHEIOS }),
           captacao: {
             id: "fa8f1ffd-0000-4000-8000-00000000000a",
             status: "novo",
@@ -523,7 +548,7 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
       decidir(
         conversa({
           tags: [TAG_CEDENTE],
-          extrato: extrato({ dados: { ...DADOS_CHEIOS, valor_credito: 0 } }),
+          extrato: extrato({ ...DADOS_CHEIOS, valor_credito: 0 }),
         })
       )
     );
@@ -537,18 +562,20 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
       decidir(
         conversa({
           tags: [TAG_CEDENTE],
-          extrato: extrato({ dados: { ...DADOS_CHEIOS, saldo_devedor: 0 } }),
+          extrato: extrato({ ...DADOS_CHEIOS, saldo_devedor: 0 }),
         })
       )
     );
     assert.equal(linha.saldo_devedor, 0);
   });
 
-  test("A ARMADILHA DAS CEM VEZES: string no jsonb é RECUSADA, nunca convertida", () => {
-    // Hoje o jsonb entrega `number` (medido, 34/34). Se um dia entregar
-    // string, o leitor errado ("131163.29" -> tira o ponto -> 13116329) faria
-    // cento e trinta e um mil virar treze milhões, calado. O leitor estrito
-    // devolve null, o campo fica vazio, e um humano vê que falta dado.
+  test("A ARMADILHA DAS CEM VEZES: string é RECUSADA, nunca convertida", () => {
+    // Hoje a coluna é `numeric` e atravessa o JSON como `number` (medido:
+    // 22/22, com a isca do `text` devolvendo "string" para provar que a régua
+    // sabe discordar). Se um dia entregar string, o leitor errado
+    // ("131163.29" -> tira o ponto -> 13116329) faria cento e trinta e um mil
+    // virar treze milhões, calado. O leitor estrito devolve null, o campo fica
+    // vazio, e um humano vê que falta dado.
     assert.equal(numeroDoExtrato("131163.29"), null, "string tem de ser RECUSADA");
     assert.equal(numeroDoExtrato("131163,29"), null);
     assert.equal(numeroDoExtrato(131163.29), 131163.29, "numero passa inteiro");
@@ -561,18 +588,31 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
 
     // E o efeito na linha inteira: extrato com tudo em string vira captação
     // sem números, e não captação com números errados.
+    //
+    // O CAST É DELIBERADO E É O PONTO DO TESTE. Desde 03/09 o tipo diz
+    // `number | null`, então escrever string aqui é ilegal para o
+    // TypeScript — e é justamente por isso que o cast precisa existir: o que
+    // se está simulando é o dia em que o RUNTIME entrega o que o TIPO
+    // proíbe (driver novo, view intermediária, migração que troca a coluna
+    // por text). Sem o cast, essa traição fica impossível de testar e a
+    // defesa em runtime vira fé. Com ele, fica provada.
+    const extratoTraidor = {
+      valor_credito: "131163.29",
+      saldo_devedor: "80000",
+      parcelas_pagas: "42",
+      administradora: "Unifisa",
+    } as unknown as {
+      valor_credito: number;
+      saldo_devedor: number;
+      parcelas_pagas: number;
+      administradora: string;
+    };
+
     const linha = comoInserir(
       decidir(
         conversa({
           tags: [TAG_CEDENTE],
-          extrato: extrato({
-            dados: {
-              valor_credito: "131163.29",
-              saldo_devedor: "80000",
-              parcelas_pagas: "42",
-              administradora: "Unifisa",
-            },
-          }),
+          extrato: extrato(extratoTraidor),
         })
       )
     );
@@ -580,6 +620,48 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
     assert.equal(linha.saldo_devedor, null);
     assert.equal(linha.parcelas_pagas, null);
     assert.equal(linha.administradora, "Unifisa", "texto continua sendo texto");
+  });
+
+  test("DUAS CASAS: valor de dois decimais atravessa IGUAL, e a terceira casa é cortada aqui, não no banco", () => {
+    // O destino é `captacoes.credito numeric(14,2)` (medido no xtv). A fonte
+    // é `numeric` SEM precisão: aceita qualquer escala. Quem atravessa é o
+    // float64, que não guarda 0,29 exato.
+    //
+    // A FIXTURE que a coordenação pediu: um valor de dois decimais sai igual.
+    assert.equal(reaisDoExtrato(131163.29), 131163.29, "duas casas saem intactas");
+    assert.equal(reaisDoExtrato(0.1), 0.1);
+    assert.equal(reaisDoExtrato(1061000), 1061000, "o maior credito medido no banco");
+    assert.equal(reaisDoExtrato(80000), 80000);
+
+    // CONTROLE NEGATIVO — sem ele este teste passaria com uma função que não
+    // faz nada. A terceira casa TEM de ser cortada, e cortada AQUI, para o
+    // banco nunca arredondar calado. Se algum dia `reaisDoExtrato` virar
+    // identidade, esta linha cai.
+    assert.equal(reaisDoExtrato(131163.294), 131163.29, "a terceira casa cai");
+    assert.equal(reaisDoExtrato(131163.296), 131163.3, "e arredonda, nao trunca");
+    assert.notEqual(reaisDoExtrato(131163.294), 131163.294, "ISCA: nao e identidade");
+
+    // A severidade de `numeroDoExtrato` continua valendo: arredondar não
+    // amoleceu a recusa de string.
+    assert.equal(reaisDoExtrato("131163.29"), null, "string continua RECUSADA");
+    assert.equal(reaisDoExtrato(-1), null);
+    assert.equal(reaisDoExtrato(null), null);
+
+    // E a contagem NÃO passa por aqui de propósito: arredondar antes faria
+    // `42.001` virar `42` e passar por inteiro. Leitura suja tem de virar nulo.
+    assert.equal(inteiroDoExtrato(42.001), null, "arredondar nao pode salvar inteiro sujo");
+    assert.equal(reaisDoExtrato(42.001), 42, "mas em reais, 42.001 vira 42");
+
+    // A linha inteira, ponta a ponta: o que entra com duas casas sai com duas.
+    const linha = comoInserir(
+      decidir(
+        conversa({
+          tags: [TAG_CEDENTE],
+          extrato: extrato({ ...DADOS_CHEIOS, valor_credito: 131163.29 }),
+        })
+      )
+    );
+    assert.equal(linha.credito, 131163.29, "duas casas ate o fim da travessia");
   });
 
   test("o status da conversa não é fato medido: não existe no tipo de entrada", () => {

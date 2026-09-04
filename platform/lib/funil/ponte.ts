@@ -190,7 +190,13 @@ export type ExtratoEscolhido = {
    *  que não. Essa distinção é do SQL (`ext_contemplada is false`) e há
    *  teste dos dois lados. */
   readonly contemplada: boolean | null;
-  readonly dados: Readonly<Record<string, unknown>>;
+  // AS COLUNAS TIPADAS, NÃO O `dados` jsonb. Ver o bloco "DE ONDE VÊM OS
+  // NÚMEROS" mais abaixo: `extratos_cotas` grava tudo duas vezes, e medimos
+  // que as duas cópias concordam em 34/34. Lê-se a que o banco tipou.
+  readonly administradora: string | null;
+  readonly valor_credito: number | null;
+  readonly saldo_devedor: number | null;
+  readonly parcelas_pagas: number | null;
 };
 
 /** A captação que já existe para esta chave de telefone, se existir. */
@@ -320,8 +326,8 @@ function extratoValido(e: ExtratoEscolhido | null): e is ExtratoEscolhido {
 // função tira todo caractere não-dígito de propósito. Está escrito no
 // cabeçalho dela.
 //
-// O `dados` jsonb do extrato tem o contrato EXATAMENTE OPOSTO. Medido em
-// 03/09/2026 sobre os 34 extratos, com `jsonb_typeof`:
+// O extrato tem o contrato EXATAMENTE OPOSTO. Medido em 03/09/2026 sobre os
+// 34 extratos, com `jsonb_typeof`:
 //
 //     valor_credito, saldo_devedor, parcelas_pagas -> `number` ou ausente
 //     administradora                                -> `string` ou ausente
@@ -331,6 +337,50 @@ function extratoValido(e: ExtratoEscolhido | null): e is ExtratoEscolhido {
 // Ou seja: número JSON com ponto decimal, que o driver entrega como `number`
 // de JavaScript. Passado por `moedaParaNumero`, o braço de `typeof number`
 // devolve certo — hoje funciona por sorte de tipo.
+//
+// ---- DE ONDE VÊM OS NÚMEROS (mudou em 03/09, e o motivo é medido) ---------
+//
+// `extratos_cotas` guarda os mesmos campos DUAS VEZES: dentro do `dados`
+// jsonb E em dez colunas tipadas de primeiro nível. Não é redundância
+// acidental — é o mesmo objeto gravado nos dois lugares, no mesmo insert
+// (`lib/whatsapp/processar-background.ts:461`).
+//
+// A primeira versão desta ponte lia o jsonb. Passou a ler as COLUNAS
+// TIPADAS, por medição e não por gosto. Nas 34 linhas, comparando coluna
+// contra `dados->>'x'` nos seis campos que interessam:
+//
+//     divergências em valor_credito, saldo_devedor, parcelas_pagas,
+//     administradora, contemplada, confianca ......... 0 de 34
+//
+// Concordam. E concordando, a coluna tipada é estritamente melhor: o banco
+// já garantiu o tipo na escrita, enquanto `dados->>'x'` devolve TEXTO que
+// alguém teria de converter de novo — e "converter de novo" é exatamente o
+// passo onde a bomba de cem vezes mora.
+//
+// Os tipos das colunas, medidos em `information_schema`:
+//
+//     valor_credito, saldo_devedor, confianca ....... numeric
+//     parcelas_pagas ................................ integer
+//     administradora ................................ text
+//     contemplada ................................... boolean
+//
+// E como `numeric` atravessa a serialização JSON (o PostgREST monta a
+// resposta DENTRO do Postgres, então `to_jsonb` percorre o mesmo caminho —
+// é proxy do caminho HTTP, e fica dito que é proxy):
+//
+//     numeric  -> number     (22 de 22 linhas com crédito)
+//     integer  -> number
+//     boolean  -> boolean
+//     text     -> string     <- ISCA: a régua SABE dizer "string"
+//
+// A isca importa: se `administradora` também tivesse voltado "number", a
+// medição não valeria nada, porque "number" seria só o que a régua responde
+// sempre. Ela discordou onde devia discordar.
+//
+// OS LEITORES ESTRITOS FICAM, mesmo com o tipo garantido pelo banco. Custam
+// nada e são a última linha: se um dia a travessia entregar string, o campo
+// vem NULO e aparece na mesa como "crédito não lido" — erro visível e
+// barato. O que eles impedem é o outro erro, o de treze milhões calados.
 //
 // A BOMBA está em amanhã. Se o extrator um dia emitir `"131163.29"` como
 // STRING — uma refatoração, um modelo novo, um `JSON.stringify` no meio do
@@ -345,22 +395,68 @@ function extratoValido(e: ExtratoEscolhido | null): e is ExtratoEscolhido {
 // seria o silêncio de duas casas decimais.
 // ----------------------------------------------------------------------------
 
-/** Número vindo do `dados` jsonb do extrato. EXIGE `number`; string devolve
- *  `null` de propósito (ver o bloco acima). Negativo e não-finito também. */
+/** Número vindo de uma coluna `numeric` de `extratos_cotas`. EXIGE `number`;
+ *  string devolve `null` de propósito (ver o bloco acima). Negativo e
+ *  não-finito também. */
 export function numeroDoExtrato(bruto: unknown): number | null {
   if (typeof bruto !== "number") return null;
   if (!Number.isFinite(bruto) || bruto < 0) return null;
   return bruto;
 }
 
-/** Inteiro >= 0 vindo do jsonb. Mesma severidade: só `number`. */
+// ----------------------------------------------------------------------------
+// DUAS CASAS, PORQUE O DESTINO TEM DUAS CASAS
+//
+// Medido no xtv, `information_schema.columns`:
+//   FONTE   extratos_cotas.valor_credito / saldo_devedor -> numeric SEM
+//           precisão nem escala: aceita qualquer número de casas decimais.
+//   DESTINO captacoes.credito / saldo_devedor            -> numeric(14,2).
+//
+// A fonte não tem trava e o destino tem. Quem faz a travessia é o float64 do
+// JavaScript, que não guarda 0,29 exato — guarda o binário mais próximo. Um
+// `131163.29` que voltasse do PostgREST e passasse por qualquer conta viraria
+// `131163.29000000001` no corpo do INSERT, e o Postgres arredondaria calado
+// para gravar em numeric(14,2). O número gravado não seria o número lido, e
+// ninguém veria.
+//
+// O corpo real de hoje NÃO tem esse problema, e isso foi medido, não suposto:
+//   34 linhas, 22 com crédito preenchido
+//   crédito com mais de 2 casas ....... 0
+//   saldo   com mais de 2 casas ....... 0
+//   maior escala vista ................ 2
+//   maior crédito ..................... 1.061.000
+//   ISCA: scale(1.234) devolveu 3 -- a régua sabe dizer "três casas"
+//
+// Então a trava é PREVENTIVA, e é barata: a fonte é `numeric` sem precisão,
+// nada no banco impede a terceira casa de chegar amanhã de um extrator novo.
+//
+// ESCALA: até 1,06 milhão com duas casas, `n * 100` fica em 1,06e8 — muito
+// abaixo de 2^53. O arredondamento é exato nessa faixa. Se um dia a casa
+// vender carta de trilhões, esta conta precisa de outra régua; o teto está
+// escrito aqui de propósito para o dia em que alguém procurar.
+// ----------------------------------------------------------------------------
+
+/** Reais vindos de `extratos_cotas`, já arredondados às DUAS casas do destino
+ *  `numeric(14,2)`. Mesma severidade de `numeroDoExtrato`: exige `number`. O
+ *  arredondamento existe para nunca mandar `131163.29000000001` ao banco e
+ *  deixar o Postgres cortar calado (ver o bloco acima). */
+export function reaisDoExtrato(bruto: unknown): number | null {
+  const n = numeroDoExtrato(bruto);
+  return n === null ? null : Math.round(n * 100) / 100;
+}
+
+/** Inteiro >= 0 vindo do extrato. Mesma severidade: só `number`.
+ *  NÃO passa por `reaisDoExtrato` de propósito: arredondar antes faria
+ *  `42.001` virar `42` e passar na checagem de inteiro. Aqui, `42.001` é
+ *  leitura suja e tem de virar nulo. */
 export function inteiroDoExtrato(bruto: unknown): number | null {
   const n = numeroDoExtrato(bruto);
   return n !== null && Number.isInteger(n) ? n : null;
 }
 
-/** Os quatro campos que o `dados` jsonb do extrato sabe entregar, já passados
- *  pelos leitores estritos acima e pelos CHECKs da tabela
+/** Os quatro campos que o extrato sabe entregar, lidos das COLUNAS TIPADAS de
+ *  `extratos_cotas` (não do `dados` jsonb — ver o bloco acima), já passados
+ *  pelos leitores estritos e pelos CHECKs da tabela de destino
  *  (`credito > 0`, `saldo >= 0`, `parcelas >= 0`). */
 function camposDoExtrato(e: ExtratoEscolhido | null): {
   administradora: string | null;
@@ -376,17 +472,18 @@ function camposDoExtrato(e: ExtratoEscolhido | null): {
       parcelas_pagas: null,
     };
   }
-  const d = e.dados;
-  const credito = numeroDoExtrato(d["valor_credito"]);
+  // Dinheiro sai por `reaisDoExtrato` (duas casas, como o destino); contagem
+  // sai por `inteiroDoExtrato` (sem arredondar). Ver o bloco "DUAS CASAS".
+  const credito = reaisDoExtrato(e.valor_credito);
   return {
-    administradora: textoCurto(d["administradora"], 120),
+    administradora: textoCurto(e.administradora, 120),
     // `captacoes_credito_positivo` recusa zero. Zero de OCR é leitura falha,
     // não crédito de zero real — vira nulo e um humano olha.
     credito: credito !== null && credito > 0 ? credito : null,
     // Saldo zero, ao contrário, é legítimo: cota quitada. Medido — existe um
     // extrato com `saldo_devedor: 0` no banco.
-    saldo_devedor: numeroDoExtrato(d["saldo_devedor"]),
-    parcelas_pagas: inteiroDoExtrato(d["parcelas_pagas"]),
+    saldo_devedor: reaisDoExtrato(e.saldo_devedor),
+    parcelas_pagas: inteiroDoExtrato(e.parcelas_pagas),
   };
 }
 
