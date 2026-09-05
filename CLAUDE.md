@@ -349,6 +349,37 @@ contra **~17 s** da casa. Duas regras de uso, as duas por Regra 9:
 o achado foi que ele **não existe por decisão**, e o registro fica aqui para que
 ninguém procure de novo.)
 
+**Ferramenta da Regra 7 — UMA CHAMADA = UMA LINHA, CAMINHO LITERAL.** A ferramenta
+de shell avalia o comando num `eval`, e três coisas quebram esse `eval` sem
+avisar. Escreva assim, sempre:
+
+- **Uma linha, separada por `;`.** Comando multi-linha faz `cd` e até `pwd`
+  devolverem `(eval):cd:1: too many arguments`, e o que vinha depois — inclusive
+  `npm test` — simplesmente não roda.
+- **Sem `cd`.** O diretório **volta sozinho** para o pai entre chamadas. Use
+  `git -C <caminho>` e caminho absoluto em cada comando.
+- **Sem `date` e sem variável de shell.** `date -u +%Y-%m-%dT%H:%M:%SZ` devolve
+  `illegal time format` e engole o resto da linha. Variável atribuída na mesma
+  chamada pode chegar **vazia** ao comando seguinte: `$W` funcionou no `git -C` e
+  chegou vazia no `ls`, no `grep` e no `find` da mesma linha — as três buscas
+  leram `/CLAUDE.md` em vez do arquivo real.
+- **`pwd` (ou `git -C`) na MESMA saída.** O `pwd` de uma chamada anterior não
+  prova o diretório desta; foi exatamente isso que enganou.
+- **Busca que volta vazia só vale com CONTROLE POSITIVO na mesma saída.** Este é
+  o modo perigoso da família, porque os outros gritam e este **responde**:
+  `grep` em arquivo inexistente devolve nada com ar de "não encontrei", que é a
+  resposta que se procurava. Ausência de saída não é resposta; é ausência de
+  medição.
+
+(Origem: a mesma família da Regra 7, terceira vez escrita. Em 03/08 já eram
+`cd` com `too many arguments` e `$P` não expandida; a §23.7 do `ULTIMO.md`
+registrou quatro na F2. Em 05/09, na FUNIL-01, três novas na mesma sessão: o
+`cd`/`pwd` multi-linha que impediu o `npm test` de rodar; o diretório de volta
+ao pai, que fez sete `fatal: not a git repository` e zerou uma asserção
+pré-commit inteira — pega SÓ porque o controle positivo, que devia dar 1, deu 0;
+e a `$W` vazia. A lição é uma só e é velha: **saída vazia de teste não é teste
+verde.**)
+
 **Regra 10 — MIGRATION SE ENSAIA ANTES DE APLICAR.** Ler o arquivo não encontra
 o que executar encontra. Antes de qualquer apply, o DDL inteiro roda contra o
 banco-alvo assim:

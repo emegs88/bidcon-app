@@ -2599,3 +2599,166 @@ Pus um portão no renderizador — se o HTML contiver "Log in to Vercel", ele re
   `https://github.com/emegs88/bidcon-app/pull/new/lojista-multi-01`
 - **Merge é clique do Emerson.** A fatia toca `public/` e `vercel.json` — é produção.
 - F3, só depois do merge: abrir `https://www.bidcon.com.br/bidcon-lojista/jk-alphaville`.
+
+## 26 — FUNIL-01, F3: a ponte escrita, e os defeitos que a régua achou em si mesma (02–05/09/2026)
+
+A F2 pôs a `0093` em produção. A F3 escreve **a ponte**: o código que decide, conversa por
+conversa, o que entra no funil. Até aqui é código, teste e ensaio — **a ponte não rodou contra o
+banco**. Tudo o que segue foi medido; o que não foi está dito como não foi.
+
+### 26.1 — O precedente: o `.sql` mora ao lado do `.md`
+
+A F3.1 produziu a lista nominal das candidatas — **15 `inserir` · 1 `ligar` · 2 `revisar` ·
+10 `excluir`**, mais 3 duplicados — aprovada nominalmente pelo Emerson em `706ef122`.
+
+O que fica como precedente não é a lista: é **onde a consulta que a produziu passou a morar**.
+`ident01/RELATORIOS/FUNIL-01_F3_candidatas.sql` fica ao lado do `.md` que ela gerou. Relatório
+sem a régua que o produziu é afirmação; com a régua junto, é medição que outra pessoa refaz.
+
+E o controle que segurou a lista foi o mais banal possível: **`deve ser 104`**. Uma linha que
+falha se o conjunto mudar de tamanho. Foi ela que pegou a deriva entre uma medição e a seguinte
+— não a leitura atenta, não a memória. **Controle é o que sobra quando a atenção acaba.**
+
+### 26.2 — A bomba de cem vezes
+
+`moedaParaNumero` lia a **máscara do site**, não o número. Um crédito que passasse pelo caminho
+errado saía cem vezes maior. Estava escrito, verde, e nunca tinha mordido porque o caminho que
+o usa ainda não havia rodado com dado real.
+
+A lição não é sobre moeda. É que **teste verde não prova que o caminho foi andado** — prova que
+o que foi escrito faz o que quem escreveu esperava. Cobertura de caminho e cobertura de dado
+são coisas diferentes, e a segunda só aparece quando o dado real entra.
+
+### 26.3 — Os cinco `opt_out`, e o que "sem nada por que decidir" significa
+
+Das 49 conversas do `prosperito`, **5 têm `opt_out`**. Saem cedo, no braço 2, e nunca chegam a
+discutir classe. Isso importa porque muda o denominador: das 49, sobram **44 sem tag `cedente`,
+sem extrato ≥ 0,7 e sem `opt_out`** — quarenta e quatro linhas que, se o agente entrasse na
+lista de candidatas, virariam `revisar` **sem nada por que decidir**.
+
+`revisar` não é "cuidado extra". É fila de gente. Quarenta e quatro pessoas numa fila que
+ninguém tem como despachar é o mesmo trabalho manual de antes, com um alarme por cima.
+
+### 26.4 — AGENTE-DESCONHECIDO-01: cópia guardada × cópia solta
+
+O braço 10 de `decidir()` era **mudo**. "A régua não sabe decidir" e "a régua não conhece este
+agente" imprimiam a mesma frase. Foi por essa fresta que o `prosperito` — **49 de 115
+conversas, 43% do banco** — atravessou a régua sem estar em nenhuma das três listas.
+
+O banco inteiro, medido em 05/09, com **zero** conversas de `agente_ativo` nulo:
+
+| agente | conversas | conhecido pelas três listas? |
+|---|---|---|
+| `prosperito` | 49 | **não** |
+| `valentina` | 31 | sim (compra) |
+| `caetano` | 15 | sim (captação) |
+| `tobias` | 8 | sim (candidata) |
+| `serena` | 7 | sim (compra) |
+| `vendanova` | 3 | **não** |
+| `aurora` | 1 | sim (compra) |
+| `bento` | 1 | sim (compra) |
+
+A coordenação propôs pôr o `prosperito` na lista de candidatas e mandou medir antes de escrever.
+A medição **derrubou a proposta**, e a distinção que ficou escrita é estrutural, não numérica:
+`tobias` prova que alguém já tratou aquela pessoa sobre uma cota; **`prosperito` é onde toda
+conversa está antes de ser alguma coisa.** `vendanova` fica fora pelo mesmo tipo de razão:
+plano novo não é contemplada. Nos dois casos, quem levanta a conversa continua sendo tag,
+extrato ou a régua de texto.
+
+**O defeito real estava atrás disso.** Os oito nomes existem em **três** cópias:
+
+1. `AgenteId` — o tipo, em `_prompt.ts:104`. A fonte.
+2. `REGISTRO_AGENTES: Record<AgenteId, true>` — a que esta fatia escreveu. **Guardada pelo
+   compilador**: nome novo no tipo e o build fica vermelho em `ponte.ts` até alguém decidir em
+   que lista ele entra.
+3. `MARCADOR_BASTAO`, a regex de `_prompt.ts:665`. **Ninguém a amarra a nada.**
+
+E é a terceira que mata. O handoff inteiro depende dela: `AGENTE_INICIAL = 'prosperito'` →
+o modelo emite `##AGENTE:<id>##` → `MARCADOR_BASTAO` captura em `cerebro.ts:717` →
+`processar-background.ts:773` escreve `agente_ativo` — **o único lugar do código que escreve
+essa coluna**. Nome novo no tipo com a regex esquecida = bastão não reconhecido,
+`proximoAgente` nulo, **handoff falha calado**. O vigia 9 do Radar pegaria o sintoma dias
+depois, sem a causa.
+
+Então **o teste da regex é a única trava real das três**, e está escrito assim no cabeçalho do
+teste. A mutação prova: tirar `tobias|` da regex dá `1307 pass / 1 fail`, e a mensagem do teste
+**é o conserto** — nomeia o agente, explica o sintoma e dá o arquivo e a linha.
+
+A cura de verdade é uma linha dentro do `_prompt.ts`: montar a regex de `Object.keys(AGENTES)`.
+Fica em **`AGENTES-UMA-LISTA-01`**, parada, porque toca o módulo de atendimento — e agora ela
+tem escopo de uma linha e um teste já provado que mostra que nada mudou.
+
+**Onde o log mora, e por quê.** A ordem pedia um log com o nome no `else`. Não entrou
+`console.warn`: `decidir()` é pura e a F3.4 vai chamá-la 115 vezes dentro de uma transação —
+44 avisos no `stderr` é ruído com cara de alarme, e ruído ensina a casa a ignorar o `stderr`.
+O nome vai no **`motivo`**, que já viaja ao relatório e ao painel; o alarme agregado é do
+chamador, uma vez, com o nome. **Precedente escrito: função pura não loga; quem loga é quem
+chama, uma vez, agregado.**
+
+### 26.5 — A família do cano e do shell: a contagem, e o modo que *responde*
+
+A §23.7 registrou quatro reincidências na F2. Ela continua verdadeira para a fatia dela.
+
+O que esta fatia acrescenta é uma correção de método: **eu carreguei na lista de tarefas o
+número "SEIS", que não estava escrito em lugar nenhum**, e a coordenação mandou corrigir o
+"SEIS" no arquivo. Não havia "SEIS" no arquivo. Foi ordem sobre um alvo que nenhum dos dois
+tinha medido — a Regra 7 aplicada ao lado de quem manda. A contagem honesta é: **duas em 03/08**
+(origem da Regra 7), **quatro na F2** (§23.7), **três em 05/09**. O total exato importa menos
+que o fato de o padrão ter sobrevivido a três registros.
+
+As três de 05/09:
+
+1. `cd` e depois até `pwd` devolvendo `(eval):cd:1: too many arguments` em comando multi-linha.
+   O `npm test` que vinha depois **não rodou** — e não sair saída de teste foi o que denunciou.
+2. O diretório **voltou sozinho** para o pai entre chamadas. Sete `fatal: not a git repository`
+   e uma asserção pré-commit inteira zerada. Pega **só** porque o controle positivo, que devia
+   dar 1, deu 0.
+3. `$W` chegou **vazia** ao `ls`, ao `grep` e ao `find` da mesma linha, tendo funcionado no
+   `git -C` da chamada anterior. As três buscas leram `/CLAUDE.md`.
+
+**A terceira é a que vale a regra.** As duas primeiras gritam. A terceira **responde**: `grep`
+em arquivo inexistente devolve nada com ar de "não encontrei" — exatamente a resposta que se
+procurava. É a versão de shell do corpo vazio da Regra 8 e do `ls-remote` que sai 0 com zero
+linhas. **Ausência de saída não é resposta; é ausência de medição.**
+
+Ficou escrita no `CLAUDE.md` como *Ferramenta da Regra 7 — uma chamada = uma linha, caminho
+literal*: sem `cd`, sem `date`, sem variável de shell, `pwd`/`git -C` **na mesma saída**, e
+busca vazia só vale com controle positivo ao lado.
+
+E um quarto, meu, na mesma sessão: ao escrever essa regra, ela entrou **antes** de um parágrafo
+de origem que pertencia à regra vizinha, e passou a parecer que aquela origem explicava a nova.
+Quem pegou foi a leitura crua do bloco inteiro, não o `grep` — que dava todos os números certos.
+**Contagem certa não prova ordem certa.**
+
+### 26.6 — `LISTA-VENCIDA-01` fechada como regra: a Regra 5b
+
+Uma lista nominal aprovada envelhece. O banco anda entre a aprovação e a execução, e a palavra
+dada continua valendo sobre um retrato que já não existe. A cura virou norma (`624aeeb`):
+**lista nominal carrega âncora.** A palavra se aplica sobre o relatório do ensaio, que imprime
+o diff desde a âncora; duas rodadas; âncora reconstruída só vale em janela sem evento.
+
+É por isso que o `AUTORIZO FUNIL-01 F3 BACKFILL` está **condicionado**: ele vale sobre o
+relatório do ensaio, não sobre a lista de ontem.
+
+### 26.7 — Estado
+
+- `funil-ponte-01` em **`910d996`**, empurrado, local = remoto. 1 atrás de `origin/main`
+  (`01ab42b`, snapshot da vitrine — não toca `platform/`).
+- Casa **1308/1308**, 8 suítes. Duas mutações provadas e desfeitas **por diff**, não por memória.
+- Commits da fatia: `706ef12` (lista + `.sql`) · `6887733` (F3.2) · `0508cbb` / `71fe904` /
+  `38c9f0b` / `6d281b9` (F3.3) · `63a61de` (23505) · `fd4ac1c` (filtro do runner) ·
+  `2c6738f` (`_deriva.md`) · `5b8d801` (braço 4b + espelho SQL) · `624aeeb` (Regra 5b) ·
+  `910d996` (AGENTE-DESCONHECIDO-01).
+- **Um PR por fatia**: `funil-ponte-01` carrega a F3 inteira e o PR só abre depois da F3.4.
+
+### 26.8 — O que fica sem prova
+
+- **A ponte nunca rodou contra o banco.** Tudo acima é código e teste.
+- **A F3.4 ainda não existe.** O ensaio em `begin/rollback` é o que vai ao Emerson, e a rodada
+  real só com o `AUTORIZO` reconfirmado sobre esse relatório.
+- **O espelho do predicado não foi medido**: `captacaoViva()` em TS × o `WHERE` do índice
+  parcial `captacoes_origem_chave_key`. Enquanto não for, o braço 8b está provado por leitura.
+- **Os duplicados de telefone em `wa_conversas`** seguem abertos: a chave de comparação nunca
+  passou sobre as 115.
+- **`AGENTES-UMA-LISTA-01`**, **`F4a`**, **`FUNIL-VARREDURA-01`** e a convenção dupla de import
+  (`@/` × relativo) ficam paradas, cada uma com escopo escrito.
