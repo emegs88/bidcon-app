@@ -358,7 +358,7 @@ async function postoNaChave(
   );
 
   // A CONSTANTE, NUNCA A PALAVRA. `TAG_CEDENTE` vem de `ponte.ts`, que a
-  // reexporta de `farol/cedente`. Escrever "cedente" aqui na mão seria abrir a
+  // reexporta de `farol/cedente`. Escrever a etiqueta na mão seria abrir a
   // TERCEIRA cópia da mesma etiqueta — e a segunda já custou uma fatia inteira
   // para desfazer. Cópia sem espelho é como aquilo começa.
   const perfis = irmas.map((l) => ({
@@ -457,9 +457,31 @@ export async function aplicarDecisao(
       .select("id")
       .single();
     if (error) {
+      // O ÍNDICE RECUSANDO NÃO É FALHA — É O CAMINHO ESPERADO.
+      //
+      // `23505` é `unique_violation` no Postgres. Aqui ele só pode vir de
+      // `captacoes_origem_chave_key`: entre a medição desta conversa e este
+      // insert, OUTRA invocação (outro lote da Meta, outra função rodando em
+      // paralelo) criou a captação da MESMA chave. O laço do `route.ts` roda em
+      // série e protege o lote; entre lotes, quem segura é o índice. É para
+      // isso que ele existe.
+      //
+      // Tratar isso como `falhou` seria mentir duas vezes: encheria o log de
+      // erro com o funcionamento normal do sistema, e — pior — ensinaria a
+      // casa a ignorar `[funil/gatilho] captação NÃO inserida`, que é
+      // exatamente a linha que precisa acordar alguém quando for de verdade.
+      // Alarme que toca sozinho é alarme que ninguém escuta.
+      if (error.code === "23505") {
+        console.log(
+          "[funil/gatilho] índice recusou — a chave já tem captação",
+          JSON.stringify({ conversaId: c.id, motivo: d.motivo })
+        );
+        return { feito: "decidido", decisao: d, escreveu: false };
+      }
       console.error("[funil/gatilho] captação NÃO inserida:", {
         conversaId: c.id,
         erro: error.message,
+        code: error.code,
       });
       return { feito: "falhou", onde: "insert" };
     }

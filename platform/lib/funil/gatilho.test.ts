@@ -25,6 +25,22 @@
 // Por isso `elo.then` existe aqui. Um dublê que só respondesse a `.single()`
 // passaria verde e mentiria sobre o caminho do `update`, que é justamente onde
 // mora a trava de corrida.
+//
+// ---- O CUSTO DO DUBLÊ, DECLARADO ------------------------------------------
+//
+// DUBLÊ PROVA A LÓGICA, NÃO A QUERY; A QUERY É PROVADA NO ENSAIO.
+//
+// Todo dublê que espelha a FORMA da chamada — `.is("wa_conversa_id", null)`,
+// os nomes de coluna, a ordem dos elos — passa a CONHECER a query. No dia em
+// que alguém mudar a query de verdade, o dublê pode continuar verde enquanto o
+// banco fica vermelho: ele responde ao que foi ensinado, não ao que o Postgres
+// aceitaria. Este arquivo NÃO prova que o SQL existe, que a coluna existe, nem
+// que o índice pega. Prova que, dada uma resposta, o gatilho decide e escreve o
+// que a ponte mandou — e mais nada.
+//
+// Quem prova a query é o ensaio da F3.4 contra o banco real, em begin/rollback.
+// O custo está aceito de propósito e por escrito, para que ninguém leia
+// "8/8 verde" como "a escrita funciona".
 // ============================================================================
 
 import test, { describe } from "node:test";
@@ -55,7 +71,13 @@ const bancoQueExplode = new Proxy(
 ) as never;
 
 type Chamada = { metodo: string; args: unknown[] };
-type Resposta = { data: unknown; error: { message: string } | null };
+// `code` é o SQLSTATE que o PostgREST devolve. Não é opcional por preguiça: há
+// caminho do gatilho que só existe por causa dele (`23505`, o índice recusando),
+// e há erro de rede em que ele não vem. As duas formas são reais.
+type Resposta = {
+  data: unknown;
+  error: { message: string; code?: string } | null;
+};
 
 /** Dublê encadeável e thenable. Anota tudo que foi chamado, na ordem. */
 function bancoDeMentira(resposta: Resposta) {
@@ -115,19 +137,31 @@ async function comFunil<T>(valor: string | undefined, f: () => Promise<T>): Prom
 
 /** Cala e COLETA o que o gatilho gritaria. O log é a única memória das quatro
  *  classes que não escrevem; um teste que só silenciasse jogaria fora a prova. */
-async function coletandoLogs<T>(f: () => Promise<T>): Promise<{ r: T; ditos: string[] }> {
+// `ditos` é TUDO o que foi dito; `erros` é só o que foi dito no canal de ERRO.
+// A separação não é enfeite: a diferença entre "o gatilho registrou" e "o
+// gatilho tocou o alarme" é o que distingue funcionamento normal de defeito, e
+// há teste que precisa provar o SILÊNCIO do alarme — coisa que uma lista só,
+// com os três canais misturados, não sabe dizer.
+async function coletandoLogs<T>(
+  f: () => Promise<T>
+): Promise<{ r: T; ditos: string[]; erros: string[] }> {
   const ditos: string[] = [];
+  const erros: string[] = [];
   const orig = { log: console.log, warn: console.warn, error: console.error };
+  const emTexto = (a: unknown[]) =>
+    a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ");
   const captura =
-    () =>
+    (tambemErro = false) =>
     (...a: unknown[]) => {
-      ditos.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+      const linha = emTexto(a);
+      ditos.push(linha);
+      if (tambemErro) erros.push(linha);
     };
   console.log = captura();
   console.warn = captura();
-  console.error = captura();
+  console.error = captura(true);
   try {
-    return { r: await f(), ditos };
+    return { r: await f(), ditos, erros };
   } finally {
     console.log = orig.log;
     console.warn = orig.warn;
@@ -256,10 +290,53 @@ describe("FUNIL-01 gatilho — a fronteira com o banco", () => {
   test("INSERIR que o banco recusa vira falha declarada, não exceção", async () => {
     const c = conversa();
     const d = decidir(c);
-    const { db } = bancoDeMentira({ data: null, error: { message: "duplicate key" } });
+    // `42703` é `undefined_column`. Escolhido de propósito: é um erro que NÃO
+    // pode ser o índice, para separar este caminho do `23505` logo abaixo. Se
+    // um dia alguém trocar este código por `23505`, este teste passa a medir
+    // outra coisa — e o teste seguinte fica sozinho provando os dois.
+    const { db } = bancoDeMentira({
+      data: null,
+      error: { message: "column captacoes.xpto does not exist", code: "42703" },
+    });
     const { r, ditos } = await coletandoLogs(() => aplicarDecisao(db, c, d));
     assert.deepEqual(r, { feito: "falhou", onde: "insert" });
-    assert.ok(ditos.some((x) => x.includes("duplicate key")), "o erro do banco entra no log");
+    assert.ok(
+      ditos.some((x) => x.includes("captacoes.xpto")),
+      "o erro do banco entra no log"
+    );
+  });
+
+  test("ÍNDICE RECUSOU (23505) é caminho esperado — `nada`, e log SEM alarme", async () => {
+    // Este é o encontro entre duas invocações da MESMA chave. O laço do
+    // `route.ts` roda em série e protege o lote; entre lotes, quem segura é
+    // `captacoes_origem_chave_key`. Se isto virasse `falhou`, o log de ERRO
+    // encheria de funcionamento normal — e a linha que precisa acordar alguém
+    // viraria ruído. Alarme que toca sozinho é alarme que ninguém escuta.
+    const c = conversa();
+    const d = decidir(c);
+    assert.equal(d.classe, "inserir", d.motivo);
+
+    const { db } = bancoDeMentira({
+      data: null,
+      error: {
+        message: 'duplicate key value violates unique constraint "captacoes_origem_chave_key"',
+        code: "23505",
+      },
+    });
+    const { r, ditos, erros } = await coletandoLogs(() => aplicarDecisao(db, c, d));
+
+    assert.deepEqual(
+      r,
+      { feito: "decidido", decisao: d, escreveu: false },
+      "índice recusando não é falha do gatilho"
+    );
+    assert.ok(
+      ditos.some((x) => x.includes("índice recusou")),
+      "o encontro precisa deixar rastro"
+    );
+    // A METADE QUE IMPORTA: não basta ter virado `nada`; tem de NÃO ter tocado
+    // o alarme. Sem esta linha o teste passaria mesmo se o gatilho gritasse.
+    assert.deepEqual(erros, [], "23505 não pode ir para o log de erro");
   });
 
   test("LIGAR trava a corrida com `wa_conversa_id is null` na CONDIÇÃO da escrita", async () => {
