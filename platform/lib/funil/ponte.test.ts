@@ -28,12 +28,18 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 
+import { MARCADOR_BASTAO } from "@/app/api/atende/_prompt";
+
 import {
   AGENTE_DE_CAPTACAO,
+  AGENTES_CONHECIDOS,
+  AGENTES_DE_COMPRA,
+  AGENTES_QUE_TORNAM_CANDIDATA,
   COLUNAS_DA_LINHA,
   COLUNAS_PROIBIDAS,
   CONFIANCA_MINIMA_EXTRATO,
   decidir,
+  ehAgenteConhecido,
   ehCandidata,
   inteiroDoExtrato,
   numeroDoExtrato,
@@ -859,6 +865,141 @@ describe("FUNIL-01 ponte — o que ela NUNCA escreve", () => {
       Object.prototype.hasOwnProperty.call(conversa(), "status"),
       false,
       "se `status` entrar aqui, o SQL e a TS deixaram de ser gemeos"
+    );
+  });
+});
+
+// ============================================================================
+// AGENTE-DESCONHECIDO-01 — A TRAVA, E A ÚNICA CÓPIA SOLTA DOS OITO NOMES
+// ----------------------------------------------------------------------------
+// POR QUE ESTE BLOCO EXISTE, EM UMA FRASE: os mesmos oito nomes de agente vivem
+// em TRÊS lugares, e só DOIS têm quem os cobre.
+//
+//   1. `AgenteId` (`_prompt.ts:104`)  — a fonte.
+//   2. `REGISTRO_AGENTES` (`ponte.ts`) — `Record<AgenteId, true>`: o compilador
+//      amarra. Nome novo no tipo e a build fica vermelha AQUI até alguém
+//      decidir em que lista ele entra. Não precisa de teste; precisa de build.
+//   3. `MARCADOR_BASTAO` (`_prompt.ts:665`) — uma REGEX com os oito nomes
+//      escritos à mão. NINGUÉM a cobre. É a cópia solta.
+//
+// O ESTRAGO QUE A TERCEIRA CAUSA, e é o pior dos três porque não acende luz:
+// acrescente um agente ao tipo, escreva a persona, esqueça a regex — e o
+// `##AGENTE:<novo>##` que o modelo emitir não casa. `cerebro.ts:717` devolve
+// `proximoAgente = null`, `processar-background.ts:772` não escreve
+// `agente_ativo`, e o bastão simplesmente não passa. O cliente fica com o
+// agente errado, calado. O vigia 9 do Radar (handoff mudo) pegaria o SINTOMA
+// dias depois, sem a causa.
+//
+// Este bloco NÃO conserta isso — a cura é uma linha dentro do próprio
+// `_prompt.ts` (construir a regex de `Object.keys(AGENTES)`), que toca o módulo
+// do atendimento e é o escopo da candidata `AGENTES-UMA-LISTA-01`. O que este
+// bloco faz é garantir que, no dia em que a cópia solta desencontrar da fonte,
+// a suíte reprove COM O NOME em vez de o handoff falhar em silêncio.
+// ============================================================================
+
+describe("AGENTE-DESCONHECIDO-01 — registro de agentes e a trava do bastão", () => {
+  test("A CÓPIA SOLTA: MARCADOR_BASTAO aceita TODO nome de AGENTES_CONHECIDOS", () => {
+    // O teste que justifica o bloco. Se reprovar, o nome que aparecer na
+    // mensagem é um agente que a casa conhece e cujo bastão NÃO passa.
+    for (const agente of AGENTES_CONHECIDOS) {
+      assert.ok(
+        MARCADOR_BASTAO.test(`Já te passo pra ela. ##AGENTE:${agente}##`),
+        `MARCADOR_BASTAO nao reconhece "${agente}": o bastao dele nao passa e o handoff falha CALADO (cerebro.ts:717 devolve proximoAgente=null). Acrescente "${agente}" a regex em app/api/atende/_prompt.ts`
+      );
+    }
+  });
+
+  test("ISCA da cópia solta: um nome que não existe é RECUSADO", () => {
+    // Sem esta linha, um `MARCADOR_BASTAO = /.*/` passaria no teste de cima e
+    // a trava seria decoração. Regra 9: capaz de falhar.
+    assert.equal(
+      MARCADOR_BASTAO.test("texto ##AGENTE:agente_fantasma_xyz##"),
+      false,
+      "a regex aceitou um agente inexistente - ela nao esta travando nada"
+    );
+  });
+
+  test("ISCA da âncora: o marcador só vale no FIM do texto", () => {
+    // `\s*$` é parte da régua, não enfeite: um "##AGENTE:x##" no meio da frase
+    // seria o modelo falando SOBRE o marcador, não emitindo-o.
+    assert.equal(
+      MARCADOR_BASTAO.test("##AGENTE:valentina## e ai eu continuo falando"),
+      false,
+      "a ancora \\s*$ sumiu: marcador no meio do texto passou a contar como bastao"
+    );
+    assert.ok(
+      MARCADOR_BASTAO.test("fim da frase. ##AGENTE:valentina##\n  "),
+      "CONTROLE POSITIVO: com espaco em branco depois AINDA tem de casar"
+    );
+  });
+
+  test("o registro tem os OITO, e nenhum a mais", () => {
+    assert.equal(AGENTES_CONHECIDOS.length, 8);
+    assert.deepEqual(
+      [...AGENTES_CONHECIDOS].sort(),
+      ["aurora", "bento", "caetano", "prosperito", "serena", "tobias", "valentina", "vendanova"],
+      "o registro desencontrou de AgenteId - se isto reprovar, a build ja deveria ter reprovado antes"
+    );
+  });
+
+  test("DECISÃO REGISTRADA: prosperito e vendanova são CONHECIDOS e ficam FORA das três listas", () => {
+    /* Não é omissão — é a decisão de 05/09/2026, medida antes de tomada, e este
+     * teste existe para que mudá-la seja um ato deliberado e não um descuido.
+     *
+     * `prosperito` é 49 das 115 conversas do xtv (o maior bloco) e nenhuma delas
+     * tem tag de cedente ou extrato: pô-lo em AGENTES_QUE_TORNAM_CANDIDATA faria
+     * 44 conversas virarem `revisar` sem nada por que decidir. `tobias` está na
+     * lista porque a presença dele PROVA que se tratou de uma cota; `prosperito`
+     * é onde a conversa está antes de ser alguma coisa. `vendanova` é plano
+     * novo, que não é contemplada. */
+    for (const porta of ["prosperito", "vendanova"]) {
+      assert.ok(
+        AGENTES_CONHECIDOS.includes(porta),
+        `${porta} tem de ser CONHECIDO - senao a trava apita nele todo dia`
+      );
+      assert.equal(
+        AGENTES_QUE_TORNAM_CANDIDATA.includes(porta),
+        false,
+        `${porta} entrou em AGENTES_QUE_TORNAM_CANDIDATA: mede o custo antes (em 05/09 eram 44 conversas novas em revisar)`
+      );
+      assert.equal(AGENTES_DE_COMPRA.includes(porta), false);
+      assert.notEqual(AGENTE_DE_CAPTACAO, porta);
+    }
+  });
+
+  test("ehAgenteConhecido — null é ausência, não desconhecimento", () => {
+    assert.equal(ehAgenteConhecido(null), true, "null ja tem tratamento nos bracos de cima");
+    assert.equal(ehAgenteConhecido("caetano"), true, "CONTROLE POSITIVO");
+    assert.equal(ehAgenteConhecido("prosperito"), true);
+    assert.equal(
+      ehAgenteConhecido("agente_fantasma_xyz"),
+      false,
+      "ISCA: se isto der true a trava nunca apita"
+    );
+  });
+
+  test("O BRAÇO 10 DEIXOU DE SER MUDO: o motivo diz o NOME do agente desconhecido", () => {
+    // `n_intencao: 2` é o que levanta a conversa (a régua de texto); o agente
+    // fantasma não levanta nada sozinho, e é esse o ponto.
+    const d = decidir(conversa({ agente_ativo: "agente_fantasma_xyz", n_intencao: 2 }));
+    assert.equal(d.classe, "revisar");
+    assert.match(
+      d.motivo,
+      /agente_fantasma_xyz/,
+      "o motivo nao nomeia o agente: 'a regua nao sabe decidir' e 'a regua nao conhece este agente' voltaram a sair iguais"
+    );
+    assert.match(d.motivo, /regua vencida/);
+  });
+
+  test("PAR DA ISCA: agente CONHECIDO que cai no braço 10 NÃO é acusado de desconhecido", () => {
+    // Sem este par, um motivo que gritasse "AGENTE DESCONHECIDO" sempre passaria
+    // no teste de cima. É a linha que prova que o braço distingue os dois casos.
+    const d = decidir(conversa({ agente_ativo: "prosperito", n_intencao: 2 }));
+    assert.equal(d.classe, "revisar");
+    assert.equal(
+      /AGENTE DESCONHECIDO/.test(d.motivo),
+      false,
+      "prosperito e conhecido: acusa-lo de desconhecido faria a trava gritar em 49 conversas"
     );
   });
 });

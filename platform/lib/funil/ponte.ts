@@ -129,6 +129,24 @@ import { chaveTelefone, ehTelefoneDaCasa, normalizarTelefoneBR } from "../telefo
 import { chaveOrigem, textoCurto } from "../captacao";
 import { TAG_CEDENTE, TAG_COTA_CANCELADA } from "../farol/cedente";
 
+// `import type` DE PROPÓSITO, e a diferença foi medida antes de escrever.
+// ----------------------------------------------------------------------------
+// O tipo é apagado no build: não sobra aresta de runtime nenhuma. Foi essa a
+// escolha contra a alternativa que parecia mais limpa — derivar a lista de
+// `Object.keys(AGENTES)`, que É a fonte (o `Record<AgenteId, …>` de
+// `_prompt.ts:372` é TOTAL, tem os oito, e o compilador já o cobra).
+//
+// Derivar custaria: `AGENTES` não é uma lista de nomes, são 50.276 bytes de
+// texto de persona, e importá-lo como VALOR criaria a aresta
+// `lib/funil → app/api/atende → lib/whatsapp` — o script de backfill passaria
+// a carregar os prompts de todas as personas para saber oito nomes. Antes
+// disto, `ponte.ts` importava três módulos, todos `lib/` puros, e ZERO de
+// `app/`.
+//
+// É o mesmo que `lib/tools-por-agente.ts` e `lib/whatsapp/processar-background.ts`
+// já fazem. O `cerebro.ts` importa valor, mas ele É o atendimento; a ponte não.
+import type { AgenteId } from "@/app/api/atende/_prompt";
+
 // ----------------------------------------------------------------------------
 // AS CONSTANTES DA RÉGUA. Todas espelham literais que hoje existem no SQL.
 // ----------------------------------------------------------------------------
@@ -172,6 +190,65 @@ export const AGENTES_DE_COMPRA: readonly string[] = [
   "bento",
   "aurora",
 ];
+
+// AGENTE-DESCONHECIDO-01 — A QUARTA LISTA, QUE NÃO DECIDE NADA.
+// ----------------------------------------------------------------------------
+// O QUE ACONTECEU: `prosperito` está em produção desde antes desta fatia e não
+// existia em nenhuma das três listas acima. Medido em 05/09/2026 sobre as 115
+// conversas do xtv: `prosperito` é 49 delas — o MAIOR bloco do banco, 43% —, e
+// `vendanova` é outras 3. Nenhuma conversa tem `agente_ativo` nulo. Os dois
+// caíam no braço 10 sem que a régua soubesse dizer que não os conhecia.
+//
+// POR QUE ELES NÃO ENTRAM NAS TRÊS LISTAS DE CIMA, e isto foi medido, não
+// achado: pôr `prosperito` em `AGENTES_QUE_TORNAM_CANDIDATA` transformaria 44
+// conversas (as 49 menos 5 com opt_out; zero delas tem tag ou extrato) em
+// candidatas NOVAS sem nada por que decidir — todas caindo em `revisar`. A
+// classe que existe para o que a régua não resolve viraria a maior do funil.
+// Trabalho manual barulhento não é melhor que silencioso: é o mesmo trabalho
+// com alarme.
+//
+// E a razão é estrutural, não de tamanho. `tobias` está na lista porque a
+// presença dele PROVA que alguém já tratou aquela pessoa sobre uma cota.
+// `prosperito` é onde toda conversa está ANTES de ser alguma coisa — ele é o
+// `AGENTE_INICIAL` (`_prompt.ts:695`), a recepção. Os dois parecem "lado ainda
+// não decidido"; não são a mesma coisa. Um é "é sobre cota, falta o lado"; o
+// outro é "não se decidiu nada, inclusive se é sobre cota".
+// `vendanova` fica fora pelo mesmo tipo de razão: plano novo não é
+// contemplada. Se um cliente dele tiver cota para vender, quem o levanta é a
+// tag ou o extrato — o agente, não.
+//
+// ENTÃO PARA QUE SERVE ESTA LISTA: só para a TRAVA. Ela não muda classe
+// nenhuma. Ela existe para que o braço 10 saiba dizer o nome de quem não
+// conhece, e para o ensaio da F3.4 comparar o `select distinct agente_ativo`
+// contra ela e apitar COM O NOME quando nascer agente novo.
+//
+// O `Record` NÃO É ENFEITE — É QUEM COBRA.
+// Um array solto seria a terceira cópia dos mesmos oito nomes, e a terceira
+// que uma PESSOA teria de lembrar. Como `Record<AgenteId, true>`, nome novo em
+// `AgenteId` deixa este arquivo de compilar até alguém decidir em que lista ele
+// entra. Foi exatamente isso que faltou quando o `prosperito` chegou: a régua
+// não sabia, e nada obrigava ninguém a contar para ela.
+const REGISTRO_AGENTES: Record<AgenteId, true> = {
+  prosperito: true,
+  valentina: true,
+  caetano: true,
+  serena: true,
+  tobias: true,
+  aurora: true,
+  bento: true,
+  vendanova: true,
+};
+
+/** Todo agente que a casa reconhece. NÃO decide classe: é a régua da trava.
+ *  Nome fora daqui é agente que nasceu sem ninguém avisar o funil. */
+export const AGENTES_CONHECIDOS: readonly string[] = Object.keys(REGISTRO_AGENTES);
+
+/** A pergunta da trava. `null` NÃO é desconhecido — é ausência, e ausência já
+ *  tem tratamento nos braços de cima. Só nome preenchido e fora do registro
+ *  conta como agente que a régua não conhece. */
+export function ehAgenteConhecido(agente: string | null): boolean {
+  return agente === null || AGENTES_CONHECIDOS.includes(agente);
+}
 
 /** Limiar de confiança do extrato. O `>=` é a régua, não o `>`: um extrato
  *  com confiança EXATAMENTE 0.7 passa. Está aqui dentro, e não a cargo do
@@ -811,10 +888,30 @@ export function decidir(c: ConversaMedida): Decisao {
   }
 
   // ---- 10. A régua não decide. -------------------------------------------
+  // AGENTE-DESCONHECIDO-01: ESTE BRAÇO DEIXOU DE SER MUDO.
+  //
+  // Antes ele dizia sempre a mesma frase, e por isso "a régua não sabe decidir
+  // este caso" e "a régua não conhece este agente" saíam idênticos no relatório
+  // — dois problemas diferentes com a mesma cara. O primeiro é trabalho normal;
+  // o segundo é a régua desatualizada, e some da vista justamente por parecer o
+  // primeiro. Foi assim que o `prosperito` atravessou 49 conversas.
+  //
+  // ONDE FICA O LOG, E POR QUE NÃO É UM console AQUI: `decidir()` é pura, e a
+  // F3.4 vai chamá-la 115 vezes dentro de uma transação. Um `console.warn` aqui
+  // cuspiria a mesma linha dezenas de vezes num lugar que ninguém lê, e tornaria
+  // impura a única função da fatia que dá para testar sem banco. O nome do
+  // agente vai no MOTIVO, que é o campo que já viaja para o relatório do ensaio
+  // e para a coluna do painel — quem precisa ver, vê, com o nome. O alarme
+  // agregado (um por agente, não um por linha) é do chamador, que tem
+  // `AGENTES_CONHECIDOS` e `ehAgenteConhecido` exportados para isso.
+  const agenteForaDoRegistro =
+    c.agente_ativo !== null && !ehAgenteConhecido(c.agente_ativo);
+
   return {
     classe: "revisar",
-    motivo:
-      "a regua nao decide: agente que atende os dois lados, ou suspeita levantada so pelo texto, sem tag e sem extrato. Precisa de olho humano",
+    motivo: agenteForaDoRegistro
+      ? `AGENTE DESCONHECIDO "${c.agente_ativo}": nao esta em NENHUMA lista da regua (nem candidata, nem captacao, nem compra) e nem sequer no registro de agentes da casa. Isto nao e caso de negocio, e regua vencida - alguem pos um agente em producao sem contar ao funil. Revisar e o piso seguro, nao a resposta`
+      : "a regua nao decide: agente que atende os dois lados, ou suspeita levantada so pelo texto, sem tag e sem extrato. Precisa de olho humano",
   };
 }
 
