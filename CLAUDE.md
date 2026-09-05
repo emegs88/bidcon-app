@@ -279,6 +279,38 @@ bidcon.com.br devolveu a página anterior à fatia, servida de cache, e quase
 virou o relato de que o deploy não havia subido; o que desmentiu foi consultar
 a Vercel, fonte independente. Norma fixada por Emerson.)
 
+**Ferramenta da Regra 9 — RODAR UM ARQUIVO DE TESTE SÓ.** A falsificação da
+Regra 9 pede rodar a suíte várias vezes seguidas (muta, roda, restaura, roda).
+A 17 s por rodada isso custa caro o bastante para a pessoa pular a prova — e a
+prova pulada é o defeito que a Regra 9 existe para pegar.
+
+`scripts/testes.mjs` **não tem filtro, e não é esquecimento: é construção.** Ele
+monta a lista de `DIRS.flatMap(achar)` e **nunca lê `argv`** — o próprio
+cabeçalho do arquivo explica por quê (Node ≥22 expande glob no argumento, o Node
+20 do CI trata como caminho literal; e diretório passado ao Node 20 dá `pass 0`
+com exit 0, que é um CI verde que não roda nada). Não tente passar arquivo para
+ele: o argumento é ignorado em silêncio e você mede a casa inteira achando que
+mediu um arquivo.
+
+A saída é chamar o mesmo tsx que o runner invoca, direto:
+
+```bash
+node node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.test.json --test lib/funil/gatilho.test.ts
+```
+
+Medido em 04/09/2026, de dentro de `platform/`: **169 ms** para um arquivo
+contra **~17 s** da casa. Duas regras de uso, as duas por Regra 9:
+
+- **A mutação tem de reprovar UM teste e dizer QUAL.** "Falhou" não basta; a
+  saída precisa nomear o teste. Reprovar tudo é régua quebrada, não prova.
+- **O arquivo só vale o veredito do arquivo.** Antes de commitar, a casa inteira
+  roda de novo — arquivo verde e casa vermelha é exatamente o que este atalho
+  esconde. Restaure o mutante e confira o `shasum` antes.
+
+(Origem: 04/09/2026, FUNIL-01 F3.3d. Procurar o filtro foi ordem da coordenação;
+o achado foi que ele **não existe por decisão**, e o registro fica aqui para que
+ninguém procure de novo.)
+
 **Regra 10 — MIGRATION SE ENSAIA ANTES DE APLICAR.** Ler o arquivo não encontra
 o que executar encontra. Antes de qualquer apply, o DDL inteiro roda contra o
 banco-alvo assim:
