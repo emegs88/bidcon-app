@@ -23,7 +23,17 @@ O relatório original **não imprimia o próprio contexto** — não havia `curr
 
 A âncora também **não está no fio da navalha**, e isso importa: a 104ª conversa nasceu em `2026-09-02 22:10:49Z` e a 105ª só em `2026-09-03 12:03:29Z`. A âncora cai no meio de uma janela vazia de quase catorze horas. Qualquer instante dentro dela dá o mesmo resultado — o número 104 não depende de acertar o segundo.
 
-**Uma data redonda não serviria.** `criado_em < '2026-09-03'` cortaria fora conversas do próprio dia 3 que já estavam nas 104. Régua torta dá número certo por acaso.
+### O critério, escrito para valer da próxima vez
+
+**Uma âncora reconstruída só vale quando cai numa janela sem evento.**
+
+Não é a data que a torna honesta. A data do commit é uma aproximação: o `git` marca quando alguém escreveu o arquivo, não quando a consulta leu o banco — entre um e outro passam minutos que ninguém registrou. Se a 105ª conversa tivesse nascido dois minutos depois da 104ª, a reconstrução seria um chute com cara de precisão, e o `104` sairia certo ou errado por sorte.
+
+O que a sustenta é a **janela vazia**, medida em três tabelas ao mesmo tempo: qualquer instante dentro dela devolve o mesmo número, então errar o segundo não muda nada. Se a janela for estreita, a âncora reconstruída **não serve** e a lista precisa ser remedida, não remendada.
+
+Daqui para a frente ninguém deveria precisar disto: a linha `(contexto)` no relatório imprime `current_database()` e `now()`, e a próxima lista já nasce com a âncora dentro dela. Este critério fica para quando alguém tiver de reconstruir a âncora de um artefato velho — e para que saiba quando **não** pode.
+
+**Uma data redonda também não serviria.** `criado_em < '2026-09-03'` cortaria fora conversas do próprio dia 3 que já estavam nas 104. Régua torta dá número certo por acaso.
 
 ---
 

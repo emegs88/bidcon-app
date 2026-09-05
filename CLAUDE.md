@@ -174,6 +174,44 @@ Draft que espera gate nasce SEM número; recebe o próximo livre no momento
 de aplicar. Dois drafts esperando: o primeiro autorizado leva o número
 menor. Nunca renomear por antecipação.
 
+**Regra 5b — LISTA NOMINAL CARREGA ÂNCORA. Aprovação por contagem envelhece
+sozinha, porque o banco anda enquanto a fatia é construída.** Mesma lição da
+Regra 5, um andar acima: o banco é a verdade, o arquivo é a foto, e a foto tem
+data.
+
+Toda lista nominal levada a um humano **declara o instante em que foi medida** —
+e o relatório imprime esse instante junto com o `current_database()`, na
+primeira linha da saída (Regra 7). Sem isso a âncora tem de ser reconstruída
+depois, do `git` ou do palpite.
+
+A palavra do dono **não se aplica ao número**; aplica-se ao **relatório do
+ensaio**, que imprime o **diff desde a âncora**, linha a linha. Duas rodadas,
+sempre:
+
+- **Rodada ancorada** — morde só quem existia até a âncora. Tem de reproduzir a
+  contagem aprovada EXATA. É sobre este relatório que a palavra é reconfirmada.
+- **Rodada de varredura** — sem âncora e sem bloco nominal. Pura régua, tratando
+  o que chegou depois exatamente como o gatilho ao vivo trataria. As linhas
+  novas vão NOMEADAS ao relatório, para o dono ver depois do fato.
+
+Se o diff mostrar **reclassificação** de linha já aprovada — e não só adição —,
+para e volta à coordenação ANTES de escrever: envelheceu a palavra de alguém, e
+ele decide **sobre a linha**, não sobre o número.
+
+Âncora reconstruída de artefato velho só vale se cair numa **janela sem
+evento**, medida em mais de uma tabela: se qualquer instante dentro da janela
+devolve o mesmo número, errar o segundo não muda nada. Janela estreita = remedir
+a lista, não remendar. Data redonda (`< '2026-09-03'`) é régua torta: dá número
+certo por acaso.
+
+(Origem: FUNIL-01 F3, 05/09 — lista de 104 conversas aprovada nominalmente em
+`706ef122`; dois dias depois o banco tinha 115 e as classes davam 15/2/3/11 em
+vez de 15/1/2/10. Quem pegou foi um controle cuja resposta ninguém sabia de
+cor — "total de conversas: deve ser 104", que veio 115. Controle que só confirma
+o esperado não é controle. Medida com âncora, a lista se reproduziu exata e a
+deriva era adição pura — mas isso só se soube porque foi MEDIDO, não porque
+parecia.)
+
 **Regra 6 (REGRA ZERO) — relato de execução sem a saída CRUA da ferramenta na
 mesma mensagem = NÃO ACONTECEU.** Vale pra todo ato de produção, não só
 migration: aplicar SQL, publicar, push, rodar script.
