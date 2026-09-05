@@ -127,7 +127,7 @@
 
 import { chaveTelefone, ehTelefoneDaCasa, normalizarTelefoneBR } from "../telefone";
 import { chaveOrigem, textoCurto } from "../captacao";
-import { TAG_CEDENTE } from "../farol/cedente";
+import { TAG_CEDENTE, TAG_COTA_CANCELADA } from "../farol/cedente";
 
 // ----------------------------------------------------------------------------
 // AS CONSTANTES DA RÉGUA. Todas espelham literais que hoje existem no SQL.
@@ -151,7 +151,7 @@ import { TAG_CEDENTE } from "../farol/cedente";
 // apenas a REEXPORTA, para que `ponte.test.ts` e os chamadores continuem
 // dizendo `from "./ponte"` sem saber de onde ela veio. Uma dona, vários
 // leitores.
-export { TAG_CEDENTE };
+export { TAG_CEDENTE, TAG_COTA_CANCELADA };
 
 /** Agentes cuja presença já torna a conversa CANDIDATA a ser lida.
  *  `caetano` capta; `tobias` atende os dois lados — por isso ele entra na
@@ -562,6 +562,7 @@ export function ehCandidata(c: ConversaMedida): boolean {
 export function decidir(c: ConversaMedida): Decisao {
   const chave = chaveTelefone(c.telefone);
   const temTag = c.tags.includes(TAG_CEDENTE);
+  const cotaCancelada = c.tags.includes(TAG_COTA_CANCELADA);
   const temExtrato = extratoValido(c.extrato);
 
   // ---- 1. Não é candidata: só apareceu porque divide a chave com uma. ------
@@ -614,6 +615,39 @@ export function decidir(c: ConversaMedida): Decisao {
       classe: "excluir",
       motivo:
         "telefone da casa: e a nossa propria linha conversando, nao um cedente",
+    };
+  }
+
+  // ---- 4b. COTA CANCELADA: a Bidcon não opera. ----------------------------
+  //
+  // "A Bidcon não compra cota cancelada" é palavra do Emerson, e a
+  // PENTE-MUDAS-01 já a executou uma vez — encerrou a `fc14bc83` em 29/08 com
+  // esse motivo. Só que o motivo ficou numa MENSAGEM de papel `sistema`, e
+  // régua não lê conversa. Medido em 05/09/2026: aquela conversa tem
+  // `tags: []`, `contemplada: null` e extrato com `confianca: 0,6`. Ela estava
+  // fora do funil porque 0,6 < 0,7 e porque ninguém a etiquetou — COINCIDÊNCIA,
+  // não regra. Um extrato novo com 0,71 a poria na mesa como negócio, calada.
+  //
+  // Por que ANTES do 5, do 6 e do 9: cancelada é fato sobre a COTA, e vence
+  // tudo o que vem depois. Uma conversa com as DUAS etiquetas (`cedente` e
+  // `cota_cancelada`) é cancelada, não cedente — ela quer vender, e a casa não
+  // compra. Sem este braço aqui em cima, a etiqueta `cedente` do braço 9 a
+  // mandaria para `inserir`.
+  //
+  // Por que DEPOIS do 2 e do 3: compliance vence tudo, e palavra de gente vence
+  // régua. Se alguém, olhando o caso, decidir nominalmente outra coisa, a
+  // palavra é que manda — é a mesma ordem de sempre.
+  //
+  // A ETIQUETA NÃO É DEDUZIDA DE TEXTO. Ninguém lê "cancelada" numa mensagem e
+  // marca: quem escreve é gente, ou a rotina de encerramento da
+  // COTA-CANCELADA-01, sobre fato apurado. O comentário da constante em
+  // `farol/cedente.ts` diz por quê — errar aqui não custa um lead, custa
+  // recusar um negócio que a casa faria.
+  if (cotaCancelada) {
+    return {
+      classe: "excluir",
+      motivo:
+        "cota cancelada - a Bidcon nao opera cota cancelada (palavra do Emerson). O estado esta na etiqueta, nao numa mensagem: e regua, nao coincidencia",
     };
   }
 

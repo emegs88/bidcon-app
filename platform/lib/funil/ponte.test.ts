@@ -39,6 +39,7 @@ import {
   numeroDoExtrato,
   reaisDoExtrato,
   TAG_CEDENTE,
+  TAG_COTA_CANCELADA,
   telefoneParaCaptacoes,
   type CaptacaoExistente,
   type ConversaMedida,
@@ -270,6 +271,92 @@ describe("FUNIL-01 ponte — as fixtures com nome", () => {
     // da casa virou "parecido com" e engoliria cedente de verdade.
     const d = decidir(conversa({ telefone: "5519997561900", tags: [TAG_CEDENTE] }));
     assert.equal(d.classe, "inserir", `veio ${d.classe}: ${d.motivo}`);
+  });
+
+  // ---- 4b. COTA CANCELADA ---------------------------------------------------
+  test("fc14bc83: etiqueta de cota cancelada -> excluir, por RÉGUA", () => {
+    // `agente_ativo: "caetano"` não é enfeite — é a forma MEDIDA da `fc14bc83`
+    // em 05/09/2026 (`tags: []`, extrato com confiança 0,6, agente caetano).
+    //
+    // E foi o teste que me corrigiu: escrito sem o agente, ele deu
+    // `(mesma chave)`, porque `cota_cancelada` SOZINHA não torna ninguém
+    // candidata. Isso está certo e vale dito: a etiqueta é freio, nunca
+    // acelerador. Ela não puxa conversa nenhuma para dentro da régua — só
+    // decide o destino de quem já entrou por outro motivo.
+    const d = decidir(conversa({ tags: [TAG_COTA_CANCELADA], agente_ativo: "caetano" }));
+    assert.equal(d.classe, "excluir", `veio ${d.classe}: ${d.motivo}`);
+    assert.match(d.motivo, /cota cancelada/);
+  });
+
+  test("A etiqueta é FREIO, não acelerador: sozinha não torna candidata", () => {
+    // O par do teste acima. Sem agente, sem tag `cedente` e sem extrato, a
+    // conversa não é candidata — e continua não sendo depois do 4b. Se um dia
+    // alguém puser `cota_cancelada` em `ehCandidata`, esta linha acende.
+    const d = decidir(conversa({ tags: [TAG_COTA_CANCELADA] }));
+    assert.equal(d.classe, "(mesma chave)", `veio ${d.classe}: ${d.motivo}`);
+  });
+
+  test("A ORDEM: com as DUAS etiquetas, cancelada vence cedente", () => {
+    // Este é o teste que a coordenação pediu, e é o único que prova a POSIÇÃO
+    // do braço. `cedente` sozinho manda para `inserir` (braço 9). Se o 4b
+    // estivesse embaixo do 9, esta conversa viraria captação — alguém ligaria
+    // para oferecer um negócio que a casa não faz.
+    const so_cedente = decidir(conversa({ tags: [TAG_CEDENTE] }));
+    assert.equal(so_cedente.classe, "inserir", "controle: cedente sozinho INSERE");
+
+    const as_duas = decidir(conversa({ tags: [TAG_CEDENTE, TAG_COTA_CANCELADA] }));
+    assert.equal(as_duas.classe, "excluir", `veio ${as_duas.classe}: ${as_duas.motivo}`);
+    assert.match(as_duas.motivo, /cota cancelada/);
+
+    // E a ordem das etiquetas no array não pode importar: `tags` é conjunto,
+    // não sequência. Se importasse, a decisão dependeria de quem etiquetou
+    // primeiro — que é o tipo de defeito que só aparece meses depois.
+    const invertida = decidir(conversa({ tags: [TAG_COTA_CANCELADA, TAG_CEDENTE] }));
+    assert.deepEqual(invertida, as_duas, "a ordem das etiquetas nao pode decidir nada");
+  });
+
+  test("A ORDEM: extrato cheio e contemplada NÃO salvam a cota cancelada", () => {
+    // O caso que vai acontecer de verdade: a cliente manda o extrato, ele sai
+    // com confiança alta e contemplada `true`. Sem o 4b em cima, isso é
+    // `inserir` na hora. A etiqueta é o que segura.
+    const d = decidir(
+      conversa({
+        tags: [TAG_CEDENTE, TAG_COTA_CANCELADA],
+        extrato: extrato({ ...DADOS_CHEIOS, confianca: 0.98, contemplada: true }),
+      })
+    );
+    assert.equal(d.classe, "excluir", `veio ${d.classe}: ${d.motivo}`);
+    assert.match(d.motivo, /cota cancelada/);
+  });
+
+  test("A ORDEM: compliance e palavra de gente continuam acima do 4b", () => {
+    // O 4b entrou DEPOIS do 2 e do 3, e isso tem de continuar verdade: quem
+    // pediu para não receber não vira card por outro motivo, e a palavra de
+    // gente continua vencendo a régua.
+    const optout = decidir(
+      conversa({ tags: [TAG_CEDENTE, TAG_COTA_CANCELADA], opt_out: true })
+    );
+    assert.match(optout.motivo, /opt_out/, `veio: ${optout.motivo}`);
+
+    const motivo = "palavra de teste: esta segue mesmo cancelada";
+    const nominal = decidir(
+      conversa({
+        tags: [TAG_COTA_CANCELADA],
+        nominal: { classe: "revisar", motivo, quem: "coordenacao" },
+      })
+    );
+    assert.equal(nominal.classe, "revisar", `veio ${nominal.classe}: ${nominal.motivo}`);
+    assert.equal(nominal.motivo, motivo, "o motivo tem de ser o DELE, nao o da regua");
+  });
+
+  test("ISCA: a etiqueta é a constante, não a palavra solta", () => {
+    // Se alguém trocar a comparação por `includes("cancelada")` ou por qualquer
+    // casamento parcial, estas três passam a excluir — e conversa nenhuma
+    // deveria sair do funil por causa de uma etiqueta que não existe.
+    for (const t of ["cancelada", "cota-cancelada", "COTA_CANCELADA"]) {
+      const d = decidir(conversa({ tags: [TAG_CEDENTE, t] }));
+      assert.equal(d.classe, "inserir", `"${t}" nao pode valer por cota_cancelada`);
+    }
   });
 
   // --------------------------------------------------------------------------

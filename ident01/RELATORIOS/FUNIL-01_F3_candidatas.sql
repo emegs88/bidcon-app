@@ -7,6 +7,38 @@
 -- nem create. Se algum dia esta consulta precisar escrever, ela deixa de morar
 -- aqui e vira outra coisa, com outro nome e outro gate.
 --
+-- -----------------------------------------------------------------------------
+-- A ANCORA, E POR QUE ESTE ARQUIVO E O .md AO LADO CONTAM COISAS DIFERENTES
+-- -----------------------------------------------------------------------------
+-- ANCORA = 2026-09-03T01:51:12Z, a data do commit 706ef122, que gravou o .md
+-- aprovado. Esta consulta NAO e ancorada: ela e regua viva e conta o banco de
+-- HOJE. O .md e uma foto, e foto tem data. Os dois nao se contradizem - contam
+-- coisas diferentes, e aqui esta escrito qual e qual:
+--
+--   com ancora (criado_em < 2026-09-03T01:51:12Z) -> 15 inserir / 1 ligar /
+--       2 revisar / 10 excluir / 3 duplicados. E a lista do .md, e ela se
+--       reproduz exatamente. Medido em 05/09/2026.
+--   sem ancora (o banco de hoje, 05/09/2026 14:09Z) -> 15 / 2 / 3 / 11 / 3.
+--       A diferenca e TODA por adicao: tres conversas novas (0b1efc86 ligar,
+--       57bae87d revisar, dc20bb1e excluir). NENHUMA linha aprovada mudou de
+--       classe. O detalhe esta em FUNIL-01_F3_candidatas_deriva.md.
+--
+-- A ancora foi RECONSTRUIDA, e isso e uma falha desta consulta admitida por
+-- escrito: a versao de 706ef122 nao imprimia o proprio contexto - sem
+-- `current_database()`, sem `now()`. Furo de Regra 7 no artefato. Esta versao
+-- imprime (bloco `(contexto)` na uniao la embaixo), para que a proxima ancora
+-- seja LIDA e nao deduzida.
+-- A reconstrucao bate em TRES tabelas independentes: ate a ancora ha 104
+-- conversas, 34 extratos e 2 captacoes - os tres numeros do .md. E ela nao esta
+-- no fio da navalha: a 104a conversa nasceu 2026-09-02T22:10:49Z e a 105a so
+-- 2026-09-03T12:03:29Z, uma janela vazia de quase catorze horas.
+-- Data redonda NAO serviria: `criado_em < '2026-09-03'` cortaria conversas do
+-- proprio dia 3 que ja estavam nas 104. Regua torta acerta por acaso.
+--
+-- QUEM ANCORA E O BACKFILL, NAO ESTA CONSULTA. A rodada 1 da F3.4 leva a ancora
+-- no `where` e morde so as 104; a rodada 2 e varredura, sem ancora, tratando as
+-- novas como o gatilho ao vivo trataria.
+--
 -- O QUE ELA RESPONDE. Quais das 104 conversas de WhatsApp sao cedentes que
 -- deviam existir como linha em `captacoes`, quais ja existem, quais nao sao
 -- cedente nenhum, e quais a regua NAO consegue decidir. A saida vai para o
@@ -97,6 +129,41 @@
 -- `conversas com opt_out em TODO o banco`, que esta na uniao la embaixo - o
 -- unico dos dez cujo resultado eu nao sabia prever antes de rodar. Um controle
 -- que so confirma o que voce ja espera nao e controle.
+--
+-- -----------------------------------------------------------------------------
+-- COTA CANCELADA: A REGRA QUE FALTAVA, E ONDE ELA ENTRA
+-- -----------------------------------------------------------------------------
+-- "A Bidcon nao compra cota cancelada" e palavra do Emerson, e a PENTE-MUDAS-01
+-- ja a executou uma vez - encerrou a `fc14bc83` em 29/08 por esse motivo. So que
+-- o motivo ficou escrito em PROSA, numa mensagem de papel `sistema`, e regua nao
+-- le conversa. Medido em 05/09/2026, aquela conversa tem `tags {}`,
+-- `contemplada null` e extrato com `confianca 0,6`. Ela estava fora do funil
+-- porque 0,6 < 0,7 e porque ninguem a etiquetou - COINCIDENCIA, nao regra. Um
+-- extrato novo com 0,71 a poria na mesa como negocio, calada.
+--
+-- Agora existe braco: `s.cota_cancelada`, espelho exato do braco 4b de
+-- `decidir()` em platform/lib/funil/ponte.ts, na MESMA posicao.
+--
+-- A POSICAO E ESCOLHA, e vale escrita:
+--   - DEPOIS de opt_out e das decisoes nominais - compliance vence tudo, e
+--     palavra de gente vence regua;
+--   - ANTES de contemplada, do agente de compra e da etiqueta `cedente`.
+--     Cancelada e fato sobre a COTA e vence o que vem depois. Uma conversa com
+--     as DUAS etiquetas (`cedente` e `cota_cancelada`) e cancelada, nao cedente:
+--     ela quer vender, e a casa nao compra. Sem o braco aqui em cima, a etiqueta
+--     `cedente` a mandaria para `inserir`.
+--
+-- A ETIQUETA NAO E DEDUZIDA DE TEXTO, e isso e o ponto todo. Quem a escreve e
+-- gente, ou a rotina de encerramento da COTA-CANCELADA-01, sobre fato apurado -
+-- nunca o casamento de palavra-chave. Errar aqui nao custa um lead: custa dizer
+-- que a casa nao opera um negocio que ela opera.
+--
+-- HOJE O BRACO E INERTE, e esta medido: ZERO conversas tem a etiqueta
+-- `cota_cancelada` (controle positivo na mesma medicao: 10 tem `cedente`, entao
+-- a leitura de tags funciona). Nenhuma linha muda de classe por causa dele. Por
+-- isso as contagens seguem 15 / 1 / 2 / 10, e por isso a decisao nominal da
+-- `fc14bc83` CONTINUA no bloco `palavra_do_emerson` - ver a nota la, e a isca
+-- que a aposenta no fim do relatorio.
 --
 -- -----------------------------------------------------------------------------
 -- O EXTRATO ESCOLHIDO
@@ -233,7 +300,19 @@ palavra_do_emerson(id8, classe, motivo) as (
     ('3e98b925', 'inserir', 'palavra do Emerson 02/09/2026: inserir, e o topo da fila - documentos do contrato entregues em 20/08 e sem resposta desde entao'),
     ('cda21b11', 'excluir', 'palavra do Emerson 02/09/2026: e corretor, nao cedente - vai para o funil de parceria, que ainda nao existe'),
     ('b3372777', 'excluir', 'palavra do Emerson 02/09/2026: cota nao contemplada nao e captacao - candidata a um funil proprio'),
-    ('fc14bc83', 'excluir', 'palavra do Emerson 02/09/2026: cota cancelada'),
+    -- ESTA LINHA E PROVISORIA, E O QUE A APOSENTA JA ESTA ESCRITO ABAIXO.
+    -- A regra existe agora: o braco `s.cota_cancelada` (espelho do braco 4b de
+    -- `decidir()` em platform/lib/funil/ponte.ts). Medido em 05/09/2026, porem,
+    -- NENHUMA conversa no banco tem a etiqueta `cota_cancelada` - zero linhas -,
+    -- e esta em particular tem `tags {}` e `agente_ativo caetano`. Apagar a linha
+    -- HOJE nao promoveria a conversa de "excluir (nominal)" para "excluir
+    -- (regra)": ela cairia ate o braco do agente de captacao e viraria INSERIR.
+    -- A casa poria uma cota cancelada na mesa como negocio, calada - exatamente
+    -- o defeito que o braco 4b foi escrito para fechar.
+    -- A linha morre quando a etiqueta nascer (terceira escrita nominal da F3.4).
+    -- Nao e memoria de ninguem: o controle "ISCA DA LINHA VENCIDA" no fim deste
+    -- relatorio conta quem tem a etiqueta e manda apagar quando passar de 0.
+    ('fc14bc83', 'excluir', 'palavra do Emerson 02/09/2026: cota cancelada. Motivo PROVISORIO - a regra ja existe (braco cota_cancelada), falta a etiqueta na linha; quando ela nascer, esta decisao nominal sai e a classe passa a vir da regua'),
     ('ee6271c4', 'excluir', 'palavra do Emerson 03/09/2026: negocio nao fechou. A captacao 6d4f46ea (Tamires, site) recebe status perdida como excecao nominal no backfill da F3.4; esta conversa nao vira captacao nem liga em nada')
 ),
 
@@ -288,6 +367,9 @@ base as (
     coalesce(c.opt_out, false)                               as opt_out,
     substr(c.id::text, 1, 8) as id8,
     ('cedente' = any(c.tags))                                as tem_tag,
+    -- Espelho de `TAG_COTA_CANCELADA` em platform/lib/farol/cedente.ts. Estado da
+    -- COTA, nao da pessoa: a Bidcon nao opera cota cancelada (palavra do Emerson).
+    ('cota_cancelada' = any(c.tags))                         as cota_cancelada,
     (c.chave is not null and c.chave in (select chave from chave_casa)) as eh_casa,
     (x.conversa_id is not null)                              as tem_extrato,
     x.confianca                                              as ext_confianca,
@@ -360,6 +442,7 @@ classificada as (
       when s.opt_out                                         then 'excluir'
       when s.classe_forcada is not null                      then s.classe_forcada
       when s.eh_casa                                         then 'excluir'
+      when s.cota_cancelada                                  then 'excluir'
       when s.ext_contemplada is false                        then 'excluir'
       when s.agente_ativo in ('valentina','serena','bento','aurora')
            and not s.tem_tag and not s.tem_extrato           then 'excluir'
@@ -373,6 +456,7 @@ classificada as (
       when s.opt_out                                         then 'PEDIU PARA NAO RECEBER (opt_out): uma captacao viraria card com proxima acao e alguem ligaria. Compliance vence regra e vence palavra'
       when s.classe_forcada is not null                      then s.motivo_forcado
       when s.eh_casa                                         then 'telefone da casa: e a nossa propria linha conversando, nao um cedente'
+      when s.cota_cancelada                                  then 'cota cancelada - a Bidcon nao opera cota cancelada (palavra do Emerson). O estado esta na etiqueta, nao numa mensagem: e regua, nao coincidencia'
       when s.ext_contemplada is false                        then 'o extrato escolhido diz que a cota NAO esta contemplada - nao e captacao; candidata a um funil proprio'
       when s.agente_ativo in ('valentina','serena','bento','aurora')
            and not s.tem_tag and not s.tem_extrato           then 'agente de compra, sem tag de cedente e sem extrato valido: e comprador, nao vendedor'
@@ -426,20 +510,40 @@ tudo as (
     c.motivo
   from classificada c
 
+  -- A LINHA QUE FALTAVA. Sem ela, a ancora da proxima lista tera de ser
+  -- reconstruida como esta foi. Regra 7: medicao que nao prova o proprio
+  -- contexto nao conta.
   union all
-  select '(controle)', '-', '-', 'total de conversas no banco', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'deve ser 104'
+  select '(contexto)', '-', '-', 'banco e instante desta leitura',
+         current_database() || ' @ ' || now()::text,
+         '-', '-', '-', '-', '-', '-', '-', '-',
+         'ANOTE ESTE INSTANTE: ele e a ancora da lista que sair desta rodada'
+  union all
+  select '(controle)', '-', '-', 'conversas ATE A ANCORA 2026-09-03T01:51:12Z', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'tem de ser 104 - e a foto do .md aprovado. Se mudar, alguem apagou ou reescreveu conversa antiga'
+  from wa_conversas where criado_em < timestamptz '2026-09-03 01:51:12+00'
+  union all
+  select '(controle)', '-', '-', 'conversas DEPOIS da ancora', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'a deriva. Nao entram na rodada 1 do backfill; entram na varredura. Ver FUNIL-01_F3_candidatas_deriva.md'
+  from wa_conversas where criado_em >= timestamptz '2026-09-03 01:51:12+00'
+  union all
+  select '(controle)', '-', '-', 'total de conversas no banco', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'CRESCE POR DESENHO - era 104 na ancora, 115 em 05/09. Quem carrega a expectativa fixa e a linha da ANCORA acima; esta aqui so mostra o tamanho de hoje. A nota antiga dizia "deve ser 104" e foi ela que pegou a deriva - cumpriu o papel e agora seria alarme perpetuo'
   from wa_conversas
   union all
   select '(controle)', '-', '-', 'conversas sem chave utilizavel', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'IGSID do instagram e numeros estrangeiros'
   from conv where chave is null
   union all
-  select '(controle)', '-', '-', 'extratos brutos', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'deve ser 34'
+  select '(controle)', '-', '-', 'extratos brutos ATE A ANCORA 2026-09-03T01:51:12Z', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'tem de ser 34 - a ancora nao segura so conversas: extrato novo em conversa VELHA mudaria a classe dela sem conversa nova nenhuma. Se este numero mudar, foi reescrita de linha antiga'
+  from extratos_cotas where criado_em < timestamptz '2026-09-03 01:51:12+00'
+  union all
+  select '(controle)', '-', '-', 'extratos brutos hoje', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'CRESCE POR DESENHO - era 34 na ancora, 36 em 05/09. A expectativa fixa mora na linha de cima'
   from extratos_cotas
   union all
   select '(controle)', '-', '-', 'extratos que passam no limiar 0.7', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'o resto e lixo de leitura'
   from ext_valido
   union all
-  select '(controle)', '-', '-', 'captacoes existentes', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'deve ser 2, ambas origem site'
+  select '(controle)', '-', '-', 'captacoes ATE A ANCORA 2026-09-03T01:51:12Z', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'tem de ser 2, ambas origem site. Captacao nova numa conversa VELHA a moveria de inserir para ligar - e a hipotese que a coordenacao levantou. Medida em 05/09: falsa, a captacao nova (15e35e30) e de conversa nova'
+  from captacoes where criado_em < timestamptz '2026-09-03 01:51:12+00'
+  union all
+  select '(controle)', '-', '-', 'captacoes hoje', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'CRESCE POR DESENHO - era 2 na ancora, 3 em 05/09, todas origem site. A expectativa fixa mora na linha de cima'
   from captacoes
   union all
   select '(controle)', '-', '-', 'conversas com opt_out em TODO o banco', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'se este numero crescer, a regra de compliance passa a morder mais linhas'
@@ -456,13 +560,22 @@ tudo as (
   from (select id8 from palavra_do_emerson union all select id8 from decisao_da_coordenacao) n
   where not exists (select 1 from wa_conversas w where substr(w.id::text, 1, 8) = n.id8)
   union all
+  select '(controle)', '-', '-', 'ISCA DA LINHA VENCIDA: conversas com etiqueta cota_cancelada', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'era 0 em 05/09/2026, e por isso a decisao nominal da fc14bc83 continua no bloco palavra_do_emerson. QUANDO PASSAR DE 0: apague aquela linha - a regua ja decide, e mante-la faria a decisao nominal esconder a regra que a substituiu'
+  from wa_conversas where 'cota_cancelada' = any(tags)
+  union all
+  select '(controle)', '-', '-', 'CONTROLE POSITIVO da isca acima: conversas com etiqueta cedente', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'era 10 em 05/09/2026 - se ISTO vier 0, a leitura de tags esta quebrada e o 0 da linha de cima nao quer dizer nada'
+  from wa_conversas where 'cedente' = any(tags)
+  union all
   select '(controle)', '-', '-', 'CONTROLE POSITIVO: telefones da casa achados', count(*)::text, '-', '-', '-', '-', '-', '-', '-', '-', 'deve ser 2 - se for 0, a chave da casa nao esta batendo com nada'
   from conv where chave in (select chave from chave_casa)
 )
 
 select * from tudo
 order by
-  case bloco when 'candidata' then 0 else 9 end,
+  -- O contexto vem PRIMEIRO de proposito: quem le a saida tem de saber em que
+  -- banco e em que instante ela foi medida ANTES de ler qualquer numero. Foi a
+  -- falta disto que obrigou a reconstruir a ancora do .md aprovado pelo git.
+  case bloco when '(contexto)' then 0 when 'candidata' then 1 else 9 end,
   case classe
     when 'inserir' then 1 when 'ligar' then 2 when 'revisar' then 3
     when 'excluir' then 4 when '(mesma chave)' then 5 else 8 end,

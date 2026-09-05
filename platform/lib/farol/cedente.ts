@@ -40,6 +40,32 @@ export const DETECTOR_CEDENTE_DESDE = "2026-08-09";
 export const TAG_CEDENTE = "cedente";
 
 /**
+ * O ESTADO DA COTA, ONDE A RÉGUA LÊ.
+ *
+ * "A Bidcon não compra cota cancelada" é palavra do Emerson, e a PENTE-MUDAS-01
+ * já a executou — encerrou a `fc14bc83` por esse motivo em 29/08. Só que o
+ * motivo ficou escrito em PROSA: uma mensagem de papel `sistema`. Medido em
+ * 05/09/2026, a conversa tem `tags: []`, `contemplada: null` e `confianca: 0,6`
+ * — nenhuma coluna sabe que a cota está cancelada. Ela ficou fora do funil
+ * porque 0,6 < 0,7 e porque ninguém a etiquetou: COINCIDÊNCIA, não regra. Um
+ * extrato novo com 0,71 a poria na mesa como negócio, calada.
+ *
+ * Etiqueta é COLUNA; mensagem é texto. A régua lê `wa_conversas.tags` e não lê
+ * conversa. Por isso o estado vira etiqueta.
+ *
+ * ESTA ETIQUETA NÃO SAI DE `etiquetasDaMensagem`, E ISSO É DE PROPÓSITO. O
+ * detector deste arquivo é casamento de palavra-chave sobre o que o CLIENTE
+ * escreve; deduzir "cota cancelada" de texto seria repor o defeito uma camada
+ * acima — e errar aqui não custa um lead, custa dizer que a casa não opera um
+ * negócio que ela opera. Quem escreve esta etiqueta é gente, ou a rotina de
+ * encerramento da COTA-CANCELADA-01, sobre fato apurado. Nunca o regex.
+ *
+ * A forma `snake_case` sem acento não foi inventada: é o que o banco já usa
+ * (`negociacao_particular`, medido em 05/09/2026).
+ */
+export const TAG_COTA_CANCELADA = "cota_cancelada";
+
+/**
  * Tira acento e caixa. O cliente escreve "consórcio", "consorcio" e "CONSORCIO"
  * na mesma semana, e três grafias da mesma palavra não podem ser três regras.
  */
